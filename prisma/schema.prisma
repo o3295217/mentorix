@@ -85,6 +85,7 @@ model UserProfile {
   sports         String?  // Спорт
   location       String?  // Где живу
   age            Int?     // Возраст
+  customInterests String? // JSON строка с динамическими интересами	
   education      String?  // Образование
   teamSize       Int?     // Размер команды
   workExperience String?  // Опыт работы
