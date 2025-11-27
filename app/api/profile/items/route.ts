@@ -1,30 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// POST /api/profile/items - создать новый пункт в блоке
+// POST /api/profile/items - создать новый пункт в блоке или категории
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { blockId, content } = body
+    console.log('📥 POST /api/profile/items - body:', body)
+    const { blockId, categoryId, fieldName, fieldValue } = body
 
-    if (!blockId || !content || typeof content !== 'string' || content.trim() === '') {
-      return NextResponse.json({ error: 'Block ID and content are required' }, { status: 400 })
+    if ((!blockId && !categoryId) || !fieldName || !fieldValue) {
+      console.log('❌ Validation failed:', { blockId, categoryId, fieldName, fieldValue })
+      return NextResponse.json({ error: 'Block ID or Category ID, field name and field value are required' }, { status: 400 })
     }
 
-    // Получаем максимальный order для нового пункта в этом блоке
+    // Получаем максимальный order для нового пункта
+    const whereClause = categoryId
+      ? { categoryId: parseInt(categoryId) }
+      : { blockId: parseInt(blockId), categoryId: null }
+
     const maxOrder = await prisma.profileItem.aggregate({
-      where: { blockId: parseInt(blockId) },
+      where: whereClause,
       _max: { order: true },
     })
 
     const item = await prisma.profileItem.create({
       data: {
-        blockId: parseInt(blockId),
-        content: content.trim(),
+        blockId: blockId ? parseInt(blockId) : null,
+        categoryId: categoryId ? parseInt(categoryId) : null,
+        fieldName: fieldName.trim(),
+        fieldValue: fieldValue.trim(),
+        content: null, // Deprecated field for backward compatibility
         order: (maxOrder._max.order || 0) + 1,
       },
     })
 
+    console.log('✅ Item created:', item)
     return NextResponse.json(item)
   } catch (error) {
     console.error('Error creating profile item:', error)
@@ -57,15 +67,20 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, content } = body
+    const { id, fieldName, fieldValue, order } = body
 
-    if (!id || !content || typeof content !== 'string' || content.trim() === '') {
-      return NextResponse.json({ error: 'ID and content are required' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
+
+    const updateData: any = {}
+    if (fieldName !== undefined) updateData.fieldName = fieldName.trim()
+    if (fieldValue !== undefined) updateData.fieldValue = fieldValue.trim()
+    if (order !== undefined) updateData.order = parseInt(order)
 
     const item = await prisma.profileItem.update({
       where: { id: parseInt(id) },
-      data: { content: content.trim() },
+      data: updateData,
     })
 
     return NextResponse.json(item)

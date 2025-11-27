@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { getPeriodDates } from '@/lib/dates'
+import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 
 export default function DailyPage() {
   const router = useRouter()
@@ -151,12 +152,7 @@ export default function DailyPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Ежедневное планирование</h1>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="input w-auto"
-        />
+        <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
       </div>
 
       <p className="text-lg text-gray-600">

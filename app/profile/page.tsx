@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
+// Базовый профиль (статичные поля)
 interface ProfileData {
   name: string
   occupation: string
@@ -19,25 +20,34 @@ interface ProfileData {
   other: string
 }
 
+// Динамические структуры
 interface ProfileItem {
   id: number
-  blockId: number
-  content: string
+  blockId: number | null
+  categoryId: number | null
+  fieldName: string
+  fieldValue: string
   order: number
-  createdAt: string
-  updatedAt: string
+}
+
+interface ProfileCategory {
+  id: number
+  blockId: number
+  title: string
+  order: number
+  items: ProfileItem[]
 }
 
 interface ProfileBlock {
   id: number
   title: string
   order: number
-  items: ProfileItem[]
-  createdAt: string
-  updatedAt: string
+  categories: ProfileCategory[]
+  items: ProfileItem[] // Items без категории
 }
 
 export default function ProfilePage() {
+  // Базовый профиль
   const [profile, setProfile] = useState<ProfileData>({
     name: '',
     occupation: '',
@@ -54,12 +64,12 @@ export default function ProfilePage() {
     challenges: '',
     other: '',
   })
+  const [saving, setSaving] = useState(false)
+
+  // Динамические блоки
   const [blocks, setBlocks] = useState<ProfileBlock[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [newBlockTitle, setNewBlockTitle] = useState('')
-  const [newItemContent, setNewItemContent] = useState<{ [blockId: number]: string }>({})
 
   useEffect(() => {
     loadProfile()
@@ -99,85 +109,15 @@ export default function ProfilePage() {
     try {
       const res = await fetch('/api/profile/blocks')
       const data = await res.json()
-      setBlocks(data || [])
+      // Ensure all blocks have categories and items arrays
+      const normalizedBlocks = (data || []).map((block: any) => ({
+        ...block,
+        categories: block.categories || [],
+        items: block.items || [],
+      }))
+      setBlocks(normalizedBlocks)
     } catch (error) {
       console.error('Error loading blocks:', error)
-    }
-  }
-
-  const addBlock = async () => {
-    if (!newBlockTitle.trim()) return
-
-    try {
-      const res = await fetch('/api/profile/blocks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newBlockTitle }),
-      })
-      const newBlock = await res.json()
-      setBlocks([...blocks, newBlock])
-      setNewBlockTitle('')
-      setMessage('✅ Блок добавлен')
-      setTimeout(() => setMessage(''), 2000)
-    } catch (error) {
-      console.error('Error adding block:', error)
-      setMessage('❌ Ошибка при добавлении блока')
-    }
-  }
-
-  const deleteBlock = async (blockId: number) => {
-    if (!confirm('Удалить этот блок и все его пункты?')) return
-
-    try {
-      await fetch(`/api/profile/blocks?id=${blockId}`, { method: 'DELETE' })
-      setBlocks(blocks.filter((b) => b.id !== blockId))
-      setMessage('✅ Блок удален')
-      setTimeout(() => setMessage(''), 2000)
-    } catch (error) {
-      console.error('Error deleting block:', error)
-      setMessage('❌ Ошибка при удалении блока')
-    }
-  }
-
-  const addItem = async (blockId: number) => {
-    const content = newItemContent[blockId]
-    if (!content?.trim()) return
-
-    try {
-      const res = await fetch('/api/profile/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blockId, content }),
-      })
-      const newItem = await res.json()
-
-      setBlocks(
-        blocks.map((block) =>
-          block.id === blockId ? { ...block, items: [...block.items, newItem] } : block
-        )
-      )
-      setNewItemContent({ ...newItemContent, [blockId]: '' })
-      setMessage('✅ Пункт добавлен')
-      setTimeout(() => setMessage(''), 2000)
-    } catch (error) {
-      console.error('Error adding item:', error)
-      setMessage('❌ Ошибка при добавлении пункта')
-    }
-  }
-
-  const deleteItem = async (blockId: number, itemId: number) => {
-    try {
-      await fetch(`/api/profile/items?id=${itemId}`, { method: 'DELETE' })
-      setBlocks(
-        blocks.map((block) =>
-          block.id === blockId ? { ...block, items: block.items.filter((i) => i.id !== itemId) } : block
-        )
-      )
-      setMessage('✅ Пункт удален')
-      setTimeout(() => setMessage(''), 2000)
-    } catch (error) {
-      console.error('Error deleting item:', error)
-      setMessage('❌ Ошибка при удалении пункта')
     }
   }
 
@@ -202,38 +142,63 @@ export default function ProfilePage() {
         body: JSON.stringify(payload),
       })
 
-      setMessage('✅ Профиль сохранен успешно!')
-      setTimeout(() => setMessage(''), 3000)
+      showMessage('✅ Базовый профиль сохранён!')
     } catch (error) {
       console.error('Error saving profile:', error)
-      setMessage('❌ Ошибка при сохранении')
+      showMessage('❌ Ошибка при сохранении')
     } finally {
       setSaving(false)
     }
   }
 
+  const showMessage = (text: string) => {
+    setMessage(text)
+    setTimeout(() => setMessage(''), 3000)
+  }
+
+  // === ПОЛЯ ===
+
+  const updateFieldValue = async (itemId: number, fieldValue: string) => {
+    try {
+      await fetch('/api/profile/items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: itemId,
+          fieldValue: fieldValue.trim(),
+        }),
+      })
+    } catch (error) {
+      console.error('Error updating field value:', error)
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Загрузка...</div>
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <p>Загрузка...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Мой профиль</h1>
-        <p className="text-gray-600 mt-2">
-          Заполните информацию о себе, чтобы ИИ лучше понимал вашу личность и давал персонализированные рекомендации
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="card">
+          <h1 className="text-3xl font-bold mb-2">Профиль пользователя</h1>
+          <p className="text-gray-600">
+            Ваш профиль используется ИИ-коучем для персонализированных рекомендаций и оценок
+          </p>
+        </div>
 
-      <div className="card">
-        <div className="space-y-6">
-          {/* Основная информация */}
+        {/* ===== БАЗОВЫЙ ПРОФИЛЬ ===== */}
+        <div className="card">
+          <h2 className="text-2xl font-bold mb-6">Базовая информация</h2>
+
+          {/* Личное */}
           <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">Основная информация</h2>
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">Личное</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
                 <span className="text-gray-700 font-medium mb-2 block">Имя</span>
@@ -275,7 +240,7 @@ export default function ProfilePage() {
                   value={profile.maritalStatus}
                   onChange={(e) => handleChange('maritalStatus', e.target.value)}
                   className="input"
-                  placeholder="Например: женат/замужем, холост/не замужем, есть дети"
+                  placeholder="Например: женат/замужем, есть дети"
                 />
               </label>
             </div>
@@ -283,9 +248,9 @@ export default function ProfilePage() {
 
           {/* Профессиональная информация */}
           <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">
-              Профессиональная деятельность
-            </h2>
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 pt-4 border-t border-gray-100">
+              Профессиональное
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
                 <span className="text-gray-700 font-medium mb-2 block">Должность</span>
@@ -294,7 +259,7 @@ export default function ProfilePage() {
                   value={profile.occupation}
                   onChange={(e) => handleChange('occupation', e.target.value)}
                   className="input"
-                  placeholder="Например: Генеральный директор, руководитель отдела"
+                  placeholder="Например: CEO, руководитель отдела"
                 />
               </label>
 
@@ -316,7 +281,7 @@ export default function ProfilePage() {
                   value={profile.teamSize}
                   onChange={(e) => handleChange('teamSize', e.target.value)}
                   className="input"
-                  placeholder="Количество человек в команде"
+                  placeholder="Количество человек"
                 />
               </label>
 
@@ -338,7 +303,7 @@ export default function ProfilePage() {
                 value={profile.workExperience}
                 onChange={(e) => handleChange('workExperience', e.target.value)}
                 className="textarea"
-                placeholder="Кратко опишите ваш профессиональный путь и ключевые достижения"
+                placeholder="Кратко опишите ваш профессиональный путь"
                 rows={3}
               />
             </label>
@@ -346,7 +311,9 @@ export default function ProfilePage() {
 
           {/* Личные интересы */}
           <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">Личные интересы</h2>
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 pt-4 border-t border-gray-100">
+              Интересы
+            </h3>
             <div className="space-y-4">
               <label className="block">
                 <span className="text-gray-700 font-medium mb-2 block">Хобби</span>
@@ -355,7 +322,7 @@ export default function ProfilePage() {
                   value={profile.hobbies}
                   onChange={(e) => handleChange('hobbies', e.target.value)}
                   className="input"
-                  placeholder="Например: чтение, музыка, путешествия, фотография"
+                  placeholder="Например: чтение, путешествия"
                 />
               </label>
 
@@ -366,7 +333,7 @@ export default function ProfilePage() {
                   value={profile.sports}
                   onChange={(e) => handleChange('sports', e.target.value)}
                   className="input"
-                  placeholder="Например: бег, плавание, йога, футбол"
+                  placeholder="Например: бег, йога, плавание"
                 />
               </label>
             </div>
@@ -374,7 +341,9 @@ export default function ProfilePage() {
 
           {/* Ценности и вызовы */}
           <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">Ценности и приоритеты</h2>
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 pt-4 border-t border-gray-100">
+              Ценности и приоритеты
+            </h3>
             <div className="space-y-4">
               <label className="block">
                 <span className="text-gray-700 font-medium mb-2 block">Мои ценности</span>
@@ -382,7 +351,7 @@ export default function ProfilePage() {
                   value={profile.values}
                   onChange={(e) => handleChange('values', e.target.value)}
                   className="textarea"
-                  placeholder="Что для вас важно в жизни и работе? Например: семья, профессиональный рост, здоровье, свобода"
+                  placeholder="Что для вас важно в жизни и работе?"
                   rows={3}
                 />
               </label>
@@ -393,124 +362,125 @@ export default function ProfilePage() {
                   value={profile.challenges}
                   onChange={(e) => handleChange('challenges', e.target.value)}
                   className="textarea"
-                  placeholder="С какими трудностями вы сейчас сталкиваетесь? Что хотите улучшить?"
+                  placeholder="С какими сложностями вы сталкиваетесь?"
                   rows={3}
                 />
               </label>
 
               <label className="block">
-                <span className="text-gray-700 font-medium mb-2 block">Дополнительная информация</span>
+                <span className="text-gray-700 font-medium mb-2 block">Другое</span>
                 <textarea
                   value={profile.other}
                   onChange={(e) => handleChange('other', e.target.value)}
                   className="textarea"
-                  placeholder="Любая другая информация, которая поможет ИИ лучше понять вас"
+                  placeholder="Дополнительная информация"
                   rows={3}
                 />
               </label>
             </div>
           </div>
 
-          {/* Пользовательские блоки */}
-          <div>
-            <div className="flex items-center justify-between mb-4 border-b pb-2">
-              <h2 className="text-xl font-semibold text-gray-800">Дополнительные блоки</h2>
-            </div>
+          <button onClick={saveProfile} disabled={saving} className="btn-primary mt-6 w-full">
+            {saving ? 'Сохранение...' : 'Сохранить базовый профиль'}
+          </button>
+        </div>
 
-            {/* Форма добавления нового блока */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newBlockTitle}
-                  onChange={(e) => setNewBlockTitle(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addBlock()}
-                  className="input flex-1"
-                  placeholder="Название нового блока (например: Навыки, Достижения)"
-                />
-                <button onClick={addBlock} className="btn-primary whitespace-nowrap">
-                  + Добавить блок
-                </button>
+
+        {/* Dynamic Blocks */}
+        {blocks.map((block) => (
+          <div key={block.id} className="card">
+            <h2 className="text-2xl font-bold mb-6">{block.title}</h2>
+
+            {/* Categories as sections */}
+            {block.categories.map((category) => (
+              <div key={category.id}>
+                <h3 className="text-lg font-semibold mb-4 text-gray-700 pt-4 border-t border-gray-100">
+                  {category.title}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {category.items.map((item) => (
+                    <label key={item.id} className="block">
+                      <span className="text-gray-700 font-medium mb-2 block">{item.fieldName}</span>
+                      <input
+                        type="text"
+                        value={item.fieldValue}
+                        onChange={(e) => {
+                          const newValue = e.target.value
+                          setBlocks(blocks.map(b => ({
+                            ...b,
+                            categories: b.categories.map(cat =>
+                              cat.id === category.id
+                                ? {
+                                    ...cat,
+                                    items: cat.items.map(i =>
+                                      i.id === item.id ? { ...i, fieldValue: newValue } : i
+                                    ),
+                                  }
+                                : cat
+                            ),
+                          })))
+                        }}
+                        onBlur={() => updateFieldValue(item.id, item.fieldValue)}
+                        className="input"
+                        placeholder={item.fieldName}
+                      />
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            ))}
 
-            {/* Список блоков */}
-            <div className="space-y-6">
-              {blocks.map((block) => (
-                <div key={block.id} className="border border-gray-200 rounded-lg p-4 bg-white">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-800">{block.title}</h3>
-                    <button
-                      onClick={() => deleteBlock(block.id)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium"
-                    >
-                      Удалить блок
-                    </button>
-                  </div>
-
-                  {/* Пункты блока */}
-                  <div className="space-y-2 mb-3">
-                    {block.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded"
-                      >
-                        <span className="text-gray-700">{item.content}</span>
-                        <button
-                          onClick={() => deleteItem(block.id, item.id)}
-                          className="text-red-500 hover:text-red-700 text-sm ml-2"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Форма добавления пункта */}
-                  <div className="flex gap-2">
+            {/* Direct items without category */}
+            {block.items.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {block.items.map((item) => (
+                  <label key={item.id} className="block">
+                    <span className="text-gray-700 font-medium mb-2 block">{item.fieldName}</span>
                     <input
                       type="text"
-                      value={newItemContent[block.id] || ''}
-                      onChange={(e) =>
-                        setNewItemContent({ ...newItemContent, [block.id]: e.target.value })
-                      }
-                      onKeyPress={(e) => e.key === 'Enter' && addItem(block.id)}
-                      className="input flex-1 text-sm"
-                      placeholder="Добавить пункт..."
+                      value={item.fieldValue}
+                      onChange={(e) => {
+                        const newValue = e.target.value
+                        setBlocks(blocks.map(b =>
+                          b.id === block.id
+                            ? {
+                                ...b,
+                                items: b.items.map(i =>
+                                  i.id === item.id ? { ...i, fieldValue: newValue } : i
+                                ),
+                              }
+                            : b
+                        ))
+                      }}
+                      onBlur={() => updateFieldValue(item.id, item.fieldValue)}
+                      className="input"
+                      placeholder={item.fieldName}
                     />
-                    <button onClick={() => addItem(block.id)} className="btn-primary text-sm">
-                      + Добавить
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {blocks.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  Нет дополнительных блоков. Создайте первый блок выше.
-                </div>
-              )}
-            </div>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
+        ))}
+
+        {/* Tips */}
+        <div className="card bg-blue-50 border border-blue-200">
+          <h3 className="font-semibold text-blue-900 mb-2">💡 Как это работает?</h3>
+          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <li><strong>Блок</strong> - верхний уровень (например: "Во что верю")</li>
+            <li><strong>Категория</strong> (опционально) - группировка полей (например: "Принципы работы")</li>
+            <li><strong>Поле</strong> - конкретная информация с названием и значением</li>
+            <li>Можно добавлять поля как напрямую в блок, так и через категории</li>
+            <li>ИИ учитывает всю информацию при генерации рекомендаций</li>
+          </ul>
         </div>
 
-        <div className="mt-6 flex items-center gap-4 border-t pt-6">
-          <button onClick={saveProfile} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? 'Сохранение...' : 'Сохранить профиль'}
-          </button>
-          {message && <span className="text-sm font-medium">{message}</span>}
-        </div>
-      </div>
-
-      {/* Tips */}
-      <div className="card bg-blue-50 border border-blue-200">
-        <h3 className="font-semibold text-blue-900 mb-2">💡 Почему это важно?</h3>
-        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-          <li>ИИ сможет давать рекомендации с учетом вашего образа жизни и приоритетов</li>
-          <li>Оценки станут более персонализированными и релевантными</li>
-          <li>Система будет учитывать ваш контекст при планировании задач</li>
-          <li>Вы получите более точные советы по балансу работы и личной жизни</li>
-        </ul>
+        {/* Message Toast */}
+        {message && (
+          <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
+            <p className="font-medium">{message}</p>
+          </div>
+        )}
       </div>
     </div>
   )

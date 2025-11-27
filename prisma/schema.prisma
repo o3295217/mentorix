@@ -33,6 +33,17 @@ model DailyEntry {
   date       DateTime     @unique
   planText   String?
   factText   String?
+
+  // НОВЫЕ ПОЛЯ: Контекст дня
+  emotionalState    String?  // Эмоциональное состояние
+  physicalState     String?  // Физическое состояние
+  lifeEvents        String?  // Важные события дня (JSON)
+  externalFactors   String?  // Внешние обстоятельства
+  energyLevel       Int?     // Уровень энергии 1-10
+  sleepQuality      Int?     // Качество сна 1-10
+  familyTime        Int?     // Время с семьей (минуты)
+  exerciseTime      Int?     // Время на спорт (минуты)
+
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   evaluation Evaluation?
@@ -44,19 +55,38 @@ model Evaluation {
   id                   Int        @id @default(autoincrement())
   dailyEntryId         Int        @unique
   dailyEntry           DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
+
+  // ГЛАВНАЯ МЕТРИКА
+  dreamProgressScore   Int        @default(5) // Насколько день приблизил к мечте (1-10)
+
+  // Классические метрики
   strategyScore        Int
   operationsScore      Int
   teamScore            Int
   efficiencyScore      Int
   overallScore         Float
+
   feedbackText         String
   planVsFactText       String
+
+  // Вертикальный alignment
   alignmentDayWeek     String
   alignmentWeekMonth   String
   alignmentMonthQuarter String
   alignmentQuarterHalf String
   alignmentHalfYear    String
   alignmentYearDream   String
+
+  // НОВЫЕ ПОЛЯ: Флаги баланса
+  healthFlag           String?    // "ok", "warning", "critical"
+  familyFlag           String?    // "ok", "warning", "critical"
+  energyFlag           String?    // "ok", "warning", "critical"
+
+  // НОВЫЕ ПОЛЯ: Горизонтальный alignment
+  workHealthAlignment  String?    // works/partial/conflict/critical
+  workFamilyAlignment  String?    // works/partial/conflict/critical
+  workValuesAlignment  String?    // works/partial/conflict/critical
+
   recommendationsText  String
   createdAt            DateTime   @default(now())
 
@@ -99,24 +129,90 @@ model UserProfile {
 }
 
 model ProfileBlock {
-  id        Int            @id @default(autoincrement())
-  title     String         // Название блока (например: "Личные интересы", "Навыки")
-  order     Int            @default(0) // Порядок отображения
-  items     ProfileItem[]  // Пункты внутри блока
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id         Int               @id @default(autoincrement())
+  title      String            // Название блока (например: "Личные интересы", "Навыки")
+  order      Int               @default(0) // Порядок отображения
+  categories ProfileCategory[] // Категории внутри блока (опционально)
+  items      ProfileItem[]     // Пункты напрямую в блоке (без категории)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
   @@map("profile_blocks")
 }
 
+model ProfileCategory {
+  id        Int           @id @default(autoincrement())
+  blockId   Int           // Связь с блоком
+  block     ProfileBlock  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  title     String        // Название категории (например: "Личное", "Профессиональное")
+  order     Int           @default(0) // Порядок внутри блока
+  items     ProfileItem[] // Пункты внутри категории
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("profile_categories")
+}
+
 model ProfileItem {
-  id        Int          @id @default(autoincrement())
-  blockId   Int          // Связь с блоком
-  block     ProfileBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  content   String       // Содержимое пункта (например: "Бег", "Фотография")
-  order     Int          @default(0) // Порядок внутри блока
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id         Int              @id @default(autoincrement())
+  blockId    Int?             // Связь напрямую с блоком (если без категории)
+  block      ProfileBlock?    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  categoryId Int?             // Связь с категорией (если внутри категории)
+  category   ProfileCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  fieldName  String           // Название поля (например: "Хобби", "Навык")
+  fieldValue String           // Значение поля (например: "Фотография", "Python")
+  content    String?          // Deprecated: для обратной совместимости
+  order      Int              @default(0) // Порядок внутри блока/категории
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@map("profile_items")
+}
+
+// НОВАЯ ТАБЛИЦА: Периодические оценки (недельные, месячные)
+model PeriodEvaluation {
+  id                  Int      @id @default(autoincrement())
+  periodType          String   // 'week', 'month', 'quarter', 'year', 'custom'
+  periodStart         DateTime
+  periodEnd           DateTime
+
+  // Основные метрики
+  dreamProgressScore  Float
+  overallScore        Float
+
+  // Блоки оценки (JSON с детальными данными)
+  professionalBlock   String   // JSON с оценками профессионального блока
+  personalBlock       String   // JSON с оценками личного блока
+  socialBlock         String   // JSON с оценками социального блока
+  balanceBlock        String   // JSON с оценками баланса
+
+  // Анализ
+  patterns            String   // JSON: паттерны поведения
+  trends              String   // JSON: тренды
+  goalsCompletion     String   // JSON: выполнение целей периода
+  alignment           String   // JSON: детальный alignment анализ
+  blockers            String?  // JSON: что блокирует движение к целям
+
+  // Обратная связь
+  feedbackText        String
+  recommendationsText String
+  insights            String?  // Глубокие инсайты (для долгосрочных периодов)
+
+  createdAt           DateTime @default(now())
+
+  @@map("period_evaluations")
+}
+
+// НОВАЯ ТАБЛИЦА: Контекст окружающего мира
+model WorldContext {
+  id              Int      @id @default(autoincrement())
+  date            DateTime @unique
+  marketEvents    String?  // Рыночные события (JSON)
+  personalEvents  String?  // Личные события: болезнь, отпуск и т.д.
+  constraints     String?  // Ограничения и форс-мажоры
+  notes           String?  // Произвольные заметки
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("world_context")
 }

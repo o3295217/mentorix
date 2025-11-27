@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
+import BalanceFlags from '@/components/BalanceFlags'
 
 function getAlignmentStatus(text: string): 'works' | 'partial' | 'no' {
   const lower = text.toLowerCase()
@@ -104,10 +105,22 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
       <p className="text-lg text-gray-600">{format(date, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
 
-      {/* Overall Score */}
+      {/* ГЛАВНАЯ МЕТРИКА - Dream Progress Score */}
+      <div className="card text-center bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-300">
+        <h2 className="text-2xl font-bold mb-2 text-purple-900">🌟 Движение к мечте</h2>
+        <p className={`text-7xl font-bold ${getScoreColor(evaluation.dreamProgressScore || evaluation.overallScore)}`}>
+          {evaluation.dreamProgressScore || evaluation.overallScore}
+        </p>
+        <p className="text-gray-600 mt-2 text-lg">из 10</p>
+        <p className="text-sm text-gray-600 mt-3 max-w-md mx-auto">
+          Главная метрика: насколько этот день приблизил тебя к мечте
+        </p>
+      </div>
+
+      {/* Overall Score - вторичная метрика */}
       <div className="card text-center bg-gradient-to-r from-primary-50 to-purple-50">
-        <h2 className="text-xl font-semibold mb-2">Общая оценка</h2>
-        <p className={`text-6xl font-bold ${getScoreColor(evaluation.overallScore)}`}>{evaluation.overallScore}</p>
+        <h2 className="text-xl font-semibold mb-2">Общая оценка (среднее по 4 показателям)</h2>
+        <p className={`text-5xl font-bold ${getScoreColor(evaluation.overallScore)}`}>{evaluation.overallScore}</p>
         <p className="text-gray-600 mt-1">из 10</p>
       </div>
 
@@ -156,9 +169,19 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         <p className="text-gray-800 whitespace-pre-wrap">{evaluation.feedbackText}</p>
       </div>
 
+      {/* Balance Flags - НОВЫЙ КОМПОНЕНТ */}
+      <BalanceFlags
+        healthFlag={evaluation.healthFlag}
+        familyFlag={evaluation.familyFlag}
+        energyFlag={evaluation.energyFlag}
+      />
+
       {/* Alignment */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">🎯 Выравнивание целей (Alignment)</h2>
+        <h2 className="text-xl font-bold mb-4">🎯 Вертикальный Alignment (путь к мечте)</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Проверка: работают ли задачи каждого уровня на следующий уровень вплоть до мечты
+        </p>
         <div className="space-y-4">
           {alignments.map((alignment, i) => {
             const status = getAlignmentStatus(alignment.text)
@@ -174,6 +197,36 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
           })}
         </div>
       </div>
+
+      {/* Horizontal Alignment - если есть */}
+      {(evaluation.workHealthAlignment || evaluation.workFamilyAlignment || evaluation.workValuesAlignment) && (
+        <div className="card bg-yellow-50 border-2 border-yellow-200">
+          <h2 className="text-xl font-bold mb-4 text-yellow-900">⚖️ Горизонтальный Alignment (баланс сфер)</h2>
+          <p className="text-sm text-gray-700 mb-4">
+            Проверка баланса между работой и другими сферами жизни
+          </p>
+          <div className="space-y-3">
+            {evaluation.workHealthAlignment && (
+              <div className="p-3 bg-white rounded border">
+                <h3 className="font-semibold text-sm mb-1">Работа ↔ Здоровье:</h3>
+                <p className="text-sm text-gray-700">{evaluation.workHealthAlignment}</p>
+              </div>
+            )}
+            {evaluation.workFamilyAlignment && (
+              <div className="p-3 bg-white rounded border">
+                <h3 className="font-semibold text-sm mb-1">Работа ↔ Семья:</h3>
+                <p className="text-sm text-gray-700">{evaluation.workFamilyAlignment}</p>
+              </div>
+            )}
+            {evaluation.workValuesAlignment && (
+              <div className="p-3 bg-white rounded border">
+                <h3 className="font-semibold text-sm mb-1">Работа ↔ Ценности:</h3>
+                <p className="text-sm text-gray-700">{evaluation.workValuesAlignment}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recommendations */}
       <div className="card bg-green-50 border border-green-200">

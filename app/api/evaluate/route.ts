@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { evaluateDay, EvaluationRequest } from '@/lib/anthropic'
+import { evaluateDayNew } from '@/lib/anthropic'
+import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
 
 export async function POST(request: NextRequest) {
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'dailyEntryId is required' }, { status: 400 })
     }
 
-    // Get daily entry
+    // Получить daily entry
     const dailyEntry = await prisma.dailyEntry.findUnique({
       where: { id: dailyEntryId },
     })
@@ -22,15 +23,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (!dailyEntry.factText) {
-      return NextResponse.json({ error: 'Fact text is required for evaluation' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Fact text is required for evaluation' },
+        { status: 400 }
+      )
     }
 
-    // Get dream goal
+    // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
       orderBy: { createdAt: 'desc' },
     })
 
-    // Get all period goals
+    // Получить все периодические цели
     const date = dailyEntry.date
     const yearPeriod = getPeriodDates(date, 'year')
     const halfYearPeriod = getPeriodDates(date, 'half_year')
@@ -38,51 +42,53 @@ export async function POST(request: NextRequest) {
     const monthPeriod = getPeriodDates(date, 'month')
     const weekPeriod = getPeriodDates(date, 'week')
 
-    const [yearGoals, halfYearGoals, quarterGoals, monthGoals, weekGoals] = await Promise.all([
-      prisma.periodGoal.findFirst({
-        where: { periodType: 'year', periodStart: yearPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.periodGoal.findFirst({
-        where: { periodType: 'half_year', periodStart: halfYearPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.periodGoal.findFirst({
-        where: { periodType: 'quarter', periodStart: quarterPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.periodGoal.findFirst({
-        where: { periodType: 'month', periodStart: monthPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.periodGoal.findFirst({
-        where: { periodType: 'week', periodStart: weekPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ])
+    const [yearGoals, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
+      await Promise.all([
+        prisma.periodGoal.findFirst({
+          where: { periodType: 'year', periodStart: yearPeriod.start },
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.periodGoal.findFirst({
+          where: { periodType: 'half_year', periodStart: halfYearPeriod.start },
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.periodGoal.findFirst({
+          where: { periodType: 'quarter', periodStart: quarterPeriod.start },
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.periodGoal.findFirst({
+          where: { periodType: 'month', periodStart: monthPeriod.start },
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.periodGoal.findFirst({
+          where: { periodType: 'week', periodStart: weekPeriod.start },
+          orderBy: { createdAt: 'desc' },
+        }),
+      ])
 
-    // Get open tasks
+    // Получить незакрытые задачи
     const openTasks = await prisma.openTask.findMany({
       where: { isClosed: false },
     })
 
-    // Get user profile
+    // Получить профиль пользователя
     const userProfile = await prisma.userProfile.findFirst({
       orderBy: { createdAt: 'desc' },
     })
 
-    // Prepare evaluation request
-    const evaluationRequest: EvaluationRequest = {
-      dreamGoal: dream?.goalText || 'Не указана',
-      yearGoals: yearGoals ? JSON.parse(yearGoals.goalsJson) : [],
-      halfYearGoals: halfYearGoals ? JSON.parse(halfYearGoals.goalsJson) : [],
-      quarterGoals: quarterGoals ? JSON.parse(quarterGoals.goalsJson) : [],
-      monthGoals: monthGoals ? JSON.parse(monthGoals.goalsJson) : [],
-      weekGoals: weekGoals ? JSON.parse(weekGoals.goalsJson) : [],
+    // Подготовить запрос для оценки (НОВЫЙ ФОРМАТ)
+    const evaluationRequest: DailyEvaluationRequest = {
+      date: date.toLocaleDateString('ru-RU'),
       planText: dailyEntry.planText || '',
       factText: dailyEntry.factText || '',
-      date: date.toLocaleDateString('ru-RU'),
-      openTasks: openTasks.map((t) => `[${t.taskType}] ${t.taskText}`),
+      goals: {
+        dreamGoal: dream?.goalText || 'Не указана',
+        yearGoals: yearGoals ? JSON.parse(yearGoals.goalsJson) : [],
+        halfYearGoals: halfYearGoals ? JSON.parse(halfYearGoals.goalsJson) : [],
+        quarterGoals: quarterGoals ? JSON.parse(quarterGoals.goalsJson) : [],
+        monthGoals: monthGoals ? JSON.parse(monthGoals.goalsJson) : [],
+        weekGoals: weekGoals ? JSON.parse(weekGoals.goalsJson) : [],
+      },
       userProfile: userProfile
         ? {
             name: userProfile.name || undefined,
@@ -101,15 +107,27 @@ export async function POST(request: NextRequest) {
             other: userProfile.other || undefined,
           }
         : undefined,
+      context: {
+        emotionalState: dailyEntry.emotionalState || undefined,
+        physicalState: dailyEntry.physicalState || undefined,
+        lifeEvents: dailyEntry.lifeEvents || undefined,
+        externalFactors: dailyEntry.externalFactors || undefined,
+        energyLevel: dailyEntry.energyLevel || undefined,
+        sleepQuality: dailyEntry.sleepQuality || undefined,
+        familyTime: dailyEntry.familyTime || undefined,
+        exerciseTime: dailyEntry.exerciseTime || undefined,
+      },
+      openTasks: openTasks.map((t) => `[${t.taskType}] ${t.taskText}`),
     }
 
-    // Call Claude API
-    const evaluationResponse = await evaluateDay(evaluationRequest)
+    // Вызвать Claude API (НОВАЯ ФУНКЦИЯ)
+    const evaluationResponse = await evaluateDayNew(evaluationRequest)
 
-    // Save evaluation
+    // Сохранить оценку с НОВЫМИ ПОЛЯМИ
     const evaluation = await prisma.evaluation.create({
       data: {
         dailyEntryId,
+        dreamProgressScore: evaluationResponse.dream_progress_score,
         strategyScore: evaluationResponse.strategy_score,
         operationsScore: evaluationResponse.operations_score,
         teamScore: evaluationResponse.team_score,
@@ -124,12 +142,22 @@ export async function POST(request: NextRequest) {
         alignmentHalfYear: evaluationResponse.alignment.half_to_year,
         alignmentYearDream: evaluationResponse.alignment.year_to_dream,
         recommendationsText: evaluationResponse.recommendations,
+        // НОВЫЕ ПОЛЯ
+        healthFlag: evaluationResponse.balance_flags.health,
+        familyFlag: evaluationResponse.balance_flags.family,
+        energyFlag: evaluationResponse.balance_flags.energy,
+        workHealthAlignment: evaluationResponse.horizontal_alignment?.work_health,
+        workFamilyAlignment: evaluationResponse.horizontal_alignment?.work_family,
+        workValuesAlignment: evaluationResponse.horizontal_alignment?.work_values,
       },
     })
 
     return NextResponse.json(evaluation)
   } catch (error) {
     console.error('Error evaluating day:', error)
-    return NextResponse.json({ error: 'Failed to evaluate day' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to evaluate day', details: String(error) },
+      { status: 500 }
+    )
   }
 }

@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/profile/blocks - получить все блоки с пунктами
+// GET /api/profile/blocks - получить все блоки с категориями и пунктами
 export async function GET() {
   try {
     const blocks = await prisma.profileBlock.findMany({
       include: {
+        categories: {
+          include: {
+            items: {
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
         items: {
+          where: { categoryId: null }, // Только items без категории
           orderBy: { order: 'asc' },
         },
       },
@@ -73,19 +82,23 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// PATCH /api/profile/blocks - обновить название блока
+// PATCH /api/profile/blocks - обновить название или порядок блока
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, title } = body
+    const { id, title, order } = body
 
-    if (!id || !title || typeof title !== 'string' || title.trim() === '') {
-      return NextResponse.json({ error: 'ID and title are required' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
+
+    const updateData: any = {}
+    if (title !== undefined) updateData.title = title.trim()
+    if (order !== undefined) updateData.order = parseInt(order)
 
     const block = await prisma.profileBlock.update({
       where: { id: parseInt(id) },
-      data: { title: title.trim() },
+      data: updateData,
       include: {
         items: {
           orderBy: { order: 'asc' },

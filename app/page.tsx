@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import DreamProgress from '@/components/DreamProgress'
 
 export default function HomePage() {
   const [today] = useState(new Date())
@@ -50,6 +51,13 @@ export default function HomePage() {
         <p className="text-lg text-gray-600">{format(today, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
       </div>
 
+      {/* Dream Progress - ГЛАВНЫЙ ВИДЖЕТ */}
+      <DreamProgress
+        dreamGoal={dreamGoal?.goalText || ''}
+        dreamProgressScore={dailyEntry?.evaluation?.dreamProgressScore}
+        showDetails={!!dailyEntry?.evaluation}
+      />
+
       {/* Today's Card */}
       <div className="card">
         <h2 className="text-2xl font-bold mb-4">Сегодняшний день</h2>
@@ -94,25 +102,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Dream Goal */}
-      <div className="card">
-        <h2 className="text-2xl font-bold mb-4">🎯 Ваша мечта (5 лет)</h2>
-        {dreamGoal?.goalText ? (
-          <div>
-            <p className="text-lg text-gray-800 mb-4">{dreamGoal.goalText}</p>
-            <Link href="/goals" className="text-primary-600 hover:underline">
-              Редактировать цели
-            </Link>
-          </div>
-        ) : (
-          <div>
-            <p className="text-gray-600 mb-4">Мечта еще не установлена</p>
-            <Link href="/goals" className="btn-primary inline-block">
-              Создать мечту
-            </Link>
-          </div>
-        )}
-      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
