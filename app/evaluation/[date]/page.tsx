@@ -45,6 +45,8 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const resolvedParams = use(params)
   const [dailyEntry, setDailyEntry] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [addingTask, setAddingTask] = useState<string | null>(null)
+  const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadData()
@@ -59,6 +61,27 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
       console.error('Error loading evaluation:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const addTaskToOpen = async (task: any) => {
+    setAddingTask(task.taskText)
+    try {
+      await fetch('/api/tasks/add-suggested', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskText: task.taskText,
+          taskType: task.taskType,
+          originDate: dailyEntry.date,
+        }),
+      })
+      setAddedTasks(new Set(addedTasks).add(task.taskText))
+    } catch (error) {
+      console.error('Error adding task:', error)
+      alert('Ошибка при добавлении задачи')
+    } finally {
+      setAddingTask(null)
     }
   }
 
@@ -201,7 +224,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
       {/* Horizontal Alignment - если есть */}
       {(evaluation.workHealthAlignment || evaluation.workFamilyAlignment || evaluation.workValuesAlignment) && (
         <div className="card bg-yellow-50 border-2 border-yellow-200">
-          <h2 className="text-xl font-bold mb-4 text-yellow-900">⚖️ Горизонтальный Alignment (баланс сфер)</h2>
+          <h2 className="text-xl font-bold mb-4 text-yellow-900">⚖️ Баланс сфер жизни</h2>
           <p className="text-sm text-gray-700 mb-4">
             Проверка баланса между работой и другими сферами жизни
           </p>
@@ -224,6 +247,67 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
                 <p className="text-sm text-gray-700">{evaluation.workValuesAlignment}</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Suggested Tasks */}
+      {evaluation.suggestedTasksJson && JSON.parse(evaluation.suggestedTasksJson).length > 0 && (
+        <div className="card bg-purple-50 border-2 border-purple-200">
+          <h2 className="text-xl font-bold mb-4 text-purple-900">📋 Предложенные задачи</h2>
+          <p className="text-sm text-gray-700 mb-4">
+            ИИ выявил важные задачи, которые стоит добавить в список незакрытых
+          </p>
+          <div className="space-y-3">
+            {JSON.parse(evaluation.suggestedTasksJson).map((task: any, i: number) => {
+              const isAdded = addedTasks.has(task.taskText)
+              const isAdding = addingTask === task.taskText
+
+              return (
+                <div key={i} className="p-4 bg-white rounded-lg border-2 border-purple-200">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          task.taskType === 'strategic'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {task.taskType === 'strategic' ? '🎯 Стратегическая' : '⚙️ Операционная'}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          task.priority === 'high'
+                            ? 'bg-red-100 text-red-700'
+                            : task.priority === 'medium'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {task.priority === 'high' ? '🔥 Высокий' : task.priority === 'medium' ? '⚡ Средний' : '📌 Низкий'}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-2">{task.taskText}</h3>
+                      <p className="text-sm text-gray-600">{task.reason}</p>
+                    </div>
+                    <button
+                      onClick={() => addTaskToOpen(task)}
+                      disabled={isAdded || isAdding}
+                      className={`px-4 py-2 rounded font-medium text-sm transition-colors ${
+                        isAdded
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                    >
+                      {isAdding ? 'Добавление...' : isAdded ? '✓ Добавлено' : '+ Добавить'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-4 p-3 bg-purple-100 rounded">
+            <p className="text-sm text-purple-900">
+              💡 Добавленные задачи появятся на вкладке <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>
+            </p>
           </div>
         </div>
       )}

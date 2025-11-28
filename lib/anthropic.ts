@@ -2,14 +2,22 @@ import Anthropic from '@anthropic-ai/sdk'
 import {
   DailyEvaluationRequest,
   DailyEvaluationResponse,
+  PeriodEvaluationRequest,
+  PeriodEvaluationResponse,
+  ForecastRequest,
+  ForecastResponse,
   UserProfile,
   GoalsHierarchy,
   DailyContext,
 } from './prompts/types'
 import { buildCacheablePromptPart, buildDynamicPromptPart, validateGoals } from './prompts/daily'
+import { buildPeriodEvaluationPrompt } from './prompts/period'
+import { buildForecastPrompt } from './prompts/forecast'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 2,
+  timeout: 5 * 60 * 1000, // 5 minutes timeout for the HTTP client
 })
 
 // Экспорт типов для обратной совместимости
@@ -151,4 +159,94 @@ export async function evaluateDay(
     alignment: newResponse.alignment,
     recommendations: newResponse.recommendations,
   }
+}
+
+// Функция оценки периода (неделя/месяц/квартал/год)
+export async function evaluatePeriod(
+  request: PeriodEvaluationRequest
+): Promise<PeriodEvaluationResponse> {
+  // Построение промпта для периодической оценки
+  const prompt = buildPeriodEvaluationPrompt(request)
+
+  // Вызов Claude API с кэшированием (используем Haiku для скорости)
+  const message = await anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022', // Быстрая модель для периодических оценок
+    max_tokens: 8192, // Увеличен лимит для более длинных ответов
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: prompt,
+            cache_control: { type: 'ephemeral' }, // Кэшируем промпт на 5 минут
+          },
+        ],
+      },
+    ],
+  })
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
+
+  // Извлечение JSON из ответа
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Failed to parse period evaluation response from Claude')
+  }
+
+  const parsedResponse = JSON.parse(jsonMatch[0]) as PeriodEvaluationResponse
+
+  // Валидация ответа
+  if (
+    !parsedResponse.dreamProgressScore ||
+    !parsedResponse.overallScore ||
+    !parsedResponse.feedback
+  ) {
+    throw new Error('Invalid period evaluation response structure')
+  }
+
+  return parsedResponse
+}
+
+// Функция прогноза
+export async function generateForecast(
+  request: ForecastRequest
+): Promise<ForecastResponse> {
+  // Построение промпта для прогноза
+  const prompt = buildForecastPrompt(request)
+
+  // Вызов Claude API с кэшированием
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 8192,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: prompt,
+            cache_control: { type: 'ephemeral' }, // Кэшируем промпт на 5 минут
+          },
+        ],
+      },
+    ],
+  })
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
+
+  // Извлечение JSON из ответа
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Failed to parse forecast response from Claude')
+  }
+
+  const parsedResponse = JSON.parse(jsonMatch[0]) as ForecastResponse
+
+  // Валидация ответа
+  if (!parsedResponse.dreamForecast || !parsedResponse.summary) {
+    throw new Error('Invalid forecast response structure')
+  }
+
+  return parsedResponse
 }

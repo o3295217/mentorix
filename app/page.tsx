@@ -115,9 +115,24 @@ export default function HomePage() {
           <p className="text-gray-600">Установите цели на неделю, месяц, квартал и год</p>
         </Link>
 
+        <Link href="/periods" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50">
+          <h3 className="text-lg font-semibold mb-2">📊 Периодические оценки</h3>
+          <p className="text-gray-600">Получите оценку недели, месяца, квартала или года от ИИ</p>
+        </Link>
+
+        <Link href="/forecast" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-purple-50">
+          <h3 className="text-lg font-semibold mb-2">🔮 Прогнозы</h3>
+          <p className="text-gray-600">Узнайте прогноз достижения мечты и выполнения целей</p>
+        </Link>
+
         <Link href="/analytics" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-lg font-semibold mb-2">📊 Аналитика</h3>
+          <h3 className="text-lg font-semibold mb-2">📈 Аналитика</h3>
           <p className="text-gray-600">Просмотрите статистику и тренды вашей эффективности</p>
+        </Link>
+
+        <Link href="/tasks" className="card hover:shadow-lg transition-shadow">
+          <h3 className="text-lg font-semibold mb-2">✅ Задачи</h3>
+          <p className="text-gray-600">Управляйте незакрытыми задачами и приоритетами</p>
         </Link>
       </div>
     </div>

@@ -18,10 +18,26 @@ export default function DailyPage() {
   const [saving, setSaving] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [message, setMessage] = useState('')
+  const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
+  const [tasks, setTasks] = useState<string[]>([])
+  const [newTaskText, setNewTaskText] = useState('')
 
   useEffect(() => {
     loadData()
   }, [selectedDate])
+
+  // Восстановить высоту textarea при загрузке (только один раз)
+  useEffect(() => {
+    // Небольшая задержка чтобы дать время DOM отрендериться
+    setTimeout(() => {
+      const textareas = document.querySelectorAll('textarea')
+      textareas.forEach((textarea: Element) => {
+        const el = textarea as HTMLTextAreaElement
+        el.style.height = 'auto'
+        el.style.height = el.scrollHeight + 'px'
+      })
+    }, 100)
+  }, [selectedDate]) // Только при смене даты, не при каждом изменении planText
 
   const loadData = async () => {
     try {
@@ -33,10 +49,32 @@ export default function DailyPage() {
         setDailyEntry(daily)
         setPlanText(daily.planText || '')
         setFactText(daily.factText || '')
+
+        // Загрузить задачи из planText
+        if (daily.planText) {
+          const taskList = daily.planText.split('\n').filter((t: string) => t.trim())
+          setTasks(taskList)
+        } else {
+          setTasks([])
+        }
+
+        // Восстановить выбранные задачи
+        if (daily.selectedTasksJson) {
+          try {
+            const selected = JSON.parse(daily.selectedTasksJson) as number[]
+            setSelectedTasks(new Set(selected))
+          } catch (e) {
+            setSelectedTasks(new Set())
+          }
+        } else {
+          setSelectedTasks(new Set())
+        }
       } else {
         setDailyEntry(null)
         setPlanText('')
         setFactText('')
+        setTasks([])
+        setSelectedTasks(new Set())
       }
 
       // Load week goals
@@ -56,9 +94,28 @@ export default function DailyPage() {
     }
   }
 
-  const savePlan = async () => {
-    setSaving(true)
-    setMessage('')
+  const addTask = () => {
+    if (!newTaskText.trim()) return
+    const updatedTasks = [...tasks, newTaskText.trim()]
+    setTasks(updatedTasks)
+    setNewTaskText('')
+    // Автоматически сохраняем
+    savePlanWithTasks(updatedTasks)
+  }
+
+  const removeTask = (index: number) => {
+    const updatedTasks = tasks.filter((_, i) => i !== index)
+    setTasks(updatedTasks)
+    // Убираем из выбранных если была выбрана
+    const newSelected = new Set(selectedTasks)
+    newSelected.delete(index)
+    setSelectedTasks(newSelected)
+    // Автоматически сохраняем
+    savePlanWithTasks(updatedTasks, newSelected)
+  }
+
+  const savePlanWithTasks = async (taskList: string[] = tasks, selected: Set<number> = selectedTasks) => {
+    const planTextToSave = taskList.join('\n')
 
     try {
       const res = await fetch('/api/daily', {
@@ -66,20 +123,27 @@ export default function DailyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate,
-          planText,
+          planText: planTextToSave,
+          selectedTasksJson: JSON.stringify(Array.from(selected)),
         }),
       })
 
       const data = await res.json()
       setDailyEntry(data)
-      setMessage('✅ План сохранен!')
-      setTimeout(() => setMessage(''), 3000)
+      setPlanText(planTextToSave)
     } catch (error) {
       console.error('Error saving plan:', error)
       setMessage('❌ Ошибка при сохранении')
-    } finally {
-      setSaving(false)
     }
+  }
+
+  const savePlan = async () => {
+    setSaving(true)
+    setMessage('')
+    await savePlanWithTasks()
+    setMessage('✅ План сохранен!')
+    setTimeout(() => setMessage(''), 3000)
+    setSaving(false)
   }
 
   const saveFact = async () => {
@@ -106,6 +170,43 @@ export default function DailyPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const transferCompletedTasks = async () => {
+    if (selectedTasks.size === 0) {
+      setMessage('ℹ️ Выберите задачи для переноса')
+      setTimeout(() => setMessage(''), 2000)
+      return
+    }
+
+    const tasksToTransfer: string[] = []
+    tasks.forEach((task, index) => {
+      if (selectedTasks.has(index)) {
+        tasksToTransfer.push(task)
+      }
+    })
+
+    // Добавляем выбранные задачи в факт
+    const currentFact = factText.trim()
+    const newFact = currentFact
+      ? `${currentFact}\n${tasksToTransfer.join('\n')}`
+      : tasksToTransfer.join('\n')
+    setFactText(newFact)
+
+    setMessage(`✅ Перенесено ${tasksToTransfer.length} ${tasksToTransfer.length === 1 ? 'задача' : tasksToTransfer.length < 5 ? 'задачи' : 'задач'}`)
+    setTimeout(() => setMessage(''), 3000)
+  }
+
+  const toggleTaskSelection = (index: number) => {
+    const newSelected = new Set(selectedTasks)
+    if (newSelected.has(index)) {
+      newSelected.delete(index)
+    } else {
+      newSelected.add(index)
+    }
+    setSelectedTasks(newSelected)
+    // Автоматически сохраняем
+    savePlanWithTasks(tasks, newSelected)
   }
 
   const evaluate = async () => {
@@ -188,34 +289,96 @@ export default function DailyPage() {
         </div>
       </div>
 
-      {/* Plan */}
-      <div className="card">
-        <h2 className="text-xl font-bold mb-4">📝 План на день</h2>
-        <textarea
-          value={planText}
-          onChange={(e) => setPlanText(e.target.value)}
-          className="textarea"
-          placeholder="Введите план на день...&#10;&#10;Например:&#10;1. Утром - работа над ИИ ассистентом&#10;2. Калькулятор на 2026 год&#10;3. Штатное расписание на 2026"
-          rows={8}
-        />
-        <button onClick={savePlan} disabled={saving} className="btn-primary mt-4 disabled:opacity-50">
-          {saving ? 'Сохранение...' : 'Сохранить план'}
-        </button>
-      </div>
+      {/* Plan and Fact side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Plan - Left */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">📝 План на день</h2>
+            <button
+              onClick={transferCompletedTasks}
+              className="text-sm bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1 rounded border border-green-300 transition-colors"
+              title="Перенести выбранные задачи в факт"
+            >
+              ➡️ Перенести выбранные
+            </button>
+          </div>
 
-      {/* Fact */}
-      <div className="card">
-        <h2 className="text-xl font-bold mb-4">✅ Факт выполнения</h2>
-        <textarea
-          value={factText}
-          onChange={(e) => setFactText(e.target.value)}
-          className="textarea"
-          placeholder="Введите что реально сделали за день...&#10;&#10;Например:&#10;1. ИИ ассистент - не сделал&#10;2. Калькулятор - готов&#10;3. Штатное расписание - не сделал"
-          rows={8}
-        />
-        <button onClick={saveFact} disabled={saving} className="btn-primary mt-4 disabled:opacity-50">
-          {saving ? 'Сохранение...' : 'Сохранить факт'}
-        </button>
+          {/* Добавление новой задачи */}
+          <div className="mb-4 flex gap-2">
+            <input
+              type="text"
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addTask()
+                }
+              }}
+              placeholder="Добавить задачу..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={addTask}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Добавить
+            </button>
+          </div>
+
+          {/* Список задач */}
+          <div className="space-y-2 mb-4">
+            {tasks.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-8">
+                Добавьте задачи на день...
+              </p>
+            ) : (
+              tasks.map((task, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+                    selectedTasks.has(index)
+                      ? 'bg-green-50 border-green-300'
+                      : 'bg-white border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTasks.has(index)}
+                    onChange={() => toggleTaskSelection(index)}
+                    className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                  />
+                  <span className={`flex-1 text-sm ${selectedTasks.has(index) ? 'line-through text-gray-500' : ''}`}>
+                    {task}
+                  </span>
+                  <button
+                    onClick={() => removeTask(index)}
+                    className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
+                    title="Удалить задачу"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Fact - Right */}
+        <div className="card">
+          <h2 className="text-xl font-bold mb-4">✅ Факт выполнения</h2>
+          <textarea
+            value={factText}
+            onChange={(e) => setFactText(e.target.value)}
+            className="textarea"
+            placeholder="Введите что реально сделали за день...&#10;&#10;Например:&#10;1. ИИ ассистент - не сделал&#10;2. Калькулятор - готов&#10;3. Штатное расписание - не сделал"
+            rows={12}
+          />
+          <button onClick={saveFact} disabled={saving} className="btn-primary mt-4 disabled:opacity-50">
+            {saving ? 'Сохранение...' : 'Сохранить факт'}
+          </button>
+        </div>
       </div>
 
       {/* Evaluate */}

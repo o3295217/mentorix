@@ -20,32 +20,6 @@ interface ProfileData {
   other: string
 }
 
-// Динамические структуры
-interface ProfileItem {
-  id: number
-  blockId: number | null
-  categoryId: number | null
-  fieldName: string
-  fieldValue: string
-  order: number
-}
-
-interface ProfileCategory {
-  id: number
-  blockId: number
-  title: string
-  order: number
-  items: ProfileItem[]
-}
-
-interface ProfileBlock {
-  id: number
-  title: string
-  order: number
-  categories: ProfileCategory[]
-  items: ProfileItem[] // Items без категории
-}
-
 export default function ProfilePage() {
   // Базовый профиль
   const [profile, setProfile] = useState<ProfileData>({
@@ -66,14 +40,11 @@ export default function ProfilePage() {
   })
   const [saving, setSaving] = useState(false)
 
-  // Динамические блоки
-  const [blocks, setBlocks] = useState<ProfileBlock[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
     loadProfile()
-    loadBlocks()
   }, [])
 
   const loadProfile = async () => {
@@ -102,22 +73,6 @@ export default function ProfilePage() {
       console.error('Error loading profile:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadBlocks = async () => {
-    try {
-      const res = await fetch('/api/profile/blocks')
-      const data = await res.json()
-      // Ensure all blocks have categories and items arrays
-      const normalizedBlocks = (data || []).map((block: any) => ({
-        ...block,
-        categories: block.categories || [],
-        items: block.items || [],
-      }))
-      setBlocks(normalizedBlocks)
-    } catch (error) {
-      console.error('Error loading blocks:', error)
     }
   }
 
@@ -154,23 +109,6 @@ export default function ProfilePage() {
   const showMessage = (text: string) => {
     setMessage(text)
     setTimeout(() => setMessage(''), 3000)
-  }
-
-  // === ПОЛЯ ===
-
-  const updateFieldValue = async (itemId: number, fieldValue: string) => {
-    try {
-      await fetch('/api/profile/items', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: itemId,
-          fieldValue: fieldValue.trim(),
-        }),
-      })
-    } catch (error) {
-      console.error('Error updating field value:', error)
-    }
   }
 
   if (loading) {
@@ -385,95 +323,6 @@ export default function ProfilePage() {
           </button>
         </div>
 
-
-        {/* Dynamic Blocks */}
-        {blocks.map((block) => (
-          <div key={block.id} className="card">
-            <h2 className="text-2xl font-bold mb-6">{block.title}</h2>
-
-            {/* Categories as sections */}
-            {block.categories.map((category) => (
-              <div key={category.id}>
-                <h3 className="text-lg font-semibold mb-4 text-gray-700 pt-4 border-t border-gray-100">
-                  {category.title}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {category.items.map((item) => (
-                    <label key={item.id} className="block">
-                      <span className="text-gray-700 font-medium mb-2 block">{item.fieldName}</span>
-                      <input
-                        type="text"
-                        value={item.fieldValue}
-                        onChange={(e) => {
-                          const newValue = e.target.value
-                          setBlocks(blocks.map(b => ({
-                            ...b,
-                            categories: b.categories.map(cat =>
-                              cat.id === category.id
-                                ? {
-                                    ...cat,
-                                    items: cat.items.map(i =>
-                                      i.id === item.id ? { ...i, fieldValue: newValue } : i
-                                    ),
-                                  }
-                                : cat
-                            ),
-                          })))
-                        }}
-                        onBlur={() => updateFieldValue(item.id, item.fieldValue)}
-                        className="input"
-                        placeholder={item.fieldName}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {/* Direct items without category */}
-            {block.items.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {block.items.map((item) => (
-                  <label key={item.id} className="block">
-                    <span className="text-gray-700 font-medium mb-2 block">{item.fieldName}</span>
-                    <input
-                      type="text"
-                      value={item.fieldValue}
-                      onChange={(e) => {
-                        const newValue = e.target.value
-                        setBlocks(blocks.map(b =>
-                          b.id === block.id
-                            ? {
-                                ...b,
-                                items: b.items.map(i =>
-                                  i.id === item.id ? { ...i, fieldValue: newValue } : i
-                                ),
-                              }
-                            : b
-                        ))
-                      }}
-                      onBlur={() => updateFieldValue(item.id, item.fieldValue)}
-                      className="input"
-                      placeholder={item.fieldName}
-                    />
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {/* Tips */}
-        <div className="card bg-blue-50 border border-blue-200">
-          <h3 className="font-semibold text-blue-900 mb-2">💡 Как это работает?</h3>
-          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-            <li><strong>Блок</strong> - верхний уровень (например: "Во что верю")</li>
-            <li><strong>Категория</strong> (опционально) - группировка полей (например: "Принципы работы")</li>
-            <li><strong>Поле</strong> - конкретная информация с названием и значением</li>
-            <li>Можно добавлять поля как напрямую в блок, так и через категории</li>
-            <li>ИИ учитывает всю информацию при генерации рекомендаций</li>
-          </ul>
-        </div>
 
         {/* Message Toast */}
         {message && (

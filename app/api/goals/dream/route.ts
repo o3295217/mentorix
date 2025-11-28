@@ -17,15 +17,20 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { goalText } = body
+    const { goalText, years } = body
 
     if (!goalText) {
       return NextResponse.json({ error: 'goalText is required' }, { status: 400 })
     }
 
+    const yearsValue = years && years >= 1 && years <= 10 ? years : 5
+
     // Create or update dream goal (we only keep one)
     const dream = await prisma.dreamGoal.create({
-      data: { goalText },
+      data: {
+        goalText,
+        years: yearsValue,
+      },
     })
 
     return NextResponse.json(dream)

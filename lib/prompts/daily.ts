@@ -4,7 +4,6 @@ import {
 } from './types'
 import {
   formatUserProfile,
-  formatGoalsHierarchy,
   formatDailyContext,
   NO_DREAM_RESPONSE,
   getNoGoalsResponse,
@@ -110,6 +109,13 @@ ${request.goals.dreamGoal}
     - Какую задачу взять в приоритет
     - Что изменить в подходе
 
+11. ПРЕДЛОЖИ ЗАДАЧИ для добавления в список незакрытых (опционально):
+    - Анализируй невыполненные задачи из плана
+    - Предлагай только ВАЖНЫЕ задачи (не более 3)
+    - Для каждой задачи укажи: текст, тип (strategic/operational), приоритет (high/medium/low), причину
+    - НЕ предлагай мелкие или одноразовые задачи
+    - Предлагай задачи, которые откладываются несколько дней подряд ИЛИ критичны для мечты
+
 ФОРМАТ ОТВЕТА - СТРОГО JSON:
 {
   "dream_progress_score": число 1-10,
@@ -133,12 +139,20 @@ ${request.goals.dreamGoal}
     "energy": "ok/warning/critical"
   },
   "horizontal_alignment": {
-    "work_health": "works/partial/conflict/critical (только если есть проблема)",
-    "work_family": "works/partial/conflict/critical (только если есть проблема)",
-    "work_values": "works/partial/conflict/critical (только если есть проблема)"
+    "work_health": "баланс/частично/конфликт/критично (только если есть проблема)",
+    "work_family": "баланс/частично/конфликт/критично (только если есть проблема)",
+    "work_values": "баланс/частично/конфликт/критично (только если есть проблема)"
   },
   "feedback": "жесткая честная обратная связь (2-3 абзаца) - приблизил ли день к мечте?",
-  "recommendations": "1-2 конкретные рекомендации на завтра"
+  "recommendations": "1-2 конкретные рекомендации на завтра",
+  "suggested_tasks": [
+    {
+      "taskText": "Описание задачи",
+      "taskType": "strategic или operational",
+      "priority": "high/medium/low",
+      "reason": "Почему эта задача важна для движения к мечте"
+    }
+  ]
 }
 
 КРИТИЧЕСКИ ВАЖНО:

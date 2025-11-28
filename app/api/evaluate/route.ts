@@ -34,20 +34,24 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Получить все периодические цели
+    // Получить все цели из новой иерархической структуры
     const date = dailyEntry.date
+    const year = date.getFullYear()
+
+    // Периоды для загрузки из period_goals
     const yearPeriod = getPeriodDates(date, 'year')
     const halfYearPeriod = getPeriodDates(date, 'half_year')
     const quarterPeriod = getPeriodDates(date, 'quarter')
     const monthPeriod = getPeriodDates(date, 'month')
     const weekPeriod = getPeriodDates(date, 'week')
 
-    const [yearGoals, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
+    const [currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
       await Promise.all([
-        prisma.periodGoal.findFirst({
-          where: { periodType: 'year', periodStart: yearPeriod.start },
-          orderBy: { createdAt: 'desc' },
+        // Загружаем цели на год из year_goals
+        prisma.yearGoal.findUnique({
+          where: { year },
         }),
+        // Остальные цели из period_goals (как раньше)
         prisma.periodGoal.findFirst({
           where: { periodType: 'half_year', periodStart: halfYearPeriod.start },
           orderBy: { createdAt: 'desc' },
@@ -76,14 +80,15 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Подготовить запрос для оценки (НОВЫЙ ФОРМАТ)
+    // Подготовить запрос для оценки (ОБНОВЛЕННЫЙ ФОРМАТ)
     const evaluationRequest: DailyEvaluationRequest = {
       date: date.toLocaleDateString('ru-RU'),
       planText: dailyEntry.planText || '',
       factText: dailyEntry.factText || '',
       goals: {
         dreamGoal: dream?.goalText || 'Не указана',
-        yearGoals: yearGoals ? JSON.parse(yearGoals.goalsJson) : [],
+        // Цели на год теперь из year_goals таблицы
+        yearGoals: currentYearGoal ? JSON.parse(currentYearGoal.goalsJson) : [],
         halfYearGoals: halfYearGoals ? JSON.parse(halfYearGoals.goalsJson) : [],
         quarterGoals: quarterGoals ? JSON.parse(quarterGoals.goalsJson) : [],
         monthGoals: monthGoals ? JSON.parse(monthGoals.goalsJson) : [],
@@ -123,9 +128,10 @@ export async function POST(request: NextRequest) {
     // Вызвать Claude API (НОВАЯ ФУНКЦИЯ)
     const evaluationResponse = await evaluateDayNew(evaluationRequest)
 
-    // Сохранить оценку с НОВЫМИ ПОЛЯМИ
-    const evaluation = await prisma.evaluation.create({
-      data: {
+    // Сохранить или обновить оценку с НОВЫМИ ПОЛЯМИ (используем upsert для повторных оценок)
+    const evaluation = await prisma.evaluation.upsert({
+      where: { dailyEntryId },
+      create: {
         dailyEntryId,
         dreamProgressScore: evaluationResponse.dream_progress_score,
         strategyScore: evaluationResponse.strategy_score,
@@ -149,6 +155,38 @@ export async function POST(request: NextRequest) {
         workHealthAlignment: evaluationResponse.horizontal_alignment?.work_health,
         workFamilyAlignment: evaluationResponse.horizontal_alignment?.work_family,
         workValuesAlignment: evaluationResponse.horizontal_alignment?.work_values,
+        // Предложенные задачи
+        suggestedTasksJson: evaluationResponse.suggested_tasks
+          ? JSON.stringify(evaluationResponse.suggested_tasks)
+          : null,
+      },
+      update: {
+        dreamProgressScore: evaluationResponse.dream_progress_score,
+        strategyScore: evaluationResponse.strategy_score,
+        operationsScore: evaluationResponse.operations_score,
+        teamScore: evaluationResponse.team_score,
+        efficiencyScore: evaluationResponse.efficiency_score,
+        overallScore: evaluationResponse.overall_score,
+        feedbackText: evaluationResponse.feedback,
+        planVsFactText: evaluationResponse.plan_vs_fact,
+        alignmentDayWeek: evaluationResponse.alignment.day_to_week,
+        alignmentWeekMonth: evaluationResponse.alignment.week_to_month,
+        alignmentMonthQuarter: evaluationResponse.alignment.month_to_quarter,
+        alignmentQuarterHalf: evaluationResponse.alignment.quarter_to_half,
+        alignmentHalfYear: evaluationResponse.alignment.half_to_year,
+        alignmentYearDream: evaluationResponse.alignment.year_to_dream,
+        recommendationsText: evaluationResponse.recommendations,
+        // НОВЫЕ ПОЛЯ
+        healthFlag: evaluationResponse.balance_flags.health,
+        familyFlag: evaluationResponse.balance_flags.family,
+        energyFlag: evaluationResponse.balance_flags.energy,
+        workHealthAlignment: evaluationResponse.horizontal_alignment?.work_health,
+        workFamilyAlignment: evaluationResponse.horizontal_alignment?.work_family,
+        workValuesAlignment: evaluationResponse.horizontal_alignment?.work_values,
+        // Предложенные задачи
+        suggestedTasksJson: evaluationResponse.suggested_tasks
+          ? JSON.stringify(evaluationResponse.suggested_tasks)
+          : null,
       },
     })
 
