@@ -6,6 +6,7 @@ import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { getPeriodDates } from '@/lib/dates'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
+import { DailyEntry, PeriodGoals, OpenTask } from '@/lib/types'
 
 export default function DailyPage() {
   const router = useRouter()
@@ -14,13 +15,16 @@ export default function DailyPage() {
   const [factText, setFactText] = useState('')
   const [weekGoals, setWeekGoals] = useState<string[]>([])
   const [monthGoals, setMonthGoals] = useState<string[]>([])
-  const [dailyEntry, setDailyEntry] = useState<any>(null)
+  const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
   const [saving, setSaving] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [message, setMessage] = useState('')
-  const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
-  const [tasks, setTasks] = useState<string[]>([])
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [tasks, setTasks] = useState<OpenTask[]>([])
   const [newTaskText, setNewTaskText] = useState('')
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editingTaskText, setEditingTaskText] = useState('')
 
   useEffect(() => {
     loadData()
@@ -29,7 +33,7 @@ export default function DailyPage() {
   // Восстановить высоту textarea при загрузке (только один раз)
   useEffect(() => {
     // Небольшая задержка чтобы дать время DOM отрендериться
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       const textareas = document.querySelectorAll('textarea')
       textareas.forEach((textarea: Element) => {
         const el = textarea as HTMLTextAreaElement
@@ -37,58 +41,81 @@ export default function DailyPage() {
         el.style.height = el.scrollHeight + 'px'
       })
     }, 100)
+    
+    return () => clearTimeout(timeoutId)
   }, [selectedDate]) // Только при смене даты, не при каждом изменении planText
 
   const loadData = async () => {
     try {
       // Load daily entry
       const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
-      const daily = await dailyRes.json()
-
-      if (daily) {
-        setDailyEntry(daily)
-        setPlanText(daily.planText || '')
-        setFactText(daily.factText || '')
-
-        // Загрузить задачи из planText
-        if (daily.planText) {
-          const taskList = daily.planText.split('\n').filter((t: string) => t.trim())
-          setTasks(taskList)
-        } else {
-          setTasks([])
-        }
-
-        // Восстановить выбранные задачи
-        if (daily.selectedTasksJson) {
-          try {
-            const selected = JSON.parse(daily.selectedTasksJson) as number[]
-            setSelectedTasks(new Set(selected))
-          } catch (e) {
-            setSelectedTasks(new Set())
-          }
-        } else {
-          setSelectedTasks(new Set())
-        }
-      } else {
+      if (!dailyRes.ok) {
+        console.error('Failed to fetch daily entry:', dailyRes.status)
         setDailyEntry(null)
         setPlanText('')
         setFactText('')
         setTasks([])
         setSelectedTasks(new Set())
+      } else {
+        const daily = await dailyRes.json()
+
+        if (daily) {
+          setDailyEntry(daily)
+          setPlanText(daily.planText || '')
+          setFactText(daily.factText || '')
+
+          // Загрузить задачи из planText с генерацией ID
+          if (daily.planText) {
+            const taskList = daily.planText.split('\n').filter((t: string) => t.trim())
+            const tasksWithIds = taskList.map((text: string, index: number) => ({
+              id: `${daily.id}-${index}-${text.substring(0, 20)}`, // Уникальный ID на основе позиции и текста
+              text
+            }))
+            setTasks(tasksWithIds)
+          } else {
+            setTasks([])
+          }
+
+          // Восстановить выбранные задачи
+          if (daily.selectedTasksJson) {
+            try {
+              const selected = JSON.parse(daily.selectedTasksJson) as string[]
+              setSelectedTasks(new Set(selected))
+            } catch (e) {
+              setSelectedTasks(new Set())
+            }
+          } else {
+            setSelectedTasks(new Set())
+          }
+        } else {
+          setDailyEntry(null)
+          setPlanText('')
+          setFactText('')
+          setTasks([])
+          setSelectedTasks(new Set())
+        }
       }
 
       // Load week goals
       const date = new Date(selectedDate)
       const { start: weekStart } = getPeriodDates(date, 'week')
       const weekRes = await fetch(`/api/goals/period?type=week&date=${weekStart.toISOString()}`)
-      const weekData = await weekRes.json()
-      setWeekGoals(weekData?.goals || [])
+      if (weekRes.ok) {
+        const weekData = await weekRes.json()
+        setWeekGoals(weekData?.goals || [])
+      } else {
+        setWeekGoals([])
+      }
 
       // Load month goals
       const { start: monthStart } = getPeriodDates(date, 'month')
       const monthRes = await fetch(`/api/goals/period?type=month&date=${monthStart.toISOString()}`)
-      const monthData = await monthRes.json()
-      setMonthGoals(monthData?.goals || [])
+      if (monthRes.ok) {
+        const monthData = await monthRes.json()
+        setMonthGoals(monthData?.goals || [])
+      } else {
+        setMonthGoals([])
+      }
     } catch (error) {
       console.error('Error loading data:', error)
     }
@@ -96,26 +123,33 @@ export default function DailyPage() {
 
   const addTask = () => {
     if (!newTaskText.trim()) return
-    const updatedTasks = [...tasks, newTaskText.trim()]
+    const newTask = {
+      id: `temp-${Date.now()}-${Math.random()}`,
+      text: newTaskText.trim()
+    }
+    const updatedTasks = [...tasks, newTask]
     setTasks(updatedTasks)
     setNewTaskText('')
     // Автоматически сохраняем
     savePlanWithTasks(updatedTasks)
   }
 
-  const removeTask = (index: number) => {
-    const updatedTasks = tasks.filter((_, i) => i !== index)
+  const removeTask = (taskId: string) => {
+    const updatedTasks = tasks.filter(t => t.id !== taskId)
     setTasks(updatedTasks)
     // Убираем из выбранных если была выбрана
     const newSelected = new Set(selectedTasks)
-    newSelected.delete(index)
+    newSelected.delete(taskId)
     setSelectedTasks(newSelected)
     // Автоматически сохраняем
     savePlanWithTasks(updatedTasks, newSelected)
   }
 
-  const savePlanWithTasks = async (taskList: string[] = tasks, selected: Set<number> = selectedTasks) => {
-    const planTextToSave = taskList.join('\n')
+  const savePlanWithTasks = async (
+    taskList: Array<{id: string, text: string}> = tasks,
+    selected: Set<string> = selectedTasks
+  ) => {
+    const planTextToSave = taskList.map(t => t.text).join('\n')
 
     try {
       const res = await fetch('/api/daily', {
@@ -180,9 +214,9 @@ export default function DailyPage() {
     }
 
     const tasksToTransfer: string[] = []
-    tasks.forEach((task, index) => {
-      if (selectedTasks.has(index)) {
-        tasksToTransfer.push(task)
+    tasks.forEach((task) => {
+      if (selectedTasks.has(task.id)) {
+        tasksToTransfer.push(task.text)
       }
     })
 
@@ -197,24 +231,71 @@ export default function DailyPage() {
     setTimeout(() => setMessage(''), 3000)
   }
 
-  const toggleTaskSelection = (index: number) => {
+  const toggleTaskSelection = (taskId: string) => {
     const newSelected = new Set(selectedTasks)
-    if (newSelected.has(index)) {
-      newSelected.delete(index)
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId)
     } else {
-      newSelected.add(index)
+      newSelected.add(taskId)
     }
     setSelectedTasks(newSelected)
     // Автоматически сохраняем
     savePlanWithTasks(tasks, newSelected)
   }
 
-  const evaluate = async () => {
-    if (!dailyEntry?.id) {
-      setMessage('❌ Сначала сохраните план и факт')
+  const handleDragStart = (taskId: string) => {
+    setDraggedTaskId(taskId)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (targetTaskId: string) => {
+    if (!draggedTaskId || draggedTaskId === targetTaskId) return
+
+    const draggedIndex = tasks.findIndex(t => t.id === draggedTaskId)
+    const targetIndex = tasks.findIndex(t => t.id === targetTaskId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    const newTasks = [...tasks]
+    const [draggedTask] = newTasks.splice(draggedIndex, 1)
+    newTasks.splice(targetIndex, 0, draggedTask)
+
+    setTasks(newTasks)
+    setDraggedTaskId(null)
+    savePlanWithTasks(newTasks, selectedTasks)
+  }
+
+  const startEditingTask = (taskId: string, currentText: string) => {
+    setEditingTaskId(taskId)
+    setEditingTaskText(currentText)
+  }
+
+  const saveEditedTask = (taskId: string) => {
+    if (!editingTaskText.trim()) {
+      // Если текст пустой, отменяем редактирование
+      setEditingTaskId(null)
+      setEditingTaskText('')
       return
     }
 
+    const updatedTasks = tasks.map(t =>
+      t.id === taskId ? { ...t, text: editingTaskText.trim() } : t
+    )
+    setTasks(updatedTasks)
+    setEditingTaskId(null)
+    setEditingTaskText('')
+    savePlanWithTasks(updatedTasks, selectedTasks)
+  }
+
+  const cancelEditingTask = () => {
+    setEditingTaskId(null)
+    setEditingTaskText('')
+  }
+
+  const evaluate = async () => {
     if (!factText) {
       setMessage('❌ Добавьте факт выполнения перед оценкой')
       return
@@ -224,11 +305,39 @@ export default function DailyPage() {
     setMessage('⏳ Получение оценки от ИИ...')
 
     try {
+      // Если нет dailyEntry, сначала сохраняем и получаем актуальный ID
+      let entryId = dailyEntry?.id
+
+      if (!entryId) {
+        // Сохраняем план и факт, получаем ID из ответа
+        const planTextToSave = tasks.map(t => t.text).join('\n')
+        const saveRes = await fetch('/api/daily', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: selectedDate,
+            planText: planTextToSave,
+            factText,
+            selectedTasksJson: JSON.stringify(Array.from(selectedTasks)),
+          }),
+        })
+
+        const savedEntry = await saveRes.json()
+        if (!savedEntry?.id) {
+          setMessage('❌ Ошибка при сохранении данных')
+          setEvaluating(false)
+          return
+        }
+
+        entryId = savedEntry.id
+        setDailyEntry(savedEntry)
+      }
+
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dailyEntryId: dailyEntry.id,
+          dailyEntryId: entryId,
         }),
       })
 
@@ -317,11 +426,11 @@ export default function DailyPage() {
                 }
               }}
               placeholder="Добавить задачу..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <button
               onClick={addTask}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="btn-primary"
             >
               Добавить
             </button>
@@ -334,26 +443,58 @@ export default function DailyPage() {
                 Добавьте задачи на день...
               </p>
             ) : (
-              tasks.map((task, index) => (
+              tasks.map((task) => (
                 <div
-                  key={index}
+                  key={task.id}
+                  draggable={editingTaskId !== task.id}
+                  onDragStart={() => handleDragStart(task.id)}
+                  onDragOver={handleDragOver}
+                  onDrop={() => handleDrop(task.id)}
                   className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
-                    selectedTasks.has(index)
+                    editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
+                  } ${
+                    selectedTasks.has(task.id)
                       ? 'bg-green-50 border-green-300'
                       : 'bg-white border-gray-200 hover:border-gray-300'
-                  }`}
+                  } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                 >
+                  <span className="text-gray-400 cursor-grab active:cursor-grabbing">⋮⋮</span>
                   <input
                     type="checkbox"
-                    checked={selectedTasks.has(index)}
-                    onChange={() => toggleTaskSelection(index)}
+                    checked={selectedTasks.has(task.id)}
+                    onChange={() => toggleTaskSelection(task.id)}
                     className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                   />
-                  <span className={`flex-1 text-sm ${selectedTasks.has(index) ? 'line-through text-gray-500' : ''}`}>
-                    {task}
-                  </span>
+
+                  {editingTaskId === task.id ? (
+                    <input
+                      type="text"
+                      value={editingTaskText}
+                      onChange={(e) => setEditingTaskText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          saveEditedTask(task.id)
+                        } else if (e.key === 'Escape') {
+                          cancelEditingTask()
+                        }
+                      }}
+                      onBlur={() => saveEditedTask(task.id)}
+                      autoFocus
+                      className="flex-1 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  ) : (
+                    <span
+                      className={`flex-1 text-sm ${selectedTasks.has(task.id) ? 'line-through text-gray-500' : ''}`}
+                      onDoubleClick={() => startEditingTask(task.id, task.text)}
+                      title="Дважды кликните для редактирования"
+                    >
+                      {task.text}
+                    </span>
+                  )}
+
                   <button
-                    onClick={() => removeTask(index)}
+                    onClick={() => removeTask(task.id)}
                     className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
                     title="Удалить задачу"
                   >
@@ -363,6 +504,10 @@ export default function DailyPage() {
               ))
             )}
           </div>
+
+          <button onClick={savePlan} disabled={saving} className="btn-primary disabled:opacity-50 w-full">
+            {saving ? 'Сохранение...' : 'Сохранить план'}
+          </button>
         </div>
 
         {/* Fact - Right */}
@@ -375,7 +520,7 @@ export default function DailyPage() {
             placeholder="Введите что реально сделали за день...&#10;&#10;Например:&#10;1. ИИ ассистент - не сделал&#10;2. Калькулятор - готов&#10;3. Штатное расписание - не сделал"
             rows={12}
           />
-          <button onClick={saveFact} disabled={saving} className="btn-primary mt-4 disabled:opacity-50">
+          <button onClick={saveFact} disabled={saving} className="btn-primary w-full disabled:opacity-50">
             {saving ? 'Сохранение...' : 'Сохранить факт'}
           </button>
         </div>

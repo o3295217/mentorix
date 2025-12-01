@@ -20,6 +20,10 @@ export default function HistoryPage() {
       const from = subDays(to, days)
 
       const res = await fetch(`/api/daily?from=${from.toISOString()}&to=${to.toISOString()}`)
+      if (!res.ok) {
+        console.error('Failed to load entries:', res.status)
+        return
+      }
       const data = await res.json()
       setEntries(data)
     } catch (error) {

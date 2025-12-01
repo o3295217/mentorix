@@ -35,6 +35,10 @@ export default function PeriodsPage() {
   const fetchEvaluations = async () => {
     try {
       const res = await fetch('/api/periods')
+      if (!res.ok) {
+        console.error('Failed to load evaluations:', res.status)
+        return
+      }
       const data = await res.json()
       setEvaluations(data)
     } catch (error) {
@@ -117,9 +121,9 @@ export default function PeriodsPage() {
 
       // Redirect to evaluation page
       window.location.href = `/periods/${newEvaluation.id}`
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating evaluation:', error)
-      alert(`Ошибка: ${error.message}`)
+      alert(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
     } finally {
       setCreating(false)
     }

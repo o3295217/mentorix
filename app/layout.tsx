@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Link from 'next/link'
+import Navigation from '@/components/Navigation'
 
 export const metadata: Metadata = {
   title: 'AI Effectiveness Assistant',
@@ -12,45 +12,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru">
       <body suppressHydrationWarning>
         <div className="min-h-screen flex flex-col">
-          <header className="bg-white shadow-sm border-b border-gray-200">
-            <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between h-16">
-                <div className="flex space-x-8">
-                  <Link href="/" className="flex items-center text-xl font-bold text-primary-600">
-                    AI Assistant
-                  </Link>
-                  <div className="flex space-x-4 items-center">
-                    <Link href="/" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Главная
-                    </Link>
-                    <Link href="/goals" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Цели
-                    </Link>
-                    <Link href="/daily" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Планирование
-                    </Link>
-                    <Link href="/periods" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Периоды
-                    </Link>
-                    <Link href="/forecast" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Прогнозы
-                    </Link>
-                    <Link href="/history" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      История
-                    </Link>
-                    <Link href="/analytics" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Аналитика
-                    </Link>
-                    <Link href="/tasks" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Задачи
-                    </Link>
-                    <Link href="/profile" className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium">
-                      Профиль
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </nav>
+          <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+            <Navigation />
           </header>
 
           <main className="flex-1">

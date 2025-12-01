@@ -5,11 +5,19 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import DreamProgress from '@/components/DreamProgress'
+import ProgressIndicator from '@/components/ProgressIndicator'
+import { DreamGoal, DailyEntry, ProgressStats } from '@/lib/types'
+
+interface UserProfile {
+  name?: string
+}
 
 export default function HomePage() {
   const [today] = useState(new Date())
-  const [dreamGoal, setDreamGoal] = useState<any>(null)
-  const [dailyEntry, setDailyEntry] = useState<any>(null)
+  const [dreamGoal, setDreamGoal] = useState<DreamGoal | null>(null)
+  const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
+  const [progressStats, setProgressStats] = useState<ProgressStats | null>(null)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,14 +28,32 @@ export default function HomePage() {
     try {
       // Fetch dream goal
       const dreamRes = await fetch('/api/goals/dream')
-      const dream = await dreamRes.json()
-      setDreamGoal(dream)
+      if (dreamRes.ok) {
+        const dream = await dreamRes.json()
+        setDreamGoal(dream)
+      }
 
       // Fetch today's entry
       const dateStr = format(today, 'yyyy-MM-dd')
       const dailyRes = await fetch(`/api/daily?date=${dateStr}`)
-      const daily = await dailyRes.json()
-      setDailyEntry(daily)
+      if (dailyRes.ok) {
+        const daily = await dailyRes.json()
+        setDailyEntry(daily)
+      }
+
+      // Fetch progress stats
+      const progressRes = await fetch('/api/progress')
+      if (progressRes.ok) {
+        const progress = await progressRes.json()
+        setProgressStats(progress)
+      }
+
+      // Fetch user profile
+      const profileRes = await fetch('/api/profile')
+      if (profileRes.ok) {
+        const profile = await profileRes.json()
+        setUserProfile(profile)
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -57,6 +83,18 @@ export default function HomePage() {
         dreamProgressScore={dailyEntry?.evaluation?.dreamProgressScore}
         showDetails={!!dailyEntry?.evaluation}
       />
+
+      {/* Progress Indicator */}
+      {progressStats && (
+        <ProgressIndicator
+          productiveDays={progressStats.productiveDays}
+          currentStreak={progressStats.currentStreak}
+          progressPercent={progressStats.progressPercent}
+          targetDays={progressStats.targetDays}
+          currentSpeed={progressStats.currentSpeed}
+          userName={userProfile?.name}
+        />
+      )}
 
       {/* Today's Card */}
       <div className="card">

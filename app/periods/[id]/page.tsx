@@ -42,6 +42,10 @@ export default function PeriodDetailPage() {
   const fetchEvaluation = async () => {
     try {
       const res = await fetch(`/api/periods/${id}`)
+      if (!res.ok) {
+        console.error('Failed to load evaluation:', res.status)
+        return
+      }
       const data = await res.json()
       setEvaluation(data)
     } catch (error) {

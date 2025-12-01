@@ -5,11 +5,9 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    console.log('📥 POST /api/profile/items - body:', body)
     const { blockId, categoryId, fieldName, fieldValue } = body
 
     if ((!blockId && !categoryId) || !fieldName || !fieldValue) {
-      console.log('❌ Validation failed:', { blockId, categoryId, fieldName, fieldValue })
       return NextResponse.json({ error: 'Block ID or Category ID, field name and field value are required' }, { status: 400 })
     }
 
@@ -34,7 +32,6 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log('✅ Item created:', item)
     return NextResponse.json(item)
   } catch (error) {
     console.error('Error creating profile item:', error)
@@ -73,7 +70,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
 
-    const updateData: any = {}
+    const updateData: { fieldName?: string; fieldValue?: string; order?: number } = {}
     if (fieldName !== undefined) updateData.fieldName = fieldName.trim()
     if (fieldValue !== undefined) updateData.fieldValue = fieldValue.trim()
     if (order !== undefined) updateData.order = parseInt(order)

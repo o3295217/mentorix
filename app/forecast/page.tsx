@@ -79,7 +79,13 @@ export default function ForecastPage() {
   const generateForecast = async () => {
     setLoading(true)
     try {
-      const body: any = {
+      const body: {
+        forecastType: string
+        historicalDays: number
+        periodType?: string
+        periodStart?: string
+        periodEnd?: string
+      } = {
         forecastType,
         historicalDays,
       }
@@ -107,9 +113,9 @@ export default function ForecastPage() {
 
       const data = await res.json()
       setForecast(data)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating forecast:', error)
-      alert(`Ошибка: ${error.message}`)
+      alert(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
     } finally {
       setLoading(false)
     }

@@ -1,0 +1,133 @@
+// Типы для API-ответов (фронтенд)
+
+// === МЕЧТА ===
+export interface DreamGoal {
+  id: number
+  goalText: string
+  years: number
+  createdAt: string
+  updatedAt: string
+}
+
+// === ОЦЕНКА ДНЯ ===
+export interface Evaluation {
+  id: number
+  dailyEntryId: number
+  dreamProgressScore: number
+  strategyScore: number
+  operationsScore: number
+  teamScore: number
+  efficiencyScore: number
+  overallScore: number
+  feedbackText: string
+  planVsFactText: string
+  alignmentDayWeek: string
+  alignmentWeekMonth: string
+  alignmentMonthQuarter: string
+  alignmentQuarterHalf: string
+  alignmentHalfYear: string
+  alignmentYearDream: string
+  recommendationsText: string
+  healthFlag?: string
+  familyFlag?: string
+  energyFlag?: string
+  workHealthAlignment?: string
+  workFamilyAlignment?: string
+  workValuesAlignment?: string
+  suggestedTasksJson?: string
+  createdAt: string
+}
+
+// === ЕЖЕДНЕВНАЯ ЗАПИСЬ ===
+export interface DailyEntry {
+  id: number
+  date: string
+  planText?: string
+  factText?: string
+  emotionalState?: string
+  physicalState?: string
+  lifeEvents?: string
+  externalFactors?: string
+  energyLevel?: number
+  sleepQuality?: number
+  familyTime?: number
+  exerciseTime?: number
+  selectedTasksJson?: string
+  createdAt: string
+  updatedAt: string
+  evaluation?: Evaluation
+}
+
+// === СТАТИСТИКА ПРОГРЕССА ===
+export interface ProgressStats {
+  currentSpeed: number
+  totalDays: number
+  productiveDays: number
+  currentStreak: number
+  longestStreak: number
+  avgSpeed30d: number
+  fuelLevel: number
+  milestones: {
+    '10': boolean
+    '30': boolean
+    '100': boolean
+    '365': boolean
+    '1000': boolean
+  }
+  progressPercent: number
+  targetDays: number
+  last30DaysData?: Array<{ date: string; score: number }>
+  distribution: {
+    excellent: number
+    medium: number
+    poor: number
+  }
+}
+
+// === ЦЕЛИ НА ПЕРИОД ===
+export interface PeriodGoals {
+  goals: string[]
+}
+
+// === ЗАДАЧА ===
+export interface Task {
+  id: string
+  text: string
+}
+
+// === ОТКРЫТАЯ ЗАДАЧА ===
+export interface OpenTask {
+  id: number
+  taskText: string
+  taskType: 'strategic' | 'operational'
+  originDate: string
+  isClosed: boolean
+  closedAt?: string
+  createdAt: string
+}
+
+// === ПРЕДЛОЖЕННАЯ ЗАДАЧА (от ИИ) ===
+export interface SuggestedTask {
+  taskText: string
+  taskType: 'strategic' | 'operational'
+  priority: 'high' | 'medium' | 'low'
+  reason: string
+}
+
+// === ДАННЫЕ ДЛЯ ГРАФИКА ТРЕНДОВ ===
+export interface TrendDataPoint {
+  date: string
+  overallScore: number
+  dreamProgressScore: number
+  strategyScore: number
+  operationsScore: number
+}
+
+// === СТАТИСТИКА ДЛЯ АНАЛИТИКИ ===
+export interface AnalyticsStats {
+  avg: number
+  max: number
+  min: number
+  topDays: TrendDataPoint[]
+  worstDays: TrendDataPoint[]
+}

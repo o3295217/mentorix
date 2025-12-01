@@ -50,6 +50,10 @@ export default function ProfilePage() {
   const loadProfile = async () => {
     try {
       const res = await fetch('/api/profile')
+      if (!res.ok) {
+        console.error('Failed to load profile:', res.status)
+        return
+      }
       const data = await res.json()
       if (data) {
         setProfile({

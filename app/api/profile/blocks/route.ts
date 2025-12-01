@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
 
-    const updateData: any = {}
+    const updateData: { title?: string; order?: number } = {}
     if (title !== undefined) updateData.title = title.trim()
     if (order !== undefined) updateData.order = parseInt(order)
 

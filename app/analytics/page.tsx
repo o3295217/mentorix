@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { TrendDataPoint, AnalyticsStats } from '@/lib/types'
 
 export default function AnalyticsPage() {
-  const [trendData, setTrendData] = useState<any[]>([])
+  const [trendData, setTrendData] = useState<TrendDataPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
 
@@ -15,6 +16,10 @@ export default function AnalyticsPage() {
   const loadTrendData = async () => {
     try {
       const res = await fetch(`/api/analytics/trend?days=${days}`)
+      if (!res.ok) {
+        console.error('Failed to load trend data:', res.status)
+        return
+      }
       const data = await res.json()
       setTrendData(data)
     } catch (error) {
@@ -112,7 +117,7 @@ export default function AnalyticsPage() {
             <div className="card">
               <h2 className="text-xl font-bold mb-4 text-green-700">🏆 Лучшие дни</h2>
               <div className="space-y-2">
-                {stats.topDays.map((day: any, i: number) => (
+                {stats.topDays.map((day, i) => (
                   <div key={i} className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                     <span className="text-sm">{day.date}</span>
                     <span className="font-bold text-green-700">{day.overallScore}</span>
@@ -124,7 +129,7 @@ export default function AnalyticsPage() {
             <div className="card">
               <h2 className="text-xl font-bold mb-4 text-red-700">📉 Худшие дни</h2>
               <div className="space-y-2">
-                {stats.worstDays.map((day: any, i: number) => (
+                {stats.worstDays.map((day, i) => (
                   <div key={i} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
                     <span className="text-sm">{day.date}</span>
                     <span className="font-bold text-red-700">{day.overallScore}</span>

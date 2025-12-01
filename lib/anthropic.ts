@@ -10,7 +10,7 @@ import {
   GoalsHierarchy,
   DailyContext,
 } from './prompts/types'
-import { buildCacheablePromptPart, buildDynamicPromptPart, validateGoals } from './prompts/daily'
+import { DAILY_EVALUATION_SYSTEM_PROMPT, buildUserDataPrompt, validateGoals } from './prompts/daily'
 import { buildPeriodEvaluationPrompt } from './prompts/period'
 import { buildForecastPrompt } from './prompts/forecast'
 
@@ -19,6 +19,33 @@ const anthropic = new Anthropic({
   maxRetries: 2,
   timeout: 5 * 60 * 1000, // 5 minutes timeout for the HTTP client
 })
+
+// Логирование статистики кэширования Claude API
+interface CacheUsage {
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+  input_tokens?: number
+  output_tokens?: number
+}
+
+function logCacheStats(functionName: string, usage: CacheUsage | undefined) {
+  const cacheCreated = usage?.cache_creation_input_tokens || 0
+  const cacheRead = usage?.cache_read_input_tokens || 0
+  const inputTokens = usage?.input_tokens || 0
+  const outputTokens = usage?.output_tokens || 0
+  
+  const cacheHit = cacheRead > 0
+  const savingsPercent = inputTokens > 0 ? Math.round((cacheRead / (inputTokens + cacheRead)) * 100) : 0
+  
+  console.log(`[Claude Cache] ${functionName}:`, {
+    cacheHit,
+    cacheCreated,
+    cacheRead,
+    inputTokens,
+    outputTokens,
+    savingsPercent: `${savingsPercent}%`,
+  })
+}
 
 // Экспорт типов для обратной совместимости
 export type { UserProfile, GoalsHierarchy, DailyContext, DailyEvaluationResponse }
@@ -87,43 +114,49 @@ export async function evaluateDayNew(
     return validation.response
   }
 
-  // Построение промпта с разделением на кэшируемую и динамическую части
-  const cacheablePrompt = buildCacheablePromptPart(request)
-  const dynamicPrompt = buildDynamicPromptPart(request)
+  // Построение user промпта со всеми данными (мечта, цели, план/факт)
+  const userPrompt = buildUserDataPrompt(request)
 
   // Вызов Claude API с Prompt Caching
-  // Кэшируемая часть: инструкции + мечта + профиль + годовые цели (меняются редко)
-  // Динамическая часть: план/факт дня + месячные/недельные цели (меняются часто)
+  // System prompt: ТОЛЬКО инструкции (кэшируются, ~3500 токенов)
+  // User message: все данные пользователя (НЕ кэшируются - всегда актуальные)
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5-20250929',
     max_tokens: 4096,
+    system: [
+      {
+        type: 'text',
+        text: DAILY_EVALUATION_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' }, // Кэшируем инструкции на 5 минут
+      },
+    ],
     messages: [
       {
         role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: cacheablePrompt,
-            cache_control: { type: 'ephemeral' }, // Кэшируем на 5 минут
-          },
-          {
-            type: 'text',
-            text: dynamicPrompt,
-          },
-        ],
+        content: userPrompt,
       },
     ],
   })
+
+  // Логируем статистику кэширования
+  logCacheStats('evaluateDayNew', message.usage)
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   // Извлечение JSON из ответа (Claude может обернуть в markdown)
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
+    console.error('Claude response without JSON:', responseText)
     throw new Error('Failed to parse evaluation response from Claude')
   }
 
-  const parsedResponse = JSON.parse(jsonMatch[0]) as DailyEvaluationResponse
+  let parsedResponse: DailyEvaluationResponse
+  try {
+    parsedResponse = JSON.parse(jsonMatch[0])
+  } catch (e) {
+    console.error('Invalid JSON from Claude:', jsonMatch[0])
+    throw new Error('Claude returned invalid JSON response')
+  }
 
   // Валидация ответа
   if (
@@ -186,15 +219,25 @@ export async function evaluatePeriod(
     ],
   })
 
+  // Логируем статистику кэширования
+  logCacheStats('evaluatePeriod', message.usage)
+
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   // Извлечение JSON из ответа
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
+    console.error('Claude response without JSON:', responseText)
     throw new Error('Failed to parse period evaluation response from Claude')
   }
 
-  const parsedResponse = JSON.parse(jsonMatch[0]) as PeriodEvaluationResponse
+  let parsedResponse: PeriodEvaluationResponse
+  try {
+    parsedResponse = JSON.parse(jsonMatch[0])
+  } catch (e) {
+    console.error('Invalid JSON from Claude:', jsonMatch[0])
+    throw new Error('Claude returned invalid JSON response for period evaluation')
+  }
 
   // Валидация ответа
   if (
@@ -233,15 +276,25 @@ export async function generateForecast(
     ],
   })
 
+  // Логируем статистику кэширования
+  logCacheStats('generateForecast', message.usage)
+
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   // Извлечение JSON из ответа
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
+    console.error('Claude response without JSON:', responseText)
     throw new Error('Failed to parse forecast response from Claude')
   }
 
-  const parsedResponse = JSON.parse(jsonMatch[0]) as ForecastResponse
+  let parsedResponse: ForecastResponse
+  try {
+    parsedResponse = JSON.parse(jsonMatch[0])
+  } catch (e) {
+    console.error('Invalid JSON from Claude:', jsonMatch[0])
+    throw new Error('Claude returned invalid JSON response for forecast')
+  }
 
   // Валидация ответа
   if (!parsedResponse.dreamForecast || !parsedResponse.summary) {

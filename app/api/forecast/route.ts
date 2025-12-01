@@ -3,6 +3,17 @@ import { prisma } from '@/lib/prisma'
 import { generateForecast } from '@/lib/anthropic'
 import { ForecastRequest, DayData } from '@/lib/prompts/types'
 
+// Безопасный парсинг JSON с fallback значением
+function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
+  if (!json) return fallback
+  try {
+    return JSON.parse(json)
+  } catch (e) {
+    console.error('Failed to parse JSON:', json)
+    return fallback
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -92,7 +103,7 @@ export async function POST(request: NextRequest) {
           orderBy: { createdAt: 'desc' },
         })
         if (weekGoal) {
-          currentPeriodGoals = JSON.parse(weekGoal.goalsJson)
+          currentPeriodGoals = safeParseJson(weekGoal.goalsJson, [])
         }
       } else if (periodType === 'month') {
         const monthGoal = await prisma.periodGoal.findFirst({
@@ -100,7 +111,7 @@ export async function POST(request: NextRequest) {
           orderBy: { createdAt: 'desc' },
         })
         if (monthGoal) {
-          currentPeriodGoals = JSON.parse(monthGoal.goalsJson)
+          currentPeriodGoals = safeParseJson(monthGoal.goalsJson, [])
         }
       } else if (periodType === 'quarter') {
         const quarterGoal = await prisma.periodGoal.findFirst({
@@ -108,7 +119,7 @@ export async function POST(request: NextRequest) {
           orderBy: { createdAt: 'desc' },
         })
         if (quarterGoal) {
-          currentPeriodGoals = JSON.parse(quarterGoal.goalsJson)
+          currentPeriodGoals = safeParseJson(quarterGoal.goalsJson, [])
         }
       } else if (periodType === 'year') {
         const year = periodStartDate.getFullYear()
@@ -116,7 +127,7 @@ export async function POST(request: NextRequest) {
           where: { year },
         })
         if (yearGoal) {
-          currentPeriodGoals = JSON.parse(yearGoal.goalsJson)
+          currentPeriodGoals = safeParseJson(yearGoal.goalsJson, [])
         }
       }
     }

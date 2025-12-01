@@ -5,11 +5,13 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import BalanceFlags from '@/components/BalanceFlags'
+import { DailyEntry, SuggestedTask } from '@/lib/types'
 
 function getAlignmentStatus(text: string): 'works' | 'partial' | 'no' {
   const lower = text.toLowerCase()
   if (lower.includes('works') || lower.includes('работает')) return 'works'
   if (lower.includes('partial') || lower.includes('частично')) return 'partial'
+  if (lower.includes('no') || lower.includes('нет')) return 'no'
   return 'no'
 }
 
@@ -43,7 +45,7 @@ function getScoreColor(score: number): string {
 
 export default function EvaluationPage({ params }: { params: Promise<{ date: string }> }) {
   const resolvedParams = use(params)
-  const [dailyEntry, setDailyEntry] = useState<any>(null)
+  const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
   const [loading, setLoading] = useState(true)
   const [addingTask, setAddingTask] = useState<string | null>(null)
   const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set())
@@ -55,6 +57,10 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const loadData = async () => {
     try {
       const res = await fetch(`/api/daily?date=${resolvedParams.date}`)
+      if (!res.ok) {
+        console.error('Failed to load evaluation:', res.status)
+        return
+      }
       const data = await res.json()
       setDailyEntry(data)
     } catch (error) {
@@ -64,7 +70,11 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
     }
   }
 
-  const addTaskToOpen = async (task: any) => {
+  const addTaskToOpen = async (task: SuggestedTask) => {
+    if (!dailyEntry) {
+      alert('Ошибка: данные дня не загружены')
+      return
+    }
     setAddingTask(task.taskText)
     try {
       await fetch('/api/tasks/add-suggested', {
@@ -259,7 +269,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
             ИИ выявил важные задачи, которые стоит добавить в список незакрытых
           </p>
           <div className="space-y-3">
-            {JSON.parse(evaluation.suggestedTasksJson).map((task: any, i: number) => {
+            {(JSON.parse(evaluation.suggestedTasksJson) as SuggestedTask[]).map((task, i) => {
               const isAdded = addedTasks.has(task.taskText)
               const isAdding = addingTask === task.taskText
 
