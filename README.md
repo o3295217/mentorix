@@ -11,13 +11,17 @@
 - 🔗 Проверка alignment (выравнивания) целей между уровнями
 - 📈 История всех дней с оценками
 - ✅ Управление незакрытыми задачами
+- 🚗 Прогресс к мечте с расчётом прогноза достижения
+- 🔮 AI-прогнозы и периодические оценки (неделя, месяц, квартал, год)
+- 👤 Персонализированный профиль пользователя
+- ⚖️ Мониторинг баланса: здоровье, семья, энергия
 
 ## Технологии
 
-- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
+- **Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend:** Next.js API Routes
 - **Database:** SQLite + Prisma ORM
-- **AI:** Anthropic Claude API (claude-sonnet-4.5)
+- **AI:** Anthropic Claude API (claude-sonnet-4-5-20250929) с Prompt Caching
 - **Charts:** Recharts
 
 ## Установка и запуск
@@ -37,24 +41,17 @@ npm install
 
 ### 3. Настроить переменные окружения
 
-Создайте файл `.env.local` на основе `.env.example`:
-
-```bash
-cp .env.example .env.local
-```
-
-Отредактируйте `.env.local` и добавьте свой API ключ Anthropic:
+Создайте файл `.env.local`:
 
 ```env
 DATABASE_URL="file:./dev.db"
 ANTHROPIC_API_KEY="ваш-api-ключ-здесь"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
 ### 4. Инициализировать базу данных
 
 ```bash
-npx prisma migrate dev --name init
+npx prisma migrate dev
 ```
 
 ### 5. Запустить приложение
@@ -84,63 +81,66 @@ docker run -p 3000:3000 --env-file .env.local ghcr.io/o3295217/ai-assistant-spec
 
 ```
 ai-assistant-spec/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   │   ├── goals/        # Goals API
-│   │   ├── daily/        # Daily entries API
-│   │   ├── evaluate/     # Evaluation API
-│   │   ├── tasks/        # Tasks API
-│   │   └── analytics/    # Analytics API
-│   ├── goals/            # Goals management page
-│   ├── daily/            # Daily planning page
-│   ├── evaluation/       # Evaluation display page
-│   ├── history/          # History page
-│   ├── analytics/        # Analytics page
-│   └── tasks/            # Tasks page
-├── lib/                   # Utilities
-│   ├── prisma.ts         # Prisma client
-│   ├── anthropic.ts      # Claude API integration
-│   └── dates.ts          # Date utilities
+├── app/                       # Next.js App Router
+│   ├── api/                   # API routes
+│   │   ├── analytics/         # Аналитика и тренды
+│   │   ├── daily/             # Ежедневные записи
+│   │   ├── evaluate/          # Оценка дня (Claude AI)
+│   │   ├── evaluate-period/   # Оценка периодов (неделя/месяц/квартал/год)
+│   │   ├── forecast/          # AI-прогнозы
+│   │   ├── goals/             # Цели (dream, period)
+│   │   ├── health/            # Данные здоровья
+│   │   ├── periods/           # Периодические цели
+│   │   ├── profile/           # Профиль пользователя
+│   │   ├── progress/          # Статистика прогресса
+│   │   └── tasks/             # Задачи (open, closed, reopen)
+│   ├── analytics/             # Страница аналитики
+│   ├── daily/                 # Страница планирования
+│   ├── evaluation/            # Страница оценки дня
+│   ├── forecast/              # Страница прогнозов
+│   ├── goals/                 # Страница целей
+│   ├── history/               # История оценок
+│   ├── periods/               # Периодические оценки
+│   ├── profile/               # Профиль пользователя
+│   ├── progress/              # Прогресс к мечте
+│   └── tasks/                 # Управление задачами
+├── components/                # React компоненты
+│   ├── BalanceFlags.tsx       # Флаги баланса (здоровье/семья/энергия)
+│   ├── DatePickerWithIndicators.tsx  # Календарь с индикаторами
+│   ├── DreamProgress.tsx      # Виджет прогресса к мечте
+│   ├── Navigation.tsx         # Навигация с активной вкладкой
+│   ├── ProgressIndicator.tsx  # Индикатор прогноза на главной
+│   └── Speedometer.tsx        # Визуализация скорости
+├── lib/                       # Утилиты
+│   ├── anthropic.ts           # Claude API интеграция с кэшированием
+│   ├── dates.ts               # Работа с датами
+│   ├── prisma.ts              # Prisma клиент
+│   ├── types.ts               # TypeScript типы
+│   └── prompts/               # Системные промпты для AI
+│       ├── core.ts            # Базовый промпт
+│       └── daily.ts           # Промпт для оценки дня
 ├── prisma/
-│   └── schema.prisma     # Database schema
-├── Dockerfile            # Docker configuration
-├── docker-compose.yml    # Docker Compose configuration
+│   └── schema.prisma          # Схема базы данных
+├── docs/
+│   ├── SPECIFICATION.md       # Техническая спецификация
+│   └── USER_GUIDE.md          # Руководство пользователя
+├── Dockerfile
+├── docker-compose.yml
 └── package.json
 ```
 
-## Использование
+## Документация
 
-### 1. Установите цели
-
-Перейдите в раздел **Цели** и заполните:
-- Мечту на 5 лет
-- Цели на год, полугодие, квартал, месяц, неделю
-
-### 2. Создайте план на день
-
-В разделе **Планирование**:
-- Утром создайте план на день
-- Вечером добавьте факт выполнения
-- Нажмите "Получить оценку"
-
-### 3. Получите оценку от ИИ
-
-Claude проанализирует:
-- Выполнение плана
-- Alignment (соответствие дневных задач долгосрочным целям)
-- Даст конструктивную критику и рекомендации
-
-### 4. Отслеживайте прогресс
-
-- **История:** просмотр всех дней с оценками
-- **Аналитика:** графики и статистика
-- **Задачи:** управление незакрытыми задачами
+- 📘 [Руководство пользователя](docs/USER_GUIDE.md) — как пользоваться приложением
+- 📋 [Техническая спецификация](docs/SPECIFICATION.md) — детальное описание архитектуры
 
 ## Получение API ключа Anthropic
 
 1. Зарегистрируйтесь на https://console.anthropic.com
 2. Создайте новый API ключ
 3. Добавьте его в `.env.local`
+
+**Примерная стоимость:** $5-20/месяц при активном использовании (с учётом Prompt Caching).
 
 ## Разработка
 
@@ -156,21 +156,33 @@ npm start
 
 # Lint
 npm run lint
+
+# Type check
+npx tsc --noEmit
 ```
 
 ## База данных
 
-### Создать миграцию
-
 ```bash
+# Создать миграцию
 npx prisma migrate dev --name migration_name
-```
 
-### Просмотр БД
+# Применить миграции (production)
+npx prisma migrate deploy
 
-```bash
+# Просмотр БД в браузере
 npx prisma studio
+
+# Сброс БД (осторожно!)
+npx prisma migrate reset
 ```
+
+## Переменные окружения
+
+| Переменная | Описание | Обязательно |
+|------------|----------|-------------|
+| `DATABASE_URL` | Путь к SQLite файлу | Да |
+| `ANTHROPIC_API_KEY` | API ключ Anthropic | Да |
 
 ## Лицензия
 
