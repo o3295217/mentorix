@@ -78,11 +78,7 @@ export default function HomePage() {
       </div>
 
       {/* Dream Progress - ГЛАВНЫЙ ВИДЖЕТ */}
-      <DreamProgress
-        dreamGoal={dreamGoal?.goalText || ''}
-        dreamProgressScore={dailyEntry?.evaluation?.dreamProgressScore}
-        showDetails={!!dailyEntry?.evaluation}
-      />
+      <DreamProgress dreamGoal={dreamGoal?.goalText || ''} />
 
       {/* Progress Indicator */}
       {progressStats && (

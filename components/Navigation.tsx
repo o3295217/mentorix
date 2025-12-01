@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import ThemeToggle from './ThemeToggle'
 
 const navItems = [
   { href: '/', label: 'Главная' },
@@ -40,14 +41,17 @@ export default function Navigation() {
                 href={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive(item.href)
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
+                    ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
                 {item.label}
               </Link>
             ))}
           </div>
+        </div>
+        <div className="flex items-center">
+          <ThemeToggle />
         </div>
       </div>
     </nav>
