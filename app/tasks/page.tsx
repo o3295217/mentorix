@@ -10,6 +10,7 @@ export default function TasksPage() {
   const [closedTasks, setClosedTasks] = useState<OpenTask[]>([])
   const [showClosed, setShowClosed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     loadTasks()
@@ -68,6 +69,39 @@ export default function TasksPage() {
     }
   }
 
+  const addToPlan = async (task: OpenTask) => {
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd')
+      
+      // Получаем текущий план на сегодня
+      const dailyRes = await fetch(`/api/daily?date=${today}`)
+      const daily = dailyRes.ok ? await dailyRes.json() : null
+      
+      // Добавляем задачу к плану
+      const currentPlan = daily?.planText || ''
+      const newPlan = currentPlan ? `${currentPlan}\n${task.taskText}` : task.taskText
+      
+      // Сохраняем обновленный план
+      const saveRes = await fetch('/api/daily', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: today,
+          planText: newPlan,
+        }),
+      })
+      
+      if (saveRes.ok) {
+        setMessage(`✅ "${task.taskText.substring(0, 30)}..." добавлено в план`)
+        setTimeout(() => setMessage(''), 3000)
+      }
+    } catch (error) {
+      console.error('Error adding task to plan:', error)
+      setMessage('❌ Ошибка при добавлении в план')
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+
   const strategicOpen = openTasks.filter((t) => t.taskType === 'strategic')
   const operationalOpen = openTasks.filter((t) => t.taskType === 'operational')
   const strategicClosed = closedTasks.filter((t) => t.taskType === 'strategic')
@@ -105,12 +139,20 @@ export default function TasksPage() {
                       <span className="text-gray-600">
                         {format(new Date(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
-                      <button
-                        onClick={() => closeTask(task.id)}
-                        className="text-purple-600 hover:text-purple-800 font-medium"
-                      >
-                        Закрыть
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => addToPlan(task)}
+                          className="text-green-600 hover:text-green-800 font-medium"
+                        >
+                          + В план
+                        </button>
+                        <button
+                          onClick={() => closeTask(task.id)}
+                          className="text-purple-600 hover:text-purple-800 font-medium"
+                        >
+                          Закрыть
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -132,12 +174,20 @@ export default function TasksPage() {
                       <span className="text-gray-600">
                         {format(new Date(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
-                      <button
-                        onClick={() => closeTask(task.id)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Закрыть
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => addToPlan(task)}
+                          className="text-green-600 hover:text-green-800 font-medium"
+                        >
+                          + В план
+                        </button>
+                        <button
+                          onClick={() => closeTask(task.id)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Закрыть
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -215,6 +265,12 @@ export default function TasksPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {message && (
+        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
+          <p className="font-medium">{message}</p>
         </div>
       )}
     </div>

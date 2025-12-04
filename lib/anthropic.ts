@@ -22,8 +22,8 @@ const anthropic = new Anthropic({
 
 // Логирование статистики кэширования Claude API
 interface CacheUsage {
-  cache_creation_input_tokens?: number
-  cache_read_input_tokens?: number
+  cache_creation_input_tokens?: number | null
+  cache_read_input_tokens?: number | null
   input_tokens?: number
   output_tokens?: number
 }

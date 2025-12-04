@@ -19,11 +19,11 @@ export default function DailyPage() {
   const [saving, setSaving] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [message, setMessage] = useState('')
-  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
   const [tasks, setTasks] = useState<OpenTask[]>([])
   const [newTaskText, setNewTaskText] = useState('')
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editingTaskText, setEditingTaskText] = useState('')
 
   useEffect(() => {
@@ -67,9 +67,13 @@ export default function DailyPage() {
           // Загрузить задачи из planText с генерацией ID
           if (daily.planText) {
             const taskList = daily.planText.split('\n').filter((t: string) => t.trim())
-            const tasksWithIds = taskList.map((text: string, index: number) => ({
-              id: `${daily.id}-${index}-${text.substring(0, 20)}`, // Уникальный ID на основе позиции и текста
-              text
+            const tasksWithIds: OpenTask[] = taskList.map((text: string, index: number) => ({
+              id: index + 1,
+              taskText: text,
+              taskType: 'operational' as const,
+              originDate: selectedDate,
+              isClosed: false,
+              createdAt: new Date().toISOString()
             }))
             setTasks(tasksWithIds)
           } else {
@@ -79,8 +83,8 @@ export default function DailyPage() {
           // Восстановить выбранные задачи
           if (daily.selectedTasksJson) {
             try {
-              const selected = JSON.parse(daily.selectedTasksJson) as string[]
-              setSelectedTasks(new Set(selected))
+              const selected = JSON.parse(daily.selectedTasksJson) as (string | number)[]
+              setSelectedTasks(new Set(selected.map(id => Number(id))))
             } catch (e) {
               setSelectedTasks(new Set())
             }
@@ -123,9 +127,13 @@ export default function DailyPage() {
 
   const addTask = () => {
     if (!newTaskText.trim()) return
-    const newTask = {
-      id: `temp-${Date.now()}-${Math.random()}`,
-      text: newTaskText.trim()
+    const newTask: OpenTask = {
+      id: Date.now(),
+      taskText: newTaskText.trim(),
+      taskType: 'operational',
+      originDate: selectedDate,
+      isClosed: false,
+      createdAt: new Date().toISOString()
     }
     const updatedTasks = [...tasks, newTask]
     setTasks(updatedTasks)
@@ -134,7 +142,7 @@ export default function DailyPage() {
     savePlanWithTasks(updatedTasks)
   }
 
-  const removeTask = (taskId: string) => {
+  const removeTask = (taskId: number) => {
     const updatedTasks = tasks.filter(t => t.id !== taskId)
     setTasks(updatedTasks)
     // Убираем из выбранных если была выбрана
@@ -146,10 +154,10 @@ export default function DailyPage() {
   }
 
   const savePlanWithTasks = async (
-    taskList: Array<{id: string, text: string}> = tasks,
-    selected: Set<string> = selectedTasks
+    taskList: OpenTask[] = tasks,
+    selected: Set<number> = selectedTasks
   ) => {
-    const planTextToSave = taskList.map(t => t.text).join('\n')
+    const planTextToSave = taskList.map(t => t.taskText).join('\n')
 
     try {
       const res = await fetch('/api/daily', {
@@ -216,7 +224,7 @@ export default function DailyPage() {
     const tasksToTransfer: string[] = []
     tasks.forEach((task) => {
       if (selectedTasks.has(task.id)) {
-        tasksToTransfer.push(task.text)
+        tasksToTransfer.push(task.taskText)
       }
     })
 
@@ -231,7 +239,7 @@ export default function DailyPage() {
     setTimeout(() => setMessage(''), 3000)
   }
 
-  const toggleTaskSelection = (taskId: string) => {
+  const toggleTaskSelection = (taskId: number) => {
     const newSelected = new Set(selectedTasks)
     if (newSelected.has(taskId)) {
       newSelected.delete(taskId)
@@ -243,7 +251,7 @@ export default function DailyPage() {
     savePlanWithTasks(tasks, newSelected)
   }
 
-  const handleDragStart = (taskId: string) => {
+  const handleDragStart = (taskId: number) => {
     setDraggedTaskId(taskId)
   }
 
@@ -251,7 +259,7 @@ export default function DailyPage() {
     e.preventDefault()
   }
 
-  const handleDrop = (targetTaskId: string) => {
+  const handleDrop = (targetTaskId: number) => {
     if (!draggedTaskId || draggedTaskId === targetTaskId) return
 
     const draggedIndex = tasks.findIndex(t => t.id === draggedTaskId)
@@ -268,12 +276,12 @@ export default function DailyPage() {
     savePlanWithTasks(newTasks, selectedTasks)
   }
 
-  const startEditingTask = (taskId: string, currentText: string) => {
+  const startEditingTask = (taskId: number, currentText: string) => {
     setEditingTaskId(taskId)
     setEditingTaskText(currentText)
   }
 
-  const saveEditedTask = (taskId: string) => {
+  const saveEditedTask = (taskId: number) => {
     if (!editingTaskText.trim()) {
       // Если текст пустой, отменяем редактирование
       setEditingTaskId(null)
@@ -282,7 +290,7 @@ export default function DailyPage() {
     }
 
     const updatedTasks = tasks.map(t =>
-      t.id === taskId ? { ...t, text: editingTaskText.trim() } : t
+      t.id === taskId ? { ...t, taskText: editingTaskText.trim() } : t
     )
     setTasks(updatedTasks)
     setEditingTaskId(null)
@@ -310,7 +318,7 @@ export default function DailyPage() {
 
       if (!entryId) {
         // Сохраняем план и факт, получаем ID из ответа
-        const planTextToSave = tasks.map(t => t.text).join('\n')
+        const planTextToSave = tasks.map(t => t.taskText).join('\n')
         const saveRes = await fetch('/api/daily', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -486,10 +494,10 @@ export default function DailyPage() {
                   ) : (
                     <span
                       className={`flex-1 text-sm ${selectedTasks.has(task.id) ? 'line-through text-gray-500' : ''}`}
-                      onDoubleClick={() => startEditingTask(task.id, task.text)}
+                      onDoubleClick={() => startEditingTask(task.id, task.taskText)}
                       title="Дважды кликните для редактирования"
                     >
-                      {task.text}
+                      {task.taskText}
                     </span>
                   )}
 
