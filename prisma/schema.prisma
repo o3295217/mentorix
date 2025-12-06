@@ -34,11 +34,57 @@ model PeriodGoal {
   periodType  String   // 'year', 'half_year', 'quarter', 'month', 'week'
   periodStart DateTime
   periodEnd   DateTime
-  goalsJson   String   // JSON array of goals
+  goalsJson   String   // JSON array of goals (legacy, для обратной совместимости)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@map("period_goals")
+}
+
+// Новая модель для отдельных целей с метаданными
+model Goal {
+  id          Int       @id @default(autoincrement())
+  text        String    // Текст цели
+  periodType  String    // 'year', 'half_year', 'quarter', 'month', 'week'
+  periodKey   String    // Ключ периода: "2025", "2025-Q1", "2025-12", "2025-12-W1"
+  
+  // Статус и прогресс
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  
+  // Дедлайн
+  deadline    DateTime?
+  
+  // Приоритет: 'high', 'medium', 'low'
+  priority    String    @default("medium")
+  
+  // Теги (JSON array: ["работа", "здоровье"])
+  tagsJson    String    @default("[]")
+  
+  // Связи с другими целями (JSON array of goal IDs that block this one)
+  blockedByJson String  @default("[]")
+  
+  // История (JSON array of events: [{type: 'created'|'moved'|'completed', date, from?, to?}])
+  historyJson String    @default("[]")
+  
+  // Порядок сортировки
+  sortOrder   Int       @default(0)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([periodType, periodKey])
+  @@map("goals")
+}
+
+// Теги для целей
+model GoalTag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  color     String   @default("#6B7280") // Цвет тега (hex)
+  createdAt DateTime @default(now())
+
+  @@map("goal_tags")
 }
 
 model DailyEntry {
