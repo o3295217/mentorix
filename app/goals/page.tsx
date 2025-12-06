@@ -667,13 +667,13 @@ export default function GoalsPage() {
     showMessage(`✅ Скопировано в Q${quarter}`)
   }
 
-  // Копирование цели года в месяц (новая функция)
+  // Копирование цели года в месяц (+ автоматически в квартал)
   const copyYearGoalToMonth = (year: number, goalText: string, month: number) => {
     const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
     const monthDate = new Date(year, month, 1)
     const currentGoals = periodGoals.get(monthKey) || []
     
-    // Проверка на дубликат
+    // Проверка на дубликат в месяце
     if (isDuplicate(currentGoals, goalText)) {
       if (!confirm(`⚠️ Цель "${goalText}" уже есть в ${monthNames[month]}.\n\nВсё равно добавить?`)) {
         setCopyDropdown(null)
@@ -681,19 +681,33 @@ export default function GoalsPage() {
       }
     }
     
+    // Определяем квартал
+    const quarter = Math.floor(month / 3) + 1
+    const quarterKey = `${year}-Q${quarter}`
+    const quarterDate = new Date(year, (quarter - 1) * 3, 1)
+    
+    // Добавляем в квартал (если нет)
+    const quarterGoals = periodGoals.get(quarterKey) || []
+    if (!isDuplicate(quarterGoals, goalText)) {
+      const updatedQuarterGoals = [...quarterGoals, goalText]
+      setPeriodGoals(prev => new Map(prev).set(quarterKey, updatedQuarterGoals))
+      savePeriodGoals('quarter', quarterDate, updatedQuarterGoals, `Q${quarter} ${year}`)
+    }
+    
+    // Добавляем в месяц
     const updatedGoals = [...currentGoals, goalText]
     setPeriodGoals(prev => new Map(prev).set(monthKey, updatedGoals))
     savePeriodGoals('month', monthDate, updatedGoals, monthNames[month])
     setCopyDropdown(null)
-    showMessage(`✅ Скопировано в ${monthNames[month]}`)
+    showMessage(`✅ Скопировано в Q${quarter} → ${monthNames[month]}`)
   }
 
-  // Копирование цели года в неделю
+  // Копирование цели года в неделю (+ автоматически в квартал и месяц)
   const copyYearGoalToWeek = (year: number, goalText: string, month: number, weekNum: number, weekStart: Date) => {
     const weekKey = `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
     const currentGoals = periodGoals.get(weekKey) || []
     
-    // Проверка на дубликат
+    // Проверка на дубликат в неделе
     if (isDuplicate(currentGoals, goalText)) {
       if (!confirm(`⚠️ Цель "${goalText}" уже есть в Неделе ${weekNum} ${monthNames[month]}.\n\nВсё равно добавить?`)) {
         setCopyDropdown(null)
@@ -701,11 +715,35 @@ export default function GoalsPage() {
       }
     }
     
+    // Определяем квартал и месяц
+    const quarter = Math.floor(month / 3) + 1
+    const quarterKey = `${year}-Q${quarter}`
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
+    const quarterDate = new Date(year, (quarter - 1) * 3, 1)
+    const monthDate = new Date(year, month, 1)
+    
+    // Добавляем в квартал (если нет)
+    const quarterGoals = periodGoals.get(quarterKey) || []
+    if (!isDuplicate(quarterGoals, goalText)) {
+      const updatedQuarterGoals = [...quarterGoals, goalText]
+      setPeriodGoals(prev => new Map(prev).set(quarterKey, updatedQuarterGoals))
+      savePeriodGoals('quarter', quarterDate, updatedQuarterGoals, `Q${quarter} ${year}`)
+    }
+    
+    // Добавляем в месяц (если нет)
+    const monthGoals = periodGoals.get(monthKey) || []
+    if (!isDuplicate(monthGoals, goalText)) {
+      const updatedMonthGoals = [...monthGoals, goalText]
+      setPeriodGoals(prev => new Map(prev).set(monthKey, updatedMonthGoals))
+      savePeriodGoals('month', monthDate, updatedMonthGoals, monthNames[month])
+    }
+    
+    // Добавляем в неделю
     const updatedGoals = [...currentGoals, goalText]
     setPeriodGoals(prev => new Map(prev).set(weekKey, updatedGoals))
     savePeriodGoals('week', weekStart, updatedGoals, `Неделя ${weekNum}`)
     setCopyDropdown(null)
-    showMessage(`✅ Скопировано в Неделю ${weekNum} ${monthNames[month]}`)
+    showMessage(`✅ Скопировано в Q${quarter} → ${monthNames[month]} → Неделю ${weekNum}`)
   }
 
   // Копирование цели квартала в месяц
@@ -729,12 +767,12 @@ export default function GoalsPage() {
     showMessage(`✅ Скопировано в ${monthNames[month]}`)
   }
 
-  // Копирование цели квартала в неделю (новая функция)
+  // Копирование цели квартала в неделю (+ автоматически в месяц)
   const copyQuarterGoalToWeek = (year: number, goalText: string, month: number, weekNum: number, weekStart: Date) => {
     const weekKey = `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
     const currentGoals = periodGoals.get(weekKey) || []
     
-    // Проверка на дубликат
+    // Проверка на дубликат в неделе
     if (isDuplicate(currentGoals, goalText)) {
       if (!confirm(`⚠️ Цель "${goalText}" уже есть в Неделе ${weekNum} ${monthNames[month]}.\n\nВсё равно добавить?`)) {
         setCopyDropdown(null)
@@ -742,11 +780,22 @@ export default function GoalsPage() {
       }
     }
     
+    // Добавляем в месяц (если нет)
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
+    const monthDate = new Date(year, month, 1)
+    const monthGoals = periodGoals.get(monthKey) || []
+    if (!isDuplicate(monthGoals, goalText)) {
+      const updatedMonthGoals = [...monthGoals, goalText]
+      setPeriodGoals(prev => new Map(prev).set(monthKey, updatedMonthGoals))
+      savePeriodGoals('month', monthDate, updatedMonthGoals, monthNames[month])
+    }
+    
+    // Добавляем в неделю
     const updatedGoals = [...currentGoals, goalText]
     setPeriodGoals(prev => new Map(prev).set(weekKey, updatedGoals))
     savePeriodGoals('week', weekStart, updatedGoals, `Неделя ${weekNum}`)
     setCopyDropdown(null)
-    showMessage(`✅ Скопировано в Неделю ${weekNum} ${monthNames[month]}`)
+    showMessage(`✅ Скопировано в ${monthNames[month]} → Неделю ${weekNum}`)
   }
 
   // Копирование цели месяца в неделю
