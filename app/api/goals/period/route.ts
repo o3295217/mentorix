@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPeriodDates, PeriodType } from '@/lib/dates'
+import { z } from 'zod'
+
+const PeriodGoalSchema = z.object({
+  periodType: z.enum(['week', 'month', 'quarter', 'half_year', 'year']),
+  periodStart: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid date' }),
+  periodEnd: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid date' }),
+  goals: z.array(z.string()),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,11 +46,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { periodType, periodStart, periodEnd, goals } = body
-
-    if (!periodType || !periodStart || !periodEnd || !Array.isArray(goals)) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    
+    const validation = PeriodGoalSchema.safeParse(body)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+    
+    const { periodType, periodStart, periodEnd, goals } = validation.data
 
     const periodGoal = await prisma.periodGoal.create({
       data: {

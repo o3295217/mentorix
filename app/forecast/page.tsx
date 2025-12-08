@@ -1,53 +1,92 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { ForecastResponse } from '@/lib/prompts/types'
 
-interface ForecastResponse {
-  forecast: {
-    currentPeriodForecast?: {
-      periodType: string
-      completionProbability: number
-      expectedCompletionRate: number
-      daysRemaining: number
-      currentPace: string
-      recommendations: string[]
-    }
-    dreamForecast: {
-      estimatedYears: number
-      onTrack: boolean
-      dreamProgressRate: number
-      adjustmentNeeded: string
-    }
-    whatIfScenarios: Array<{
-      scenario: string
-      impact: string
-      probability: string
-    }>
-    keyRecommendations: string[]
-    summary: string
-  }
+interface ForecastApiResponse {
+  forecast: ForecastResponse
   metadata: {
-    historicalDaysCount: number
-    periodStart: string
-    periodEnd: string
-    dreamGoal: string
-    dreamYears: number
+    basePeriod: {
+      type: string
+      start: string
+      end: string
+      daysCount: number
+    }
+    horizon: {
+      type: string
+      start?: string
+      end?: string
+      goalsCount: number
+    }
+    dream: {
+      goal: string
+      years: number
+    }
   }
 }
 
 export default function ForecastPage() {
-  const [forecastType, setForecastType] = useState<'comprehensive' | 'current_period' | 'dream_achievement'>('comprehensive')
-  const [periodType, setPeriodType] = useState<'week' | 'month' | 'quarter' | 'year' | null>(null)
-  const [periodStart, setPeriodStart] = useState('')
-  const [periodEnd, setPeriodEnd] = useState('')
-  const [historicalDays, setHistoricalDays] = useState(30)
-  const [loading, setLoading] = useState(false)
-  const [forecast, setForecast] = useState<ForecastResponse | null>(null)
+  // База для анализа (прошлое)
+  const [basePeriodType, setBasePeriodType] = useState<'week' | 'month' | 'quarter' | 'year' | 'custom'>('month')
+  const [basePeriodStart, setBasePeriodStart] = useState('')
+  const [basePeriodEnd, setBasePeriodEnd] = useState('')
 
-  const selectQuickPeriod = (type: 'week' | 'month' | 'quarter' | 'year') => {
+  // Горизонт прогноза (будущее)
+  const [forecastHorizon, setForecastHorizon] = useState<'week' | 'month' | 'quarter' | 'year' | 'custom'>('month')
+  const [horizonStart, setHorizonStart] = useState('')
+  const [horizonEnd, setHorizonEnd] = useState('')
+
+  const [loading, setLoading] = useState(false)
+  const [forecast, setForecast] = useState<ForecastApiResponse | null>(null)
+
+  // Автоматически установить базовый период при загрузке
+  useEffect(() => {
+    selectBasePeriod('month')
+    selectHorizonPeriod('month')
+  }, [])
+
+  const selectBasePeriod = (type: 'week' | 'month' | 'quarter' | 'year' | 'custom') => {
+    setBasePeriodType(type)
+
+    if (type === 'custom') {
+      // Для custom не меняем даты - пользователь сам выберет
+      return
+    }
+
+    const today = new Date()
+    let start: Date
+    let end: Date = today
+
+    switch (type) {
+      case 'week':
+        start = subDays(today, 7)
+        break
+      case 'month':
+        start = subDays(today, 30)
+        break
+      case 'quarter':
+        start = subDays(today, 90)
+        break
+      case 'year':
+        start = subDays(today, 365)
+        break
+    }
+
+    setBasePeriodStart(format(start, 'yyyy-MM-dd'))
+    setBasePeriodEnd(format(end, 'yyyy-MM-dd'))
+  }
+
+  const selectHorizonPeriod = (type: 'week' | 'month' | 'quarter' | 'year' | 'custom') => {
+    setForecastHorizon(type)
+
+    if (type === 'custom') {
+      // Для custom не меняем даты - пользователь сам выберет
+      return
+    }
+
     const today = new Date()
     let start: Date
     let end: Date
@@ -71,33 +110,37 @@ export default function ForecastPage() {
         break
     }
 
-    setPeriodType(type)
-    setPeriodStart(format(start, 'yyyy-MM-dd'))
-    setPeriodEnd(format(end, 'yyyy-MM-dd'))
+    setHorizonStart(format(start, 'yyyy-MM-dd'))
+    setHorizonEnd(format(end, 'yyyy-MM-dd'))
   }
 
   const generateForecast = async () => {
+    if (!basePeriodStart || !basePeriodEnd) {
+      alert('Выберите базовый период для анализа')
+      return
+    }
+
+    if (!horizonStart || !horizonEnd) {
+      alert('Выберите период для прогноза')
+      return
+    }
+
     setLoading(true)
     try {
       const body: {
-        forecastType: string
-        historicalDays: number
-        periodType?: string
-        periodStart?: string
-        periodEnd?: string
+        basePeriodType: string
+        basePeriodStart: string
+        basePeriodEnd: string
+        forecastHorizon: string
+        horizonStart: string
+        horizonEnd: string
       } = {
-        forecastType,
-        historicalDays,
-      }
-
-      if (forecastType === 'current_period' && periodType && periodStart && periodEnd) {
-        body.periodType = periodType
-        body.periodStart = periodStart
-        body.periodEnd = periodEnd
-      } else if (forecastType === 'comprehensive' && periodType && periodStart && periodEnd) {
-        body.periodType = periodType
-        body.periodStart = periodStart
-        body.periodEnd = periodEnd
+        basePeriodType,
+        basePeriodStart,
+        basePeriodEnd,
+        forecastHorizon,
+        horizonStart,
+        horizonEnd,
       }
 
       const res = await fetch('/api/forecast', {
@@ -121,13 +164,22 @@ export default function ForecastPage() {
     }
   }
 
-  const getPaceColor = (pace: string) => {
+  const getRiskColor = (risk: string) => {
     const colors: Record<string, string> = {
-      'отстает': 'text-red-600',
-      'в темпе': 'text-green-600',
-      'опережает': 'text-blue-600',
+      'низкий': 'bg-green-100 text-green-800 border-green-300',
+      'средний': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'высокий': 'bg-red-100 text-red-800 border-red-300',
     }
-    return colors[pace] || 'text-gray-600'
+    return colors[risk] || 'bg-gray-100 text-gray-800 border-gray-300'
+  }
+
+  const getImpactColor = (impact: string) => {
+    const colors: Record<string, string> = {
+      'позитивный': 'border-green-500',
+      'негативный': 'border-red-500',
+      'нейтральный': 'border-gray-400',
+    }
+    return colors[impact] || 'border-gray-400'
   }
 
   const getProbabilityColor = (probability: string) => {
@@ -148,124 +200,197 @@ export default function ForecastPage() {
         </Link>
       </div>
 
-      {/* Forecast Configuration */}
-      <div className="card bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200">
+      {/* Описание новой логики */}
+      <div className="card bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900 dark:to-purple-900 border-2 border-indigo-200 dark:border-indigo-700">
+        <h2 className="text-xl font-bold mb-3">🔮 Как работает прогноз</h2>
+        <div className="space-y-2 text-sm">
+          <p><strong>1️⃣ БАЗА ДЛЯ АНАЛИЗА (прошлое):</strong> Система анализирует ваш план vs факт за выбранный период, чтобы понять реальное качество выполнения задач.</p>
+          <p><strong>2️⃣ ГОРИЗОНТ ПРОГНОЗА (будущее):</strong> На основе анализа строится прогноз: выполните ли вы цели периода (неделя/месяц/квартал/год) или достигнете мечты.</p>
+          <p><strong>3️⃣ ЧЕСТНАЯ ОЦЕНКА:</strong> Прогноз основан не на скорах, а на реальном качестве выполнения задач из вашего плана и факта.</p>
+        </div>
+      </div>
+
+      {/* Настройки прогноза */}
+      <div className="card bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900 dark:to-pink-900 border-2 border-purple-200 dark:border-purple-700">
         <h2 className="text-2xl font-bold mb-4">Настройки прогноза</h2>
 
-        {/* Forecast Type Selection */}
+        {/* База для анализа */}
         <div className="mb-6">
-          <label className="block font-semibold mb-2">Тип прогноза</label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="block font-semibold mb-2">📊 База для анализа (прошлое)</label>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Выберите период, за который система проанализирует ваши план/факт и качество выполнения</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
             <button
-              onClick={() => setForecastType('comprehensive')}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                forecastType === 'comprehensive'
-                  ? 'bg-purple-600 text-white border-purple-600'
-                  : 'bg-white border-gray-300 hover:border-purple-400'
+              onClick={() => selectBasePeriod('week')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                basePeriodType === 'week'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400'
               }`}
             >
-              <div className="text-2xl mb-1">🔮</div>
-              <div className="font-semibold">Комплексный</div>
-              <div className="text-xs mt-1 opacity-75">Все типы анализа</div>
+              📅 Неделя
             </button>
-
             <button
-              onClick={() => setForecastType('current_period')}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                forecastType === 'current_period'
-                  ? 'bg-purple-600 text-white border-purple-600'
-                  : 'bg-white border-gray-300 hover:border-purple-400'
+              onClick={() => selectBasePeriod('month')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                basePeriodType === 'month'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400'
               }`}
             >
-              <div className="text-2xl mb-1">📅</div>
-              <div className="font-semibold">Текущий период</div>
-              <div className="text-xs mt-1 opacity-75">Выполнение целей</div>
+              📆 Месяц
             </button>
-
             <button
-              onClick={() => setForecastType('dream_achievement')}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                forecastType === 'dream_achievement'
-                  ? 'bg-purple-600 text-white border-purple-600'
-                  : 'bg-white border-gray-300 hover:border-purple-400'
+              onClick={() => selectBasePeriod('quarter')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                basePeriodType === 'quarter'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400'
               }`}
             >
-              <div className="text-2xl mb-1">🌟</div>
-              <div className="font-semibold">Достижение мечты</div>
-              <div className="text-xs mt-1 opacity-75">Долгосрочный план</div>
+              📊 Квартал
+            </button>
+            <button
+              onClick={() => selectBasePeriod('year')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                basePeriodType === 'year'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+              }`}
+            >
+              🗓️ Год
+            </button>
+            <button
+              onClick={() => selectBasePeriod('custom')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                basePeriodType === 'custom'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+              }`}
+            >
+              📝 Свой период
             </button>
           </div>
-        </div>
 
-        {/* Period Selection (for current_period and comprehensive) */}
-        {(forecastType === 'current_period' || forecastType === 'comprehensive') && (
-          <div className="mb-6">
-            <label className="block font-semibold mb-2">Период для анализа</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-              <button
-                onClick={() => selectQuickPeriod('week')}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  periodType === 'week'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                📅 Неделя
-              </button>
-              <button
-                onClick={() => selectQuickPeriod('month')}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  periodType === 'month'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                📆 Месяц
-              </button>
-              <button
-                onClick={() => selectQuickPeriod('quarter')}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  periodType === 'quarter'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                📊 Квартал
-              </button>
-              <button
-                onClick={() => selectQuickPeriod('year')}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  periodType === 'year'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                🗓️ Год
-              </button>
+          {/* Кастомные даты для базового периода */}
+          {basePeriodType === 'custom' && (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Дата начала</label>
+                <input
+                  type="date"
+                  value={basePeriodStart}
+                  onChange={(e) => setBasePeriodStart(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Дата окончания</label>
+                <input
+                  type="date"
+                  value={basePeriodEnd}
+                  onChange={(e) => setBasePeriodEnd(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Historical Days */}
-        <div className="mb-6">
-          <label className="block font-semibold mb-2">
-            Исторические данные (дней для анализа): {historicalDays}
-          </label>
-          <input
-            type="range"
-            min="7"
-            max="90"
-            value={historicalDays}
-            onChange={(e) => setHistoricalDays(parseInt(e.target.value))}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-gray-600 mt-1">
-            <span>7 дней</span>
-            <span>90 дней</span>
-          </div>
+          {basePeriodStart && basePeriodEnd && (
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Период: {format(new Date(basePeriodStart), 'd MMM yyyy', { locale: ru })} — {format(new Date(basePeriodEnd), 'd MMM yyyy', { locale: ru })}
+            </p>
+          )}
         </div>
 
-        {/* Generate Button */}
+        {/* Горизонт прогноза */}
+        <div className="mb-6">
+          <label className="block font-semibold mb-2">🎯 Горизонт прогноза (будущее)</label>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Выберите, на какой период строить прогноз</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+            <button
+              onClick={() => selectHorizonPeriod('week')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                forecastHorizon === 'week'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400'
+              }`}
+            >
+              📅 Неделя
+            </button>
+            <button
+              onClick={() => selectHorizonPeriod('month')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                forecastHorizon === 'month'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400'
+              }`}
+            >
+              📆 Месяц
+            </button>
+            <button
+              onClick={() => selectHorizonPeriod('quarter')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                forecastHorizon === 'quarter'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400'
+              }`}
+            >
+              📊 Квартал
+            </button>
+            <button
+              onClick={() => selectHorizonPeriod('year')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                forecastHorizon === 'year'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400'
+              }`}
+            >
+              🗓️ Год
+            </button>
+            <button
+              onClick={() => selectHorizonPeriod('custom')}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                forecastHorizon === 'custom'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:border-purple-400'
+              }`}
+            >
+              📝 Свой период
+            </button>
+          </div>
+
+          {/* Кастомные даты для горизонта прогноза */}
+          {forecastHorizon === 'custom' && (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Дата начала</label>
+                <input
+                  type="date"
+                  value={horizonStart}
+                  onChange={(e) => setHorizonStart(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Дата окончания</label>
+                <input
+                  type="date"
+                  value={horizonEnd}
+                  onChange={(e) => setHorizonEnd(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {horizonStart && horizonEnd && (
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Период: {format(new Date(horizonStart), 'd MMM yyyy', { locale: ru })} — {format(new Date(horizonEnd), 'd MMM yyyy', { locale: ru })}
+            </p>
+          )}
+        </div>
+
+        {/* Кнопка генерации */}
         <button
           onClick={generateForecast}
           disabled={loading}
@@ -275,140 +400,249 @@ export default function ForecastPage() {
         </button>
       </div>
 
-      {/* Forecast Results */}
+      {/* Результаты прогноза */}
       {forecast && (
         <div className="space-y-6">
-          {/* Metadata */}
-          <div className="card bg-gray-50 border-2 border-gray-200">
-            <h3 className="font-semibold mb-2">ℹ️ Информация о прогнозе</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          {/* Метаданные */}
+          <div className="card bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700">
+            <h3 className="font-semibold mb-3">ℹ️ Информация о прогнозе</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-gray-600">Исторических дней</p>
-                <p className="font-bold">{forecast.metadata.historicalDaysCount}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Период анализа</p>
+                <p className="text-gray-600 dark:text-gray-400 mb-1">База для анализа</p>
                 <p className="font-bold">
-                  {format(new Date(forecast.metadata.periodStart), 'd MMM', { locale: ru })} - {format(new Date(forecast.metadata.periodEnd), 'd MMM', { locale: ru })}
+                  {forecast.metadata.basePeriod.type} ({forecast.metadata.basePeriod.daysCount} дней)
+                </p>
+                <p className="text-xs text-gray-500">
+                  {format(new Date(forecast.metadata.basePeriod.start), 'd MMM yyyy', { locale: ru })} — {format(new Date(forecast.metadata.basePeriod.end), 'd MMM yyyy', { locale: ru })}
                 </p>
               </div>
               <div>
-                <p className="text-gray-600">Мечта</p>
-                <p className="font-bold line-clamp-2">{forecast.metadata.dreamGoal}</p>
+                <p className="text-gray-600 dark:text-gray-400 mb-1">Горизонт прогноза</p>
+                <p className="font-bold">
+                  {forecast.metadata.horizon.type} ({forecast.metadata.horizon.goalsCount} целей)
+                </p>
+                {forecast.metadata.horizon.start && forecast.metadata.horizon.end && (
+                  <p className="text-xs text-gray-500">
+                    {format(new Date(forecast.metadata.horizon.start), 'd MMM yyyy', { locale: ru })} — {format(new Date(forecast.metadata.horizon.end), 'd MMM yyyy', { locale: ru })}
+                  </p>
+                )}
               </div>
-              <div>
-                <p className="text-gray-600">Лет на мечту</p>
-                <p className="font-bold">{forecast.metadata.dreamYears} лет</p>
+              <div className="md:col-span-2">
+                <p className="text-gray-600 dark:text-gray-400 mb-1">Мечта</p>
+                <p className="font-bold">{forecast.metadata.dream.goal}</p>
+                <p className="text-xs text-gray-500">{forecast.metadata.dream.years} лет</p>
               </div>
             </div>
           </div>
 
-          {/* Dream Forecast */}
-          <div className="card bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300">
-            <h2 className="text-2xl font-bold mb-4">🌟 Прогноз достижения мечты</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Расчетное время</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {forecast.forecast.dreamForecast.estimatedYears.toFixed(1)} лет
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Идет по плану?</p>
-                <p className={`text-3xl font-bold ${forecast.forecast.dreamForecast.onTrack ? 'text-green-600' : 'text-red-600'}`}>
-                  {forecast.forecast.dreamForecast.onTrack ? '✅ Да' : '❌ Нет'}
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Прогресс в год</p>
+          {/* Качество выполнения (базовый период) */}
+          <div className="card bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900 dark:to-cyan-900 border-2 border-blue-300 dark:border-blue-700">
+            <h2 className="text-2xl font-bold mb-4">📊 Анализ качества выполнения</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Всего задач</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {forecast.forecast.dreamForecast.dreamProgressRate.toFixed(1)}%
+                  {forecast.forecast.executionQuality.totalTasksCompleted}/{forecast.forecast.executionQuality.totalTasksPlanned}
+                </p>
+                <p className="text-xs text-gray-500">{forecast.forecast.executionQuality.completionRate}% выполнено</p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Стратегических</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {forecast.forecast.executionQuality.strategicTasksCompleted}/{forecast.forecast.executionQuality.strategicTasksPlanned}
+                </p>
+                <p className="text-xs text-gray-500">{forecast.forecast.executionQuality.strategicCompletionRate}% выполнено</p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Средний Dream Progress</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {forecast.forecast.executionQuality.avgDreamProgress.toFixed(1)}/10
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Тренд</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {forecast.forecast.executionQuality.trend === 'растет' && '📈'}
+                  {forecast.forecast.executionQuality.trend === 'стабильно' && '➡️'}
+                  {forecast.forecast.executionQuality.trend === 'падает' && '📉'}
+                  {' '}{forecast.forecast.executionQuality.trend}
                 </p>
               </div>
             </div>
-            <div className="bg-white p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Необходимые корректировки</h3>
-              <p className="whitespace-pre-wrap">{forecast.forecast.dreamForecast.adjustmentNeeded}</p>
-            </div>
-          </div>
-
-          {/* Current Period Forecast */}
-          {forecast.forecast.currentPeriodForecast && (
-            <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300">
-              <h2 className="text-2xl font-bold mb-4">📅 Прогноз текущего периода</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="bg-white p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Вероятность выполнения</p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {forecast.forecast.currentPeriodForecast.completionProbability}%
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Ожидаемое выполнение</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    {forecast.forecast.currentPeriodForecast.expectedCompletionRate}%
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Осталось дней</p>
-                  <p className="text-3xl font-bold text-orange-600">
-                    {forecast.forecast.currentPeriodForecast.daysRemaining}
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Текущий темп</p>
-                  <p className={`text-2xl font-bold ${getPaceColor(forecast.forecast.currentPeriodForecast.currentPace)}`}>
-                    {forecast.forecast.currentPeriodForecast.currentPace}
-                  </p>
-                </div>
-              </div>
-              <div className="bg-white p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Рекомендации</h3>
-                <ul className="list-disc list-inside space-y-1">
-                  {forecast.forecast.currentPeriodForecast.recommendations.map((rec, i) => (
-                    <li key={i}>{rec}</li>
+            {forecast.forecast.executionQuality.patterns.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Выявленные паттерны</h3>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {forecast.forecast.executionQuality.patterns.map((pattern) => (
+                    <li key={pattern}>{pattern}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Паттерны поведения */}
+          {forecast.forecast.behaviorPatterns.length > 0 && (
+            <div className="card bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-900 dark:to-emerald-900 border-2 border-teal-300 dark:border-teal-700">
+              <h2 className="text-2xl font-bold mb-4">🧠 Паттерны поведения</h2>
+              <div className="space-y-3">
+                {forecast.forecast.behaviorPatterns.map((pattern) => (
+                  <div key={pattern.pattern} className={`bg-white dark:bg-gray-800 p-4 rounded-lg border-l-4 ${getImpactColor(pattern.impact)}`}>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold">{pattern.pattern}</h3>
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        pattern.impact === 'позитивный' ? 'bg-green-100 text-green-800' :
+                        pattern.impact === 'негативный' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {pattern.impact}
+                      </span>
+                    </div>
+                    {pattern.recommendation && (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">💡 {pattern.recommendation}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* What If Scenarios */}
-          <div className="card bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300">
-            <h2 className="text-2xl font-bold mb-4">🤔 Сценарии "Что если?"</h2>
-            <div className="space-y-3">
-              {forecast.forecast.whatIfScenarios.map((scenario, i) => (
-                <div key={i} className="bg-white p-4 rounded-lg border-l-4 border-yellow-500">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-lg">{scenario.scenario}</h3>
-                    <span className={`text-sm font-semibold px-3 py-1 rounded-full ${getProbabilityColor(scenario.probability)}`}>
-                      {scenario.probability}
-                    </span>
+          {/* Прогноз по целям горизонта */}
+          {forecast.forecast.goalForecasts.length > 0 && (
+            <div className="card bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900 dark:to-pink-900 border-2 border-purple-300 dark:border-purple-700">
+              <h2 className="text-2xl font-bold mb-4">🎯 Прогноз по целям горизонта</h2>
+              <div className="mb-4 bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Общая вероятность выполнения всех целей</p>
+                <p className="text-4xl font-bold text-purple-600">{forecast.forecast.overallProbability}%</p>
+              </div>
+              <div className="space-y-4">
+                {forecast.forecast.goalForecasts.map((goal) => (
+                  <div key={goal.goal} className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="font-semibold text-lg flex-1">{goal.goal}</h3>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-purple-600">{goal.probability}%</span>
+                        <span className={`text-xs px-3 py-1 rounded-full border-2 ${getRiskColor(goal.risk)}`}>
+                          {goal.risk} риск
+                        </span>
+                      </div>
+                    </div>
+                    {goal.threats.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-sm font-semibold text-red-600 mb-1">⚠️ Угрозы:</p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          {goal.threats.map((threat, j) => (
+                            <li key={j} className="text-gray-700 dark:text-gray-300">{threat}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="bg-green-50 dark:bg-green-900 p-3 rounded border-l-4 border-green-500">
+                      <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">💡 Рекомендация:</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">{goal.recommendation}</p>
+                    </div>
                   </div>
-                  <p className="text-gray-700">{scenario.impact}</p>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Прогноз достижения мечты */}
+          <div className="card bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900 dark:to-orange-900 border-2 border-yellow-300 dark:border-yellow-700">
+            <h2 className="text-2xl font-bold mb-4">🌟 Прогноз достижения мечты</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Расчетное время (при текущем темпе)</p>
+                <p className="text-4xl font-bold text-orange-600">
+                  {forecast.forecast.dreamForecast.estimatedYears.toFixed(1)} лет
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Идет по плану?</p>
+                <p className={`text-4xl font-bold ${forecast.forecast.dreamForecast.onTrack ? 'text-green-600' : 'text-red-600'}`}>
+                  {forecast.forecast.dreamForecast.onTrack ? '✅ Да' : '❌ Нет'}
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Прогресс в год (текущий темп)</p>
+                <p className="text-3xl font-bold text-blue-600">
+                  {forecast.forecast.dreamForecast.progressPerYear.toFixed(1)}%
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Требуется для достижения вовремя</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {forecast.forecast.dreamForecast.requiredProgressPerYear.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Разрыв между текущим и требуемым темпом</p>
+              <p className={`text-3xl font-bold mb-3 ${forecast.forecast.dreamForecast.gap > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {forecast.forecast.dreamForecast.gap > 0 ? '-' : '+'}{Math.abs(forecast.forecast.dreamForecast.gap).toFixed(1)}%
+              </p>
+              <div className="bg-blue-50 dark:bg-blue-900 p-3 rounded border-l-4 border-blue-500">
+                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">🔧 Необходимые корректировки:</p>
+                <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{forecast.forecast.dreamForecast.adjustmentNeeded}</p>
+              </div>
             </div>
           </div>
 
-          {/* Key Recommendations */}
-          <div className="card bg-gradient-to-br from-green-50 to-teal-50 border-2 border-green-300">
-            <h2 className="text-2xl font-bold mb-4">💡 Ключевые рекомендации</h2>
-            <div className="space-y-2">
-              {forecast.forecast.keyRecommendations.map((rec, i) => (
-                <div key={i} className="bg-white p-4 rounded-lg flex items-start gap-3">
-                  <span className="text-2xl">{i + 1}.</span>
-                  <p className="flex-1 text-lg">{rec}</p>
-                </div>
-              ))}
+          {/* Сценарии "что если" */}
+          {forecast.forecast.whatIfScenarios.length > 0 && (
+            <div className="card bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900 dark:to-blue-900 border-2 border-indigo-300 dark:border-indigo-700">
+              <h2 className="text-2xl font-bold mb-4">🤔 Сценарии "Что если?"</h2>
+              <div className="space-y-3">
+                {forecast.forecast.whatIfScenarios.map((scenario) => (
+                  <div key={scenario.scenario} className="bg-white dark:bg-gray-800 p-4 rounded-lg border-l-4 border-indigo-500">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-lg flex-1">{scenario.scenario}</h3>
+                      <span className={`text-sm font-semibold px-3 py-1 rounded-full ${getProbabilityColor(scenario.probability)}`}>
+                        {scenario.probability} вероятность
+                      </span>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300">{scenario.impact}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Summary */}
-          <div className="card bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-300">
+          {/* Критические риски */}
+          {forecast.forecast.criticalRisks.length > 0 && (
+            <div className="card bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900 dark:to-orange-900 border-2 border-red-300 dark:border-red-700">
+              <h2 className="text-2xl font-bold mb-4 text-red-700 dark:text-red-300">⚠️ Критические риски</h2>
+              <div className="space-y-2">
+                {forecast.forecast.criticalRisks.map((risk) => (
+                  <div key={risk} className="bg-white dark:bg-gray-800 p-4 rounded-lg border-l-4 border-red-500 flex items-start gap-3">
+                    <span className="text-2xl">🚨</span>
+                    <p className="flex-1 text-gray-800 dark:text-gray-200">{risk}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ключевые рекомендации */}
+          {forecast.forecast.keyRecommendations.length > 0 && (
+            <div className="card bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900 dark:to-teal-900 border-2 border-green-300 dark:border-green-700">
+              <h2 className="text-2xl font-bold mb-4">💡 Ключевые рекомендации</h2>
+              <div className="space-y-3">
+                {forecast.forecast.keyRecommendations.map((rec, i) => (
+                  <div key={rec} className="bg-white dark:bg-gray-800 p-4 rounded-lg flex items-start gap-3 border-l-4 border-green-500">
+                    <span className="text-2xl font-bold text-green-600">{i + 1}.</span>
+                    <p className="flex-1 text-lg text-gray-800 dark:text-gray-200">{rec}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Резюме */}
+          <div className="card bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-2 border-gray-300 dark:border-gray-700">
             <h2 className="text-2xl font-bold mb-4">📝 Резюме прогноза</h2>
-            <div className="bg-white p-6 rounded-lg">
-              <p className="whitespace-pre-wrap text-lg leading-relaxed">{forecast.forecast.summary}</p>
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-lg">
+              <p className="whitespace-pre-wrap text-lg leading-relaxed text-gray-800 dark:text-gray-200">{forecast.forecast.summary}</p>
             </div>
           </div>
         </div>

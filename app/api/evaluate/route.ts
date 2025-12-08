@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { evaluateDayNew } from '@/lib/anthropic'
 import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
+import { z } from 'zod'
+
+const EvaluateSchema = z.object({
+  dailyEntryId: z.number().int().positive(),
+})
 
 // Безопасный парсинг JSON с fallback значением
 function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
@@ -18,11 +23,16 @@ function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { dailyEntryId } = body
-
-    if (!dailyEntryId) {
-      return NextResponse.json({ error: 'dailyEntryId is required' }, { status: 400 })
+    
+    const validation = EvaluateSchema.safeParse(body)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+
+    const { dailyEntryId } = validation.data
 
     // Получить daily entry
     const dailyEntry = await prisma.dailyEntry.findUnique({

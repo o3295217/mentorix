@@ -196,47 +196,99 @@ export interface PeriodEvaluationResponse {
 
 // === ПРОГНОЗЫ ===
 
-// Запрос для прогноза
+// Данные дня с полным анализом план/факт
+export interface DayDataFull extends DayData {
+  tasksPlanned: number      // Сколько задач запланировано
+  tasksCompleted: number    // Сколько выполнено
+  strategicTasks: number    // Стратегических задач
+  strategicCompleted: number // Выполнено стратегических
+}
+
+// Анализ качества выполнения за базовый период
+export interface ExecutionQuality {
+  totalTasksPlanned: number
+  totalTasksCompleted: number
+  completionRate: number // %
+  strategicTasksPlanned: number
+  strategicTasksCompleted: number
+  strategicCompletionRate: number // %
+  avgDreamProgress: number
+  avgOverallScore: number
+  trend: 'растет' | 'стабильно' | 'падает'
+  patterns: string[] // Выявленные паттерны поведения
+}
+
+// Запрос для прогноза (НОВАЯ ЛОГИКА)
 export interface ForecastRequest {
-  forecastType: 'current_period' | 'dream_achievement' | 'comprehensive'
-  periodType?: 'week' | 'month' | 'quarter' | 'year' // Для прогноза текущего периода
-  historicalDays: DayData[] // История для анализа
-  currentPeriodGoals?: string[] // Цели текущего периода
+  // 1. БАЗА ДЛЯ АНАЛИЗА (прошлое)
+  basePeriodType: 'week' | 'month' | 'quarter' | 'year' | 'custom'
+  basePeriodStart: string
+  basePeriodEnd: string
+  baseDays: DayDataFull[] // Дни базового периода с план/факт
+  
+  // 2. ГОРИЗОНТ ПРОГНОЗА (будущее)
+  forecastHorizon: 'week' | 'month' | 'quarter' | 'year' | 'dream'
+  horizonGoals: string[] // Цели горизонта
+  horizonStart?: string
+  horizonEnd?: string
+  
+  // Контекст
   dreamGoal: string
-  dreamYears: number // Сколько лет на мечту
+  dreamYears: number
   userProfile?: UserProfile
 }
 
-// Прогноз выполнения целей текущего периода
-export interface CurrentPeriodForecast {
-  periodType: string
-  completionProbability: number // % вероятность выполнения всех целей
-  expectedCompletionRate: number // % ожидаемое выполнение
-  daysRemaining: number
-  currentPace: 'отстает' | 'в темпе' | 'опережает'
-  recommendations: string[]
+// Прогноз по конкретной цели
+export interface GoalForecast {
+  goal: string
+  probability: number // % вероятность выполнения
+  risk: 'низкий' | 'средний' | 'высокий'
+  threats: string[] // Что угрожает выполнению
+  recommendation: string
 }
 
-// Прогноз достижения мечты
-export interface DreamAchievementForecast {
-  estimatedYears: number // Сколько лет до мечты при текущем темпе
-  onTrack: boolean // Идет ли по плану (в пределах запланированных лет)
-  dreamProgressRate: number // % прогресса в год при текущем темпе
-  adjustmentNeeded: string // Что нужно изменить
+// Паттерны поведения
+export interface BehaviorPattern {
+  pattern: string // Описание паттерна
+  impact: 'позитивный' | 'негативный' | 'нейтральный'
+  recommendation?: string
+}
+
+// Прогноз достижения мечты (обновленный)
+export interface DreamForecast {
+  estimatedYears: number
+  onTrack: boolean
+  progressPerYear: number // % прогресса в год
+  requiredProgressPerYear: number // Сколько нужно для достижения вовремя
+  gap: number // Разрыв между текущим и требуемым
+  adjustmentNeeded: string
 }
 
 // Сценарий "что если"
 export interface WhatIfScenario {
-  scenario: string // Описание сценария
-  impact: string // Влияние
+  scenario: string
+  impact: string
   probability: 'низкая' | 'средняя' | 'высокая'
 }
 
-// Комплексный ответ прогноза
+// Комплексный ответ прогноза (НОВЫЙ)
 export interface ForecastResponse {
-  currentPeriodForecast?: CurrentPeriodForecast
-  dreamForecast: DreamAchievementForecast
+  // Анализ базового периода
+  executionQuality: ExecutionQuality
+  behaviorPatterns: BehaviorPattern[]
+  
+  // Прогноз по горизонту
+  horizonType: string
+  goalForecasts: GoalForecast[] // Прогноз по каждой цели
+  overallProbability: number // Общая вероятность выполнения целей горизонта
+  
+  // Прогноз мечты
+  dreamForecast: DreamForecast
+  
+  // Сценарии и рекомендации
   whatIfScenarios: WhatIfScenario[]
-  keyRecommendations: string[] // 3-5 главных рекомендаций
-  summary: string // Краткое резюме прогноза
+  keyRecommendations: string[]
+  criticalRisks: string[] // Критические риски
+  
+  summary: string
 }

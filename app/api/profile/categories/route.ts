@@ -72,8 +72,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
     }
 
+    const numericId = parseInt(id)
+    if (isNaN(numericId)) {
+      return NextResponse.json({ error: 'Invalid category ID' }, { status: 400 })
+    }
+
     await prisma.profileCategory.delete({
-      where: { id: parseInt(id) },
+      where: { id: numericId },
     })
 
     return NextResponse.json({ success: true })
@@ -93,12 +98,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
 
+    const numericId = typeof id === 'number' ? id : parseInt(id)
+    if (isNaN(numericId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    }
+
     const updateData: { title?: string; order?: number } = {}
     if (title !== undefined) updateData.title = title.trim()
     if (order !== undefined) updateData.order = parseInt(order)
 
     const category = await prisma.profileCategory.update({
-      where: { id: parseInt(id) },
+      where: { id: numericId },
       data: updateData,
       include: {
         items: {

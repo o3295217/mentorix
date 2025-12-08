@@ -26,30 +26,31 @@ export default function HomePage() {
 
   const fetchData = async () => {
     try {
-      // Fetch dream goal
-      const dreamRes = await fetch('/api/goals/dream')
+      const dateStr = format(today, 'yyyy-MM-dd')
+      
+      // Параллельная загрузка всех данных
+      const [dreamRes, dailyRes, progressRes, profileRes] = await Promise.all([
+        fetch('/api/goals/dream'),
+        fetch(`/api/daily?date=${dateStr}`),
+        fetch('/api/progress'),
+        fetch('/api/profile'),
+      ])
+
       if (dreamRes.ok) {
         const dream = await dreamRes.json()
         setDreamGoal(dream)
       }
 
-      // Fetch today's entry
-      const dateStr = format(today, 'yyyy-MM-dd')
-      const dailyRes = await fetch(`/api/daily?date=${dateStr}`)
       if (dailyRes.ok) {
         const daily = await dailyRes.json()
         setDailyEntry(daily)
       }
 
-      // Fetch progress stats
-      const progressRes = await fetch('/api/progress')
       if (progressRes.ok) {
         const progress = await progressRes.json()
         setProgressStats(progress)
       }
 
-      // Fetch user profile
-      const profileRes = await fetch('/api/profile')
       if (profileRes.ok) {
         const profile = await profileRes.json()
         setUserProfile(profile)

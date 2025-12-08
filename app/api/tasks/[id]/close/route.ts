@@ -4,9 +4,14 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
+    const numericId = parseInt(id)
+    
+    if (isNaN(numericId)) {
+      return NextResponse.json({ error: 'Invalid task ID' }, { status: 400 })
+    }
 
     const task = await prisma.openTask.update({
-      where: { id: parseInt(id) },
+      where: { id: numericId },
       data: {
         isClosed: true,
         closedAt: new Date(),

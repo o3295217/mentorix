@@ -62,3 +62,13 @@ export function getPeriodName(date: Date, periodType: PeriodType): string {
       return `${year}`
   }
 }
+
+export const getYearDistance = (year: number, currentYear: number = new Date().getFullYear()) => year - currentYear
+
+export const getDetailLevel = (year: number, currentYear: number = new Date().getFullYear()): 'month' | 'quarter' | 'half' | 'year' => {
+  const distance = getYearDistance(year, currentYear)
+  if (distance === 0) return 'month'
+  if (distance === 1) return 'quarter'
+  if (distance <= 3) return 'half'
+  return 'year'
+}

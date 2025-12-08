@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { format, subDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
+import { DailyEntry } from '@/lib/types'
 
 export default function HistoryPage() {
-  const [entries, setEntries] = useState<any[]>([])
+  const [entries, setEntries] = useState<DailyEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
 
@@ -90,7 +91,7 @@ export default function HistoryPage() {
                     </div>
                   </div>
 
-                  {hasEvaluation && (
+                  {hasEvaluation && entry.evaluation && (
                     <div
                       className={`px-6 py-3 rounded-lg border-2 ${getScoreColor(entry.evaluation.overallScore)}`}
                     >

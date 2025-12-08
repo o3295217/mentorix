@@ -45,6 +45,10 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
     try {
       const monthStr = format(currentMonth, 'yyyy-MM')
       const res = await fetch(`/api/daily/indicators?month=${monthStr}`)
+      if (!res.ok) {
+        console.error('Failed to load indicators:', res.status)
+        return
+      }
       const data = await res.json()
       setIndicators(data)
     } catch (error) {

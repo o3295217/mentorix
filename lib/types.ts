@@ -131,3 +131,28 @@ export interface AnalyticsStats {
   topDays: TrendDataPoint[]
   worstDays: TrendDataPoint[]
 }
+
+// === ЦЕЛИ ===
+export interface Goal {
+  id: number
+  text: string
+  periodType: string
+  periodKey: string
+  completed: boolean
+  completedAt: string | null
+  deadline: string | null
+  priority: number // 0=нет, 1=низкий, 2=средний, 3=высокий
+  tags: string[]
+  blockedBy: number[]
+  history: { action: string; date: string; from?: string; to?: string }[]
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+// === ТЕГ ЦЕЛИ ===
+export interface GoalTag {
+  id: number
+  name: string
+  color: string
+}

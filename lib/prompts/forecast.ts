@@ -1,179 +1,258 @@
 import {
   ForecastRequest,
   ForecastResponse,
-  DayData,
+  DayDataFull,
+  ExecutionQuality,
 } from './types'
 import { formatUserProfile } from './core'
 
-// Вычисление текущего темпа прогресса
-function calculateCurrentPace(days: DayData[]): {
-  avgDreamProgress: number
-  avgOverall: number
-  trend: 'растет' | 'стабильно' | 'падает'
-} {
+// Расчет качества выполнения за базовый период
+function calculateExecutionQuality(days: DayDataFull[]): ExecutionQuality {
   if (days.length === 0) {
-    return { avgDreamProgress: 0, avgOverall: 0, trend: 'стабильно' }
+    return {
+      totalTasksPlanned: 0,
+      totalTasksCompleted: 0,
+      completionRate: 0,
+      strategicTasksPlanned: 0,
+      strategicTasksCompleted: 0,
+      strategicCompletionRate: 0,
+      avgDreamProgress: 0,
+      avgOverallScore: 0,
+      trend: 'стабильно',
+      patterns: [],
+    }
   }
 
-  const avgDreamProgress =
-    days.reduce((sum, d) => sum + d.dreamProgressScore, 0) / days.length
-  const avgOverall = days.reduce((sum, d) => sum + d.overallScore, 0) / days.length
+  const totalTasksPlanned = days.reduce((sum, d) => sum + d.tasksPlanned, 0)
+  const totalTasksCompleted = days.reduce((sum, d) => sum + d.tasksCompleted, 0)
+  const strategicTasksPlanned = days.reduce((sum, d) => sum + d.strategicTasks, 0)
+  const strategicTasksCompleted = days.reduce((sum, d) => sum + d.strategicCompleted, 0)
 
-  // Определение тренда: сравниваем первую и вторую половину периода
+  const completionRate = totalTasksPlanned > 0 
+    ? Math.round((totalTasksCompleted / totalTasksPlanned) * 100) 
+    : 0
+  const strategicCompletionRate = strategicTasksPlanned > 0 
+    ? Math.round((strategicTasksCompleted / strategicTasksPlanned) * 100) 
+    : 0
+
+  const avgDreamProgress = days.reduce((sum, d) => sum + d.dreamProgressScore, 0) / days.length
+  const avgOverallScore = days.reduce((sum, d) => sum + d.overallScore, 0) / days.length
+
+  // Определение тренда
   const midpoint = Math.floor(days.length / 2)
-  const firstHalfAvg =
-    days.slice(0, midpoint).reduce((sum, d) => sum + d.dreamProgressScore, 0) / midpoint
-  const secondHalfAvg =
-    days.slice(midpoint).reduce((sum, d) => sum + d.dreamProgressScore, 0) /
-    (days.length - midpoint)
+  if (midpoint === 0) {
+    return {
+      totalTasksPlanned,
+      totalTasksCompleted,
+      completionRate,
+      strategicTasksPlanned,
+      strategicTasksCompleted,
+      strategicCompletionRate,
+      avgDreamProgress,
+      avgOverallScore,
+      trend: 'стабильно',
+      patterns: [],
+    }
+  }
+
+  const firstHalfAvg = days.slice(0, midpoint).reduce((sum, d) => sum + d.dreamProgressScore, 0) / midpoint
+  const secondHalfAvg = days.slice(midpoint).reduce((sum, d) => sum + d.dreamProgressScore, 0) / (days.length - midpoint)
 
   let trend: 'растет' | 'стабильно' | 'падает' = 'стабильно'
   if (secondHalfAvg > firstHalfAvg + 0.5) trend = 'растет'
   else if (secondHalfAvg < firstHalfAvg - 0.5) trend = 'падает'
 
-  return { avgDreamProgress, avgOverall, trend }
+  return {
+    totalTasksPlanned,
+    totalTasksCompleted,
+    completionRate,
+    strategicTasksPlanned,
+    strategicTasksCompleted,
+    strategicCompletionRate,
+    avgDreamProgress,
+    avgOverallScore,
+    trend,
+    patterns: [], // ИИ заполнит
+  }
 }
 
-// Форматирование исторических данных для промпта
-function formatHistoricalData(days: DayData[]): string {
-  const pace = calculateCurrentPace(days)
-
+// Форматирование данных базового периода
+function formatBasePeriodData(days: DayDataFull[], quality: ExecutionQuality): string {
   return `
-📊 ИСТОРИЧЕСКИЕ ДАННЫЕ (последние ${days.length} дней):
+📊 БАЗА ДЛЯ АНАЛИЗА (${days.length} дней):
 
-Средние показатели:
-- Dream Progress: ${pace.avgDreamProgress.toFixed(1)}/10
-- Overall Score: ${pace.avgOverall.toFixed(1)}/10
-- Тренд: ${pace.trend}
+КАЧЕСТВО ВЫПОЛНЕНИЯ:
+- Всего задач запланировано: ${quality.totalTasksPlanned}
+- Выполнено: ${quality.totalTasksCompleted} (${quality.completionRate}%)
+- Стратегических задач: ${quality.strategicTasksPlanned}
+- Выполнено стратегических: ${quality.strategicTasksCompleted} (${quality.strategicCompletionRate}%)
 
-Последние 10 дней:
-${days
-  .slice(-10)
-  .map(
-    (d, i) => `
-День ${i + 1} (${d.date}): Dream Progress ${d.dreamProgressScore}/10, Overall ${d.overallScore}/10
-План: ${d.planText.substring(0, 100)}...
-Факт: ${d.factText.substring(0, 100)}...
-`
-  )
-  .join('\n')}
+ОЦЕНКИ:
+- Средний Dream Progress: ${quality.avgDreamProgress.toFixed(1)}/10
+- Средний Overall Score: ${quality.avgOverallScore.toFixed(1)}/10
+- Тренд: ${quality.trend}
+
+ДЕТАЛИ ПО ДНЯМ:
+${days.map((d, i) => `
+День ${i + 1} (${d.date}):
+  План: ${d.planText.substring(0, 200)}${d.planText.length > 200 ? '...' : ''}
+  Факт: ${d.factText.substring(0, 200)}${d.factText.length > 200 ? '...' : ''}
+  Задачи: ${d.tasksCompleted}/${d.tasksPlanned} выполнено (стратегических: ${d.strategicCompleted}/${d.strategicTasks})
+  Оценки: Dream ${d.dreamProgressScore}/10, Overall ${d.overallScore}/10
+`).join('\\n')}
 `
 }
 
-// Построение промпта для прогноза
+// Построение промпта для прогноза (НОВАЯ ЛОГИКА)
 export function buildForecastPrompt(request: ForecastRequest): string {
   const userProfileSection = formatUserProfile(request.userProfile)
-  const historicalData = formatHistoricalData(request.historicalDays)
-  const pace = calculateCurrentPace(request.historicalDays)
+  const quality = calculateExecutionQuality(request.baseDays)
+  const baseData = formatBasePeriodData(request.baseDays, quality)
 
-  return `Ты строгий ИИ-коуч и аналитик. Твоя задача - дать ЧЕСТНЫЙ ПРОГНОЗ движения пользователя к его мечте.
+  const horizonNames: Record<string, string> = {
+    week: 'Неделя',
+    month: 'Месяц',
+    quarter: 'Квартал',
+    year: 'Год',
+    dream: 'Мечта',
+  }
+
+  const horizonName = horizonNames[request.forecastHorizon] || request.forecastHorizon
+
+  return `Ты строгий ИИ-коуч и аналитик. Твоя задача - дать ЧЕСТНЫЙ ПРОГНОЗ на основе РЕАЛЬНОГО качества выполнения задач.
 
 ${userProfileSection}
 
 🌟 МЕЧТА ПОЛЬЗОВАТЕЛЯ (${request.dreamYears} лет):
 ${request.dreamGoal}
 
-${request.currentPeriodGoals && request.currentPeriodGoals.length > 0 ? `
-🎯 ЦЕЛИ ТЕКУЩЕГО ПЕРИОДА (${request.periodType || 'период'}):
-${request.currentPeriodGoals.join('\n')}
-` : ''}
+---
 
-${historicalData}
+${baseData}
+
+---
+
+🎯 ГОРИЗОНТ ПРОГНОЗА: ${horizonName}
+${request.horizonStart && request.horizonEnd ? `Период: ${request.horizonStart} — ${request.horizonEnd}` : ''}
+
+ЦЕЛИ ГОРИЗОНТА:
+${request.horizonGoals.length > 0 
+  ? request.horizonGoals.map((g, i) => `${i + 1}. ${g}`).join('\\n')
+  : 'Цели не указаны'}
 
 ---
 
 ИНСТРУКЦИИ ДЛЯ ПРОГНОЗА:
 
-ТИП ПРОГНОЗА: ${request.forecastType === 'current_period' ? 'Прогноз текущего периода' : request.forecastType === 'dream_achievement' ? 'Прогноз достижения мечты' : 'Комплексный прогноз'}
+1. АНАЛИЗ КАЧЕСТВА ВЫПОЛНЕНИЯ (базовый период):
+   - Проанализируй План vs Факт каждого дня
+   - Выяви паттерны: когда срывается план? какие задачи не выполняются?
+   - Оцени качество стратегических задач vs операционных
+   - Найди закономерности: дни недели, типы задач, время
+   - КОНКРЕТНО: что работает, что нет
 
-${request.forecastType === 'current_period' || request.forecastType === 'comprehensive' ? `
-1. ПРОГНОЗ ВЫПОЛНЕНИЯ ЦЕЛЕЙ ТЕКУЩЕГО ПЕРИОДА:
-   - Проанализируй текущий темп (Dream Progress: ${pace.avgDreamProgress.toFixed(1)}/10, тренд: ${pace.trend})
-   - Оцени вероятность выполнения ВСЕХ целей периода (0-100%)
-   - Рассчитай ожидаемый % выполнения (сколько целей реально будет выполнено)
-   - Определи текущий темп: отстает/в темпе/опережает
-   - Дай 3-5 конкретных рекомендаций для улучшения результата
-` : ''}
+2. ПРОГНОЗ ПО КАЖДОЙ ЦЕЛИ ГОРИЗОНТА:
+   Для каждой цели из списка выше:
+   - Вероятность выполнения (0-100%)
+   - Уровень риска: низкий/средний/высокий
+   - Что угрожает выполнению (конкретные факторы из анализа)
+   - Рекомендация по этой цели
 
-${request.forecastType === 'dream_achievement' || request.forecastType === 'comprehensive' ? `
-2. ПРОГНОЗ ДОСТИЖЕНИЯ МЕЧТЫ:
-   - При текущем темпе (Dream Progress: ${pace.avgDreamProgress.toFixed(1)}/10): сколько лет до мечты?
-   - Идет ли по плану? (план: ${request.dreamYears} лет)
-   - Рассчитай % прогресса в год при текущем темпе
-   - Что нужно изменить, чтобы достичь мечты за ${request.dreamYears} лет?
-   - Будь честным: если темп слабый - скажи прямо
-` : ''}
+3. ПРОГНОЗ ДОСТИЖЕНИЯ МЕЧТЫ:
+   При текущем качестве выполнения (${quality.completionRate}% задач, ${quality.strategicCompletionRate}% стратегических):
+   - Сколько лет до мечты реально?
+   - Идет ли по плану (${request.dreamYears} лет)?
+   - Какой % прогресса в год при текущем темпе?
+   - Какой % нужен для достижения вовремя?
+   - Что конкретно нужно изменить?
 
-3. "ЧТО ЕСЛИ" СЦЕНАРИИ (3-5 сценариев):
-   - Если увеличить Dream Progress на 20% → какое влияние?
-   - Если продолжать в текущем темпе → что произойдет?
-   - Если упадет в баланс (здоровье/семья) → какие риски?
-   - Если улучшить strategyScore → как повлияет на мечту?
-   - Если появится блокер (болезнь, кризис) → насколько отстанет?
+4. ПАТТЕРНЫ ПОВЕДЕНИЯ (3-5 паттернов):
+   На основе анализа план/факт:
+   - Позитивные паттерны (что работает)
+   - Негативные паттерны (что мешает)
+   - Рекомендации по каждому
 
-   Для каждого сценария:
-   - Описание сценария
-   - Влияние на достижение мечты
-   - Вероятность: низкая/средняя/высокая
+5. СЦЕНАРИИ "ЧТО ЕСЛИ" (3-5):
+   - Если улучшить выполнение стратегических задач до 80%
+   - Если продолжать в текущем темпе
+   - Если выполнение упадет еще на 20%
+   - Если сфокусироваться на 1-2 ключевых целях
+   - Конкретный сценарий под эту ситуацию
 
-4. КЛЮЧЕВЫЕ РЕКОМЕНДАЦИИ (3-5 главных):
-   - Фокус на конкретных действиях
-   - Что делать ЗАВТРА, чтобы приблизиться к мечте
-   - На чем сфокусироваться в ближайший период
-   - Что изменить в подходе
-   - Какие риски предотвратить
+6. КРИТИЧЕСКИЕ РИСКИ (если есть):
+   - Что может сорвать достижение целей?
+   - На что обратить внимание СРОЧНО?
 
-5. КРАТКОЕ РЕЗЮМЕ ПРОГНОЗА (2-3 абзаца):
-   - Честная оценка текущей ситуации
-   - Реалистичен ли план достижения мечты
-   - Главные выводы и предупреждения
-   - Мотивация (если заслужена) или жесткая критика (если нужна)
+7. КЛЮЧЕВЫЕ РЕКОМЕНДАЦИИ (3-5):
+   - КОНКРЕТНЫЕ действия
+   - Что делать ЗАВТРА
+   - Что изменить в подходе к планированию
+   - Как улучшить выполнение стратегических задач
 
 ФОРМАТ ОТВЕТА - СТРОГО JSON:
 {
-  ${request.forecastType === 'current_period' || request.forecastType === 'comprehensive' ? `
-  "currentPeriodForecast": {
-    "periodType": "${request.periodType || 'период'}",
-    "completionProbability": число 0-100 (% вероятность выполнения всех целей),
-    "expectedCompletionRate": число 0-100 (% ожидаемое выполнение),
-    "daysRemaining": число (оставшихся дней в периоде, примерная оценка),
-    "currentPace": "отстает/в темпе/опережает",
-    "recommendations": ["рекомендация1", "рекомендация2", ...]
+  "executionQuality": {
+    "totalTasksPlanned": ${quality.totalTasksPlanned},
+    "totalTasksCompleted": ${quality.totalTasksCompleted},
+    "completionRate": ${quality.completionRate},
+    "strategicTasksPlanned": ${quality.strategicTasksPlanned},
+    "strategicTasksCompleted": ${quality.strategicTasksCompleted},
+    "strategicCompletionRate": ${quality.strategicCompletionRate},
+    "avgDreamProgress": ${quality.avgDreamProgress.toFixed(1)},
+    "avgOverallScore": ${quality.avgOverallScore.toFixed(1)},
+    "trend": "${quality.trend}",
+    "patterns": ["паттерн 1 из анализа", "паттерн 2", ...]
   },
-  ` : ''}
+  "behaviorPatterns": [
+    {
+      "pattern": "Описание паттерна",
+      "impact": "позитивный/негативный/нейтральный",
+      "recommendation": "Что делать"
+    }
+  ],
+  "horizonType": "${horizonName}",
+  "goalForecasts": [
+    {
+      "goal": "Текст цели",
+      "probability": число 0-100,
+      "risk": "низкий/средний/высокий",
+      "threats": ["угроза 1", "угроза 2"],
+      "recommendation": "Что делать для этой цели"
+    }
+  ],
+  "overallProbability": число 0-100 (общая вероятность выполнить все цели горизонта),
   "dreamForecast": {
-    "estimatedYears": число (сколько лет до мечты при текущем темпе),
-    "onTrack": true/false (идет ли по плану - в пределах ${request.dreamYears} лет),
-    "dreamProgressRate": число (% прогресса в год при текущем темпе),
-    "adjustmentNeeded": "что нужно изменить для достижения мечты за ${request.dreamYears} лет"
+    "estimatedYears": число (реальный срок при текущем темпе),
+    "onTrack": true/false,
+    "progressPerYear": число (% в год при текущем темпе),
+    "requiredProgressPerYear": число (% нужно для достижения за ${request.dreamYears} лет),
+    "gap": число (разрыв между текущим и требуемым),
+    "adjustmentNeeded": "Что конкретно изменить"
   },
   "whatIfScenarios": [
     {
-      "scenario": "Если увеличить Dream Progress на 20%",
-      "impact": "Детальное описание влияния на достижение мечты",
+      "scenario": "Описание сценария",
+      "impact": "Влияние на цели и мечту",
       "probability": "низкая/средняя/высокая"
-    },
-    {
-      "scenario": "Если продолжать в текущем темпе",
-      "impact": "Что произойдет",
-      "probability": "средняя/высокая"
     }
-    // ... еще 2-3 сценария
   ],
   "keyRecommendations": [
     "Конкретная рекомендация 1",
-    "Конкретная рекомендация 2",
-    "Конкретная рекомендация 3"
+    "Конкретная рекомендация 2"
   ],
-  "summary": "Краткое резюме прогноза (2-3 абзаца): честная оценка ситуации, реалистичность плана, главные выводы"
+  "criticalRisks": [
+    "Риск 1 (если есть)",
+    "Риск 2"
+  ],
+  "summary": "2-3 абзаца: честная оценка на основе анализа план/факт, прогноз по целям, что делать"
 }
 
 КРИТИЧЕСКИ ВАЖНО:
-- Будь ЧЕСТНЫМ: если темп слабый - скажи прямо, не приукрашивай
-- Основывайся на ДАННЫХ: средний Dream Progress ${pace.avgDreamProgress.toFixed(1)}/10, тренд ${pace.trend}
-- Прогноз должен быть РЕАЛИСТИЧНЫМ: если при текущем темпе мечта недостижима за ${request.dreamYears} лет - скажи сколько реально нужно
-- Рекомендации должны быть КОНКРЕТНЫМИ и ДЕЙСТВЕННЫМИ
-- Сценарии "что если" должны быть ПРАКТИЧНЫМИ и ВЕРОЯТНЫМИ
-- Если тренд падает - предупреди о рисках ЖЕСТКО
-- Если тренд растет - похвали, но напомни о балансе и устойчивости`
+- Анализируй РЕАЛЬНЫЕ данные план/факт, не абстрактные скоры
+- Прогноз по КАЖДОЙ цели горизонта отдельно
+- Паттерны из КОНКРЕТНЫХ примеров (дни, задачи)
+- Если ${quality.completionRate}% выполнения - это мало, скажи прямо
+- Если ${quality.strategicCompletionRate}% стратегических - это проблема, укажи
+- Рекомендации должны быть ДЕЙСТВЕННЫМИ и КОНКРЕТНЫМИ
+- Не приукрашивай: если темп слабый - говори как есть`
 }

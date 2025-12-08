@@ -7,8 +7,14 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const numericId = parseInt(id)
+    
+    if (isNaN(numericId)) {
+      return NextResponse.json({ error: 'Invalid period ID' }, { status: 400 })
+    }
+    
     const evaluation = await prisma.periodEvaluation.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: numericId },
     })
 
     if (!evaluation) {

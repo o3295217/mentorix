@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const YearGoalSchema = z.object({
+  year: z.number().int().min(2020).max(2100),
+  goals: z.array(z.string()),
+})
 
 // GET /api/goals/year?year=2025
 export async function GET(request: NextRequest) {
@@ -12,6 +18,9 @@ export async function GET(request: NextRequest) {
     }
 
     const year = parseInt(yearParam)
+    if (isNaN(year)) {
+      return NextResponse.json({ error: 'Invalid year parameter' }, { status: 400 })
+    }
     const yearGoal = await prisma.yearGoal.findUnique({
       where: { year },
     })
@@ -34,14 +43,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { year, goals } = body
-
-    if (!year || !Array.isArray(goals)) {
+    
+    const validation = YearGoalSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'year and goals array are required' },
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
       )
     }
+    
+    const { year, goals } = validation.data
 
     const yearGoal = await prisma.yearGoal.upsert({
       where: { year },

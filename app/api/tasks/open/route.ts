@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const OpenTaskSchema = z.object({
+  taskText: z.string().min(1, "Task text is required"),
+  taskType: z.enum(['strategic', 'operational']),
+  originDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Invalid date format",
+  }),
+})
 
 export async function GET() {
   try {
@@ -18,11 +27,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { taskText, taskType, originDate } = body
-
-    if (!taskText || !taskType || !originDate) {
-      return NextResponse.json({ error: 'taskText, taskType, and originDate are required' }, { status: 400 })
+    
+    const validation = OpenTaskSchema.safeParse(body)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+
+    const { taskText, taskType, originDate } = validation.data
 
     const task = await prisma.openTask.create({
       data: {

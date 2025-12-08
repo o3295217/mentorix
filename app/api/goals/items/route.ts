@@ -151,7 +151,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 })
     }
 
-    await prisma.goal.delete({ where: { id: parseInt(id) } })
+    const numericId = parseInt(id)
+    if (isNaN(numericId)) {
+      return NextResponse.json({ error: 'Invalid goal ID' }, { status: 400 })
+    }
+
+    await prisma.goal.delete({ where: { id: numericId } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

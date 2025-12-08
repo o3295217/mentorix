@@ -4,38 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
-import BalanceFlags from '@/components/BalanceFlags'
 import { DailyEntry, SuggestedTask } from '@/lib/types'
-
-function getAlignmentStatus(text: string): 'works' | 'partial' | 'no' {
-  const lower = text.toLowerCase()
-  if (lower.includes('works') || lower.includes('работает')) return 'works'
-  if (lower.includes('partial') || lower.includes('частично')) return 'partial'
-  if (lower.includes('no') || lower.includes('нет')) return 'no'
-  return 'no'
-}
-
-function getAlignmentIcon(status: 'works' | 'partial' | 'no'): string {
-  switch (status) {
-    case 'works':
-      return '✅'
-    case 'partial':
-      return '⚠️'
-    case 'no':
-      return '❌'
-  }
-}
-
-function getAlignmentColor(status: 'works' | 'partial' | 'no'): string {
-  switch (status) {
-    case 'works':
-      return 'text-green-600'
-    case 'partial':
-      return 'text-yellow-600'
-    case 'no':
-      return 'text-red-600'
-  }
-}
 
 function getScoreColor(score: number): string {
   if (score >= 7) return 'text-green-600'
@@ -118,15 +87,6 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const evaluation = dailyEntry.evaluation
   const date = new Date(dailyEntry.date)
 
-  const alignments = [
-    { label: 'День → Неделя', text: evaluation.alignmentDayWeek },
-    { label: 'Неделя → Месяц', text: evaluation.alignmentWeekMonth },
-    { label: 'Месяц → Квартал', text: evaluation.alignmentMonthQuarter },
-    { label: 'Квартал → Полугодие', text: evaluation.alignmentQuarterHalf },
-    { label: 'Полугодие → Год', text: evaluation.alignmentHalfYear },
-    { label: 'Год → Мечта', text: evaluation.alignmentYearDream },
-  ]
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -202,65 +162,6 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         <p className="text-gray-800 whitespace-pre-wrap">{evaluation.feedbackText}</p>
       </div>
 
-      {/* Balance Flags - НОВЫЙ КОМПОНЕНТ */}
-      <BalanceFlags
-        healthFlag={evaluation.healthFlag}
-        familyFlag={evaluation.familyFlag}
-        energyFlag={evaluation.energyFlag}
-      />
-
-      {/* Alignment */}
-      <div className="card">
-        <h2 className="text-xl font-bold mb-4">🎯 Вертикальный Alignment (путь к мечте)</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Проверка: работают ли задачи каждого уровня на следующий уровень вплоть до мечты
-        </p>
-        <div className="space-y-4">
-          {alignments.map((alignment, i) => {
-            const status = getAlignmentStatus(alignment.text)
-            return (
-              <div key={i} className="border-l-4 border-gray-300 pl-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-2xl ${getAlignmentColor(status)}`}>{getAlignmentIcon(status)}</span>
-                  <h3 className="font-semibold">{alignment.label}</h3>
-                </div>
-                <p className="text-gray-700 text-sm">{alignment.text}</p>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Horizontal Alignment - если есть */}
-      {(evaluation.workHealthAlignment || evaluation.workFamilyAlignment || evaluation.workValuesAlignment) && (
-        <div className="card bg-yellow-50 border-2 border-yellow-200">
-          <h2 className="text-xl font-bold mb-4 text-yellow-900">⚖️ Баланс сфер жизни</h2>
-          <p className="text-sm text-gray-700 mb-4">
-            Проверка баланса между работой и другими сферами жизни
-          </p>
-          <div className="space-y-3">
-            {evaluation.workHealthAlignment && (
-              <div className="p-3 bg-white rounded border">
-                <h3 className="font-semibold text-sm mb-1">Работа ↔ Здоровье:</h3>
-                <p className="text-sm text-gray-700">{evaluation.workHealthAlignment}</p>
-              </div>
-            )}
-            {evaluation.workFamilyAlignment && (
-              <div className="p-3 bg-white rounded border">
-                <h3 className="font-semibold text-sm mb-1">Работа ↔ Семья:</h3>
-                <p className="text-sm text-gray-700">{evaluation.workFamilyAlignment}</p>
-              </div>
-            )}
-            {evaluation.workValuesAlignment && (
-              <div className="p-3 bg-white rounded border">
-                <h3 className="font-semibold text-sm mb-1">Работа ↔ Ценности:</h3>
-                <p className="text-sm text-gray-700">{evaluation.workValuesAlignment}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Suggested Tasks */}
       {evaluation.suggestedTasksJson && JSON.parse(evaluation.suggestedTasksJson).length > 0 && (
         <div className="card bg-purple-50 border-2 border-purple-200">
@@ -269,12 +170,12 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
             ИИ выявил важные задачи, которые стоит добавить в список незакрытых
           </p>
           <div className="space-y-3">
-            {(JSON.parse(evaluation.suggestedTasksJson) as SuggestedTask[]).map((task, i) => {
+            {(JSON.parse(evaluation.suggestedTasksJson) as SuggestedTask[]).map((task) => {
               const isAdded = addedTasks.has(task.taskText)
               const isAdding = addingTask === task.taskText
 
               return (
-                <div key={i} className="p-4 bg-white rounded-lg border-2 border-purple-200">
+                <div key={task.taskText} className="p-4 bg-white rounded-lg border-2 border-purple-200">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">

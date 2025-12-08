@@ -29,8 +29,8 @@ interface PeriodEvaluation {
 }
 
 export default function PeriodDetailPage() {
-  const params = useParams()
-  const id = params.id as string
+  const params = useParams<{ id: string }>()
+  const id = params.id
 
   const [evaluation, setEvaluation] = useState<PeriodEvaluation | null>(null)
   const [loading, setLoading] = useState(true)
@@ -263,8 +263,8 @@ export default function PeriodDetailPage() {
             <div className="bg-white p-4 rounded-lg">
               <h3 className="font-semibold mb-2 text-orange-600">⚠️ Проблемы с балансом</h3>
               <ul className="list-disc list-inside">
-                {patterns.balanceIssues.map((issue: string, i: number) => (
-                  <li key={i}>{issue}</li>
+                {patterns.balanceIssues.map((issue: string) => (
+                  <li key={issue}>{issue}</li>
                 ))}
               </ul>
             </div>
@@ -327,8 +327,8 @@ export default function PeriodDetailPage() {
               <div className="bg-white p-4 rounded-lg">
                 <h3 className="font-semibold mb-2 text-red-600">Стратегические</h3>
                 <ul className="list-disc list-inside">
-                  {blockers.strategic.map((blocker: string, i: number) => (
-                    <li key={i}>{blocker}</li>
+                  {blockers.strategic.map((blocker: string) => (
+                    <li key={blocker}>{blocker}</li>
                   ))}
                 </ul>
               </div>
@@ -337,8 +337,8 @@ export default function PeriodDetailPage() {
               <div className="bg-white p-4 rounded-lg">
                 <h3 className="font-semibold mb-2 text-orange-600">Операционные</h3>
                 <ul className="list-disc list-inside">
-                  {blockers.operational.map((blocker: string, i: number) => (
-                    <li key={i}>{blocker}</li>
+                  {blockers.operational.map((blocker: string) => (
+                    <li key={blocker}>{blocker}</li>
                   ))}
                 </ul>
               </div>
@@ -347,8 +347,8 @@ export default function PeriodDetailPage() {
               <div className="bg-white p-4 rounded-lg">
                 <h3 className="font-semibold mb-2 text-yellow-600">Личные</h3>
                 <ul className="list-disc list-inside">
-                  {blockers.personal.map((blocker: string, i: number) => (
-                    <li key={i}>{blocker}</li>
+                  {blockers.personal.map((blocker: string) => (
+                    <li key={blocker}>{blocker}</li>
                   ))}
                 </ul>
               </div>
