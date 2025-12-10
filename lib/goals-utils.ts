@@ -10,7 +10,7 @@ export const parseWeekKey = (key: string): { weekStart: Date; weekNum: number; y
   const weekNum = parseInt(parts[2].replace('W', ''))
   
   const firstDay = new Date(year, month, 1)
-  let current = new Date(firstDay)
+  const current = new Date(firstDay)
   while (current.getDay() !== 1) current.setDate(current.getDate() + 1)
   for (let i = 1; i < weekNum; i++) current.setDate(current.getDate() + 7)
   return { weekStart: current, weekNum, year, month }
@@ -38,10 +38,10 @@ export const getPeriodKey = (periodType: 'quarter' | 'month' | 'week', date: Dat
       return `${year}-Q${Math.floor(month / 3) + 1}`
     case 'month':
       return `${year}-${String(month + 1).padStart(2, '0')}`
-    case 'week':
+    case 'week': {
       // Для недели нужна дополнительная логика
       const firstDay = new Date(year, month, 1)
-      let weekStart = new Date(firstDay)
+      const weekStart = new Date(firstDay)
       while (weekStart.getDay() !== 1) weekStart.setDate(weekStart.getDate() + 1)
       
       let weekNum = 1
@@ -53,6 +53,7 @@ export const getPeriodKey = (periodType: 'quarter' | 'month' | 'week', date: Dat
         weekNum++
       }
       return `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
+    }
     default:
       return ''
   }

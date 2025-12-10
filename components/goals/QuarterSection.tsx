@@ -154,7 +154,7 @@ export default function QuarterSection({
                 if (quarter === currQuarter && year === currentYear) {
                   const firstD = new Date(year, currMonth, 1)
                   const lastD = new Date(year, currMonth + 1, 0)
-                  let curr = new Date(firstD)
+                  const curr = new Date(firstD)
                   while (curr.getDay() !== 1) curr.setDate(curr.getDate() + 1)
                   let wNum = 1
                   while (curr <= lastD) {
@@ -284,7 +284,7 @@ export default function QuarterSection({
                               const weeksData: { num: number; start: Date; end: Date }[] = []
                               const firstD = new Date(year, currMonth, 1)
                               const lastD = new Date(year, currMonth + 1, 0)
-                              let curr = new Date(firstD)
+                              const curr = new Date(firstD)
                               while (curr.getDay() !== 1) curr.setDate(curr.getDate() + 1)
                               let wNum = 1
                               while (curr <= lastD) {

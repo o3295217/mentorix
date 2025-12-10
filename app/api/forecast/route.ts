@@ -29,7 +29,7 @@ function countTasks(text: string): { total: number; strategic: number } {
       trimmed.startsWith('☑') ||
       trimmed.startsWith('✓') ||
       trimmed.startsWith('✗') ||
-      /^\d+[\.\)]/.test(trimmed)
+      /^\d+[.)]/.test(trimmed)
     )
   })
   

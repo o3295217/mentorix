@@ -58,7 +58,7 @@ export default function ForecastPage() {
 
     const today = new Date()
     let start: Date
-    let end: Date = today
+    const end: Date = today
 
     switch (type) {
       case 'week':

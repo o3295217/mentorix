@@ -2,36 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PeriodType, getPeriodDates } from '@/lib/dates'
+import { DreamGoal, Goal, GoalTag } from '@/lib/types'
 
-// Types
-export interface DreamGoal {
-  id: number
-  goalText: string
-  years: number
-}
-
-export interface Goal {
-  id: number
-  text: string
-  periodType: string
-  periodKey: string
-  completed: boolean
-  completedAt: string | null
-  deadline: string | null
-  priority: number // 0=нет, 1=низкий, 2=средний, 3=высокий
-  tags: string[]
-  blockedBy: number[]
-  history: { action: string; date: string; from?: string; to?: string }[]
-  sortOrder: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface GoalTag {
-  id: number
-  name: string
-  color: string
-}
+// Re-export types for backward compatibility
+export type { DreamGoal, Goal, GoalTag } from '@/lib/types'
 
 interface UseGoalsReturn {
   // Dream
@@ -199,7 +173,7 @@ export function useGoals(): UseGoalsReturn {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       } else if (periodType === 'week') {
         const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-        let current = new Date(firstDay)
+        const current = new Date(firstDay)
         while (current.getDay() !== 1 && current <= date) {
           current.setDate(current.getDate() + 1)
         }
@@ -224,7 +198,7 @@ export function useGoals(): UseGoalsReturn {
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
     
-    let current = new Date(firstDay)
+    const current = new Date(firstDay)
     while (current.getDay() !== 1) {
       current.setDate(current.getDate() + 1)
     }

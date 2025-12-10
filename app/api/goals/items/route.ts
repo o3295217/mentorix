@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // Конвертация числа приоритета в строку
 const priorityNumToStr = (num: number): string => {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     const periodType = searchParams.get('periodType')
     const periodKey = searchParams.get('periodKey')
 
-    const where: any = {}
+    const where: Prisma.GoalWhereInput = {}
     if (periodType) where.periodType = periodType
     if (periodKey) where.periodKey = periodKey
 
