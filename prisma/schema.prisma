@@ -279,3 +279,64 @@ model WorldContext {
 
   @@map("world_context")
 }
+
+// Привычки (повторяющиеся задачи)
+model Habit {
+  id          Int      @id @default(autoincrement())
+  taskText    String   // Текст задачи
+  
+  // Частота повторения
+  frequency   String   @default("daily") // daily, weekdays, weekends, weekly, custom
+  daysOfWeek  String?  // JSON array: [1,2,3,4,5] для пн-пт (1=пн, 7=вс)
+  interval    Int?     // Каждые N дней (для custom)
+  
+  // Статус
+  isActive    Boolean  @default(true)
+  
+  // Статистика
+  streak      Int      @default(0) // Текущая серия дней подряд
+  bestStreak  Int      @default(0) // Лучшая серия
+  totalDone   Int      @default(0) // Всего выполнено раз
+  
+  // Порядок сортировки
+  sortOrder   Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("habits")
+}
+
+// Профиль понимания пользователя (обновляется ИИ после оценки дня)
+model UserInsights {
+  id          Int      @id @default(autoincrement())
+  
+  // Паттерны поведения (выявленные закономерности)
+  patterns    String?  // "Утром продуктивнее. Большие задачи откладывает."
+  
+  // Сильные стороны
+  strengths   String?  // "Системный подход, последовательность в привычках"
+  
+  // Сложности и зоны роста
+  challenges  String?  // "Переоценка количества задач, сложно начинать творческие задачи"
+  
+  // Предпочтения в планировании
+  preferences String?  // "Предпочитает 3-5 ключевых задач, не любит микроменеджмент"
+  
+  // Рекомендации ИИ
+  recommendations String? // "Разбивать большие задачи, ставить сложную задачу на утро"
+  
+  // Мотивация и ценности
+  motivators  String?  // "Семья, финансовая свобода, развитие бизнеса"
+  
+  // Сводка последней недели (обновляется раз в неделю)
+  weeklySummary String? // Краткая сводка достижений и паттернов недели
+  
+  // Счетчик оценок для трекинга
+  evaluationCount Int   @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("user_insights")
+}

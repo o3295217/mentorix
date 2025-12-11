@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { evaluateDayNew } from '@/lib/anthropic'
+import { evaluateDayNew, updateUserInsights } from '@/lib/anthropic'
 import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
 import { z } from 'zod'
@@ -43,9 +43,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Daily entry not found' }, { status: 404 })
     }
 
-    if (!dailyEntry.factText) {
+    // Факт теперь из selectedTasksJson (чекбоксы) или из factText (старый формат)
+    const planTasks = dailyEntry.planText?.split('\n').filter(t => t.trim()) || []
+    const selectedTaskIds = safeParseJson<number[]>(dailyEntry.selectedTasksJson, [])
+    
+    // Формируем факт из отмеченных задач
+    let factText = dailyEntry.factText || ''
+    if (selectedTaskIds.length > 0 && planTasks.length > 0) {
+      // Новый формат: факт = отмеченные задачи
+      const completedTasks = selectedTaskIds
+        .filter(id => id > 0 && id <= planTasks.length)
+        .map(id => planTasks[id - 1])
+        .filter(Boolean)
+      
+      if (completedTasks.length > 0) {
+        factText = completedTasks.join('\n')
+      }
+    }
+
+    if (!factText) {
       return NextResponse.json(
-        { error: 'Fact text is required for evaluation' },
+        { error: 'No completed tasks. Mark tasks as done before evaluation.' },
         { status: 400 }
       )
     }
@@ -105,7 +123,7 @@ export async function POST(request: NextRequest) {
     const evaluationRequest: DailyEvaluationRequest = {
       date: date.toLocaleDateString('ru-RU'),
       planText: dailyEntry.planText || '',
-      factText: dailyEntry.factText || '',
+      factText: factText, // Используем вычисленный факт из чекбоксов
       goals: {
         dreamGoal: dream?.goalText || 'Не указана',
         // Цели на год теперь из year_goals таблицы
@@ -186,6 +204,90 @@ export async function POST(request: NextRequest) {
       create: { dailyEntryId, ...evaluationData },
       update: evaluationData,
     })
+
+    // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
+    try {
+      // Получить текущий профиль insights
+      let currentInsights = await prisma.userInsights.findFirst()
+      
+      // Получить историю последних 7 дней для контекста
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      
+      const recentEntries = await prisma.dailyEntry.findMany({
+        where: {
+          date: { gte: sevenDaysAgo },
+          evaluation: { isNot: null }
+        },
+        include: { evaluation: true },
+        orderBy: { date: 'desc' },
+        take: 7
+      })
+
+      const recentDays = recentEntries.map(entry => {
+        const planTasks = entry.planText?.split('\n').filter(t => t.trim()).length || 0
+        const selectedTasks = safeParseJson<number[]>(entry.selectedTasksJson, [])
+        return {
+          date: entry.date.toLocaleDateString('ru-RU'),
+          planTasks,
+          completedTasks: selectedTasks.length,
+          dreamScore: entry.evaluation?.dreamProgressScore || 5,
+          overallScore: Math.round(entry.evaluation?.overallScore || 5)
+        }
+      })
+
+      // Подготовить запрос для обновления insights
+      const insightsUpdate = await updateUserInsights({
+        currentInsights: currentInsights ? {
+          patterns: currentInsights.patterns || undefined,
+          strengths: currentInsights.strengths || undefined,
+          challenges: currentInsights.challenges || undefined,
+          preferences: currentInsights.preferences || undefined,
+          recommendations: currentInsights.recommendations || undefined,
+          motivators: currentInsights.motivators || undefined,
+        } : null,
+        evaluationCount: (currentInsights?.evaluationCount || 0) + 1,
+        planText: dailyEntry.planText || '',
+        factText: factText,
+        evaluationFeedback: evaluationResponse.feedback,
+        dreamProgressScore: evaluationResponse.dream_progress_score,
+        overallScore: evaluationResponse.overall_score,
+        recentDays
+      })
+
+      // Сохранить обновлённый профиль
+      if (currentInsights) {
+        await prisma.userInsights.update({
+          where: { id: currentInsights.id },
+          data: {
+            patterns: insightsUpdate.patterns || currentInsights.patterns,
+            strengths: insightsUpdate.strengths || currentInsights.strengths,
+            challenges: insightsUpdate.challenges || currentInsights.challenges,
+            preferences: insightsUpdate.preferences || currentInsights.preferences,
+            recommendations: insightsUpdate.recommendations || currentInsights.recommendations,
+            motivators: insightsUpdate.motivators || currentInsights.motivators,
+            evaluationCount: (currentInsights.evaluationCount || 0) + 1
+          }
+        })
+      } else {
+        await prisma.userInsights.create({
+          data: {
+            patterns: insightsUpdate.patterns,
+            strengths: insightsUpdate.strengths,
+            challenges: insightsUpdate.challenges,
+            preferences: insightsUpdate.preferences,
+            recommendations: insightsUpdate.recommendations,
+            motivators: insightsUpdate.motivators,
+            evaluationCount: 1
+          }
+        })
+      }
+
+      console.log('[UserInsights] Profile updated successfully')
+    } catch (insightsError) {
+      // Не прерываем оценку если обновление профиля не удалось
+      console.error('[UserInsights] Failed to update profile:', insightsError)
+    }
 
     return NextResponse.json(evaluation)
   } catch (error) {

@@ -1,9 +1,51 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { format } from 'date-fns'
 import { getPeriodDates } from '@/lib/dates'
 import { DailyEntry, OpenTask } from '@/lib/types'
+
+// Типы для проверки плана
+export interface TaskSuggestion {
+  goalText: string
+  reason: string
+  difficulty: 'легко' | 'средне' | 'сложно'
+  source: 'week' | 'month'
+}
+
+export interface CheckPlanResult {
+  overall: string
+  suggestions: TaskSuggestion[]
+  warnings: string[]
+  tips: string[]
+}
+
+// Типы для чата
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+// Типы для привычек
+export interface Habit {
+  id: number
+  taskText: string
+  frequency: string
+  daysOfWeek: string | null
+  interval: number | null
+  isActive: boolean
+  streak: number
+  bestStreak: number
+  totalDone: number
+  sortOrder: number
+}
+
+export interface HabitSuggestion {
+  text: string
+  consecutiveDays: number
+  totalCount: number
+  reason: string
+}
 
 interface UseDailyReturn {
   selectedDate: string
@@ -22,6 +64,27 @@ interface UseDailyReturn {
   saving: boolean
   evaluating: boolean
   message: string
+  
+  // Habits
+  habits: Habit[]
+  habitSuggestions: HabitSuggestion[]
+  addHabitsToTasks: (habitTexts?: string[]) => void
+  createHabitFromTask: (taskText: string, frequency?: string, daysOfWeek?: number[]) => Promise<void>
+  deleteHabit: (habitId: number) => Promise<void>
+  
+  // Check plan (deprecated - используй чат)
+  checkingPlan: boolean
+  checkPlanResult: CheckPlanResult | null
+  checkPlan: () => Promise<void>
+  clearCheckPlanResult: () => void
+  
+  // Chat with AI
+  chatMessages: ChatMessage[]
+  chatInput: string
+  setChatInput: (text: string) => void
+  sendChatMessage: (initialMessage?: string) => Promise<void>
+  sendingChat: boolean
+  clearChat: () => void
   
   // Task operations
   addTask: () => void
@@ -64,6 +127,17 @@ export function useDaily(): UseDailyReturn {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editingTaskText, setEditingTaskText] = useState('')
+  const [checkingPlan, setCheckingPlan] = useState(false)
+  const [checkPlanResult, setCheckPlanResult] = useState<CheckPlanResult | null>(null)
+  
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [sendingChat, setSendingChat] = useState(false)
+  
+  // Habits state
+  const [habits, setHabits] = useState<Habit[]>([])
+  const [habitSuggestions, setHabitSuggestions] = useState<HabitSuggestion[]>([])
 
   const showMessage = useCallback((text: string, duration = 3000) => {
     setMessage(text)
@@ -145,6 +219,45 @@ export function useDaily(): UseDailyReturn {
       } else {
         setMonthGoals([])
       }
+
+      // Load habits for today
+      const habitsRes = await fetch(`/api/habits?date=${selectedDate}`)
+      let loadedHabits: Habit[] = []
+      if (habitsRes.ok) {
+        const habitsData = await habitsRes.json()
+        loadedHabits = habitsData?.habits || []
+        setHabits(loadedHabits)
+      } else {
+        setHabits([])
+      }
+
+      // Если день пустой — автоматически добавляем привычки в задачи
+      const dailyCheck = await fetch(`/api/daily?date=${selectedDate}`)
+      const dailyData = dailyCheck.ok ? await dailyCheck.json() : null
+      const hasPlan = dailyData?.planText && dailyData.planText.trim().length > 0
+      
+      if (!hasPlan && loadedHabits.length > 0) {
+        // День пустой — добавляем привычки
+        const habitTasks: OpenTask[] = loadedHabits.map((habit, index) => ({
+          id: index + 1,
+          taskText: habit.taskText,
+          taskType: 'operational' as const,
+          originDate: selectedDate,
+          isClosed: false,
+          createdAt: new Date().toISOString()
+        }))
+        setTasks(habitTasks)
+        // Не сохраняем сразу — пользователь может захотеть что-то добавить
+      }
+
+      // Load habit suggestions
+      const suggestionsRes = await fetch(`/api/habits/suggestions?date=${selectedDate}`)
+      if (suggestionsRes.ok) {
+        const suggestionsData = await suggestionsRes.json()
+        setHabitSuggestions(suggestionsData?.suggestions || [])
+      } else {
+        setHabitSuggestions([])
+      }
     } catch (error) {
       console.error('Error loading data:', error)
     }
@@ -216,6 +329,89 @@ export function useDaily(): UseDailyReturn {
     savePlanWithTasks(updatedTasks, selectedTasks)
     showMessage('Цель добавлена в план')
   }, [selectedDate, tasks, selectedTasks, savePlanWithTasks, showMessage])
+
+  // Добавить привычки в задачи
+  const addHabitsToTasks = useCallback((habitTexts?: string[]) => {
+    // Если не переданы тексты, берём из текущих активных привычек
+    const textsToAdd = habitTexts ?? habits.map(h => h.taskText)
+    
+    if (textsToAdd.length === 0) return
+    
+    // Фильтруем уже добавленные
+    const existingTexts = new Set(tasks.map(t => t.taskText.toLowerCase()))
+    const newHabitTexts = textsToAdd.filter(text => !existingTexts.has(text.toLowerCase()))
+    
+    if (newHabitTexts.length === 0) {
+      showMessage('ℹ️ Все привычки уже в плане')
+      return
+    }
+
+    const maxId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) : 0
+    const newTasks: OpenTask[] = newHabitTexts.map((text, index) => ({
+      id: maxId + index + 1,
+      taskText: text,
+      taskType: 'operational' as const,
+      originDate: selectedDate,
+      isClosed: false,
+      createdAt: new Date().toISOString()
+    }))
+
+    const updatedTasks = [...tasks, ...newTasks]
+    setTasks(updatedTasks)
+    savePlanWithTasks(updatedTasks, selectedTasks)
+    showMessage(`✅ Добавлено ${newHabitTexts.length} ${newHabitTexts.length === 1 ? 'привычка' : 'привычек'}`)
+  }, [selectedDate, tasks, selectedTasks, habits, savePlanWithTasks, showMessage])
+
+  // Создать привычку из задачи
+  const createHabitFromTask = useCallback(async (
+    taskText: string, 
+    frequency: string = 'daily',
+    daysOfWeek?: number[]
+  ) => {
+    try {
+      const res = await fetch('/api/habits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskText,
+          frequency,
+          daysOfWeek,
+        }),
+      })
+
+      if (res.ok) {
+        const habit = await res.json()
+        setHabits(prev => [...prev, habit])
+        // Убрать из предложений
+        setHabitSuggestions(prev => prev.filter(s => s.text !== taskText))
+        showMessage('🔄 Привычка создана!')
+      } else {
+        showMessage('❌ Не удалось создать привычку')
+      }
+    } catch (error) {
+      console.error('Error creating habit:', error)
+      showMessage('❌ Ошибка при создании привычки')
+    }
+  }, [showMessage])
+
+  // Удалить привычку
+  const deleteHabit = useCallback(async (habitId: number) => {
+    try {
+      const res = await fetch(`/api/habits?id=${habitId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setHabits(prev => prev.filter(h => h.id !== habitId))
+        showMessage('🗑️ Привычка удалена')
+      } else {
+        showMessage('❌ Не удалось удалить привычку')
+      }
+    } catch (error) {
+      console.error('Error deleting habit:', error)
+      showMessage('❌ Ошибка при удалении привычки')
+    }
+  }, [showMessage])
 
   const removeTask = useCallback((taskId: number) => {
     const updatedTasks = tasks.filter(t => t.id !== taskId)
@@ -340,9 +536,119 @@ export function useDaily(): UseDailyReturn {
     showMessage(`✅ Перенесено ${tasksToTransfer.length} ${tasksToTransfer.length === 1 ? 'задача' : tasksToTransfer.length < 5 ? 'задачи' : 'задач'}`)
   }, [selectedTasks, tasks, factText, showMessage])
 
+  // Проверка плана ИИ
+  const checkPlan = useCallback(async () => {
+    if (tasks.length === 0) {
+      showMessage('ℹ️ Добавьте хотя бы одну задачу')
+      return
+    }
+
+    setCheckingPlan(true)
+    setCheckPlanResult(null)
+    showMessage('🔍 Проверяю план...', 0)
+
+    try {
+      const planTasks = tasks.map(t => t.taskText)
+
+      const res = await fetch('/api/daily/check-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          planTasks,
+        }),
+      })
+
+      if (res.ok) {
+        const result: CheckPlanResult = await res.json()
+        setCheckPlanResult(result)
+        setMessage('')
+      } else {
+        const error = await res.json()
+        showMessage(`❌ Ошибка: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error checking plan:', error)
+      showMessage('❌ Ошибка при проверке плана')
+    } finally {
+      setCheckingPlan(false)
+    }
+  }, [tasks, selectedDate, showMessage])
+
+  const clearCheckPlanResult = useCallback(() => {
+    setCheckPlanResult(null)
+  }, [])
+
+  // Chat functions
+  const sendChatMessage = useCallback(async (initialMessage?: string) => {
+    const messageToSend = initialMessage || chatInput.trim()
+    if (!messageToSend) return
+    
+    if (tasks.length === 0) {
+      showMessage('ℹ️ Сначала добавьте задачи в план')
+      return
+    }
+
+    setSendingChat(true)
+    
+    // Добавить сообщение пользователя в историю (если не initialMessage)
+    const newUserMessage: ChatMessage = { role: 'user', content: messageToSend }
+    const updatedMessages = initialMessage 
+      ? chatMessages // При initial message не добавляем в UI - это системный запрос
+      : [...chatMessages, newUserMessage]
+    
+    if (!initialMessage) {
+      setChatMessages(updatedMessages)
+      setChatInput('')
+    }
+
+    try {
+      const planTasks = tasks.map(t => t.taskText)
+      const completedTasks = tasks
+        .filter(t => selectedTasks.has(t.id))
+        .map(t => t.taskText)
+
+      const res = await fetch('/api/daily/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          planTasks,
+          completedTasks,
+          messages: chatMessages,
+          userMessage: messageToSend,
+        }),
+      })
+
+      if (res.ok) {
+        const { message: aiMessage } = await res.json()
+        const assistantMessage: ChatMessage = { role: 'assistant', content: aiMessage }
+        setChatMessages(prev => [...prev, 
+          ...(initialMessage ? [newUserMessage] : []), 
+          assistantMessage
+        ])
+      } else {
+        const error = await res.json()
+        showMessage(`❌ Ошибка: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error sending chat message:', error)
+      showMessage('❌ Ошибка при отправке сообщения')
+    } finally {
+      setSendingChat(false)
+    }
+  }, [chatInput, chatMessages, tasks, selectedTasks, selectedDate, showMessage])
+
+  const clearChat = useCallback(() => {
+    setChatMessages([])
+    setChatInput('')
+  }, [])
+
   const evaluate = useCallback(async (router: { push: (path: string) => void }) => {
-    if (!factText) {
-      showMessage('❌ Добавьте факт выполнения перед оценкой')
+    // Факт = отмеченные задачи
+    const completedTasks = tasks.filter(t => selectedTasks.has(t.id))
+    if (completedTasks.length === 0) {
+      showMessage('❌ Отметьте выполненные задачи перед оценкой')
       return
     }
 
@@ -418,6 +724,16 @@ export function useDaily(): UseDailyReturn {
     saving,
     evaluating,
     message,
+    checkingPlan,
+    checkPlanResult,
+    checkPlan,
+    clearCheckPlanResult,
+    chatMessages,
+    chatInput,
+    setChatInput,
+    sendChatMessage,
+    sendingChat,
+    clearChat,
     addTask,
     addGoalToTasks,
     removeTask,
@@ -436,5 +752,11 @@ export function useDaily(): UseDailyReturn {
     saveFact,
     transferCompletedTasks,
     evaluate,
+    // Habits
+    habits,
+    habitSuggestions,
+    addHabitsToTasks,
+    createHabitFromTask,
+    deleteHabit,
   }
 }

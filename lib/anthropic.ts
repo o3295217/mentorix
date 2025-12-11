@@ -303,3 +303,123 @@ export async function generateForecast(
 
   return parsedResponse
 }
+
+// === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
+
+export interface UserInsightsUpdate {
+  patterns?: string
+  strengths?: string
+  challenges?: string
+  preferences?: string
+  recommendations?: string
+  motivators?: string
+}
+
+export interface UpdateInsightsRequest {
+  currentInsights: UserInsightsUpdate | null
+  evaluationCount: number
+  // Данные для анализа
+  planText: string
+  factText: string
+  evaluationFeedback: string
+  dreamProgressScore: number
+  overallScore: number
+  // Последние N дней для контекста
+  recentDays?: Array<{
+    date: string
+    planTasks: number
+    completedTasks: number
+    dreamScore: number
+    overallScore: number
+  }>
+}
+
+const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивности. Твоя задача — обновить профиль понимания пользователя на основе его планов и результатов.
+
+ТЕКУЩИЙ ПРОФИЛЬ (если есть):
+{current_insights}
+
+ДАННЫЕ СЕГОДНЯШНЕГО ДНЯ:
+- План: {plan_text}
+- Выполнено: {fact_text}
+- Оценка дня: {overall_score}/10
+- Приближение к мечте: {dream_score}/10
+- Обратная связь: {feedback}
+
+ИСТОРИЯ ПОСЛЕДНИХ ДНЕЙ:
+{recent_days}
+
+КОЛИЧЕСТВО ОЦЕНЁННЫХ ДНЕЙ: {evaluation_count}
+
+ЗАДАЧА:
+На основе накопленных данных обнови или сформируй профиль понимания пользователя.
+
+Верни JSON:
+{
+  "patterns": "Выявленные паттерны поведения (продуктивное время, склонность откладывать, и т.д.)",
+  "strengths": "Сильные стороны пользователя",
+  "challenges": "Сложности и зоны роста",
+  "preferences": "Предпочтения в планировании (количество задач, типы задач)",
+  "recommendations": "Персональные рекомендации для повышения эффективности",
+  "motivators": "Что мотивирует пользователя (если удалось выявить)"
+}
+
+ВАЖНО:
+- Если данных мало (< 5 дней), делай осторожные выводы
+- Обновляй существующий профиль, а не заменяй полностью
+- Будь конкретен, избегай общих фраз
+- Пиши на русском языке
+- Отвечай ТОЛЬКО JSON без пояснений`
+
+export async function updateUserInsights(
+  request: UpdateInsightsRequest
+): Promise<UserInsightsUpdate> {
+  const currentInsightsText = request.currentInsights
+    ? JSON.stringify(request.currentInsights, null, 2)
+    : 'Профиль пока не сформирован'
+
+  const recentDaysText = request.recentDays && request.recentDays.length > 0
+    ? request.recentDays.map(d => 
+        `- ${d.date}: ${d.completedTasks}/${d.planTasks} задач, мечта: ${d.dreamScore}/10, день: ${d.overallScore}/10`
+      ).join('\n')
+    : 'Нет данных'
+
+  const prompt = UPDATE_INSIGHTS_PROMPT
+    .replace('{current_insights}', currentInsightsText)
+    .replace('{plan_text}', request.planText)
+    .replace('{fact_text}', request.factText)
+    .replace('{overall_score}', String(request.overallScore))
+    .replace('{dream_score}', String(request.dreamProgressScore))
+    .replace('{feedback}', request.evaluationFeedback)
+    .replace('{recent_days}', recentDaysText)
+    .replace('{evaluation_count}', String(request.evaluationCount))
+
+  // Используем Haiku — дешевле для этой задачи
+  const message = await anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 2048,
+    messages: [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+  })
+
+  logCacheStats('updateUserInsights', message.usage)
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
+
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    console.error('Claude response without JSON:', responseText)
+    throw new Error('Failed to parse insights response from Claude')
+  }
+
+  try {
+    return JSON.parse(jsonMatch[0])
+  } catch (e) {
+    console.error('Invalid JSON from Claude:', jsonMatch[0])
+    throw new Error('Claude returned invalid JSON for insights')
+  }
+}

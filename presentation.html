@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI LAB — AI Effectiveness Assistant</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23667eea' rx='15' width='100' height='100'/><text x='50' y='68' font-size='40' font-weight='bold' fill='white' text-anchor='middle' font-family='system-ui'>AI</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .slide {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            scroll-snap-align: start;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 50px 60px;
+            max-width: 950px;
+            width: 100%;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            color: #1a1a2e;
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 35px;
+            line-height: 1.6;
+        }
+        
+        h2 {
+            font-size: 1.6em;
+            margin-bottom: 25px;
+            color: #1a1a2e;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section h3 {
+            font-size: 1.15em;
+            color: #1a1a2e;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+            display: inline-block;
+        }
+        
+        .section p {
+            font-size: 1em;
+            color: #444;
+            line-height: 1.7;
+        }
+        
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 25px;
+        }
+        
+        .slide-2 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .slide-3 {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin: 25px 0;
+        }
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            padding: 20px 25px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .step-number {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .step-content h3 {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+            color: #1a1a2e;
+        }
+        
+        .step-content p {
+            color: #555;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+        
+        .highlight-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            border-radius: 16px;
+            margin-top: 25px;
+        }
+        
+        .highlight-box h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        
+        .highlight-box p {
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+        
+        .navigation {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .nav-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: white;
+            color: #764ba2;
+            font-size: 1.5em;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        
+        .nav-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        html {
+            scroll-behavior: smooth;
+            scroll-snap-type: y mandatory;
+        }
+        
+        @media (max-width: 768px) {
+            .card {
+                padding: 30px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            .two-columns {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Слайд 1 -->
+    <section class="slide slide-1" id="slide1">
+        <div class="card">
+            <h1>AI Effectiveness Assistant</h1>
+            <p class="subtitle">
+                Персональный ИИ-ассистент для управления эффективностью. Помогает превратить большую мечту 
+                в конкретные ежедневные действия, отслеживает прогресс и адаптируется под ваш стиль работы.
+            </p>
+            
+            <div class="two-columns">
+                <div class="section">
+                    <h3>Иерархия целей</h3>
+                    <p>
+                        Система выстраивает связь между вашей большой мечтой и ежедневными задачами. 
+                        Горизонт планирования настраивается индивидуально — без ограничений.
+                        Каждый уровень — год, полугодие, квартал, месяц, неделя — связан с предыдущим. 
+                        При оценке дня ИИ анализирует, насколько ваши действия приближают к мечте.
+                    </p>
+                </div>
+                
+                <div class="section">
+                    <h3>Профиль понимания</h3>
+                    <p>
+                        После каждой оценки дня ИИ обновляет профиль понимания пользователя: выявляет паттерны 
+                        поведения, определяет сильные стороны и зоны роста, запоминает предпочтения в планировании. 
+                        Со временем рекомендации становятся всё более персональными.
+                    </p>
+                </div>
+                
+                <div class="section">
+                    <h3>Умный диалог о плане</h3>
+                    <p>
+                        Вы можете обсудить план дня с ИИ-ассистентом. Он учитывает ваши цели на неделю и месяц, 
+                        знает профиль понимания, предлагает добавить задачи из целей. При этом принимает ваши 
+                        возражения — вы знаете контекст лучше.
+                    </p>
+                </div>
+                
+                <div class="section">
+                    <h3>Привычки и автоматизация</h3>
+                    <p>
+                        Создавайте ежедневные или еженедельные привычки. При открытии пустого дня они 
+                        автоматически добавляются в план. Система отслеживает серии выполнения (streak) 
+                        и помогает формировать устойчивые привычки.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Слайд 2 -->
+    <section class="slide slide-2" id="slide2">
+        <div class="card">
+            <h2>Как устроен рабочий процесс</h2>
+            
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Утреннее планирование</h3>
+                        <p>
+                            Откройте страницу ежедневного планирования. Если день пустой — привычки добавятся автоматически. 
+                            Перед вами цели недели и месяца — одним кликом добавляйте их в план. 
+                            ИИ проверит план и предложит задачи, которые приблизят к целям.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Выполнение в течение дня</h3>
+                        <p>
+                            Выполняйте задачи и отмечайте их галочками. Если что-то не получается или возникают вопросы — 
+                            откройте чат с ИИ и обсудите план. Ассистент знает ваш контекст и может помочь 
+                            расставить приоритеты или предложить альтернативы.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Вечерняя оценка</h3>
+                        <p>
+                            В конце дня нажмите «Оценить день». ИИ сравнит план с фактом, выставит оценки по разным 
+                            критериям, проанализирует выравнивание с целями всех уровней. После этого автоматически 
+                            обновится профиль понимания — ИИ станет знать вас лучше.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="highlight-box">
+                <h3>Результат использования</h3>
+                <p>
+                    С каждым днём ИИ-ассистент всё лучше понимает ваши паттерны и даёт более точные рекомендации. 
+                    Вы видите прогресс к мечте, понимаете что работает, а что нет. Диалоги становятся живыми 
+                    и персональными, а не шаблонными. Система помогает фокусироваться на том, что действительно важно.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Слайд 3: В разработке -->
+    <section class="slide slide-3" id="slide3">
+        <div class="card">
+            <h2>В разработке</h2>
+            
+            <div class="two-columns">
+                <div class="section">
+                    <h3>Интеграции</h3>
+                    <p>
+                        Синхронизация с популярными календарями и сервисами: Google Calendar, Яндекс Календарь, Notion. 
+                        Автоматический импорт событий и задач, двусторонняя синхронизация для единого рабочего пространства.
+                    </p>
+                </div>
+                
+                <div class="section">
+                    <h3>Режимы взаимодействия</h3>
+                    <p>
+                        Настройка стиля общения ИИ-ассистента под ваши предпочтения: наставник (мягкие рекомендации), 
+                        коуч (вопросы для самостоятельного поиска решений), тренер (жёсткий контроль и мотивация).
+                    </p>
+                </div>
+                
+                <div class="section">
+                    <h3>Работа с куратором</h3>
+                    <p>
+                        Возможность подключить куратора или ментора. Автоматическая отправка отчётов о прогрессе, 
+                        достижениях и зонах роста. Куратор видит динамику и может давать обратную связь.
+                    </p>
+                </div>
+                
+                <div class="section">
+                    <h3>Корпоративная версия</h3>
+                    <p>
+                        Режим «Рабочий план» для сотрудников компании. Автоматическое формирование отчётов для руководителя. 
+                        Прозрачность рабочего процесса без микроменеджмента.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="highlight-box" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                <h3>Панель руководителя</h3>
+                <p>
+                    Отдельный интерфейс для контроля работы команды с помощью ИИ. Ассистент знает профиль каждого сотрудника 
+                    и подсказывает руководителю, как эффективнее взаимодействовать с каждым. Система подсвечивает риски 
+                    выгорания и конфликтов, помогает формировать сбалансированные команды и распределять задачи 
+                    с учётом сильных сторон каждого.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <div class="navigation">
+        <button class="nav-btn" onclick="document.getElementById('slide1').scrollIntoView()">↑</button>
+        <button class="nav-btn" onclick="document.getElementById('slide3').scrollIntoView()">↓</button>
+    </div>
+</body>
+</html>

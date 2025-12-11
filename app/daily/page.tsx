@@ -1,19 +1,27 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { useDaily } from '@/hooks/useDaily'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 
+type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
+
 export default function DailyPage() {
   const router = useRouter()
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Модальное окно создания привычки
+  const [showHabitModal, setShowHabitModal] = useState(false)
+  const [habitTaskText, setHabitTaskText] = useState('')
+  const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
+  const [habitDays, setHabitDays] = useState<number[]>([])
+  
   const {
     selectedDate,
     setSelectedDate,
-    factText,
-    setFactText,
     weekGoals,
     monthGoals,
     dailyEntry,
@@ -24,6 +32,12 @@ export default function DailyPage() {
     saving,
     evaluating,
     message,
+    chatMessages,
+    chatInput,
+    setChatInput,
+    sendChatMessage,
+    sendingChat,
+    clearChat,
     addTask,
     addGoalToTasks,
     removeTask,
@@ -40,23 +54,56 @@ export default function DailyPage() {
     handleDrop,
     savePlan,
     saveFact,
-    transferCompletedTasks,
     evaluate,
+    // Habits
+    habits,
+    habitSuggestions,
+    addHabitsToTasks,
+    createHabitFromTask,
+    deleteHabit,
   } = useDaily()
 
-  // Восстановить высоту textarea при загрузке
+  // Проверить, является ли задача привычкой
+  const getHabitForTask = (taskText: string) => {
+    return habits.find(h => h.taskText.toLowerCase() === taskText.toLowerCase())
+  }
+
+  // Открыть модальное окно для создания привычки
+  const openHabitModal = (taskText: string) => {
+    setHabitTaskText(taskText)
+    setHabitFrequency('daily')
+    setHabitDays([])
+    setShowHabitModal(true)
+  }
+
+  // Создать привычку с выбранными параметрами
+  const handleCreateHabit = async () => {
+    await createHabitFromTask(
+      habitTaskText, 
+      habitFrequency, 
+      habitFrequency === 'weekly' || habitFrequency === 'custom' ? habitDays : undefined
+    )
+    setShowHabitModal(false)
+  }
+
+  // Переключить день недели
+  const toggleDay = (day: number) => {
+    setHabitDays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    )
+  }
+
+  // Прокрутка чата вниз при новых сообщениях
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      const textareas = document.querySelectorAll('textarea')
-      textareas.forEach((textarea: Element) => {
-        const el = textarea as HTMLTextAreaElement
-        el.style.height = 'auto'
-        el.style.height = el.scrollHeight + 'px'
-      })
-    }, 100)
-    
-    return () => clearTimeout(timeoutId)
-  }, [selectedDate])
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [chatMessages])
+
+  // Статистика выполнения
+  const completedCount = selectedTasks.size
+  const totalCount = tasks.length
+  const completionPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
     <div className="space-y-6">
@@ -70,18 +117,18 @@ export default function DailyPage() {
       </p>
 
       {/* Context from periods */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card bg-blue-50 border border-blue-200">
-          <h3 className="font-semibold text-blue-900 mb-3">🎯 Цели текущей недели:</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+          <h3 className="font-medium text-sm text-blue-900 mb-2">🎯 Цели текущей недели:</h3>
           {weekGoals.length > 0 ? (
-            <ul className="text-sm text-blue-800 space-y-1">
+            <ul className="text-xs text-blue-800 space-y-0.5">
               {weekGoals.map((goal, index) => (
-                <li key={index} className="flex items-start gap-2 group">
-                  <span className="mt-1">•</span>
+                <li key={index} className="flex items-center gap-1.5 leading-tight">
+                  <span>•</span>
                   <span className="flex-1">{goal}</span>
                   <button
                     onClick={() => addGoalToTasks(goal)}
-                    className="opacity-0 group-hover:opacity-100 text-blue-600 hover:text-blue-800 transition-opacity text-xs px-2 py-0.5 bg-blue-100 hover:bg-blue-200 rounded"
+                    className="text-blue-600 hover:text-blue-800 text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded whitespace-nowrap"
                     title="Добавить в план"
                   >
                     → в план
@@ -90,21 +137,21 @@ export default function DailyPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-blue-600">Не установлены</p>
+            <p className="text-xs text-blue-600">Не установлены</p>
           )}
         </div>
 
-        <div className="card bg-purple-50 border border-purple-200">
-          <h3 className="font-semibold text-purple-900 mb-3">📋 Цели текущего месяца:</h3>
+        <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+          <h3 className="font-medium text-sm text-purple-900 mb-2">📋 Цели текущего месяца:</h3>
           {monthGoals.length > 0 ? (
-            <ul className="text-sm text-purple-800 space-y-1">
+            <ul className="text-xs text-purple-800 space-y-0.5">
               {monthGoals.map((goal, index) => (
-                <li key={index} className="flex items-start gap-2 group">
-                  <span className="mt-1">•</span>
+                <li key={index} className="flex items-center gap-1.5 leading-tight">
+                  <span>•</span>
                   <span className="flex-1">{goal}</span>
                   <button
                     onClick={() => addGoalToTasks(goal)}
-                    className="opacity-0 group-hover:opacity-100 text-purple-600 hover:text-purple-800 transition-opacity text-xs px-2 py-0.5 bg-purple-100 hover:bg-purple-200 rounded"
+                    className="text-purple-600 hover:text-purple-800 text-xs px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 rounded whitespace-nowrap"
                     title="Добавить в план"
                   >
                     → в план
@@ -113,24 +160,26 @@ export default function DailyPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-purple-600">Не установлены</p>
+            <p className="text-xs text-purple-600">Не установлены</p>
           )}
         </div>
       </div>
 
-      {/* Plan and Fact side by side */}
+      {/* Plan and Chat side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Plan - Left */}
-        <div className="card">
+        <div className="card flex flex-col" style={{ minHeight: '500px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">📝 План на день</h2>
-            <button
-              onClick={transferCompletedTasks}
-              className="text-sm bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1 rounded border border-green-300 transition-colors"
-              title="Перенести выбранные задачи в факт"
-            >
-              ➡️ Перенести выбранные
-            </button>
+            {totalCount > 0 && (
+              <span className={`text-sm px-3 py-1 rounded-full ${
+                completionPercent === 100 ? 'bg-green-100 text-green-700' :
+                completionPercent >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                ✅ {completedCount}/{totalCount} ({completionPercent}%)
+              </span>
+            )}
           </div>
 
           {/* Добавление новой задачи */}
@@ -156,8 +205,81 @@ export default function DailyPage() {
             </button>
           </div>
 
+          {/* Блок привычек — показываем только те, которых ещё нет в плане */}
+          {(() => {
+            const taskTextsLower = new Set(tasks.map(t => t.taskText.toLowerCase()))
+            const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
+            
+            if (habitsNotInPlan.length === 0) return null
+            
+            return (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-amber-900 text-sm">🔄 Привычки на сегодня</h3>
+                  <button
+                    onClick={() => addHabitsToTasks()}
+                    className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors"
+                  >
+                    + Все в план
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {habitsNotInPlan.map((habit) => (
+                    <span 
+                      key={habit.id}
+                      className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 pl-2 pr-1 py-1 rounded-full"
+                    >
+                      <button
+                        onClick={() => addHabitsToTasks([habit.taskText])}
+                        className="hover:text-amber-900 transition-colors"
+                        title="Добавить в план"
+                      >
+                        {habit.taskText}
+                        {habit.streak > 0 && <span className="ml-1 text-amber-600">🔥{habit.streak}</span>}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (confirm(`Удалить привычку "${habit.taskText}"?`)) {
+                            deleteHabit(habit.id)
+                          }
+                        }}
+                        className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
+                        title="Удалить привычку"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Предложения создать привычки */}
+          {habitSuggestions.length > 0 && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-medium text-blue-900 text-sm mb-2">💡 Сделать привычкой?</h3>
+              <div className="space-y-2">
+                {habitSuggestions.slice(0, 3).map((suggestion, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <span className="text-blue-800 truncate flex-1 mr-2">
+                      "{suggestion.text}" — {suggestion.totalCount} раз
+                    </span>
+                    <button
+                      onClick={() => createHabitFromTask(suggestion.text)}
+                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors flex-shrink-0"
+                    >
+                      Создать
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Список задач */}
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 flex-1 overflow-y-auto">
             {tasks.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
                 Добавьте задачи на день...
@@ -210,9 +332,43 @@ export default function DailyPage() {
                       title="Дважды кликните для редактирования"
                     >
                       {task.taskText}
+                      {getHabitForTask(task.taskText) && (
+                        <span className="ml-1 text-amber-500 text-xs" title="Это привычка">🔄</span>
+                      )}
                     </span>
                   )}
 
+                  {/* Кнопка создать/удалить привычку */}
+                  {(() => {
+                    const habit = getHabitForTask(task.taskText)
+                    if (habit) {
+                      // Задача является привычкой — показываем кнопку удаления цикла
+                      return (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Снять цикличность с "${task.taskText}"?`)) {
+                              deleteHabit(habit.id)
+                            }
+                          }}
+                          className="text-amber-500 hover:text-red-500 text-sm px-1 py-1 opacity-70 hover:opacity-100 transition-all"
+                          title="Снять цикличность (удалить привычку)"
+                        >
+                          ⏹️
+                        </button>
+                      )
+                    } else {
+                      // Не привычка — показываем кнопку создания
+                      return (
+                        <button
+                          onClick={() => openHabitModal(task.taskText)}
+                          className="text-amber-500 hover:text-amber-700 text-sm px-1 py-1 opacity-50 hover:opacity-100 transition-opacity"
+                          title="Сделать привычкой"
+                        >
+                          🔄
+                        </button>
+                      )
+                    }
+                  })()}
                   <button
                     onClick={() => removeTask(task.id)}
                     className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
@@ -225,39 +381,128 @@ export default function DailyPage() {
             )}
           </div>
 
-          <button onClick={savePlan} disabled={saving} className="btn-primary disabled:opacity-50 w-full">
-            {saving ? 'Сохранение...' : 'Сохранить план'}
-          </button>
+          {/* Три кнопки - закреплены внизу */}
+          <div className="grid grid-cols-3 gap-2 mt-auto pt-4">
+            <button 
+              onClick={savePlan} 
+              disabled={saving} 
+              className="btn-primary disabled:opacity-50 text-sm py-2"
+            >
+              {saving ? '...' : '💾 Сохранить'}
+            </button>
+            <button 
+              onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации. Какие задачи из целей недели/месяца я мог бы ещё добавить?')}
+              disabled={sendingChat || tasks.length === 0} 
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 text-sm"
+              title="ИИ проверит план"
+            >
+              {sendingChat ? '...' : '🔍 Оценка'}
+            </button>
+            <button 
+              onClick={saveFact} 
+              disabled={saving || selectedTasks.size === 0} 
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 text-sm"
+              title="Сохранить отмеченные задачи как выполненные"
+            >
+              {saving ? '...' : '✅ Факт'}
+            </button>
+          </div>
         </div>
 
-        {/* Fact - Right */}
-        <div className="card">
-          <h2 className="text-xl font-bold mb-4">✅ Факт выполнения</h2>
-          <textarea
-            value={factText}
-            onChange={(e) => setFactText(e.target.value)}
-            className="textarea"
-            placeholder="Введите что реально сделали за день...&#10;&#10;Например:&#10;1. ИИ ассистент - не сделал&#10;2. Калькулятор - готов&#10;3. Штатное расписание - не сделал"
-            rows={12}
-          />
-          <button onClick={saveFact} disabled={saving} className="btn-primary w-full disabled:opacity-50">
-            {saving ? 'Сохранение...' : 'Сохранить факт'}
-          </button>
+        {/* Chat - Right */}
+        <div className="card flex flex-col" style={{ minHeight: '500px' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">💬 Обсуждение с ИИ</h2>
+            {chatMessages.length > 0 && (
+              <button 
+                onClick={clearChat}
+                className="text-sm text-gray-500 hover:text-gray-700"
+                title="Очистить чат"
+              >
+                🗑️ Очистить
+              </button>
+            )}
+          </div>
+
+          {/* Сообщения чата */}
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto space-y-3 mb-4 p-2 bg-gray-50 rounded-lg"
+            style={{ maxHeight: '350px' }}
+          >
+            {chatMessages.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                <p className="mb-2">Нажмите "🔍 Оценка" чтобы получить рекомендации по плану</p>
+                <p className="text-sm">Или напишите вопрос ИИ-помощнику</p>
+              </div>
+            ) : (
+              chatMessages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`p-3 rounded-lg ${
+                    msg.role === 'user'
+                      ? 'bg-primary-100 ml-8'
+                      : 'bg-white border border-gray-200 mr-8'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium">
+                      {msg.role === 'user' ? '👤 Вы' : '🤖 ИИ'}
+                    </span>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              ))
+            )}
+            {sendingChat && (
+              <div className="p-3 rounded-lg bg-white border border-gray-200 mr-8">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">🤖 ИИ</span>
+                  <span className="text-sm text-gray-400">печатает...</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Ввод сообщения */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendChatMessage()
+                }
+              }}
+              placeholder="Напишите сообщение..."
+              disabled={sendingChat}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
+            />
+            <button
+              onClick={() => sendChatMessage()}
+              disabled={sendingChat || !chatInput.trim()}
+              className="btn-primary disabled:opacity-50"
+            >
+              ➤
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Evaluate */}
       <div className="card bg-gradient-to-r from-primary-50 to-purple-50 border border-primary-200">
-        <h2 className="text-xl font-bold mb-4">🤖 Получить оценку от ИИ</h2>
+        <h2 className="text-xl font-bold mb-4">🤖 Получить оценку дня от ИИ</h2>
         <p className="text-gray-700 mb-4">
-          После заполнения плана и факта, получите детальную оценку и обратную связь от ИИ-ассистента.
+          После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
         </p>
         <button
           onClick={() => evaluate(router)}
-          disabled={evaluating || !factText}
+          disabled={evaluating || selectedTasks.size === 0}
           className="btn-primary disabled:opacity-50"
         >
-          {evaluating ? 'Получение оценки...' : 'Получить оценку'}
+          {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
         </button>
         {dailyEntry?.evaluation && (
           <p className="mt-4 text-sm text-green-700">
@@ -267,8 +512,100 @@ export default function DailyPage() {
       </div>
 
       {message && (
-        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200">
+        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
           <p className="font-medium">{message}</p>
+        </div>
+      )}
+
+      {/* Модальное окно создания привычки */}
+      {showHabitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-xl font-bold mb-4">🔄 Создать привычку</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Задача:</label>
+              <p className="text-gray-900 bg-gray-50 p-2 rounded">{habitTaskText}</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Повторять:</label>
+              <div className="space-y-2">
+                {[
+                  { value: 'daily', label: '📅 Ежедневно' },
+                  { value: 'weekdays', label: '💼 По будням (Пн-Пт)' },
+                  { value: 'weekends', label: '🌴 По выходным (Сб-Вс)' },
+                  { value: 'weekly', label: '📆 Раз в неделю' },
+                  { value: 'custom', label: '⚙️ Выбрать дни' },
+                ].map(option => (
+                  <label 
+                    key={option.value} 
+                    className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors ${
+                      habitFrequency === option.value 
+                        ? 'border-amber-500 bg-amber-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="frequency"
+                      value={option.value}
+                      checked={habitFrequency === option.value}
+                      onChange={(e) => setHabitFrequency(e.target.value as FrequencyType)}
+                      className="mr-2"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Выбор дней для weekly и custom */}
+            {(habitFrequency === 'weekly' || habitFrequency === 'custom') && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Дни недели:</label>
+                <div className="flex gap-1">
+                  {[
+                    { day: 1, label: 'Пн' },
+                    { day: 2, label: 'Вт' },
+                    { day: 3, label: 'Ср' },
+                    { day: 4, label: 'Чт' },
+                    { day: 5, label: 'Пт' },
+                    { day: 6, label: 'Сб' },
+                    { day: 7, label: 'Вс' },
+                  ].map(({ day, label }) => (
+                    <button
+                      key={day}
+                      onClick={() => toggleDay(day)}
+                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                        habitDays.includes(day)
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => setShowHabitModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateHabit}
+                disabled={(habitFrequency === 'weekly' || habitFrequency === 'custom') && habitDays.length === 0}
+                className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+              >
+                Создать
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { OpenTask } from '@/lib/types'
 
@@ -11,6 +11,14 @@ export default function TasksPage() {
   const [showClosed, setShowClosed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
+  
+  // Отслеживание задач в плане: { taskId: date }
+  const [tasksInPlan, setTasksInPlan] = useState<Record<number, string>>({})
+  
+  // Модальное окно выбора даты
+  const [showDateModal, setShowDateModal] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<OpenTask | null>(null)
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   useEffect(() => {
     loadTasks()
@@ -48,6 +56,12 @@ export default function TasksPage() {
       if (closedTask) {
         setOpenTasks(openTasks.filter((t) => t.id !== taskId))
         setClosedTasks([{ ...closedTask, isClosed: true, closedAt: new Date().toISOString() }, ...closedTasks])
+        // Убираем из "в плане"
+        setTasksInPlan(prev => {
+          const updated = { ...prev }
+          delete updated[taskId]
+          return updated
+        })
       }
     } catch (error) {
       console.error('Error closing task:', error)
@@ -69,31 +83,47 @@ export default function TasksPage() {
     }
   }
 
-  const addToPlan = async (task: OpenTask) => {
+  // Открыть модальное окно выбора даты
+  const openDateModal = (task: OpenTask) => {
+    setSelectedTask(task)
+    setSelectedDate(format(new Date(), 'yyyy-MM-dd'))
+    setShowDateModal(true)
+  }
+
+  // Добавить задачу в план на выбранную дату
+  const addToPlan = async () => {
+    if (!selectedTask) return
+    
     try {
-      const today = format(new Date(), 'yyyy-MM-dd')
-      
-      // Получаем текущий план на сегодня
-      const dailyRes = await fetch(`/api/daily?date=${today}`)
+      // Получаем текущий план на выбранную дату
+      const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
       const daily = dailyRes.ok ? await dailyRes.json() : null
       
       // Добавляем задачу к плану
       const currentPlan = daily?.planText || ''
-      const newPlan = currentPlan ? `${currentPlan}\n${task.taskText}` : task.taskText
+      const newPlan = currentPlan ? `${currentPlan}\n${selectedTask.taskText}` : selectedTask.taskText
       
       // Сохраняем обновленный план
       const saveRes = await fetch('/api/daily', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: today,
+          date: selectedDate,
           planText: newPlan,
         }),
       })
       
       if (saveRes.ok) {
-        setMessage(`✅ "${task.taskText.substring(0, 30)}..." добавлено в план`)
+        // Добавляем в отслеживание
+        setTasksInPlan(prev => ({ ...prev, [selectedTask.id]: selectedDate }))
+        
+        const dateLabel = selectedDate === format(new Date(), 'yyyy-MM-dd') 
+          ? 'сегодня' 
+          : format(new Date(selectedDate), 'd MMM', { locale: ru })
+        
+        setMessage(`✅ Добавлено в план на ${dateLabel}`)
         setTimeout(() => setMessage(''), 3000)
+        setShowDateModal(false)
       }
     } catch (error) {
       console.error('Error adding task to plan:', error)
@@ -139,13 +169,21 @@ export default function TasksPage() {
                       <span className="text-gray-600">
                         {format(new Date(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => addToPlan(task)}
-                          className="text-green-600 hover:text-green-800 font-medium"
-                        >
-                          + В план
-                        </button>
+                      <div className="flex gap-3 items-center">
+                        {tasksInPlan[task.id] ? (
+                          <span className="text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
+                            ✓ в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
+                              ? '' 
+                              : `(${format(new Date(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => openDateModal(task)}
+                            className="text-green-600 hover:text-green-800 font-medium"
+                          >
+                            + В план
+                          </button>
+                        )}
                         <button
                           onClick={() => closeTask(task.id)}
                           className="text-purple-600 hover:text-purple-800 font-medium"
@@ -174,13 +212,21 @@ export default function TasksPage() {
                       <span className="text-gray-600">
                         {format(new Date(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => addToPlan(task)}
-                          className="text-green-600 hover:text-green-800 font-medium"
-                        >
-                          + В план
-                        </button>
+                      <div className="flex gap-3 items-center">
+                        {tasksInPlan[task.id] ? (
+                          <span className="text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
+                            ✓ в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
+                              ? '' 
+                              : `(${format(new Date(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => openDateModal(task)}
+                            className="text-green-600 hover:text-green-800 font-medium"
+                          >
+                            + В план
+                          </button>
+                        )}
                         <button
                           onClick={() => closeTask(task.id)}
                           className="text-blue-600 hover:text-blue-800 font-medium"
@@ -271,6 +317,71 @@ export default function TasksPage() {
       {message && (
         <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
           <p className="font-medium">{message}</p>
+        </div>
+      )}
+
+      {/* Модальное окно выбора даты */}
+      {showDateModal && selectedTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-xl font-bold mb-4">📅 Добавить в план</h3>
+            
+            <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+              {selectedTask.taskText}
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">На какой день?</label>
+              
+              {/* Быстрые кнопки */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    selectedDate === format(new Date(), 'yyyy-MM-dd')
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Сегодня
+                </button>
+                <button
+                  onClick={() => setSelectedDate(format(addDays(new Date(), 1), 'yyyy-MM-dd'))}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    selectedDate === format(addDays(new Date(), 1), 'yyyy-MM-dd')
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Завтра
+                </button>
+              </div>
+
+              {/* Календарь */}
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDateModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={addToPlan}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Добавить
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
