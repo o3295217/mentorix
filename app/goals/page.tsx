@@ -23,7 +23,6 @@ export default function GoalsPage() {
     periodGoals,
     loadPeriodGoalsWithKey,
     loadAllWeeksForMonth,
-    savePeriodGoals,
     addPeriodGoal,
     removePeriodGoal,
     editPeriodGoal,

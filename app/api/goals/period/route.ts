@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getPeriodDates, PeriodType } from '@/lib/dates'
+import { getPeriodDates, parseDateParam, PeriodType } from '@/lib/dates'
 import { z } from 'zod'
 
 const PeriodGoalSchema = z.object({
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'type and date are required' }, { status: 400 })
     }
 
-    const date = new Date(dateStr)
+    const date = parseDateParam(dateStr)
     const { start, end } = getPeriodDates(date, type)
 
     const periodGoal = await prisma.periodGoal.findFirst({
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
     const periodGoal = await prisma.periodGoal.create({
       data: {
         periodType,
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
+        periodStart: parseDateParam(periodStart),
+        periodEnd: parseDateParam(periodEnd),
         goalsJson: JSON.stringify(goals),
       },
     })

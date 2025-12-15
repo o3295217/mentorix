@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { parseDateParam } from '@/lib/dates'
 
 // Конвертация числа приоритета в строку
 const priorityNumToStr = (num: number): string => {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
         text,
         periodType,
         periodKey,
-        deadline: deadline ? new Date(deadline) : null,
+        deadline: deadline ? parseDateParam(deadline) : null,
         priority: priorityStr,
         tagsJson: JSON.stringify(tags || []),
         historyJson: JSON.stringify([{
@@ -120,7 +121,7 @@ export async function PUT(request: NextRequest) {
           completed, 
           completedAt: completed ? new Date() : null 
         }),
-        ...(deadline !== undefined && { deadline: deadline ? new Date(deadline) : null }),
+        ...(deadline !== undefined && { deadline: deadline ? parseDateParam(deadline) : null }),
         ...(priorityStr !== undefined && { priority: priorityStr }),
         ...(tags !== undefined && { tagsJson: JSON.stringify(tags) }),
         ...(blockedBy !== undefined && { blockedByJson: JSON.stringify(blockedBy) }),

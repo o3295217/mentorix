@@ -67,10 +67,6 @@ export default function Speedometer({
   const diffYears = yearsToGoal - targetYears
   const diffText = diffYears > 0 ? `+${diffYears.toFixed(1)} лет` : `${diffYears.toFixed(1)} лет`
 
-  // Какая скорость нужна чтобы уложиться в план
-  const requiredSpeed = remainingProductiveDays > 0 
-    ? Math.min(10, (remainingProductiveDays / (targetYears * 365 - (productiveDays / efficiency - productiveDays))) * 10)
-    : 0
   // Упрощённо: нужная скорость = оставшиеся_дни / оставшееся_время * 10
   const daysElapsed = productiveDays > 0 ? productiveDays / efficiency : 0
   const targetDaysRemaining = targetYears * 365 - daysElapsed

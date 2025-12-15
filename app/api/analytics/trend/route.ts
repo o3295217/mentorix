@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { subDays } from 'date-fns'
+import { toDateKey } from '@/lib/dates'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     })
 
     const trendData = entries.map((entry) => ({
-      date: entry.date.toISOString().split('T')[0],
+      date: toDateKey(entry.date),
       overallScore: entry.evaluation?.overallScore || 0,
       strategyScore: entry.evaluation?.strategyScore || 0,
       operationsScore: entry.evaluation?.operationsScore || 0,

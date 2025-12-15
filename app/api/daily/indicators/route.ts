@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeParseJsonArray } from '@/lib/fact-utils'
+import { toDateKey } from '@/lib/dates'
 
 // GET /api/daily/indicators?month=2025-11
 export async function GET(request: NextRequest) {
@@ -39,10 +41,11 @@ export async function GET(request: NextRequest) {
     }> = {}
 
     entries.forEach((entry) => {
-      const dateKey = entry.date.toISOString().split('T')[0] // "2025-11-25"
+      const dateKey = toDateKey(entry.date) // local date key
+      const selected = safeParseJsonArray<number>(entry.selectedTasksJson)
       indicators[dateKey] = {
         hasPlan: !!entry.planText,
-        hasFact: !!entry.factText,
+        hasFact: selected.length > 0 || !!entry.factText,
         hasEvaluation: !!entry.evaluation,
         dreamProgressScore: entry.evaluation?.dreamProgressScore,
       }

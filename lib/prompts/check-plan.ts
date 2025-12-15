@@ -1,4 +1,4 @@
-import { GoalsHierarchy, UserProfile } from './types'
+import { UserProfile } from './types'
 import { formatUserProfile } from './core'
 
 // Профиль понимания пользователя

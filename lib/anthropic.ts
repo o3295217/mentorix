@@ -153,7 +153,7 @@ export async function evaluateDayNew(
   let parsedResponse: DailyEvaluationResponse
   try {
     parsedResponse = JSON.parse(jsonMatch[0])
-  } catch (e) {
+  } catch {
     console.error('Invalid JSON from Claude:', jsonMatch[0])
     throw new Error('Claude returned invalid JSON response')
   }
@@ -234,7 +234,7 @@ export async function evaluatePeriod(
   let parsedResponse: PeriodEvaluationResponse
   try {
     parsedResponse = JSON.parse(jsonMatch[0])
-  } catch (e) {
+  } catch {
     console.error('Invalid JSON from Claude:', jsonMatch[0])
     throw new Error('Claude returned invalid JSON response for period evaluation')
   }
@@ -291,7 +291,7 @@ export async function generateForecast(
   let parsedResponse: ForecastResponse
   try {
     parsedResponse = JSON.parse(jsonMatch[0])
-  } catch (e) {
+  } catch {
     console.error('Invalid JSON from Claude:', jsonMatch[0])
     throw new Error('Claude returned invalid JSON response for forecast')
   }
@@ -418,7 +418,7 @@ export async function updateUserInsights(
 
   try {
     return JSON.parse(jsonMatch[0])
-  } catch (e) {
+  } catch {
     console.error('Invalid JSON from Claude:', jsonMatch[0])
     throw new Error('Claude returned invalid JSON for insights')
   }

@@ -1,6 +1,5 @@
 import {
   PeriodEvaluationRequest,
-  PeriodEvaluationResponse,
   DayData,
 } from './types'
 import { formatUserProfile } from './core'
@@ -45,9 +44,6 @@ export function buildPeriodEvaluationPrompt(
     new Date(request.periodStart),
     new Date(request.periodEnd)
   )
-
-  const periodName =
-    request.periodType === 'custom' ? `Период (${template} шаблон)` : request.periodType
 
   const instructionsMap = {
     week: 'НЕДЕЛЬНАЯ ОЦЕНКА',

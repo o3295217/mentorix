@@ -1,5 +1,7 @@
 // Утилиты для работы с целями
 
+import { parseDateParam, toDateKey } from '@/lib/dates'
+
 export const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
 // Helper to parse week key (e.g., "2025-12-W1")
@@ -25,7 +27,7 @@ export const isDuplicate = (goals: string[], newGoal: string): boolean => {
 // Проверка просрочки цели
 export const isOverdue = (deadline: string | null): boolean => {
   if (!deadline) return false
-  return new Date(deadline) < new Date()
+  return toDateKey(parseDateParam(deadline)) < toDateKey(new Date())
 }
 
 // Получение ключа периода

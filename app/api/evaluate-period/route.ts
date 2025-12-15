@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { evaluatePeriod } from '@/lib/anthropic'
 import { PeriodEvaluationRequest, DayData } from '@/lib/prompts/types'
+import { parseDateParam } from '@/lib/dates'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,8 +16,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const startDate = new Date(periodStart)
-    const endDate = new Date(periodEnd)
+    const startDate = parseDateParam(periodStart)
+    const endDate = parseDateParam(periodEnd)
 
     // Получить все дневные записи за период
     const dailyEntries = await prisma.dailyEntry.findMany({

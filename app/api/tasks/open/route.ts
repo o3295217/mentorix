@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { parseDateParam } from '@/lib/dates'
 
 const OpenTaskSchema = z.object({
   taskText: z.string().min(1, "Task text is required"),
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
       data: {
         taskText,
         taskType,
-        originDate: new Date(originDate),
+        originDate: parseDateParam(originDate),
       },
     })
 

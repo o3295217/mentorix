@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Goal } from '@/lib/types'
 import { monthNames } from '@/lib/goals-utils'
+import { parseDateParam, toDateKey } from '@/lib/dates'
 
 interface MonthSectionProps {
   month: number // 0-11
@@ -164,7 +165,7 @@ export default function MonthSection({
 
   const isOverdue = (deadline: string | null): boolean => {
     if (!deadline) return false
-    return new Date(deadline) < new Date()
+    return toDateKey(parseDateParam(deadline)) < toDateKey(new Date())
   }
 
   return (
@@ -366,7 +367,7 @@ export default function MonthSection({
             <div className="border-t border-gray-100 mt-3 pt-3">
               <p className="text-xs text-gray-500 font-medium mb-2">✨ Недели месяца:</p>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {weeksInMonth.map((week, idx) => {
+                {weeksInMonth.map((week, _idx) => {
                   const weekKey = week.key
                   const weekGoals = periodGoals.get(weekKey) || []
                   const today = new Date()
@@ -563,7 +564,7 @@ export default function MonthSection({
                                       </div>
                                       {goalDeadline && (
                                         <div className={`text-xs mt-0.5 ${isDeadlineOverdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
-                                          ⏰ {new Date(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                                          ⏰ {parseDateParam(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                                         </div>
                                       )}
                                     </div>

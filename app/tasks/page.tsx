@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { format, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { OpenTask } from '@/lib/types'
+import { parseDateParam } from '@/lib/dates'
 
 export default function TasksPage() {
   const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
@@ -119,7 +120,7 @@ export default function TasksPage() {
         
         const dateLabel = selectedDate === format(new Date(), 'yyyy-MM-dd') 
           ? 'сегодня' 
-          : format(new Date(selectedDate), 'd MMM', { locale: ru })
+          : format(parseDateParam(selectedDate), 'd MMM', { locale: ru })
         
         setMessage(`✅ Добавлено в план на ${dateLabel}`)
         setTimeout(() => setMessage(''), 3000)
@@ -167,14 +168,14 @@ export default function TasksPage() {
                     <p className="text-gray-800 mb-2">{task.taskText}</p>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">
-                        {format(new Date(task.originDate), 'd MMM yyyy', { locale: ru })}
+                        {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
                       <div className="flex gap-3 items-center">
                         {tasksInPlan[task.id] ? (
                           <span className="text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
                             ✓ в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
                               ? '' 
-                              : `(${format(new Date(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
+                              : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
                           </span>
                         ) : (
                           <button
@@ -210,14 +211,14 @@ export default function TasksPage() {
                     <p className="text-gray-800 mb-2">{task.taskText}</p>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">
-                        {format(new Date(task.originDate), 'd MMM yyyy', { locale: ru })}
+                        {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
                       <div className="flex gap-3 items-center">
                         {tasksInPlan[task.id] ? (
                           <span className="text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
                             ✓ в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
                               ? '' 
-                              : `(${format(new Date(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
+                              : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
                           </span>
                         ) : (
                           <button

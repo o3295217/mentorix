@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { TrendDataPoint, AnalyticsStats } from '@/lib/types'
+import { TrendDataPoint } from '@/lib/types'
 
 export default function AnalyticsPage() {
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([])

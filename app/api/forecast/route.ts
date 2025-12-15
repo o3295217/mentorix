@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateForecast } from '@/lib/anthropic'
 import { ForecastRequest, DayDataFull } from '@/lib/prompts/types'
+import { parseDateParam } from '@/lib/dates'
+import { buildFactFromSelection } from '@/lib/fact-utils'
 
 // Безопасный парсинг JSON с fallback значением
 function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
   if (!json) return fallback
   try {
     return JSON.parse(json)
-  } catch (e) {
+  } catch {
     console.error('Failed to parse JSON:', json)
     return fallback
   }
@@ -101,8 +103,8 @@ export async function POST(request: NextRequest) {
     }
 
     // === ЗАГРУЗКА ДАННЫХ БАЗОВОГО ПЕРИОДА ===
-    const baseStart = new Date(basePeriodStart)
-    const baseEnd = new Date(basePeriodEnd)
+    const baseStart = parseDateParam(basePeriodStart)
+    const baseEnd = parseDateParam(basePeriodEnd)
 
     const dailyEntries = await prisma.dailyEntry.findMany({
       where: {
@@ -131,13 +133,19 @@ export async function POST(request: NextRequest) {
 
     // Подготовить данные дней с полным анализом план/факт
     const baseDays: DayDataFull[] = daysWithEvaluations.map((entry) => {
+      const derived = buildFactFromSelection({
+        planText: entry.planText,
+        factText: entry.factText,
+        selectedTasksJson: entry.selectedTasksJson,
+      })
+
       const planTasks = countTasks(entry.planText || '')
-      const completed = countCompletedTasks(entry.planText || '', entry.factText || '')
+      const completed = countCompletedTasks(entry.planText || '', derived.factText)
       
       return {
         date: entry.date.toLocaleDateString('ru-RU'),
         planText: entry.planText || '',
-        factText: entry.factText || '',
+        factText: derived.factText,
         dreamProgressScore: entry.evaluation!.dreamProgressScore,
         overallScore: entry.evaluation!.overallScore,
         strategyScore: entry.evaluation!.strategyScore,
@@ -149,7 +157,7 @@ export async function POST(request: NextRequest) {
         energyFlag: entry.evaluation!.energyFlag || undefined,
         // Новые поля для анализа задач
         tasksPlanned: planTasks.total,
-        tasksCompleted: completed.completed,
+        tasksCompleted: Math.max(completed.completed, derived.completedTasks.length),
         strategicTasks: planTasks.strategic,
         strategicCompleted: completed.strategicCompleted,
       }
@@ -158,7 +166,6 @@ export async function POST(request: NextRequest) {
     // === ЗАГРУЗКА ЦЕЛЕЙ ГОРИЗОНТА ===
     let horizonGoals: string[] = []
     let horizonStartDate: Date | undefined
-    let horizonEndDate: Date | undefined
 
     if (forecastHorizon === 'dream') {
       // Для мечты берем годовые цели
@@ -170,8 +177,7 @@ export async function POST(request: NextRequest) {
         horizonGoals = safeParseJson(yearGoal.goalsJson, [])
       }
     } else if (horizonStart && horizonEnd) {
-      horizonStartDate = new Date(horizonStart)
-      horizonEndDate = new Date(horizonEnd)
+      horizonStartDate = parseDateParam(horizonStart)
 
       if (forecastHorizon === 'week') {
         const weekGoal = await prisma.periodGoal.findFirst({

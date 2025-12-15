@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { getPeriodDates } from '@/lib/dates'
 import { DailyEntry, OpenTask } from '@/lib/types'

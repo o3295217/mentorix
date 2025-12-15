@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
-import { getPeriodDates } from '@/lib/dates'
+import { getPeriodDates, parseDateParam, toDateKey } from '@/lib/dates'
+import { buildFactFromSelection, splitLines } from '@/lib/fact-utils'
 import { 
   CHECK_PLAN_SYSTEM_PROMPT, 
   buildCheckPlanPrompt, 
@@ -34,7 +35,7 @@ function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
 // Получить день недели на русском
 function getDayOfWeek(dateStr: string): string {
   const days = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
-  const date = new Date(dateStr)
+  const date = parseDateParam(dateStr)
   return days[date.getDay()]
 }
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, planTasks } = validation.data
-    const targetDate = new Date(date)
+    const targetDate = parseDateParam(date)
 
     // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
@@ -92,12 +93,16 @@ export async function POST(request: NextRequest) {
     })
 
     const recentHistory = recentEntries.map(entry => {
-      const planLines = entry.planText?.split('\n').filter(t => t.trim()) || []
-      const factLines = entry.factText?.split('\n').filter(t => t.trim()) || []
+      const planLines = splitLines(entry.planText)
+      const { completedTasks } = buildFactFromSelection({
+        planText: entry.planText,
+        factText: entry.factText,
+        selectedTasksJson: entry.selectedTasksJson,
+      })
       return {
-        date: entry.date.toISOString().split('T')[0],
+        date: toDateKey(entry.date),
         planTasks: planLines,
-        completedTasks: factLines,
+        completedTasks,
       }
     })
 

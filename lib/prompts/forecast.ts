@@ -1,6 +1,5 @@
 import {
   ForecastRequest,
-  ForecastResponse,
   DayDataFull,
   ExecutionQuality,
 } from './types'

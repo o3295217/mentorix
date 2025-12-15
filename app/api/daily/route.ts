@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { parseDateParam } from '@/lib/dates'
 
 const DailyEntrySchema = z.object({
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Get single entry by date
     if (dateStr) {
-      const date = new Date(dateStr)
+      const date = parseDateParam(dateStr)
       const entry = await prisma.dailyEntry.findUnique({
         where: { date },
         include: { evaluation: true },
@@ -34,8 +35,8 @@ export async function GET(request: NextRequest) {
       const entries = await prisma.dailyEntry.findMany({
         where: {
           date: {
-            gte: new Date(from),
-            lte: new Date(to),
+            gte: parseDateParam(from),
+            lte: parseDateParam(to),
           },
         },
         include: { evaluation: true },
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, planText, factText, selectedTasksJson } = validation.data
-    const entryDate = new Date(date)
+    const entryDate = parseDateParam(date)
 
     // Upsert daily entry
     const entry = await prisma.dailyEntry.upsert({

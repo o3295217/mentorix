@@ -72,3 +72,26 @@ export const getDetailLevel = (year: number, currentYear: number = new Date().ge
   if (distance <= 3) return 'half'
   return 'year'
 }
+
+// === Date-only helpers (P0: avoid UTC shift for 'YYYY-MM-DD') ===
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+// Parses a date param coming from UI/query/body.
+// If value is 'YYYY-MM-DD', returns a local-midnight Date.
+// Otherwise falls back to new Date(value) for ISO strings with time.
+export function parseDateParam(value: string): Date {
+  if (DATE_ONLY_RE.test(value)) {
+    const [y, m, d] = value.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(value)
+}
+
+// Local date key, safe for date-only semantics.
+export function toDateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}

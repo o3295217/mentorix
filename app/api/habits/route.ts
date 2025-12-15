@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { parseDateParam } from '@/lib/dates'
 
 const HabitSchema = z.object({
   taskText: z.string().min(1),
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Если запрошена дата - фильтруем по дню недели
     if (dateStr) {
-      const date = new Date(dateStr)
+      const date = parseDateParam(dateStr)
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay() // 1=пн, 7=вс
       
       const habitsForToday = habits.filter(habit => {
@@ -35,10 +36,11 @@ export async function GET(request: NextRequest) {
             return dayOfWeek >= 1 && dayOfWeek <= 5
           case 'weekends':
             return dayOfWeek === 6 || dayOfWeek === 7
-          case 'weekly':
+          case 'weekly': {
             // По умолчанию понедельник, или первый день из daysOfWeek
             const days = habit.daysOfWeek ? JSON.parse(habit.daysOfWeek) : [1]
             return days.includes(dayOfWeek)
+          }
           case 'custom':
             if (habit.daysOfWeek) {
               const customDays = JSON.parse(habit.daysOfWeek)

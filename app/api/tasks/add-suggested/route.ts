@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { parseDateParam } from '@/lib/dates'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       data: {
         taskText,
         taskType,
-        originDate: new Date(originDate),
+        originDate: parseDateParam(originDate),
       },
     })
 

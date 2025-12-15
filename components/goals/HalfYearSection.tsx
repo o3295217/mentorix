@@ -13,7 +13,7 @@ interface HalfYearSectionProps {
 
 export default function HalfYearSection({
   half,
-  year,
+  year: _year,
   goals,
   onAddGoal,
   onRemoveGoal,

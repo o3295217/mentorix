@@ -14,7 +14,7 @@ function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
   if (!json) return fallback
   try {
     return JSON.parse(json)
-  } catch (e) {
+  } catch {
     console.error('Failed to parse JSON:', json)
     return fallback
   }
@@ -78,7 +78,6 @@ export async function POST(request: NextRequest) {
     const year = date.getFullYear()
 
     // Периоды для загрузки из period_goals
-    const yearPeriod = getPeriodDates(date, 'year')
     const halfYearPeriod = getPeriodDates(date, 'half_year')
     const quarterPeriod = getPeriodDates(date, 'quarter')
     const monthPeriod = getPeriodDates(date, 'month')
@@ -208,7 +207,7 @@ export async function POST(request: NextRequest) {
     // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
     try {
       // Получить текущий профиль insights
-      let currentInsights = await prisma.userInsights.findFirst()
+      const currentInsights = await prisma.userInsights.findFirst()
       
       // Получить историю последних 7 дней для контекста
       const sevenDaysAgo = new Date()

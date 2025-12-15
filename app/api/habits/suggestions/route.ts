@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { parseDateParam, toDateKey } from '@/lib/dates'
 
 interface TaskFrequency {
   text: string
@@ -13,8 +14,8 @@ interface TaskFrequency {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const dateStr = searchParams.get('date') || new Date().toISOString().split('T')[0]
-    const targetDate = new Date(dateStr)
+    const dateStr = searchParams.get('date') || toDateKey(new Date())
+    const targetDate = parseDateParam(dateStr)
 
     // Получить записи за последние 14 дней
     const twoWeeksAgo = new Date(targetDate)
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       if (!entry.planText) return
       
       const tasks = entry.planText.split('\n').filter(t => t.trim())
-      const dateKey = entry.date.toISOString().split('T')[0]
+      const dateKey = toDateKey(entry.date)
       
       tasks.forEach(task => {
         const normalized = normalizeTaskText(task)
@@ -59,8 +60,8 @@ export async function GET(request: NextRequest) {
         if (existing) {
           existing.count++
           // Проверяем последовательность дней
-          const lastDateObj = new Date(existing.lastDate)
-          const currentDateObj = new Date(dateKey)
+          const lastDateObj = parseDateParam(existing.lastDate)
+          const currentDateObj = parseDateParam(dateKey)
           const diffDays = Math.abs(
             (lastDateObj.getTime() - currentDateObj.getTime()) / (1000 * 60 * 60 * 24)
           )
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
       reason: string
     }> = []
 
-    taskMap.forEach((freq, normalized) => {
+    taskMap.forEach((freq, _normalized) => {
       if (freq.consecutiveDays >= 3) {
         suggestions.push({
           text: freq.text,
@@ -135,9 +136,9 @@ function normalizeTaskText(text: string): string {
     // Убрать emoji
     .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
     // Убрать нумерацию в начале
-    .replace(/^\d+[\.\)\-\s]+/, '')
+    .replace(/^\d+[.)\s-]+/, '')
     // Убрать чекбоксы
-    .replace(/^[\[\]☐☑✓✅❌\s]+/, '')
+    .replace(/^(\[|\]|☐|☑|✓|✅|❌|\s)+/, '')
     // Убрать лишние пробелы
     .replace(/\s+/g, ' ')
     .trim()

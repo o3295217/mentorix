@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
-import { getPeriodDates } from '@/lib/dates'
+import { getPeriodDates, parseDateParam } from '@/lib/dates'
 import { 
   PLAN_CHAT_SYSTEM_PROMPT, 
   buildPlanChatContext,
   PlanChatRequest,
-  ChatMessage 
 } from '@/lib/prompts/plan-chat'
 
 const anthropic = new Anthropic({
@@ -40,7 +39,7 @@ function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
 // День недели на русском
 function getDayOfWeek(dateStr: string): string {
   const days = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
-  const date = new Date(dateStr)
+  const date = parseDateParam(dateStr)
   return days[date.getDay()]
 }
 
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, planTasks, completedTasks, messages, userMessage } = validation.data
-    const targetDate = new Date(date)
+    const targetDate = parseDateParam(date)
 
     // Получить контекст (мечта, цели, профиль, insights)
     const [dream, weekGoalsRecord, monthGoalsRecord, userProfile, userInsights] = await Promise.all([
