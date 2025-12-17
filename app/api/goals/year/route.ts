@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 
 const YearGoalSchema = z.object({
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       year: yearGoal.year,
-      goals: JSON.parse(yearGoal.goalsJson),
+      goals: safeParseJson<string[]>(yearGoal.goalsJson, []),
     })
   } catch (error) {
     console.error('Error fetching year goal:', error)
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       year: yearGoal.year,
-      goals: JSON.parse(yearGoal.goalsJson),
+      goals: safeParseJson<string[]>(yearGoal.goalsJson, []),
     })
   } catch (error) {
     console.error('Error saving year goal:', error)

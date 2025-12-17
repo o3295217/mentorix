@@ -4,11 +4,12 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { getPeriodDates, parseDateParam, toDateKey } from '@/lib/dates'
 import { buildFactFromSelection, splitLines } from '@/lib/fact-utils'
-import { 
-  CHECK_PLAN_SYSTEM_PROMPT, 
-  buildCheckPlanPrompt, 
+import { safeParseJson } from '@/lib/api-utils'
+import {
+  CHECK_PLAN_SYSTEM_PROMPT,
+  buildCheckPlanPrompt,
   CheckPlanRequest,
-  CheckPlanResponse 
+  CheckPlanResponse
 } from '@/lib/prompts/check-plan'
 
 const anthropic = new Anthropic({
@@ -21,16 +22,6 @@ const CheckPlanSchema = z.object({
   date: z.string(),
   planTasks: z.array(z.string()),
 })
-
-// Безопасный парсинг JSON
-function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
-  if (!json) return fallback
-  try {
-    return JSON.parse(json)
-  } catch {
-    return fallback
-  }
-}
 
 // Получить день недели на русском
 function getDayOfWeek(dateStr: string): string {

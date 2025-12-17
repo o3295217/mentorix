@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 
 const MoveGoalSchema = z.object({
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
-    const history = JSON.parse(goal.historyJson)
+    const history = safeParseJson<Array<{ type: string; date: string; from?: unknown; to?: unknown }>>(goal.historyJson, [])
     history.push({
       type: 'moved',
       date: new Date().toISOString(),
@@ -47,9 +48,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...updatedGoal,
-      tags: JSON.parse(updatedGoal.tagsJson),
-      blockedBy: JSON.parse(updatedGoal.blockedByJson),
-      history: JSON.parse(updatedGoal.historyJson),
+      tags: safeParseJson<string[]>(updatedGoal.tagsJson, []),
+      blockedBy: safeParseJson<number[]>(updatedGoal.blockedByJson, []),
+      history: safeParseJson<Array<{ type: string; date: string }>>(updatedGoal.historyJson, []),
     })
   } catch (error) {
     console.error('Error moving goal:', error)

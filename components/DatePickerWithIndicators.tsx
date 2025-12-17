@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -24,10 +24,26 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
   const [indicators, setIndicators] = useState<DateIndicators>({})
   const pickerRef = useRef<HTMLDivElement>(null)
 
+  // Memoized loadIndicators function
+  const loadIndicators = useCallback(async () => {
+    try {
+      const monthStr = format(currentMonth, 'yyyy-MM')
+      const res = await fetch(`/api/daily/indicators?month=${monthStr}`)
+      if (!res.ok) {
+        console.error('Failed to load indicators:', res.status)
+        return
+      }
+      const data = await res.json()
+      setIndicators(data)
+    } catch (error) {
+      console.error('Error loading indicators:', error)
+    }
+  }, [currentMonth])
+
   // Загрузка индикаторов при изменении месяца
   useEffect(() => {
     loadIndicators()
-  }, [currentMonth])
+  }, [loadIndicators])
 
   // Закрытие при клике вне компонента
   useEffect(() => {
@@ -41,26 +57,11 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const loadIndicators = async () => {
-    try {
-      const monthStr = format(currentMonth, 'yyyy-MM')
-      const res = await fetch(`/api/daily/indicators?month=${monthStr}`)
-      if (!res.ok) {
-        console.error('Failed to load indicators:', res.status)
-        return
-      }
-      const data = await res.json()
-      setIndicators(data)
-    } catch (error) {
-      console.error('Error loading indicators:', error)
-    }
-  }
-
-  const handleDateSelect = (date: Date) => {
+  const handleDateSelect = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
     onChange(dateStr)
     setIsOpen(false)
-  }
+  }, [onChange])
 
   const goToToday = () => {
     const today = new Date()

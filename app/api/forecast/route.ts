@@ -4,17 +4,7 @@ import { generateForecast } from '@/lib/anthropic'
 import { ForecastRequest, DayDataFull } from '@/lib/prompts/types'
 import { parseDateParam } from '@/lib/dates'
 import { buildFactFromSelection } from '@/lib/fact-utils'
-
-// Безопасный парсинг JSON с fallback значением
-function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
-  if (!json) return fallback
-  try {
-    return JSON.parse(json)
-  } catch {
-    console.error('Failed to parse JSON:', json)
-    return fallback
-  }
-}
+import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 
 // Подсчет задач в тексте плана/факта
 function countTasks(text: string): { total: number; strategic: number } {
@@ -279,10 +269,6 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error generating forecast:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate forecast', details: String(error) },
-      { status: 500 }
-    )
+    return ApiErrors.serverError('Failed to generate forecast', error)
   }
 }

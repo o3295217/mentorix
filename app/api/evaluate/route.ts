@@ -5,21 +5,11 @@ import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { z } from 'zod'
+import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
 })
-
-// Безопасный парсинг JSON с fallback значением
-function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
-  if (!json) return fallback
-  try {
-    return JSON.parse(json)
-  } catch {
-    console.error('Failed to parse JSON:', json)
-    return fallback
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -289,10 +279,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(evaluation)
   } catch (error) {
-    console.error('Error evaluating day:', error)
-    return NextResponse.json(
-      { error: 'Failed to evaluate day', details: String(error) },
-      { status: 500 }
-    )
+    return ApiErrors.serverError('Failed to evaluate day', error)
   }
 }
