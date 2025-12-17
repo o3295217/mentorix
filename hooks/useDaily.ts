@@ -706,7 +706,9 @@ export function useDaily(): UseDailyReturn {
       newSelected.add(taskId)
     }
     setSelectedTasks(newSelected)
-  }, [selectedTasks])
+    // Автосохранение чекбоксов в БД
+    void savePlanWithTasks(tasks, newSelected)
+  }, [selectedTasks, tasks, savePlanWithTasks])
 
   const startEditingTask = useCallback((taskId: number, currentText: string) => {
     setEditingTaskId(taskId)
