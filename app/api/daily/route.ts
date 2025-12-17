@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { parseDateParam } from '@/lib/dates'
+import { splitLines } from '@/lib/fact-utils'
 
 const DailyEntrySchema = z.object({
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -10,6 +11,7 @@ const DailyEntrySchema = z.object({
   planText: z.string().optional(),
   factText: z.string().optional(),
   selectedTasksJson: z.string().optional().nullable(),
+  extraTasksJson: z.string().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -67,8 +69,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { date, planText, factText, selectedTasksJson } = validation.data
+    const { date, planText, factText, selectedTasksJson, extraTasksJson } = validation.data
     const entryDate = parseDateParam(date)
+
+    const existing = await prisma.dailyEntry.findUnique({
+      where: { date: entryDate },
+      select: { id: true, planSnapshotJson: true },
+    })
+
+    const planLines = planText !== undefined ? splitLines(planText) : []
+    const shouldSetSnapshot = planText !== undefined && planLines.length > 0 && !existing?.planSnapshotJson
+    const planSnapshotJson = shouldSetSnapshot ? JSON.stringify(planLines) : undefined
 
     // Upsert daily entry
     const entry = await prisma.dailyEntry.upsert({
@@ -77,12 +88,16 @@ export async function POST(request: NextRequest) {
         ...(planText !== undefined && { planText }),
         ...(factText !== undefined && { factText }),
         ...(selectedTasksJson !== undefined && { selectedTasksJson }),
+        ...(extraTasksJson !== undefined && { extraTasksJson }),
+        ...(planSnapshotJson !== undefined && { planSnapshotJson }),
       },
       create: {
         date: entryDate,
         planText: planText || '',
         factText: factText || '',
         selectedTasksJson: selectedTasksJson || null,
+        extraTasksJson: extraTasksJson || '[]',
+        planSnapshotJson: planLines.length > 0 ? JSON.stringify(planLines) : null,
       },
       include: { evaluation: true },
     })

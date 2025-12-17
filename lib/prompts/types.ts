@@ -88,6 +88,7 @@ export interface DailyEvaluationRequest {
   date: string
   planText: string
   factText: string
+  extraTasks?: string[]
   goals: GoalsHierarchy
   userProfile?: UserProfile
   context?: DailyContext

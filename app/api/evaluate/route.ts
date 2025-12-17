@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { evaluateDayNew, updateUserInsights } from '@/lib/anthropic'
 import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
+import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { z } from 'zod'
 
 const EvaluateSchema = z.object({
@@ -43,25 +44,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Daily entry not found' }, { status: 404 })
     }
 
-    // Факт теперь из selectedTasksJson (чекбоксы) или из factText (старый формат)
-    const planTasks = dailyEntry.planText?.split('\n').filter(t => t.trim()) || []
-    const selectedTaskIds = safeParseJson<number[]>(dailyEntry.selectedTasksJson, [])
-    
-    // Формируем факт из отмеченных задач
-    let factText = dailyEntry.factText || ''
-    if (selectedTaskIds.length > 0 && planTasks.length > 0) {
-      // Новый формат: факт = отмеченные задачи
-      const completedTasks = selectedTaskIds
-        .filter(id => id > 0 && id <= planTasks.length)
-        .map(id => planTasks[id - 1])
-        .filter(Boolean)
-      
-      if (completedTasks.length > 0) {
-        factText = completedTasks.join('\n')
-      }
-    }
+    // План для оценки: берем снимок плана (если есть), иначе текущий план
+    const planSnapshotTasks = safeParseJsonArray<string>(dailyEntry.planSnapshotJson)
+    const planTextForEval = planSnapshotTasks.length > 0
+      ? planSnapshotTasks.join('\n')
+      : (dailyEntry.planText || '')
 
-    if (!factText) {
+    // Факт из чекбоксов (по текущему плану) или fallback на factText
+    const derived = buildFactFromSelection({
+      planText: dailyEntry.planText,
+      factText: dailyEntry.factText,
+      selectedTasksJson: dailyEntry.selectedTasksJson,
+    })
+
+    const extraTasks = safeParseJsonArray<string>(dailyEntry.extraTasksJson)
+
+    if (!derived.factText && extraTasks.length === 0) {
       return NextResponse.json(
         { error: 'No completed tasks. Mark tasks as done before evaluation.' },
         { status: 400 }
@@ -121,8 +119,9 @@ export async function POST(request: NextRequest) {
     // Подготовить запрос для оценки (ОБНОВЛЕННЫЙ ФОРМАТ)
     const evaluationRequest: DailyEvaluationRequest = {
       date: date.toLocaleDateString('ru-RU'),
-      planText: dailyEntry.planText || '',
-      factText: factText, // Используем вычисленный факт из чекбоксов
+      planText: planTextForEval,
+      factText: derived.factText,
+      extraTasks,
       goals: {
         dreamGoal: dream?.goalText || 'Не указана',
         // Цели на год теперь из year_goals таблицы
@@ -247,7 +246,7 @@ export async function POST(request: NextRequest) {
         } : null,
         evaluationCount: (currentInsights?.evaluationCount || 0) + 1,
         planText: dailyEntry.planText || '',
-        factText: factText,
+        factText: derived.factText,
         evaluationFeedback: evaluationResponse.feedback,
         dreamProgressScore: evaluationResponse.dream_progress_score,
         overallScore: evaluationResponse.overall_score,

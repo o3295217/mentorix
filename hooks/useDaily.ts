@@ -5,6 +5,13 @@ import { format } from 'date-fns'
 import { getPeriodDates } from '@/lib/dates'
 import { DailyEntry, OpenTask } from '@/lib/types'
 
+type DailyPlanDraft = {
+  updatedAt: string
+  planText: string
+  selectedTaskIds: number[]
+  newTaskText?: string
+}
+
 // Типы для проверки плана
 export interface TaskSuggestion {
   goalText: string
@@ -59,6 +66,9 @@ interface UseDailyReturn {
   dailyEntry: DailyEntry | null
   tasks: OpenTask[]
   selectedTasks: Set<number>
+  extraTasks: string[]
+  newExtraTaskText: string
+  setNewExtraTaskText: (text: string) => void
   newTaskText: string
   setNewTaskText: (text: string) => void
   saving: boolean
@@ -88,6 +98,8 @@ interface UseDailyReturn {
   
   // Task operations
   addTask: () => void
+  addExtraTask: () => void
+  removeExtraTask: (index: number) => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
   toggleTaskSelection: (taskId: number) => void
@@ -112,7 +124,13 @@ interface UseDailyReturn {
 }
 
 export function useDaily(): UseDailyReturn {
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('daily:selectedDate')
+      if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved
+    }
+    return format(new Date(), 'yyyy-MM-dd')
+  })
   const [planText, setPlanText] = useState('')
   const [factText, setFactText] = useState('')
   const [weekGoals, setWeekGoals] = useState<string[]>([])
@@ -120,7 +138,9 @@ export function useDaily(): UseDailyReturn {
   const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
   const [tasks, setTasks] = useState<OpenTask[]>([])
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
+  const [extraTasks, setExtraTasks] = useState<string[]>([])
   const [newTaskText, setNewTaskText] = useState('')
+  const [newExtraTaskText, setNewExtraTaskText] = useState('')
   const [saving, setSaving] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [message, setMessage] = useState('')
@@ -138,6 +158,82 @@ export function useDaily(): UseDailyReturn {
   // Habits state
   const [habits, setHabits] = useState<Habit[]>([])
   const [habitSuggestions, setHabitSuggestions] = useState<HabitSuggestion[]>([])
+
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem('daily:selectedDate', selectedDate)
+    } catch {
+      // ignore
+    }
+  }, [selectedDate])
+
+  useEffect(() => {
+    // Prevent stale state from previous date being persisted under the new date.
+    setHasLoadedOnce(false)
+  }, [selectedDate])
+
+  const getPlanDraftKey = useCallback((date: string) => `daily:planDraft:${date}`, [])
+
+  const readPlanDraft = useCallback((date: string): DailyPlanDraft | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = window.localStorage.getItem(getPlanDraftKey(date))
+      if (!raw) return null
+      const parsed = JSON.parse(raw) as Partial<DailyPlanDraft>
+      if (!parsed || typeof parsed !== 'object') return null
+      if (typeof parsed.updatedAt !== 'string') return null
+      if (typeof parsed.planText !== 'string') return null
+      if (!Array.isArray(parsed.selectedTaskIds)) return null
+      const selectedTaskIds = parsed.selectedTaskIds
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n))
+        .map((n) => Math.trunc(n))
+
+      return {
+        updatedAt: parsed.updatedAt,
+        planText: parsed.planText,
+        selectedTaskIds,
+        newTaskText: typeof parsed.newTaskText === 'string' ? parsed.newTaskText : undefined,
+      }
+    } catch {
+      return null
+    }
+  }, [getPlanDraftKey])
+
+  const writePlanDraft = useCallback((date: string, draft: DailyPlanDraft) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(getPlanDraftKey(date), JSON.stringify(draft))
+    } catch {
+      // ignore
+    }
+  }, [getPlanDraftKey])
+
+  const clearPlanDraft = useCallback((date: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.removeItem(getPlanDraftKey(date))
+    } catch {
+      // ignore
+    }
+  }, [getPlanDraftKey])
+
+  const sanitizeSelectedForTotal = useCallback((selected: (string | number)[], total: number): Set<number> => {
+    if (total <= 0) return new Set()
+    const result = new Set<number>()
+    for (const raw of selected) {
+      const id = Number(raw)
+      if (!Number.isFinite(id)) continue
+      const rounded = Math.trunc(id)
+      if (rounded >= 1 && rounded <= total) {
+        result.add(rounded)
+      }
+    }
+    return result
+  }, [])
 
   const showMessage = useCallback((text: string, duration = 3000) => {
     setMessage(text)
@@ -157,16 +253,56 @@ export function useDaily(): UseDailyReturn {
         setFactText('')
         setTasks([])
         setSelectedTasks(new Set())
+        setExtraTasks([])
       } else {
         const daily = await dailyRes.json()
 
         if (daily) {
-          setDailyEntry(daily)
-          setPlanText(daily.planText || '')
-          setFactText(daily.factText || '')
+          const draft = readPlanDraft(selectedDate)
+          const serverUpdatedAtMs = daily.updatedAt ? new Date(daily.updatedAt).getTime() : 0
+          const draftUpdatedAtMs = draft?.updatedAt ? new Date(draft.updatedAt).getTime() : 0
 
-          if (daily.planText) {
-            const taskList = daily.planText.split('\n').filter((t: string) => t.trim())
+          const serverPlanText = (daily.planText || '').trim()
+          const draftPlanText = (draft?.planText || '').trim()
+          const draftHasAnything = !!draft && (
+            draftPlanText.length > 0 ||
+            (draft.selectedTaskIds?.length || 0) > 0 ||
+            (draft.newTaskText?.trim().length || 0) > 0
+          )
+
+          // Never let an empty draft override a non-empty saved plan.
+          const shouldUseDraft = draftHasAnything && (
+            serverPlanText.length === 0 ||
+            (!serverUpdatedAtMs || draftUpdatedAtMs > serverUpdatedAtMs)
+          )
+          if (!shouldUseDraft && draft) {
+            // Серверная версия новее — черновик можно смело убрать
+            clearPlanDraft(selectedDate)
+          }
+
+          const effectivePlanText = shouldUseDraft ? draft!.planText : (daily.planText || '')
+          const effectiveFactText = daily.factText || ''
+          const effectiveNewTaskText = shouldUseDraft ? (draft!.newTaskText || '') : ''
+
+          setDailyEntry(daily)
+          setPlanText(effectivePlanText)
+          setFactText(effectiveFactText)
+          setNewTaskText(effectiveNewTaskText)
+
+          // Extra tasks (перевыполнение)
+          try {
+            const parsed = daily.extraTasksJson ? (JSON.parse(daily.extraTasksJson) as unknown) : []
+            setExtraTasks(
+              Array.isArray(parsed)
+                ? parsed.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+                : []
+            )
+          } catch {
+            setExtraTasks([])
+          }
+
+          if (effectivePlanText) {
+            const taskList = effectivePlanText.split('\n').filter((t: string) => t.trim())
             const tasksWithIds: OpenTask[] = taskList.map((text: string, index: number) => ({
               id: index + 1,
               taskText: text,
@@ -176,18 +312,22 @@ export function useDaily(): UseDailyReturn {
               createdAt: new Date().toISOString()
             }))
             setTasks(tasksWithIds)
-          } else {
-            setTasks([])
-          }
 
-          if (daily.selectedTasksJson) {
-            try {
-              const selected = JSON.parse(daily.selectedTasksJson) as (string | number)[]
-              setSelectedTasks(new Set(selected.map(id => Number(id))))
-            } catch {
+            if (shouldUseDraft) {
+              setSelectedTasks(sanitizeSelectedForTotal(draft!.selectedTaskIds, tasksWithIds.length))
+            } else if (daily.selectedTasksJson) {
+              try {
+                const selected = JSON.parse(daily.selectedTasksJson) as (string | number)[]
+                setSelectedTasks(sanitizeSelectedForTotal(selected, tasksWithIds.length))
+              } catch {
+                setSelectedTasks(new Set())
+              }
+            } else {
               setSelectedTasks(new Set())
             }
           } else {
+            setTasks([])
+            // Нет плана — нет и валидных отмеченных задач
             setSelectedTasks(new Set())
           }
         } else {
@@ -196,6 +336,24 @@ export function useDaily(): UseDailyReturn {
           setFactText('')
           setTasks([])
           setSelectedTasks(new Set())
+          setExtraTasks([])
+          // На пустой день тоже может быть черновик
+          const draft = readPlanDraft(selectedDate)
+          if (draft) {
+            setPlanText(draft.planText)
+            setNewTaskText(draft.newTaskText || '')
+            const taskList = draft.planText.split('\n').filter((t) => t.trim())
+            const tasksWithIds: OpenTask[] = taskList.map((text, index) => ({
+              id: index + 1,
+              taskText: text,
+              taskType: 'operational' as const,
+              originDate: selectedDate,
+              isClosed: false,
+              createdAt: new Date().toISOString(),
+            }))
+            setTasks(tasksWithIds)
+            setSelectedTasks(sanitizeSelectedForTotal(draft.selectedTaskIds, tasksWithIds.length))
+          }
         }
       }
 
@@ -231,11 +389,9 @@ export function useDaily(): UseDailyReturn {
         setHabits([])
       }
 
-      // Если день пустой — автоматически добавляем привычки в задачи
-      const dailyCheck = await fetch(`/api/daily?date=${selectedDate}`)
-      const dailyData = dailyCheck.ok ? await dailyCheck.json() : null
-      const hasPlan = dailyData?.planText && dailyData.planText.trim().length > 0
-      
+      // Если день пустой — автоматически добавляем привычки в задачи.
+      // Важно: не затираем локальный черновик.
+      const hasPlan = tasks.length > 0 || planText.trim().length > 0
       if (!hasPlan && loadedHabits.length > 0) {
         // День пустой — добавляем привычки
         const habitTasks: OpenTask[] = loadedHabits.map((habit, index) => ({
@@ -258,20 +414,50 @@ export function useDaily(): UseDailyReturn {
       } else {
         setHabitSuggestions([])
       }
+
+      setHasLoadedOnce(true)
     } catch (error) {
       console.error('Error loading data:', error)
     }
-  }, [selectedDate])
+  }, [selectedDate, planText, tasks, readPlanDraft, clearPlanDraft, sanitizeSelectedForTotal])
 
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Локальный черновик плана (чтобы не пропадало при refresh)
+  useEffect(() => {
+    if (!hasLoadedOnce) return
+    const planTextDraft = tasks.length > 0
+      ? tasks.map((t) => t.taskText).join('\n')
+      : planText
+    const selectedTaskIds = Array.from(selectedTasks)
+
+    const hasAnything =
+      planTextDraft.trim().length > 0 ||
+      selectedTaskIds.length > 0 ||
+      newTaskText.trim().length > 0
+
+    // Don't overwrite an existing draft with an empty one.
+    if (!hasAnything) return
+
+    const draft: DailyPlanDraft = {
+      updatedAt: new Date().toISOString(),
+      planText: planTextDraft,
+      selectedTaskIds,
+      newTaskText: newTaskText,
+    }
+    writePlanDraft(selectedDate, draft)
+  }, [hasLoadedOnce, selectedDate, tasks, selectedTasks, newTaskText, writePlanDraft])
 
   const savePlanWithTasks = useCallback(async (
     taskList: OpenTask[] = tasks,
     selected: Set<number> = selectedTasks
   ) => {
     const planTextToSave = taskList.map(t => t.taskText).join('\n')
+
+    const allowedIds = new Set(taskList.map(t => t.id))
+    const sanitizedSelected = Array.from(selected).filter(id => allowedIds.has(id))
 
     try {
       const res = await fetch('/api/daily', {
@@ -280,34 +466,124 @@ export function useDaily(): UseDailyReturn {
         body: JSON.stringify({
           date: selectedDate,
           planText: planTextToSave,
-          selectedTasksJson: JSON.stringify(Array.from(selected)),
+          selectedTasksJson: JSON.stringify(sanitizedSelected),
         }),
       })
 
       const data = await res.json()
-      setDailyEntry(data)
+      if (!res.ok) {
+        console.error('Failed to save plan:', data)
+        showMessage('❌ Ошибка при сохранении')
+        return
+      }
+      // Update local state immediately so UI (saved/draft indicators) reacts even if
+      // the API response is stale/cached for some reason.
+      setDailyEntry((prev) => ({
+        ...(prev || data),
+        ...data,
+        planText: planTextToSave,
+        selectedTasksJson: JSON.stringify(sanitizedSelected),
+        updatedAt: new Date().toISOString(),
+      }))
       setPlanText(planTextToSave)
+      clearPlanDraft(selectedDate)
     } catch (error) {
       console.error('Error saving plan:', error)
       showMessage('❌ Ошибка при сохранении')
     }
-  }, [tasks, selectedTasks, selectedDate, showMessage])
+  }, [tasks, selectedTasks, selectedDate, showMessage, clearPlanDraft])
+
+  const saveExtraTasks = useCallback(async (tasksToSave: string[]) => {
+    try {
+      await fetch('/api/daily', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          extraTasksJson: JSON.stringify(tasksToSave),
+        }),
+      })
+    } catch (error) {
+      console.error('Error saving extra tasks:', error)
+      showMessage('❌ Ошибка при сохранении', 2000)
+    }
+  }, [selectedDate, showMessage])
+
+  const addExtraTask = useCallback(() => {
+    const text = newExtraTaskText.trim()
+    if (!text) return
+
+    const existingLower = new Set(extraTasks.map(t => t.toLowerCase()))
+    if (existingLower.has(text.toLowerCase())) {
+      showMessage('ℹ️ Уже добавлено во внеплан', 2000)
+      setNewExtraTaskText('')
+      return
+    }
+
+    const updated = [...extraTasks, text]
+    setExtraTasks(updated)
+    setNewExtraTaskText('')
+    void saveExtraTasks(updated)
+  }, [newExtraTaskText, extraTasks, saveExtraTasks, showMessage])
+
+  const removeExtraTask = useCallback((index: number) => {
+    const updated = extraTasks.filter((_, i) => i !== index)
+    setExtraTasks(updated)
+    void saveExtraTasks(updated)
+  }, [extraTasks, saveExtraTasks])
+
+  const buildTasksFromTexts = useCallback((texts: string[]): OpenTask[] => {
+    return texts
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0)
+      .map((text, index) => ({
+        id: index + 1,
+        taskText: text,
+        taskType: 'operational' as const,
+        originDate: selectedDate,
+        isClosed: false,
+        createdAt: new Date().toISOString(),
+      }))
+  }, [selectedDate])
+
+  const remapSelectionByText = useCallback((
+    prevTasks: OpenTask[],
+    prevSelected: Set<number>,
+    nextTasks: OpenTask[]
+  ): Set<number> => {
+    const selectedTexts = prevTasks
+      .filter((t) => prevSelected.has(t.id))
+      .map((t) => t.taskText.trim().toLowerCase())
+      .filter((t) => t.length > 0)
+
+    const counts = new Map<string, number>()
+    for (const text of selectedTexts) {
+      counts.set(text, (counts.get(text) || 0) + 1)
+    }
+
+    const nextSelected = new Set<number>()
+    for (const task of nextTasks) {
+      const key = task.taskText.trim().toLowerCase()
+      const c = counts.get(key) || 0
+      if (c > 0) {
+        nextSelected.add(task.id)
+        if (c === 1) counts.delete(key)
+        else counts.set(key, c - 1)
+      }
+    }
+
+    return nextSelected
+  }, [])
 
   const addTask = useCallback(() => {
     if (!newTaskText.trim()) return
-    const newTask: OpenTask = {
-      id: Date.now(),
-      taskText: newTaskText.trim(),
-      taskType: 'operational',
-      originDate: selectedDate,
-      isClosed: false,
-      createdAt: new Date().toISOString()
-    }
-    const updatedTasks = [...tasks, newTask]
+    const updatedTexts = [...tasks.map((t) => t.taskText), newTaskText.trim()]
+    const updatedTasks = buildTasksFromTexts(updatedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
+    setSelectedTasks(updatedSelected)
     setNewTaskText('')
-    savePlanWithTasks(updatedTasks, selectedTasks)
-  }, [newTaskText, selectedDate, tasks, selectedTasks, savePlanWithTasks])
+  }, [newTaskText, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const addGoalToTasks = useCallback((goalText: string) => {
     if (!goalText.trim()) return
@@ -316,19 +592,13 @@ export function useDaily(): UseDailyReturn {
       showMessage('Эта задача уже добавлена')
       return
     }
-    const newTask: OpenTask = {
-      id: Date.now(),
-      taskText: goalText.trim(),
-      taskType: 'operational',
-      originDate: selectedDate,
-      isClosed: false,
-      createdAt: new Date().toISOString()
-    }
-    const updatedTasks = [...tasks, newTask]
+    const updatedTexts = [...tasks.map((t) => t.taskText), goalText.trim()]
+    const updatedTasks = buildTasksFromTexts(updatedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
-    savePlanWithTasks(updatedTasks, selectedTasks)
+    setSelectedTasks(updatedSelected)
     showMessage('Цель добавлена в план')
-  }, [selectedDate, tasks, selectedTasks, savePlanWithTasks, showMessage])
+  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, showMessage])
 
   // Добавить привычки в задачи
   const addHabitsToTasks = useCallback((habitTexts?: string[]) => {
@@ -346,21 +616,13 @@ export function useDaily(): UseDailyReturn {
       return
     }
 
-    const maxId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) : 0
-    const newTasks: OpenTask[] = newHabitTexts.map((text, index) => ({
-      id: maxId + index + 1,
-      taskText: text,
-      taskType: 'operational' as const,
-      originDate: selectedDate,
-      isClosed: false,
-      createdAt: new Date().toISOString()
-    }))
-
-    const updatedTasks = [...tasks, ...newTasks]
+    const updatedTexts = [...tasks.map((t) => t.taskText), ...newHabitTexts]
+    const updatedTasks = buildTasksFromTexts(updatedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
-    savePlanWithTasks(updatedTasks, selectedTasks)
+    setSelectedTasks(updatedSelected)
     showMessage(`✅ Добавлено ${newHabitTexts.length} ${newHabitTexts.length === 1 ? 'привычка' : 'привычек'}`)
-  }, [selectedDate, tasks, selectedTasks, habits, savePlanWithTasks, showMessage])
+  }, [tasks, selectedTasks, habits, buildTasksFromTexts, remapSelectionByText, showMessage])
 
   // Создать привычку из задачи
   const createHabitFromTask = useCallback(async (
@@ -414,13 +676,12 @@ export function useDaily(): UseDailyReturn {
   }, [showMessage])
 
   const removeTask = useCallback((taskId: number) => {
-    const updatedTasks = tasks.filter(t => t.id !== taskId)
+    const updatedTexts = tasks.filter((t) => t.id !== taskId).map((t) => t.taskText)
+    const updatedTasks = buildTasksFromTexts(updatedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
-    const newSelected = new Set(selectedTasks)
-    newSelected.delete(taskId)
-    setSelectedTasks(newSelected)
-    savePlanWithTasks(updatedTasks, newSelected)
-  }, [tasks, selectedTasks, savePlanWithTasks])
+    setSelectedTasks(updatedSelected)
+  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const toggleTaskSelection = useCallback((taskId: number) => {
     const newSelected = new Set(selectedTasks)
@@ -430,8 +691,7 @@ export function useDaily(): UseDailyReturn {
       newSelected.add(taskId)
     }
     setSelectedTasks(newSelected)
-    savePlanWithTasks(tasks, newSelected)
-  }, [selectedTasks, tasks, savePlanWithTasks])
+  }, [selectedTasks])
 
   const startEditingTask = useCallback((taskId: number, currentText: string) => {
     setEditingTaskId(taskId)
@@ -445,14 +705,14 @@ export function useDaily(): UseDailyReturn {
       return
     }
 
-    const updatedTasks = tasks.map(t =>
-      t.id === taskId ? { ...t, taskText: editingTaskText.trim() } : t
-    )
+    const updatedTexts = tasks.map((t) => (t.id === taskId ? editingTaskText.trim() : t.taskText))
+    const updatedTasks = buildTasksFromTexts(updatedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
+    setSelectedTasks(updatedSelected)
     setEditingTaskId(null)
     setEditingTaskText('')
-    savePlanWithTasks(updatedTasks, selectedTasks)
-  }, [editingTaskText, tasks, selectedTasks, savePlanWithTasks])
+  }, [editingTaskText, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const cancelEditingTask = useCallback(() => {
     setEditingTaskId(null)
@@ -475,14 +735,17 @@ export function useDaily(): UseDailyReturn {
 
     if (draggedIndex === -1 || targetIndex === -1) return
 
-    const newTasks = [...tasks]
-    const [draggedTask] = newTasks.splice(draggedIndex, 1)
-    newTasks.splice(targetIndex, 0, draggedTask)
+    const reordered = [...tasks]
+    const [draggedTask] = reordered.splice(draggedIndex, 1)
+    reordered.splice(targetIndex, 0, draggedTask)
+    const reorderedTexts = reordered.map((t) => t.taskText)
+    const newTasks = buildTasksFromTexts(reorderedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, newTasks)
 
     setTasks(newTasks)
+    setSelectedTasks(updatedSelected)
     setDraggedTaskId(null)
-    savePlanWithTasks(newTasks, selectedTasks)
-  }, [draggedTaskId, tasks, selectedTasks, savePlanWithTasks])
+  }, [draggedTaskId, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const savePlan = useCallback(async () => {
     setSaving(true)
@@ -647,8 +910,8 @@ export function useDaily(): UseDailyReturn {
   const evaluate = useCallback(async (router: { push: (path: string) => void }) => {
     // Факт = отмеченные задачи
     const completedTasks = tasks.filter(t => selectedTasks.has(t.id))
-    if (completedTasks.length === 0) {
-      showMessage('❌ Отметьте выполненные задачи перед оценкой')
+    if (completedTasks.length === 0 && extraTasks.length === 0) {
+      showMessage('❌ Отметьте выполненные задачи или добавьте внеплан')
       return
     }
 
@@ -705,7 +968,7 @@ export function useDaily(): UseDailyReturn {
     } finally {
       setEvaluating(false)
     }
-  }, [factText, dailyEntry, tasks, selectedDate, selectedTasks, showMessage])
+  }, [factText, dailyEntry, tasks, selectedDate, selectedTasks, extraTasks, showMessage])
 
   return {
     selectedDate,
@@ -719,6 +982,9 @@ export function useDaily(): UseDailyReturn {
     dailyEntry,
     tasks,
     selectedTasks,
+    extraTasks,
+    newExtraTaskText,
+    setNewExtraTaskText,
     newTaskText,
     setNewTaskText,
     saving,
@@ -735,6 +1001,8 @@ export function useDaily(): UseDailyReturn {
     sendingChat,
     clearChat,
     addTask,
+    addExtraTask,
+    removeExtraTask,
     addGoalToTasks,
     removeTask,
     toggleTaskSelection,

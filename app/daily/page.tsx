@@ -27,6 +27,9 @@ export default function DailyPage() {
     dailyEntry,
     tasks,
     selectedTasks,
+    extraTasks,
+    newExtraTaskText,
+    setNewExtraTaskText,
     newTaskText,
     setNewTaskText,
     saving,
@@ -39,6 +42,8 @@ export default function DailyPage() {
     sendingChat,
     clearChat,
     addTask,
+    addExtraTask,
+    removeExtraTask,
     addGoalToTasks,
     removeTask,
     toggleTaskSelection,
@@ -101,9 +106,58 @@ export default function DailyPage() {
   }, [chatMessages])
 
   // Статистика выполнения
-  const completedCount = selectedTasks.size
+  const taskIdSet = new Set(tasks.map(t => t.id))
+  const completedCount = Array.from(selectedTasks).filter(id => taskIdSet.has(id)).length
   const totalCount = tasks.length
   const completionPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const extraDoneCount = extraTasks.length
+
+  const normalizePlanLine = (value: string) => {
+    let s = (value || '')
+      .normalize('NFKC')
+      .replace(/\u00A0/g, ' ') // nbsp
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // zero-width
+      .trim()
+
+    // Common leading markers: bullets, dashes, checkbox-like, emojis.
+    s = s.replace(/^(?:\*|•|-|—|–|\d+[.)])\s+/, '')
+    s = s.replace(/^(?:\[\s*\]|\[x\]|\[X\]|☐|☑|✅|✔️|✔)\s+/, '')
+
+    // Canonicalize Russian yo.
+    s = s.replace(/ё/g, 'е').replace(/Ё/g, 'Е')
+
+    // Collapse whitespace.
+    s = s.replace(/\s+/g, ' ').trim()
+
+    // Drop trailing punctuation that often differs.
+    s = s.replace(/[\s,.;:!]+$/g, '').trim()
+
+    return s.toLowerCase()
+  }
+
+  const savedFlags = (() => {
+    const savedLines = (dailyEntry?.planText || '')
+      .split('\n')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0)
+
+    const counts = new Map<string, number>()
+    for (const line of savedLines) {
+      const key = normalizePlanLine(line)
+      if (!key) continue
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+
+    return tasks.map((task) => {
+      const key = normalizePlanLine(task.taskText)
+      if (!key) return false
+      const c = counts.get(key) || 0
+      if (c <= 0) return false
+      if (c === 1) counts.delete(key)
+      else counts.set(key, c - 1)
+      return true
+    })
+  })()
 
   return (
     <div className="space-y-6">
@@ -178,6 +232,7 @@ export default function DailyPage() {
                 'bg-gray-100 text-gray-600'
               }`}>
                 ✅ {completedCount}/{totalCount} ({completionPercent}%)
+                {extraDoneCount > 0 && ` • ➕ +${extraDoneCount}`}
               </span>
             )}
           </div>
@@ -285,7 +340,7 @@ export default function DailyPage() {
                 Добавьте задачи на день...
               </p>
             ) : (
-              tasks.map((task) => (
+              tasks.map((task, index) => (
                 <div
                   key={task.id}
                   draggable={editingTaskId !== task.id}
@@ -297,7 +352,9 @@ export default function DailyPage() {
                   } ${
                     selectedTasks.has(task.id)
                       ? 'bg-green-50 border-green-300'
-                      : 'bg-white border-gray-200 hover:border-gray-300'
+                      : savedFlags[index]
+                        ? 'bg-green-50 border-green-200 hover:border-green-300'
+                        : 'bg-white border-gray-200 hover:border-gray-300 opacity-60'
                   } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                 >
                   <span className="text-gray-400 cursor-grab active:cursor-grabbing">⋮⋮</span>
@@ -381,6 +438,48 @@ export default function DailyPage() {
             )}
           </div>
 
+          {/* Вне плана (перевыполнение) */}
+          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <h3 className="font-medium text-sm text-gray-700 mb-2">➕ Вне плана (перевыполнение)</h3>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={newExtraTaskText}
+                onChange={(e) => setNewExtraTaskText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addExtraTask()
+                  }
+                }}
+                placeholder="Добавить сделанное вне плана..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <button onClick={addExtraTask} className="btn-primary text-sm py-2">
+                Добавить
+              </button>
+            </div>
+
+            {extraTasks.length === 0 ? (
+              <p className="text-xs text-gray-500">Нет</p>
+            ) : (
+              <div className="space-y-1">
+                {extraTasks.map((text, index) => (
+                  <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-white border border-gray-200 rounded px-2 py-1">
+                    <span className="flex-1">{text}</span>
+                    <button
+                      onClick={() => removeExtraTask(index)}
+                      className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
+                      title="Удалить"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Три кнопки - закреплены внизу */}
           <div className="grid grid-cols-3 gap-2 mt-auto pt-4">
             <button 
@@ -388,7 +487,7 @@ export default function DailyPage() {
               disabled={saving} 
               className="btn-primary disabled:opacity-50 text-sm py-2"
             >
-              {saving ? '...' : '💾 Сохранить'}
+              {saving ? '...' : '💾 Сохранить план'}
             </button>
             <button 
               onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации. Какие задачи из целей недели/месяца я мог бы ещё добавить?')}

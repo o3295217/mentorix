@@ -4,7 +4,8 @@ import { useState, useEffect, use } from 'react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
-import { DailyEntry, SuggestedTask } from '@/lib/types'
+import { DailyEntry, OpenTask, SuggestedTask } from '@/lib/types'
+import { areTasksSimilar } from '@/lib/task-match'
 
 function getScoreColor(score: number): string {
   if (score >= 7) return 'text-green-600'
@@ -18,6 +19,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const [loading, setLoading] = useState(true)
   const [addingTask, setAddingTask] = useState<string | null>(null)
   const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set())
+  const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
 
   useEffect(() => {
     loadData()
@@ -25,13 +27,23 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
   const loadData = async () => {
     try {
-      const res = await fetch(`/api/daily?date=${resolvedParams.date}`)
-      if (!res.ok) {
-        console.error('Failed to load evaluation:', res.status)
+      const [dailyRes, tasksRes] = await Promise.all([
+        fetch(`/api/daily?date=${resolvedParams.date}`),
+        fetch('/api/tasks/open'),
+      ])
+
+      if (!dailyRes.ok) {
+        console.error('Failed to load evaluation:', dailyRes.status)
         return
       }
-      const data = await res.json()
+
+      const data = await dailyRes.json()
       setDailyEntry(data)
+
+      if (tasksRes.ok) {
+        const tasks = await tasksRes.json()
+        setOpenTasks(Array.isArray(tasks) ? tasks : [])
+      }
     } catch (error) {
       console.error('Error loading evaluation:', error)
     } finally {
@@ -46,16 +58,25 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
     }
     setAddingTask(task.taskText)
     try {
-      await fetch('/api/tasks/add-suggested', {
+      const res = await fetch('/api/tasks/add-suggested', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskText: task.taskText,
           taskType: task.taskType,
-          originDate: dailyEntry.date,
+          // Важно: отправляем date-only ключ из URL, чтобы не было timezone-сдвигов
+          originDate: resolvedParams.date,
         }),
       })
+
+      // 409 = задача уже существует (по смыслу считаем "перенесено")
+      if (!res.ok && res.status !== 409) {
+        throw new Error(`Failed to add task: ${res.status}`)
+      }
+
       setAddedTasks(new Set(addedTasks).add(task.taskText))
+      // Перечитать dailyEntry, чтобы предложенная задача исчезла и после обновления страницы
+      await loadData()
     } catch (error) {
       console.error('Error adding task:', error)
       alert('Ошибка при добавлении задачи')
@@ -86,6 +107,24 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
   const evaluation = dailyEntry.evaluation
   const date = new Date(dailyEntry.date)
+
+  const suggestedTasks: SuggestedTask[] = (() => {
+    if (!evaluation.suggestedTasksJson) return []
+    try {
+      const parsed = JSON.parse(evaluation.suggestedTasksJson)
+      return Array.isArray(parsed) ? (parsed as SuggestedTask[]) : []
+    } catch {
+      return []
+    }
+  })()
+
+  const duplicateSuggestedTasks = suggestedTasks.filter((s) =>
+    openTasks.some((t) => areTasksSimilar(t.taskText, s.taskText))
+  )
+
+  const visibleSuggestedTasks = suggestedTasks.filter((s) =>
+    !openTasks.some((t) => areTasksSimilar(t.taskText, s.taskText))
+  )
 
   return (
     <div className="space-y-6">
@@ -163,14 +202,22 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
       </div>
 
       {/* Suggested Tasks */}
-      {evaluation.suggestedTasksJson && JSON.parse(evaluation.suggestedTasksJson).length > 0 && (
+      {(visibleSuggestedTasks.length > 0 || duplicateSuggestedTasks.length > 0) && (
         <div className="card bg-purple-50 border-2 border-purple-200">
           <h2 className="text-xl font-bold mb-4 text-purple-900">📋 Предложенные задачи</h2>
-          <p className="text-sm text-gray-700 mb-4">
-            ИИ выявил важные задачи, которые стоит добавить в список незакрытых
-          </p>
+          <p className="text-sm text-gray-700 mb-4">ИИ выявил важные задачи, которые стоит добавить в список незакрытых</p>
+
+          {duplicateSuggestedTasks.length > 0 && (
+            <div className="mb-4 p-3 bg-purple-100 rounded">
+              <p className="text-sm text-purple-900">
+                ⚠️ По этой теме уже есть незакрытые задачи (совпадение по названию/смыслу). Вместо создания дубля — сфокусируйся на закрытии
+                существующей во вкладке{' '}
+                <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>.
+              </p>
+            </div>
+          )}
           <div className="space-y-3">
-            {(JSON.parse(evaluation.suggestedTasksJson) as SuggestedTask[]).map((task) => {
+            {visibleSuggestedTasks.map((task) => {
               const isAdded = addedTasks.has(task.taskText)
               const isAdding = addingTask === task.taskText
 

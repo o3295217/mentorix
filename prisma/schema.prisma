@@ -93,6 +93,12 @@ model DailyEntry {
   planText   String?
   factText   String?
 
+  // Снимок плана (фиксируем при первом сохранении плана)
+  planSnapshotJson String? // JSON массив строк
+
+  // Задачи, сделанные вне плана (перевыполнение)
+  extraTasksJson   String   @default("[]") // JSON массив строк
+
   // НОВЫЕ ПОЛЯ: Контекст дня
   emotionalState    String?  // Эмоциональное состояние
   physicalState     String?  // Физическое состояние

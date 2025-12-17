@@ -144,6 +144,9 @@ export const DAILY_EVALUATION_SYSTEM_PROMPT = `Ты строгий ИИ-коуч
     - Для каждой задачи укажи: текст, тип (strategic/operational), приоритет (high/medium/low), причину
     - НЕ предлагай мелкие или одноразовые задачи
     - Предлагай задачи, которые откладываются несколько дней подряд ИЛИ критичны для мечты
+    - ЕСЛИ похожая задача УЖЕ ЕСТЬ в списке "❌ НЕЗАКРЫТЫЕ ЗАДАЧИ ИЗ ПРОШЛОГО":
+      - НЕ добавляй её в suggested_tasks
+      - Вместо этого прямо подчеркни в feedback или recommendations, что эта тема уже висит/повторяется несколько дней
 
 ФОРМАТ ОТВЕТА - СТРОГО JSON:
 {
@@ -239,6 +242,9 @@ ${request.planText}
 
 ✅ ФАКТ ВЫПОЛНЕНИЯ:
 ${request.factText}
+
+➕ СДЕЛАНО ВНЕ ПЛАНА (перевыполнение):
+${request.extraTasks && request.extraTasks.length > 0 ? request.extraTasks.map((t, i) => `${i + 1}. ${t}`).join('\n') : 'Нет'}
 
 ❌ НЕЗАКРЫТЫЕ ЗАДАЧИ ИЗ ПРОШЛОГО:
 ${request.openTasks.length > 0 ? request.openTasks.map((t, i) => `${i + 1}. ${t}`).join('\n') : 'Нет'}

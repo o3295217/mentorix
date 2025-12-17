@@ -44,6 +44,8 @@ export interface DailyEntry {
   date: string
   planText?: string
   factText?: string
+  planSnapshotJson?: string
+  extraTasksJson?: string
   emotionalState?: string
   physicalState?: string
   lifeEvents?: string
