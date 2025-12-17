@@ -58,7 +58,6 @@ export default function DailyPage() {
     handleDragOver,
     handleDrop,
     savePlan,
-    saveFact,
     evaluate,
     // Habits
     habits,
@@ -505,14 +504,6 @@ export default function DailyPage() {
               title="ИИ проверит план"
             >
               {sendingChat ? '...' : '🔍 Оценка'}
-            </button>
-            <button 
-              onClick={saveFact} 
-              disabled={saving || selectedTasks.size === 0} 
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 text-sm"
-              title="Сохранить отмеченные задачи как выполненные"
-            >
-              {saving ? '...' : '✅ Факт'}
             </button>
           </div>
         </div>
