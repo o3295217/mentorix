@@ -24,9 +24,20 @@ export async function GET(request: NextRequest) {
     // Get single entry by date
     if (dateStr) {
       const date = parseDateParam(dateStr)
-      const entry = await prisma.dailyEntry.findUnique({
-        where: { date },
+      // Search by date range to handle timezone differences
+      // The day starts at local midnight and ends just before next midnight
+      const nextDay = new Date(date)
+      nextDay.setDate(nextDay.getDate() + 1)
+
+      const entry = await prisma.dailyEntry.findFirst({
+        where: {
+          date: {
+            gte: date,
+            lt: nextDay,
+          },
+        },
         include: { evaluation: true },
+        orderBy: { date: 'desc' }, // Get the most recent if duplicates exist
       })
 
       return NextResponse.json(entry || null)
