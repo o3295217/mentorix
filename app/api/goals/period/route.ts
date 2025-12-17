@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPeriodDates, parseDateParam, PeriodType } from '@/lib/dates'
+import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 
 const PeriodGoalSchema = z.object({
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       periodGoal
-        ? { ...periodGoal, goals: JSON.parse(periodGoal.goalsJson) }
+        ? { ...periodGoal, goals: safeParseJson<string[]>(periodGoal.goalsJson, []) }
         : { periodType: type, periodStart: start, periodEnd: end, goals: [] }
     )
   } catch (error) {
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ ...periodGoal, goals: JSON.parse(periodGoal.goalsJson) })
+    return NextResponse.json({ ...periodGoal, goals: safeParseJson<string[]>(periodGoal.goalsJson, []) })
   } catch (error) {
     console.error('Error creating period goals:', error)
     return NextResponse.json({ error: 'Failed to create period goals' }, { status: 500 })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 import { parseDateParam } from '@/lib/dates'
 
@@ -38,15 +39,13 @@ export async function GET(request: NextRequest) {
             return dayOfWeek === 6 || dayOfWeek === 7
           case 'weekly': {
             // По умолчанию понедельник, или первый день из daysOfWeek
-            const days = habit.daysOfWeek ? JSON.parse(habit.daysOfWeek) : [1]
+            const days = safeParseJson<number[]>(habit.daysOfWeek, [1])
             return days.includes(dayOfWeek)
           }
-          case 'custom':
-            if (habit.daysOfWeek) {
-              const customDays = JSON.parse(habit.daysOfWeek)
-              return customDays.includes(dayOfWeek)
-            }
-            return true
+          case 'custom': {
+            const customDays = safeParseJson<number[]>(habit.daysOfWeek, [])
+            return customDays.length === 0 || customDays.includes(dayOfWeek)
+          }
           default:
             return true
         }

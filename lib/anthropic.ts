@@ -538,16 +538,16 @@ export async function updateUserInsights(
       ).join('\n')
     : 'Нет данных'
 
-  // Sanitize user inputs
+  // Sanitize user inputs and use function replacement to avoid double replacement attacks
   const prompt = UPDATE_INSIGHTS_PROMPT
-    .replace('{current_insights}', currentInsightsText)
-    .replace('{plan_text}', sanitizeUserInput(request.planText))
-    .replace('{fact_text}', sanitizeUserInput(request.factText))
-    .replace('{overall_score}', String(request.overallScore))
-    .replace('{dream_score}', String(request.dreamProgressScore))
-    .replace('{feedback}', sanitizeUserInput(request.evaluationFeedback))
-    .replace('{recent_days}', recentDaysText)
-    .replace('{evaluation_count}', String(request.evaluationCount))
+    .replace('{current_insights}', () => sanitizeUserInput(currentInsightsText))
+    .replace('{plan_text}', () => sanitizeUserInput(request.planText))
+    .replace('{fact_text}', () => sanitizeUserInput(request.factText))
+    .replace('{overall_score}', () => String(request.overallScore))
+    .replace('{dream_score}', () => String(request.dreamProgressScore))
+    .replace('{feedback}', () => sanitizeUserInput(request.evaluationFeedback))
+    .replace('{recent_days}', () => sanitizeUserInput(recentDaysText))
+    .replace('{evaluation_count}', () => String(request.evaluationCount))
 
   // Используем Haiku с retry логикой
   const message = await withRetry(async () => {

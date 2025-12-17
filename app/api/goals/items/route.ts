@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { parseDateParam } from '@/lib/dates'
+import { safeParseJson } from '@/lib/api-utils'
 
 // Конвертация числа приоритета в строку
 const priorityNumToStr = (num: number): string => {
@@ -40,9 +41,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(goals.map(g => ({
       ...g,
       priority: priorityStrToNum(g.priority),
-      tags: JSON.parse(g.tagsJson),
-      blockedBy: JSON.parse(g.blockedByJson),
-      history: JSON.parse(g.historyJson),
+      tags: safeParseJson<string[]>(g.tagsJson, []),
+      blockedBy: safeParseJson<number[]>(g.blockedByJson, []),
+      history: safeParseJson<Array<{ type: string; date: string }>>(g.historyJson, []),
     })))
   } catch (error) {
     console.error('Error fetching goals:', error)
@@ -77,9 +78,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...goal,
       priority: priorityStrToNum(goal.priority),
-      tags: JSON.parse(goal.tagsJson),
-      blockedBy: JSON.parse(goal.blockedByJson),
-      history: JSON.parse(goal.historyJson),
+      tags: safeParseJson<string[]>(goal.tagsJson, []),
+      blockedBy: safeParseJson<number[]>(goal.blockedByJson, []),
+      history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
     })
   } catch (error) {
     console.error('Error creating goal:', error)
@@ -98,7 +99,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
-    const history = JSON.parse(existingGoal.historyJson)
+    const history = safeParseJson<Array<{ type: string; date: string }>>(existingGoal.historyJson, [])
     
     // Добавляем событие в историю при изменении статуса
     if (completed !== undefined && completed !== existingGoal.completed) {
@@ -133,9 +134,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       ...goal,
       priority: priorityStrToNum(goal.priority),
-      tags: JSON.parse(goal.tagsJson),
-      blockedBy: JSON.parse(goal.blockedByJson),
-      history: JSON.parse(goal.historyJson),
+      tags: safeParseJson<string[]>(goal.tagsJson, []),
+      blockedBy: safeParseJson<number[]>(goal.blockedByJson, []),
+      history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
     })
   } catch (error) {
     console.error('Error updating goal:', error)

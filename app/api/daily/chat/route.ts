@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { getPeriodDates, parseDateParam } from '@/lib/dates'
-import { 
-  PLAN_CHAT_SYSTEM_PROMPT, 
+import { safeParseJson } from '@/lib/api-utils'
+import {
+  PLAN_CHAT_SYSTEM_PROMPT,
   buildPlanChatContext,
   PlanChatRequest,
 } from '@/lib/prompts/plan-chat'
@@ -25,16 +26,6 @@ const ChatSchema = z.object({
   })),
   userMessage: z.string(), // Новое сообщение пользователя
 })
-
-// Безопасный парсинг JSON
-function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
-  if (!json) return fallback
-  try {
-    return JSON.parse(json)
-  } catch {
-    return fallback
-  }
-}
 
 // День недели на русском
 function getDayOfWeek(dateStr: string): string {
