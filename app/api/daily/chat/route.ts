@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { getPeriodDates, parseDateParam } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
+import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
 import {
   PLAN_CHAT_SYSTEM_PROMPT,
   buildPlanChatContext,
@@ -35,6 +36,17 @@ function getDayOfWeek(dateStr: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limiting for AI endpoints
+  const clientId = getClientIdentifier(request)
+  const rateLimit = checkRateLimit(clientId, rateLimiters.ai)
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before sending another message.', retryAfter: rateLimit.retryAfter },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+    )
+  }
+
   try {
     const body = await request.json()
     

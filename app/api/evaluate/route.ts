@@ -6,12 +6,24 @@ import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { z } from 'zod'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
+import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
 })
 
 export async function POST(request: NextRequest) {
+  // Rate limiting for AI endpoints
+  const clientId = getClientIdentifier(request)
+  const rateLimit = checkRateLimit(clientId, rateLimiters.ai)
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before requesting another evaluation.', retryAfter: rateLimit.retryAfter },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+    )
+  }
+
   try {
     const body = await request.json()
     

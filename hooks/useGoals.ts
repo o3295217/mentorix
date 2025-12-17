@@ -66,9 +66,28 @@ export function useGoals(): UseGoalsReturn {
 
   const currentYear = new Date().getFullYear()
 
+  const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   const showMessage = useCallback((text: string) => {
+    // Clear previous timeout to prevent memory leaks
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current)
+      messageTimeoutRef.current = null
+    }
     setMessage(text)
-    setTimeout(() => setMessage(''), 3000)
+    messageTimeoutRef.current = setTimeout(() => {
+      setMessage('')
+      messageTimeoutRef.current = null
+    }, 3000)
+  }, [])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current)
+      }
+    }
   }, [])
 
   // Dream operations

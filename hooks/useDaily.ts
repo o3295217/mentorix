@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { format } from 'date-fns'
 import { getPeriodDates } from '@/lib/dates'
 import { DailyEntry, OpenTask } from '@/lib/types'
@@ -161,6 +161,9 @@ export function useDaily(): UseDailyReturn {
 
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
+  // Track the current date to prevent race conditions when switching dates quickly
+  const currentDateRef = useRef(selectedDate)
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
@@ -235,17 +238,43 @@ export function useDaily(): UseDailyReturn {
     return result
   }, [])
 
+  const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   const showMessage = useCallback((text: string, duration = 3000) => {
+    // Clear previous timeout to prevent memory leaks
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current)
+      messageTimeoutRef.current = null
+    }
     setMessage(text)
     if (duration > 0) {
-      setTimeout(() => setMessage(''), duration)
+      messageTimeoutRef.current = setTimeout(() => {
+        setMessage('')
+        messageTimeoutRef.current = null
+      }, duration)
+    }
+  }, [])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current)
+      }
     }
   }, [])
 
   const loadData = useCallback(async () => {
+    // Capture the date we're loading for to check later
+    const loadingDate = selectedDate
+
     try {
       // Load daily entry
       const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
+
+      // Check if date changed during fetch - prevent race condition
+      if (currentDateRef.current !== loadingDate) return
+
       if (!dailyRes.ok) {
         console.error('Failed to fetch daily entry:', dailyRes.status)
         setDailyEntry(null)
@@ -422,8 +451,9 @@ export function useDaily(): UseDailyReturn {
   }, [selectedDate, planText, tasks, readPlanDraft, clearPlanDraft, sanitizeSelectedForTotal])
 
   useEffect(() => {
+    currentDateRef.current = selectedDate
     loadData()
-  }, [loadData])
+  }, [selectedDate]) // Intentionally not including loadData to prevent infinite loops
 
   // Локальный черновик плана (чтобы не пропадало при refresh)
   useEffect(() => {
