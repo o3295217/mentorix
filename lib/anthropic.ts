@@ -13,12 +13,112 @@ import {
 import { DAILY_EVALUATION_SYSTEM_PROMPT, buildUserDataPrompt, validateGoals } from './prompts/daily'
 import { buildPeriodEvaluationPrompt } from './prompts/period'
 import { buildForecastPrompt } from './prompts/forecast'
+import { extractJsonFromAIResponse, isValidScore, clampScore, sanitizeUserInput } from './api-utils'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  maxRetries: 2,
-  timeout: 5 * 60 * 1000, // 5 minutes timeout for the HTTP client
-})
+// ============================================================================
+// API KEY VALIDATION (Lazy initialization for build-time compatibility)
+// ============================================================================
+
+let _anthropic: Anthropic | null = null
+
+function getAnthropicClient(): Anthropic {
+  if (!_anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      throw new Error(
+        'ANTHROPIC_API_KEY environment variable is not set. ' +
+        'Please set it in your .env.local file or environment.'
+      )
+    }
+    _anthropic = new Anthropic({
+      apiKey,
+      maxRetries: 2,
+      timeout: 5 * 60 * 1000, // 5 minutes timeout for the HTTP client
+    })
+  }
+  return _anthropic
+}
+
+// ============================================================================
+// RETRY LOGIC WITH EXPONENTIAL BACKOFF
+// ============================================================================
+
+interface RetryOptions {
+  maxRetries?: number
+  baseDelayMs?: number
+  maxDelayMs?: number
+}
+
+class AIServiceError extends Error {
+  constructor(
+    message: string,
+    public code: 'RATE_LIMIT' | 'API_ERROR' | 'PARSE_ERROR' | 'VALIDATION_ERROR',
+    public retryable: boolean = false,
+    public originalError?: unknown
+  ) {
+    super(message)
+    this.name = 'AIServiceError'
+  }
+}
+
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const { maxRetries = 3, baseDelayMs = 1000, maxDelayMs = 30000 } = options
+  let lastError: Error | undefined
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+
+      // Check if error is retryable
+      const isRateLimitError =
+        error instanceof Error &&
+        ('status' in error && (error as { status: number }).status === 429)
+
+      const isServerError =
+        error instanceof Error &&
+        ('status' in error && (error as { status: number }).status >= 500)
+
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.includes('ECONNREFUSED') ||
+         error.message.includes('ETIMEDOUT') ||
+         error.message.includes('network'))
+
+      const shouldRetry = isRateLimitError || isServerError || isNetworkError
+
+      if (!shouldRetry || attempt === maxRetries) {
+        if (isRateLimitError) {
+          throw new AIServiceError(
+            'Rate limit exceeded. Please try again later.',
+            'RATE_LIMIT',
+            true,
+            error
+          )
+        }
+        throw error
+      }
+
+      // Calculate delay with exponential backoff and jitter
+      const exponentialDelay = baseDelayMs * Math.pow(2, attempt)
+      const jitter = Math.random() * 1000
+      const delay = Math.min(exponentialDelay + jitter, maxDelayMs)
+
+      console.warn(
+        `[Claude API] Attempt ${attempt + 1} failed, retrying in ${Math.round(delay)}ms...`,
+        { error: lastError.message }
+      )
+
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError
+}
 
 // Логирование статистики кэширования Claude API
 interface CacheUsage {
@@ -104,6 +204,66 @@ function convertLegacyRequest(legacy: EvaluationRequest): DailyEvaluationRequest
   }
 }
 
+// ============================================================================
+// RESPONSE VALIDATORS
+// ============================================================================
+
+function isDailyEvaluationResponse(obj: unknown): obj is DailyEvaluationResponse {
+  if (typeof obj !== 'object' || obj === null) return false
+  const r = obj as Record<string, unknown>
+
+  // Validate required score fields
+  const scoreFields = [
+    'dream_progress_score',
+    'strategy_score',
+    'operations_score',
+    'team_score',
+    'efficiency_score',
+    'overall_score',
+  ]
+
+  for (const field of scoreFields) {
+    if (!isValidScore(r[field])) {
+      console.error(`[Validation] Invalid score for ${field}:`, r[field])
+      return false
+    }
+  }
+
+  // Validate required string fields
+  if (typeof r.feedback !== 'string' || r.feedback.length === 0) {
+    console.error('[Validation] Missing or invalid feedback')
+    return false
+  }
+
+  if (typeof r.plan_vs_fact !== 'string') {
+    console.error('[Validation] Missing plan_vs_fact')
+    return false
+  }
+
+  return true
+}
+
+function isPeriodEvaluationResponse(obj: unknown): obj is PeriodEvaluationResponse {
+  if (typeof obj !== 'object' || obj === null) return false
+  const r = obj as Record<string, unknown>
+
+  if (!isValidScore(r.dreamProgressScore)) return false
+  if (!isValidScore(r.overallScore)) return false
+  if (typeof r.feedback !== 'string' || r.feedback.length === 0) return false
+
+  return true
+}
+
+function isForecastResponse(obj: unknown): obj is ForecastResponse {
+  if (typeof obj !== 'object' || obj === null) return false
+  const r = obj as Record<string, unknown>
+
+  if (typeof r.dreamForecast !== 'object' || r.dreamForecast === null) return false
+  if (typeof r.summary !== 'string' || r.summary.length === 0) return false
+
+  return true
+}
+
 // НОВАЯ функция оценки дня с Prompt Caching
 export async function evaluateDayNew(
   request: DailyEvaluationRequest
@@ -114,28 +274,39 @@ export async function evaluateDayNew(
     return validation.response
   }
 
-  // Построение user промпта со всеми данными (мечта, цели, план/факт)
-  const userPrompt = buildUserDataPrompt(request)
+  // Sanitize user inputs to prevent prompt injection
+  const sanitizedRequest: DailyEvaluationRequest = {
+    ...request,
+    planText: sanitizeUserInput(request.planText),
+    factText: sanitizeUserInput(request.factText),
+    goals: {
+      ...request.goals,
+      dreamGoal: sanitizeUserInput(request.goals.dreamGoal, 1000),
+    },
+  }
 
-  // Вызов Claude API с Prompt Caching
-  // System prompt: ТОЛЬКО инструкции (кэшируются, ~3500 токенов)
-  // User message: все данные пользователя (НЕ кэшируются - всегда актуальные)
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
-    max_tokens: 4096,
-    system: [
-      {
-        type: 'text',
-        text: DAILY_EVALUATION_SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' }, // Кэшируем инструкции на 5 минут
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: userPrompt,
-      },
-    ],
+  // Построение user промпта со всеми данными (мечта, цели, план/факт)
+  const userPrompt = buildUserDataPrompt(sanitizedRequest)
+
+  // Вызов Claude API с Prompt Caching и retry логикой
+  const message = await withRetry(async () => {
+    return getAnthropicClient().messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 4096,
+      system: [
+        {
+          type: 'text',
+          text: DAILY_EVALUATION_SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' }, // Кэшируем инструкции на 5 минут
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: userPrompt,
+        },
+      ],
+    })
   })
 
   // Логируем статистику кэширования
@@ -143,31 +314,23 @@ export async function evaluateDayNew(
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  // Извлечение JSON из ответа (Claude может обернуть в markdown)
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    console.error('Claude response without JSON:', responseText)
-    throw new Error('Failed to parse evaluation response from Claude')
-  }
+  // Извлечение и валидация JSON из ответа
+  const parsedResponse = extractJsonFromAIResponse<DailyEvaluationResponse>(
+    responseText,
+    isDailyEvaluationResponse,
+    'evaluateDayNew'
+  )
 
-  let parsedResponse: DailyEvaluationResponse
-  try {
-    parsedResponse = JSON.parse(jsonMatch[0])
-  } catch {
-    console.error('Invalid JSON from Claude:', jsonMatch[0])
-    throw new Error('Claude returned invalid JSON response')
+  // Clamp scores to valid range (safety measure)
+  return {
+    ...parsedResponse,
+    dream_progress_score: clampScore(parsedResponse.dream_progress_score),
+    strategy_score: clampScore(parsedResponse.strategy_score),
+    operations_score: clampScore(parsedResponse.operations_score),
+    team_score: clampScore(parsedResponse.team_score),
+    efficiency_score: clampScore(parsedResponse.efficiency_score),
+    overall_score: clampScore(parsedResponse.overall_score),
   }
-
-  // Валидация ответа
-  if (
-    !parsedResponse.dream_progress_score ||
-    !parsedResponse.overall_score ||
-    !parsedResponse.feedback
-  ) {
-    throw new Error('Invalid evaluation response structure')
-  }
-
-  return parsedResponse
 }
 
 // СТАРАЯ функция для обратной совместимости (deprecated)
@@ -201,22 +364,24 @@ export async function evaluatePeriod(
   // Построение промпта для периодической оценки
   const prompt = buildPeriodEvaluationPrompt(request)
 
-  // Вызов Claude API с кэшированием (используем Haiku для скорости)
-  const message = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', // Быстрая модель для периодических оценок
-    max_tokens: 8192, // Увеличен лимит для более длинных ответов
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: prompt,
-            cache_control: { type: 'ephemeral' }, // Кэшируем промпт на 5 минут
-          },
-        ],
-      },
-    ],
+  // Вызов Claude API с кэшированием и retry логикой
+  const message = await withRetry(async () => {
+    return getAnthropicClient().messages.create({
+      model: 'claude-3-5-haiku-20241022', // Быстрая модель для периодических оценок
+      max_tokens: 8192,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt,
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
+        },
+      ],
+    })
   })
 
   // Логируем статистику кэширования
@@ -224,31 +389,19 @@ export async function evaluatePeriod(
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  // Извлечение JSON из ответа
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    console.error('Claude response without JSON:', responseText)
-    throw new Error('Failed to parse period evaluation response from Claude')
-  }
+  // Извлечение и валидация JSON из ответа
+  const parsedResponse = extractJsonFromAIResponse<PeriodEvaluationResponse>(
+    responseText,
+    isPeriodEvaluationResponse,
+    'evaluatePeriod'
+  )
 
-  let parsedResponse: PeriodEvaluationResponse
-  try {
-    parsedResponse = JSON.parse(jsonMatch[0])
-  } catch {
-    console.error('Invalid JSON from Claude:', jsonMatch[0])
-    throw new Error('Claude returned invalid JSON response for period evaluation')
+  // Clamp scores to valid range
+  return {
+    ...parsedResponse,
+    dreamProgressScore: clampScore(parsedResponse.dreamProgressScore),
+    overallScore: clampScore(parsedResponse.overallScore),
   }
-
-  // Валидация ответа
-  if (
-    !parsedResponse.dreamProgressScore ||
-    !parsedResponse.overallScore ||
-    !parsedResponse.feedback
-  ) {
-    throw new Error('Invalid period evaluation response structure')
-  }
-
-  return parsedResponse
 }
 
 // Функция прогноза
@@ -258,22 +411,24 @@ export async function generateForecast(
   // Построение промпта для прогноза
   const prompt = buildForecastPrompt(request)
 
-  // Вызов Claude API с кэшированием
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
-    max_tokens: 8192,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: prompt,
-            cache_control: { type: 'ephemeral' }, // Кэшируем промпт на 5 минут
-          },
-        ],
-      },
-    ],
+  // Вызов Claude API с кэшированием и retry логикой
+  const message = await withRetry(async () => {
+    return getAnthropicClient().messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 8192,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt,
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
+        },
+      ],
+    })
   })
 
   // Логируем статистику кэширования
@@ -281,27 +436,12 @@ export async function generateForecast(
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  // Извлечение JSON из ответа
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    console.error('Claude response without JSON:', responseText)
-    throw new Error('Failed to parse forecast response from Claude')
-  }
-
-  let parsedResponse: ForecastResponse
-  try {
-    parsedResponse = JSON.parse(jsonMatch[0])
-  } catch {
-    console.error('Invalid JSON from Claude:', jsonMatch[0])
-    throw new Error('Claude returned invalid JSON response for forecast')
-  }
-
-  // Валидация ответа
-  if (!parsedResponse.dreamForecast || !parsedResponse.summary) {
-    throw new Error('Invalid forecast response structure')
-  }
-
-  return parsedResponse
+  // Извлечение и валидация JSON из ответа
+  return extractJsonFromAIResponse<ForecastResponse>(
+    responseText,
+    isForecastResponse,
+    'generateForecast'
+  )
 }
 
 // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
@@ -371,6 +511,20 @@ const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивн�
 - Пиши на русском языке
 - Отвечай ТОЛЬКО JSON без пояснений`
 
+function isUserInsightsUpdate(obj: unknown): obj is UserInsightsUpdate {
+  if (typeof obj !== 'object' || obj === null) return false
+  // At least one field should be present
+  const r = obj as Record<string, unknown>
+  return (
+    typeof r.patterns === 'string' ||
+    typeof r.strengths === 'string' ||
+    typeof r.challenges === 'string' ||
+    typeof r.preferences === 'string' ||
+    typeof r.recommendations === 'string' ||
+    typeof r.motivators === 'string'
+  )
+}
+
 export async function updateUserInsights(
   request: UpdateInsightsRequest
 ): Promise<UserInsightsUpdate> {
@@ -379,47 +533,43 @@ export async function updateUserInsights(
     : 'Профиль пока не сформирован'
 
   const recentDaysText = request.recentDays && request.recentDays.length > 0
-    ? request.recentDays.map(d => 
+    ? request.recentDays.map(d =>
         `- ${d.date}: ${d.completedTasks}/${d.planTasks} задач, мечта: ${d.dreamScore}/10, день: ${d.overallScore}/10`
       ).join('\n')
     : 'Нет данных'
 
+  // Sanitize user inputs
   const prompt = UPDATE_INSIGHTS_PROMPT
     .replace('{current_insights}', currentInsightsText)
-    .replace('{plan_text}', request.planText)
-    .replace('{fact_text}', request.factText)
+    .replace('{plan_text}', sanitizeUserInput(request.planText))
+    .replace('{fact_text}', sanitizeUserInput(request.factText))
     .replace('{overall_score}', String(request.overallScore))
     .replace('{dream_score}', String(request.dreamProgressScore))
-    .replace('{feedback}', request.evaluationFeedback)
+    .replace('{feedback}', sanitizeUserInput(request.evaluationFeedback))
     .replace('{recent_days}', recentDaysText)
     .replace('{evaluation_count}', String(request.evaluationCount))
 
-  // Используем Haiku — дешевле для этой задачи
-  const message = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022',
-    max_tokens: 2048,
-    messages: [
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ],
+  // Используем Haiku с retry логикой
+  const message = await withRetry(async () => {
+    return getAnthropicClient().messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 2048,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    })
   })
 
   logCacheStats('updateUserInsights', message.usage)
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    console.error('Claude response without JSON:', responseText)
-    throw new Error('Failed to parse insights response from Claude')
-  }
-
-  try {
-    return JSON.parse(jsonMatch[0])
-  } catch {
-    console.error('Invalid JSON from Claude:', jsonMatch[0])
-    throw new Error('Claude returned invalid JSON for insights')
-  }
+  return extractJsonFromAIResponse<UserInsightsUpdate>(
+    responseText,
+    isUserInsightsUpdate,
+    'updateUserInsights'
+  )
 }

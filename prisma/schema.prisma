@@ -38,6 +38,7 @@ model PeriodGoal {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([periodType, periodStart])
   @@map("period_goals")
 }
 
@@ -74,6 +75,8 @@ model Goal {
   updatedAt   DateTime  @updatedAt
 
   @@index([periodType, periodKey])
+  @@index([completed])
+  @@index([periodType, periodKey, completed])
   @@map("goals")
 }
 
@@ -118,7 +121,7 @@ model Evaluation {
   dailyEntryId         Int        @unique
   dailyEntry           DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
 
-  // ГЛАВНАЯ МЕТРИКА
+  // ГЛАВНАЯ МЕТРИКА (индексировано для запросов прогресса)
   dreamProgressScore   Int        @default(5) // Насколько день приблизил к мечте (1-10)
 
   // Классические метрики
@@ -153,6 +156,8 @@ model Evaluation {
   suggestedTasksJson   String?    // JSON: предложенные задачи от ИИ
   createdAt            DateTime   @default(now())
 
+  @@index([dreamProgressScore])
+  @@index([createdAt])
   @@map("evaluations")
 }
 
@@ -165,6 +170,8 @@ model OpenTask {
   closedAt   DateTime?
   createdAt  DateTime  @default(now())
 
+  @@index([isClosed])
+  @@index([taskType, isClosed])
   @@map("open_tasks")
 }
 
@@ -284,26 +291,28 @@ model WorldContext {
 model Habit {
   id          Int      @id @default(autoincrement())
   taskText    String   // Текст задачи
-  
+
   // Частота повторения
   frequency   String   @default("daily") // daily, weekdays, weekends, weekly, custom
   daysOfWeek  String?  // JSON array: [1,2,3,4,5] для пн-пт (1=пн, 7=вс)
   interval    Int?     // Каждые N дней (для custom)
-  
+
   // Статус
   isActive    Boolean  @default(true)
-  
+
   // Статистика
   streak      Int      @default(0) // Текущая серия дней подряд
   bestStreak  Int      @default(0) // Лучшая серия
   totalDone   Int      @default(0) // Всего выполнено раз
-  
+
   // Порядок сортировки
   sortOrder   Int      @default(0)
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([isActive])
+  @@index([isActive, sortOrder])
   @@map("habits")
 }
 

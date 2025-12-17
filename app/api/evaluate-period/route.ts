@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { evaluatePeriod } from '@/lib/anthropic'
 import { PeriodEvaluationRequest, DayData } from '@/lib/prompts/types'
 import { parseDateParam } from '@/lib/dates'
+import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -113,11 +114,11 @@ export async function POST(request: NextRequest) {
       days: daysData,
       goals: {
         dreamGoal: dream?.goalText || 'Не указана',
-        yearGoals: currentYearGoal ? JSON.parse(currentYearGoal.goalsJson) : [],
-        halfYearGoals: halfYearGoals ? JSON.parse(halfYearGoals.goalsJson) : [],
-        quarterGoals: quarterGoals ? JSON.parse(quarterGoals.goalsJson) : [],
-        monthGoals: monthGoals ? JSON.parse(monthGoals.goalsJson) : [],
-        weekGoals: weekGoals ? JSON.parse(weekGoals.goalsJson) : [],
+        yearGoals: safeParseJson(currentYearGoal?.goalsJson, []),
+        halfYearGoals: safeParseJson(halfYearGoals?.goalsJson, []),
+        quarterGoals: safeParseJson(quarterGoals?.goalsJson, []),
+        monthGoals: safeParseJson(monthGoals?.goalsJson, []),
+        weekGoals: safeParseJson(weekGoals?.goalsJson, []),
       },
       userProfile: userProfile
         ? {
@@ -173,10 +174,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(periodEvaluation)
   } catch (error) {
-    console.error('Error evaluating period:', error)
-    return NextResponse.json(
-      { error: 'Failed to evaluate period', details: String(error) },
-      { status: 500 }
-    )
+    return ApiErrors.serverError('Failed to evaluate period', error)
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { PeriodType, getPeriodDates } from '@/lib/dates'
 import { DreamGoal, Goal, GoalTag } from '@/lib/types'
 
@@ -60,6 +60,9 @@ export function useGoals(): UseGoalsReturn {
   const [tags, setTags] = useState<GoalTag[]>([])
   const [processingGoals, setProcessingGoals] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
+
+  // Use ref for processing lock to avoid stale closure issues
+  const processingLockRef = useRef<Set<string>>(new Set())
 
   const currentYear = new Date().getFullYear()
 
@@ -311,20 +314,26 @@ export function useGoals(): UseGoalsReturn {
 
   const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0): Promise<Goal | null> => {
     const lockKey = `${periodKey}-${text}`
-    
-    if (processingGoals.has(lockKey)) return null
-    
+
+    // Use ref-based lock to prevent race conditions across renders
+    if (processingLockRef.current.has(lockKey)) {
+      return null
+    }
+
+    // Check if goal already exists in current state
     const existingGoal = goals.find(g => g.periodKey === periodKey && g.text === text)
     if (existingGoal) return existingGoal
-    
+
+    // Acquire lock
+    processingLockRef.current.add(lockKey)
     setProcessingGoals(prev => new Set(prev).add(lockKey))
-    
+
     try {
       let periodType = 'week'
       if (periodKey.includes('-Q')) periodType = 'quarter'
       else if (periodKey.match(/^\d{4}-\d{2}$/)) periodType = 'month'
       else if (periodKey.includes('-W')) periodType = 'week'
-      
+
       const res = await fetch('/api/goals/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -332,7 +341,13 @@ export function useGoals(): UseGoalsReturn {
       })
       const newGoal = await res.json()
       if (newGoal.id) {
-        setGoals(prev => [...prev, newGoal])
+        setGoals(prev => {
+          // Double-check to prevent duplicates
+          if (prev.some(g => g.periodKey === periodKey && g.text === text)) {
+            return prev
+          }
+          return [...prev, newGoal]
+        })
         const priorityIcons: Record<number, string> = { 0: '⚪', 1: '🟡', 2: '🔴' }
         if (priority > 0) showMessage(`✅ Приоритет установлен: ${priorityIcons[priority]}`)
         return newGoal
@@ -341,6 +356,8 @@ export function useGoals(): UseGoalsReturn {
       console.error('Error creating tracked goal:', error)
       showMessage('❌ Ошибка создания цели')
     } finally {
+      // Release lock
+      processingLockRef.current.delete(lockKey)
       setProcessingGoals(prev => {
         const next = new Set(prev)
         next.delete(lockKey)
@@ -348,7 +365,7 @@ export function useGoals(): UseGoalsReturn {
       })
     }
     return null
-  }, [goals, processingGoals, showMessage])
+  }, [goals, showMessage])
 
   const setGoalPriority = useCallback(async (periodKey: string, text: string, priority: number) => {
     const trackedGoal = goals.find(g => g.periodKey === periodKey && g.text === text)
