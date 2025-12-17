@@ -418,22 +418,7 @@ export function useDaily(): UseDailyReturn {
         setHabits([])
       }
 
-      // Если день пустой — автоматически добавляем привычки в задачи.
-      // Важно: не затираем локальный черновик.
-      const hasPlan = tasks.length > 0 || planText.trim().length > 0
-      if (!hasPlan && loadedHabits.length > 0) {
-        // День пустой — добавляем привычки
-        const habitTasks: OpenTask[] = loadedHabits.map((habit, index) => ({
-          id: index + 1,
-          taskText: habit.taskText,
-          taskType: 'operational' as const,
-          originDate: selectedDate,
-          isClosed: false,
-          createdAt: new Date().toISOString()
-        }))
-        setTasks(habitTasks)
-        // Не сохраняем сразу — пользователь может захотеть что-то добавить
-      }
+      // Привычки НЕ автозаполняют план — пользователь сам добавляет через кнопку "+ Все в план"
 
       // Load habit suggestions
       const suggestionsRes = await fetch(`/api/habits/suggestions?date=${selectedDate}`)

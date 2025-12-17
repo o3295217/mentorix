@@ -260,52 +260,61 @@ export default function DailyPage() {
             </button>
           </div>
 
-          {/* Блок привычек — показываем только те, которых ещё нет в плане */}
-          {(() => {
+          {/* Блок привычек — всегда показываем если есть привычки */}
+          {habits.length > 0 && (() => {
             const taskTextsLower = new Set(tasks.map(t => t.taskText.toLowerCase()))
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
-            
-            if (habitsNotInPlan.length === 0) return null
-            
+
             return (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-amber-900 text-sm">🔄 Привычки на сегодня</h3>
-                  <button
-                    onClick={() => addHabitsToTasks()}
-                    className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors"
-                  >
-                    + Все в план
-                  </button>
+                  {habitsNotInPlan.length > 0 && (
+                    <button
+                      onClick={() => addHabitsToTasks()}
+                      className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors"
+                    >
+                      + Все в план
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {habitsNotInPlan.map((habit) => (
-                    <span 
-                      key={habit.id}
-                      className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 pl-2 pr-1 py-1 rounded-full"
-                    >
-                      <button
-                        onClick={() => addHabitsToTasks([habit.taskText])}
-                        className="hover:text-amber-900 transition-colors"
-                        title="Добавить в план"
+                  {habits.map((habit) => {
+                    const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
+                    return (
+                      <span
+                        key={habit.id}
+                        className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
+                          isInPlan
+                            ? 'bg-green-100 text-green-700 line-through opacity-60'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
                       >
-                        {habit.taskText}
-                        {habit.streak > 0 && <span className="ml-1 text-amber-600">🔥{habit.streak}</span>}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (confirm(`Удалить привычку "${habit.taskText}"?`)) {
-                            deleteHabit(habit.id)
-                          }
-                        }}
-                        className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
-                        title="Удалить привычку"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
+                        <button
+                          onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
+                          className={isInPlan ? 'cursor-default' : 'hover:text-amber-900 transition-colors'}
+                          title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
+                          disabled={isInPlan}
+                        >
+                          {isInPlan && '✓ '}
+                          {habit.taskText}
+                          {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>🔥{habit.streak}</span>}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(`Удалить привычку "${habit.taskText}"?`)) {
+                              deleteHabit(habit.id)
+                            }
+                          }}
+                          className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
+                          title="Удалить привычку"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
             )
