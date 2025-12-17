@@ -12,7 +12,8 @@ type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  
+  const [mounted, setMounted] = useState(false)
+
   // Модальное окно создания привычки
   const [showHabitModal, setShowHabitModal] = useState(false)
   const [habitTaskText, setHabitTaskText] = useState('')
@@ -158,6 +159,11 @@ export default function DailyPage() {
     })
   })()
 
+  // Отмечаем, что компонент смонтирован на клиенте
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -166,7 +172,7 @@ export default function DailyPage() {
       </div>
 
       <p className="text-lg text-gray-600">
-        {format(new Date(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru })}
+        {mounted ? format(new Date(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
       </p>
 
       {/* Context from periods */}
