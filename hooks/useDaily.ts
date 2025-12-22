@@ -171,10 +171,8 @@ export function useDaily(): UseDailyReturn {
     }
   }, [selectedDate])
 
-  useEffect(() => {
-    // Prevent stale state from previous date being persisted under the new date.
-    setHasLoadedOnce(false)
-  }, [selectedDate])
+  // Ref для отслеживания даты при записи черновика (чтобы не записать старые данные под новую дату)
+  const draftDateRef = useRef(selectedDate)
 
   const getPlanDraftKey = useCallback((date: string) => `daily:planDraft:${date}`, [])
 
@@ -435,6 +433,10 @@ export function useDaily(): UseDailyReturn {
 
   useEffect(() => {
     currentDateRef.current = selectedDate
+    // Сначала сбрасываем hasLoadedOnce чтобы предотвратить запись черновика
+    setHasLoadedOnce(false)
+    // Обновляем ref для черновика
+    draftDateRef.current = selectedDate
     // Сбрасываем состояние ДО загрузки данных, чтобы не показывать старые данные
     setDailyEntry(null)
     setPlanText('')
@@ -451,6 +453,9 @@ export function useDaily(): UseDailyReturn {
   // Локальный черновик плана (чтобы не пропадало при refresh)
   useEffect(() => {
     if (!hasLoadedOnce) return
+    // Защита от записи черновика под неправильную дату при быстром переключении
+    if (draftDateRef.current !== selectedDate) return
+    
     const planTextDraft = tasks.length > 0
       ? tasks.map((t) => t.taskText).join('\n')
       : planText
@@ -471,7 +476,7 @@ export function useDaily(): UseDailyReturn {
       newTaskText: newTaskText,
     }
     writePlanDraft(selectedDate, draft)
-  }, [hasLoadedOnce, selectedDate, tasks, selectedTasks, newTaskText, writePlanDraft])
+  }, [hasLoadedOnce, selectedDate, tasks, selectedTasks, newTaskText, planText, writePlanDraft])
 
   const savePlanWithTasks = useCallback(async (
     taskList: OpenTask[] = tasks,
