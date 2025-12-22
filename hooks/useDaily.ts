@@ -261,12 +261,12 @@ export function useDaily(): UseDailyReturn {
   }, [])
 
   const loadData = useCallback(async () => {
-    // Capture the date we're loading for to check later
-    const loadingDate = selectedDate
+    // Используем ref чтобы всегда иметь актуальную дату
+    const loadingDate = currentDateRef.current
 
     try {
       // Load daily entry
-      const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
+      const dailyRes = await fetch(`/api/daily?date=${loadingDate}`)
 
       // Check if date changed during fetch - prevent race condition
       if (currentDateRef.current !== loadingDate) return
@@ -283,7 +283,7 @@ export function useDaily(): UseDailyReturn {
         const daily = await dailyRes.json()
 
         if (daily) {
-          const draft = readPlanDraft(selectedDate)
+          const draft = readPlanDraft(loadingDate)
           const serverUpdatedAtMs = daily.updatedAt ? new Date(daily.updatedAt).getTime() : 0
           const draftUpdatedAtMs = draft?.updatedAt ? new Date(draft.updatedAt).getTime() : 0
 
@@ -302,7 +302,7 @@ export function useDaily(): UseDailyReturn {
           )
           if (!shouldUseDraft && draft) {
             // Серверная версия новее — черновик можно смело убрать
-            clearPlanDraft(selectedDate)
+            clearPlanDraft(loadingDate)
           }
 
           const effectivePlanText = shouldUseDraft ? draft!.planText : (daily.planText || '')
@@ -332,7 +332,7 @@ export function useDaily(): UseDailyReturn {
               id: index + 1,
               taskText: text,
               taskType: 'operational' as const,
-              originDate: selectedDate,
+              originDate: loadingDate,
               isClosed: false,
               createdAt: new Date().toISOString()
             }))
@@ -363,7 +363,7 @@ export function useDaily(): UseDailyReturn {
           setSelectedTasks(new Set())
           setExtraTasks([])
           // На пустой день тоже может быть черновик
-          const draft = readPlanDraft(selectedDate)
+          const draft = readPlanDraft(loadingDate)
           if (draft) {
             setPlanText(draft.planText)
             setNewTaskText(draft.newTaskText || '')
@@ -372,7 +372,7 @@ export function useDaily(): UseDailyReturn {
               id: index + 1,
               taskText: text,
               taskType: 'operational' as const,
-              originDate: selectedDate,
+              originDate: loadingDate,
               isClosed: false,
               createdAt: new Date().toISOString(),
             }))
@@ -383,7 +383,7 @@ export function useDaily(): UseDailyReturn {
       }
 
       // Load week goals
-      const date = new Date(selectedDate)
+      const date = new Date(loadingDate)
       const { start: weekStart } = getPeriodDates(date, 'week')
       const weekRes = await fetch(`/api/goals/period?type=week&date=${weekStart.toISOString()}`)
       if (weekRes.ok) {
@@ -404,7 +404,7 @@ export function useDaily(): UseDailyReturn {
       }
 
       // Load habits for today
-      const habitsRes = await fetch(`/api/habits?date=${selectedDate}`)
+      const habitsRes = await fetch(`/api/habits?date=${loadingDate}`)
       let loadedHabits: Habit[] = []
       if (habitsRes.ok) {
         const habitsData = await habitsRes.json()
@@ -417,7 +417,7 @@ export function useDaily(): UseDailyReturn {
       // Привычки НЕ автозаполняют план — пользователь сам добавляет через кнопку "+ Все в план"
 
       // Load habit suggestions
-      const suggestionsRes = await fetch(`/api/habits/suggestions?date=${selectedDate}`)
+      const suggestionsRes = await fetch(`/api/habits/suggestions?date=${loadingDate}`)
       if (suggestionsRes.ok) {
         const suggestionsData = await suggestionsRes.json()
         setHabitSuggestions(suggestionsData?.suggestions || [])
@@ -429,7 +429,7 @@ export function useDaily(): UseDailyReturn {
     } catch (error) {
       console.error('Error loading data:', error)
     }
-  }, [selectedDate, planText, tasks, readPlanDraft, clearPlanDraft, sanitizeSelectedForTotal])
+  }, [readPlanDraft, clearPlanDraft, sanitizeSelectedForTotal])
 
   useEffect(() => {
     currentDateRef.current = selectedDate
