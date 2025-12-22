@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { parseDateParam } from '@/lib/dates'
+import { parseDateParam, toDateKey } from '@/lib/dates'
 import { splitLines } from '@/lib/fact-utils'
 
 const DailyEntrySchema = z.object({
@@ -23,22 +23,29 @@ export async function GET(request: NextRequest) {
 
     // Get single entry by date
     if (dateStr) {
-      const date = parseDateParam(dateStr)
-      // Search by date range to handle timezone differences
-      // The day starts at local midnight and ends just before next midnight
-      const nextDay = new Date(date)
-      nextDay.setDate(nextDay.getDate() + 1)
-
-      const entry = await prisma.dailyEntry.findFirst({
+      const requestedDateKey = dateStr.match(/^\d{4}-\d{2}-\d{2}$/) 
+        ? dateStr 
+        : toDateKey(parseDateParam(dateStr))
+      
+      // Парсим дату и ищем в диапазоне ±1 день для учёта часовых поясов
+      const localDate = parseDateParam(requestedDateKey)
+      const dayBefore = new Date(localDate)
+      dayBefore.setDate(dayBefore.getDate() - 1)
+      const dayAfter = new Date(localDate)
+      dayAfter.setDate(dayAfter.getDate() + 2)
+      
+      const entries = await prisma.dailyEntry.findMany({
         where: {
           date: {
-            gte: date,
-            lt: nextDay,
+            gte: dayBefore,
+            lt: dayAfter,
           },
         },
         include: { evaluation: true },
-        orderBy: { date: 'desc' }, // Get the most recent if duplicates exist
       })
+      
+      // Фильтруем по локальной дате
+      const entry = entries.find(e => toDateKey(e.date) === requestedDateKey)
 
       return NextResponse.json(entry || null)
     }
