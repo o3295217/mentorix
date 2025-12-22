@@ -435,6 +435,16 @@ export function useDaily(): UseDailyReturn {
 
   useEffect(() => {
     currentDateRef.current = selectedDate
+    // Сбрасываем состояние ДО загрузки данных, чтобы не показывать старые данные
+    setDailyEntry(null)
+    setPlanText('')
+    setFactText('')
+    setTasks([])
+    setSelectedTasks(new Set())
+    setExtraTasks([])
+    setNewTaskText('')
+    setChatMessages([])
+    setCheckPlanResult(null)
     loadData()
   }, [selectedDate]) // Intentionally not including loadData to prevent infinite loops
 
