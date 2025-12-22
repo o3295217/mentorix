@@ -7,6 +7,7 @@ import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { z } from 'zod'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
+import { recalculateUserStats } from '@/lib/user-stats'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
@@ -287,6 +288,13 @@ export async function POST(request: NextRequest) {
     } catch (insightsError) {
       // Не прерываем оценку если обновление профиля не удалось
       console.error('[UserInsights] Failed to update profile:', insightsError)
+    }
+
+    // === ОБНОВЛЕНИЕ НАКОПИТЕЛЬНОЙ СТАТИСТИКИ ===
+    try {
+      await recalculateUserStats()
+    } catch (statsError) {
+      console.error('[UserStats] Failed to recalculate stats:', statsError)
     }
 
     return NextResponse.json(evaluation)

@@ -374,10 +374,8 @@ export default function MonthSection({
                   const isCurrentWeek = today >= week.start && today <= week.end
                   const isDragOver = dragOverWeek === weekKey
 
-                  // Скрываем пустые недели
-                  if (weekGoals.length === 0 && !showAllPeriods && !isCurrentWeek && !draggedGoal) {
-                    return null
-                  }
+                  // Все недели текущего месяца всегда отображаются
+                  // (раньше пустые скрывались, но это мешало добавлению целей)
 
                   const weekProgress = calculateWeekProgress(weekKey)
 
@@ -415,7 +413,7 @@ export default function MonthSection({
                         <div className="flex flex-col flex-1">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">
-                              {week.start.getDate()}-{week.end.getDate()}
+                              {week.start.getDate()}{week.end.getMonth() !== week.start.getMonth() ? ` - ${week.end.getDate()}.${String(week.end.getMonth() + 1).padStart(2, '0')}` : `-${week.end.getDate()}`}
                             </span>
                             {weekProgress.total > 0 && (
                               <span className="text-xs text-gray-400">{weekProgress.completed}/{weekProgress.total}</span>
@@ -493,12 +491,17 @@ export default function MonthSection({
                               <div
                                 key={index}
                                 draggable
-                                onDragStart={() => setDraggedGoal({ weekKey, index, goal })}
+                                onDragStart={(e) => {
+                                  e.dataTransfer.effectAllowed = 'move'
+                                  e.dataTransfer.setData('text/plain', goal)
+                                  setDraggedGoal({ weekKey, index, goal })
+                                }}
                                 onDragEnd={() => {
                                   setDraggedGoal(null)
                                   setDragOverWeek(null)
                                 }}
-                                className={`p-1.5 rounded-lg border shadow-sm cursor-grab active:cursor-grabbing transition-all ${
+                                style={{ touchAction: 'none', userSelect: 'none' }}
+                                className={`p-1.5 rounded-lg border shadow-sm cursor-grab active:cursor-grabbing transition-all select-none ${
                                   isDragging ? 'opacity-50 scale-95' : 'hover:shadow-md'
                                 } ${isCompleted ? 'bg-green-50/80 border-green-200' : isDeadlineOverdue ? 'bg-red-50/80 border-red-300' : 'bg-white/80 border-gray-100 hover:border-gray-200'}`}
                               >
@@ -537,6 +540,8 @@ export default function MonthSection({
                                       type="checkbox"
                                       checked={isCompleted}
                                       disabled={isProcessing}
+                                      draggable={false}
+                                      onMouseDown={(e) => e.stopPropagation()}
                                       onChange={(e) => {
                                         e.stopPropagation()
                                         if (isProcessing) return
@@ -574,6 +579,8 @@ export default function MonthSection({
                                   <select
                                     value={goalPriority}
                                     disabled={isProcessing}
+                                    draggable={false}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onChange={(e) => {
                                       e.stopPropagation()
                                       if (isProcessing) return
@@ -587,6 +594,8 @@ export default function MonthSection({
                                     <option value="2">🔴</option>
                                   </select>
                                   <button
+                                    draggable={false}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onClick={() => {
                                       setEditingWeekGoal({ weekKey, index })
                                       setEditingWeekText(goal)
@@ -597,6 +606,8 @@ export default function MonthSection({
                                     ✏️
                                   </button>
                                   <button
+                                    draggable={false}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onClick={() => onRemoveWeekGoal(weekKey, index)}
                                     className="text-red-400 hover:text-red-600 text-xs px-1 hover:bg-red-50 rounded transition-colors"
                                   >

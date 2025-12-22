@@ -367,7 +367,7 @@ export default function DailyPage() {
                     selectedTasks.has(task.id)
                       ? 'bg-green-50 border-green-300'
                       : savedFlags[index]
-                        ? 'bg-green-50 border-green-200 hover:border-green-300'
+                        ? 'bg-white border-gray-200 hover:border-gray-300'
                         : 'bg-white border-gray-200 hover:border-gray-300 opacity-60'
                   } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                 >

@@ -5,6 +5,7 @@ import { format, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { OpenTask } from '@/lib/types'
 import { parseDateParam } from '@/lib/dates'
+import { areTasksSimilar } from '@/lib/task-match'
 
 export default function TasksPage() {
   const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
@@ -100,9 +101,37 @@ export default function TasksPage() {
       const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
       const daily = dailyRes.ok ? await dailyRes.json() : null
       
-      // Добавляем задачу к плану
+      // Получаем текущие задачи из planText
       const currentPlan = daily?.planText || ''
-      const newPlan = currentPlan ? `${currentPlan}\n${selectedTask.taskText}` : selectedTask.taskText
+      const planTasks = currentPlan ? currentPlan.split('\n').filter((t: string) => t.trim()) : []
+      
+      // Получаем extraTasks для проверки дубликатов
+      let currentExtraTasks: string[] = []
+      if (daily?.extraTasksJson) {
+        try {
+          currentExtraTasks = JSON.parse(daily.extraTasksJson)
+        } catch {
+          currentExtraTasks = []
+        }
+      }
+      
+      // Проверяем planText на похожие задачи
+      const existsInPlan = planTasks.some((t: string) => areTasksSimilar(t, selectedTask.taskText))
+      
+      // Проверяем extraTasks на похожие задачи
+      const existsInExtra = currentExtraTasks.some(t => areTasksSimilar(t, selectedTask.taskText))
+      
+      if (existsInPlan || existsInExtra) {
+        setMessage('ℹ️ Похожая задача уже есть в плане на этот день')
+        setTimeout(() => setMessage(''), 3000)
+        setShowDateModal(false)
+        return
+      }
+      
+      // Добавляем задачу в основной план (planText)
+      const newPlanText = currentPlan 
+        ? `${currentPlan}\n${selectedTask.taskText}` 
+        : selectedTask.taskText
       
       // Сохраняем обновленный план
       const saveRes = await fetch('/api/daily', {
@@ -110,7 +139,7 @@ export default function TasksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate,
-          planText: newPlan,
+          planText: newPlanText,
         }),
       })
       

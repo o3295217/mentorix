@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { format } from 'date-fns'
 import { getPeriodDates } from '@/lib/dates'
 import { DailyEntry, OpenTask } from '@/lib/types'
+import { areTasksSimilar } from '@/lib/task-match'
 
 type DailyPlanDraft = {
   updatedAt: string
@@ -124,11 +125,8 @@ interface UseDailyReturn {
 }
 
 export function useDaily(): UseDailyReturn {
+  // Всегда начинаем с текущей даты при открытии страницы
   const [selectedDate, setSelectedDate] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem('daily:selectedDate')
-      if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved
-    }
     return format(new Date(), 'yyyy-MM-dd')
   })
   const [planText, setPlanText] = useState('')
@@ -528,9 +526,15 @@ export function useDaily(): UseDailyReturn {
     const text = newExtraTaskText.trim()
     if (!text) return
 
-    const existingLower = new Set(extraTasks.map(t => t.toLowerCase()))
-    if (existingLower.has(text.toLowerCase())) {
-      showMessage('ℹ️ Уже добавлено во внеплан', 2000)
+    // Проверяем дубликаты в extraTasks
+    if (extraTasks.some(t => areTasksSimilar(t, text))) {
+      showMessage('ℹ️ Похожая задача уже добавлена во внеплан', 2000)
+      setNewExtraTaskText('')
+      return
+    }
+    // Также проверяем в основных задачах
+    if (tasks.some(t => areTasksSimilar(t.taskText, text))) {
+      showMessage('ℹ️ Похожая задача уже есть в плане', 2000)
       setNewExtraTaskText('')
       return
     }
@@ -539,7 +543,7 @@ export function useDaily(): UseDailyReturn {
     setExtraTasks(updated)
     setNewExtraTaskText('')
     void saveExtraTasks(updated)
-  }, [newExtraTaskText, extraTasks, saveExtraTasks, showMessage])
+  }, [newExtraTaskText, extraTasks, tasks, saveExtraTasks, showMessage])
 
   const removeExtraTask = useCallback((index: number) => {
     const updated = extraTasks.filter((_, i) => i !== index)
@@ -591,29 +595,53 @@ export function useDaily(): UseDailyReturn {
   }, [])
 
   const addTask = useCallback(() => {
-    if (!newTaskText.trim()) return
-    const updatedTexts = [...tasks.map((t) => t.taskText), newTaskText.trim()]
+    const text = newTaskText.trim()
+    if (!text) return
+    
+    // Проверяем дубликаты в tasks
+    if (tasks.some(t => areTasksSimilar(t.taskText, text))) {
+      showMessage('Похожая задача уже есть в плане')
+      return
+    }
+    // Проверяем дубликаты в extraTasks
+    if (extraTasks.some(t => areTasksSimilar(t, text))) {
+      showMessage('Похожая задача уже есть во внеплане')
+      return
+    }
+    
+    const updatedTexts = [...tasks.map((t) => t.taskText), text]
     const updatedTasks = buildTasksFromTexts(updatedTexts)
     const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
     setNewTaskText('')
-  }, [newTaskText, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
+    // Сохраняем в БД
+    void savePlanWithTasks(updatedTasks, updatedSelected)
+  }, [newTaskText, tasks, selectedTasks, extraTasks, buildTasksFromTexts, remapSelectionByText, showMessage, savePlanWithTasks])
 
   const addGoalToTasks = useCallback((goalText: string) => {
     if (!goalText.trim()) return
-    // Проверяем, нет ли уже такой задачи
-    if (tasks.some(t => t.taskText === goalText.trim())) {
-      showMessage('Эта задача уже добавлена')
+    const trimmedGoal = goalText.trim()
+    // Проверяем, нет ли уже такой или похожей задачи
+    const existingTask = tasks.find(t => areTasksSimilar(t.taskText, trimmedGoal))
+    if (existingTask) {
+      showMessage('Похожая задача уже есть в плане')
       return
     }
-    const updatedTexts = [...tasks.map((t) => t.taskText), goalText.trim()]
+    // Также проверяем в extraTasks
+    if (extraTasks.some(t => areTasksSimilar(t, trimmedGoal))) {
+      showMessage('Похожая задача уже есть в плане')
+      return
+    }
+    const updatedTexts = [...tasks.map((t) => t.taskText), trimmedGoal]
     const updatedTasks = buildTasksFromTexts(updatedTexts)
     const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
     showMessage('Цель добавлена в план')
-  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, showMessage])
+    // Сохраняем в БД
+    void savePlanWithTasks(updatedTasks, updatedSelected)
+  }, [tasks, selectedTasks, extraTasks, buildTasksFromTexts, remapSelectionByText, showMessage, savePlanWithTasks])
 
   // Добавить привычки в задачи
   const addHabitsToTasks = useCallback((habitTexts?: string[]) => {
@@ -696,7 +724,9 @@ export function useDaily(): UseDailyReturn {
     const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
-  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
+    // Сохраняем изменения в БД
+    void savePlanWithTasks(updatedTasks, updatedSelected)
+  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, savePlanWithTasks])
 
   const toggleTaskSelection = useCallback((taskId: number) => {
     const newSelected = new Set(selectedTasks)

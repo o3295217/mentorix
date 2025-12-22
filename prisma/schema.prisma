@@ -355,3 +355,50 @@ model UserInsights {
 
   @@map("user_insights")
 }
+
+// Накопительная статистика пользователя (обновляется после каждой оценки дня)
+model UserStats {
+  id              Int      @id @default(autoincrement())
+  
+  // Общая статистика
+  totalDays       Int      @default(0)  // Сколько дней оценено
+  totalPlanned    Int      @default(0)  // Всего задач запланировано
+  totalCompleted  Int      @default(0)  // Всего задач выполнено
+  avgCompletionPct Float   @default(0)  // Средний % выполнения
+  avgDailyScore   Float    @default(0)  // Средняя оценка дня
+  
+  // Статистика по дням недели (JSON: {"mon": 75, "tue": 80, ...})
+  completionByDayJson String @default("{}")
+  
+  // Статистика по типам задач (JSON: {"привычки": 95, "оперативки": 70, "стратегические": 50})
+  completionByTypeJson String @default("{}")
+  
+  // Часто выполняемые формулировки (JSON array: ["подъём", "зарядка", "оперативка"])
+  frequentCompletedJson String @default("[]")
+  
+  // Часто НЕвыполняемые формулировки (JSON array: ["бюджет", "презентация"])
+  frequentFailedJson String @default("[]")
+  
+  // Привычки: streak и стабильность
+  habitsAvgCompletion Float @default(0)  // Средний % выполнения привычек
+  
+  // Тренды (последние 30 дней vs предыдущие 30)
+  trendDirection  String?  // "improving", "declining", "stable"
+  trendPct        Float    @default(0)   // На сколько % изменилась эффективность
+  
+  // Лучший/худший день недели
+  bestDayOfWeek   String?  // "понедельник"
+  worstDayOfWeek  String?  // "пятница"
+  
+  // Оптимальное количество задач (при котором max выполнение)
+  optimalTaskCount Int     @default(5)
+  
+  // Серии
+  currentStreak   Int      @default(0)   // Сколько дней подряд планирует
+  bestStreak      Int      @default(0)   // Максимальная серия
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("user_stats")
+}
