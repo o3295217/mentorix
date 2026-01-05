@@ -1,6 +1,6 @@
 # АРХИТЕКТУРА ПРОЕКТА: AI Effectiveness Assistant
 
-> Техническая документация для разработчиков. Актуальность: декабрь 2025.
+> Техническая документация для разработчиков. Актуальность: январь 2026.
 
 ---
 
@@ -79,23 +79,28 @@ ai-assistant-spec/
 │   ├── Speedometer.tsx       # Прогресс к мечте
 │   ├── BalanceFlags.tsx      # Флаги баланса
 │   ├── DreamProgress.tsx
+│   ├── ProgressIndicator.tsx # Индикатор прогресса на Dashboard
 │   ├── Navigation.tsx
 │   ├── ThemeProvider.tsx
+│   ├── ThemeToggle.tsx       # Переключатель темы
 │   └── Providers.tsx
 ├── hooks/                    # React Custom Hooks
-│   ├── useDaily.ts           # Логика дневного планирования (~800 строк)
+│   ├── index.ts              # Реэкспорт хуков
+│   ├── useDaily.ts           # Логика дневного планирования (~1100 строк)
 │   ├── useGoals.ts           # Управление целями (~500 строк)
 │   ├── useGoalsCopy.ts       # Копирование целей между периодами
-│   └── useForecast.ts        # Логика прогнозов
+│   └── useForecast.ts        # Логика прогнозов (~224 строки)
 ├── lib/                      # Утилиты и конфигурация
 │   ├── prisma.ts             # Prisma Client singleton
-│   ├── anthropic.ts          # Claude API integration (~600 строк)
+│   ├── anthropic.ts          # Claude API integration (~575 строк)
 │   ├── api-utils.ts          # API утилиты, безопасность
 │   ├── dates.ts              # Работа с датами
 │   ├── fact-utils.ts         # Утилиты для фактов
 │   ├── goals-utils.ts        # Утилиты для целей
+│   ├── rate-limit.ts         # Rate limiting для API
 │   ├── task-match.ts         # Определение похожих задач
 │   ├── types.ts              # TypeScript типы
+│   ├── user-stats.ts         # Накопительная статистика (~437 строк)
 │   └── prompts/              # AI промпты
 │       ├── core.ts           # Базовые константы
 │       ├── daily.ts          # Промпт оценки дня
@@ -313,6 +318,42 @@ model UserInsights {
   updatedAt       DateTime @updatedAt
   createdAt       DateTime @default(now())
 }
+
+// НАКОПИТЕЛЬНАЯ СТАТИСТИКА ПОЛЬЗОВАТЕЛЯ
+model UserStats {
+  id                    Int      @id @default(autoincrement())
+  totalDays             Int      @default(0)   // Всего оценённых дней
+  totalPlanned          Int      @default(0)   // Всего запланировано задач
+  totalCompleted        Int      @default(0)   // Всего выполнено задач
+  avgCompletionPct      Float    @default(0)   // Средний % выполнения
+  avgDailyScore         Float    @default(0)   // Средняя оценка дня
+  completionByDayJson   String   @default("{}") // По дням недели
+  completionByTypeJson  String   @default("{}") // По типам задач
+  frequentCompletedJson String   @default("[]") // Часто выполняемые
+  frequentFailedJson    String   @default("[]") // Часто проваливаемые
+  habitsAvgCompletion   Float    @default(0)   // Средний % привычек
+  trendDirection        String?  // up, down, stable
+  trendPct              Float    @default(0)   // % изменения тренда
+  bestDayOfWeek         String?  // Лучший день недели
+  worstDayOfWeek        String?  // Худший день недели
+  optimalTaskCount      Int      @default(5)   // Оптимальное кол-во задач
+  currentStreak         Int      @default(0)   // Текущий streak
+  bestStreak            Int      @default(0)   // Лучший streak
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// КОНТЕКСТ МИРА (внешние события)
+model WorldContext {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @unique
+  marketEvents   String?  // Рыночные события
+  personalEvents String?  // Личные события
+  constraints    String?  // Ограничения
+  notes          String?  // Заметки
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
 ```
 
 ### Индексы для производительности
@@ -407,7 +448,7 @@ export async function POST(request: NextRequest) {
 
 ## 5. REACT HOOKS
 
-### useDaily.ts (~800 строк)
+### useDaily.ts (~1100 строк)
 
 **Назначение:** Управление дневным планированием
 
@@ -578,6 +619,42 @@ export function areTasksSimilar(aText: string, bText: string): boolean
 // - tokens() — разбивка на токены, фильтрация стоп-слов
 // - jaccard() — Jaccard similarity coefficient
 // Threshold: 0.6 (60% совпадения токенов)
+```
+
+### lib/rate-limit.ts
+
+**Назначение:** Rate limiting для API (защита от злоупотреблений)
+
+```typescript
+// Sliding window algorithm
+export function checkRateLimit(identifier: string, options: RateLimitOptions): RateLimitResult
+export function getClientIdentifier(request: Request): string
+
+// Предустановленные лимиты
+export const rateLimiters = {
+  ai: { limit: 20, windowMs: 60000 },      // 20 AI запросов в минуту
+  api: { limit: 100, windowMs: 60000 },    // 100 обычных запросов в минуту
+}
+```
+
+### lib/user-stats.ts
+
+**Назначение:** Накопительная статистика пользователя (~437 строк)
+
+```typescript
+// Пересчёт всей статистики
+export async function recalculateUserStats(): Promise<void>
+
+// Получение статистики для AI промптов
+export async function getUserStatsForAI(): Promise<string>
+
+// Статистика включает:
+// - Общее количество дней и задач
+// - Средний % выполнения
+// - Лучший/худший день недели
+// - Часто выполняемые/проваливаемые задачи
+// - Тренд (up/down/stable)
+// - Streak (текущий и лучший)
 ```
 
 ### lib/prompts/
@@ -915,6 +992,26 @@ if (!validation.success) {
 
 ## CHANGELOG АРХИТЕКТУРЫ
 
+### 6 января 2026
+- **Удалён `factText`** — факт теперь определяется через `selectedTasksJson` (отмеченные чекбоксы)
+- **Добавлен `hasUnsavedChanges`** — индикатор несохранённых изменений плана
+- **Изменена логика сохранения**:
+  - План (добавление/редактирование/удаление задач) → сохраняется по кнопке "Сохранить план"
+  - Чекбоксы → автосохранение (сразу в БД)
+- **Исправлен race condition** — `hasLoadedOnceRef` теперь ref вместо state для синхронного обновления при смене даты
+- Убраны функции `saveFact()` и `transferCompletedTasks()`
+- Обновлён UI кнопки "Сохранить план" с индикатором ⚠️
+
+### Январь 2026
+- Добавлен `lib/rate-limit.ts` — Rate limiting для AI endpoints
+- Добавлен `lib/user-stats.ts` — накопительная статистика пользователя
+- Добавлена модель `UserStats` — хранение статистики в БД
+- Добавлена модель `WorldContext` — внешние события и контекст
+- Добавлен `ProgressIndicator.tsx` — индикатор прогресса на Dashboard
+- Добавлен `ThemeToggle.tsx` — переключатель темы
+- `useDaily.ts` расширен до ~1100 строк
+- Обновлена документация
+
 ### Декабрь 2025
 - Добавлен `lib/api-utils.ts` — безопасность и утилиты
 - Добавлен `lib/task-match.ts` — определение похожих задач
@@ -925,4 +1022,4 @@ if (!validation.success) {
 
 ---
 
-*Последнее обновление: 17 декабря 2025*
+*Последнее обновление: 6 января 2026*

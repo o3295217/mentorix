@@ -60,8 +60,6 @@ interface UseDailyReturn {
   setSelectedDate: (date: string) => void
   planText: string
   setPlanText: (text: string) => void
-  factText: string
-  setFactText: (text: string) => void
   weekGoals: string[]
   monthGoals: string[]
   dailyEntry: DailyEntry | null
@@ -75,6 +73,7 @@ interface UseDailyReturn {
   saving: boolean
   evaluating: boolean
   message: string
+  hasUnsavedChanges: boolean
   
   // Habits
   habits: Habit[]
@@ -119,8 +118,6 @@ interface UseDailyReturn {
   
   // Save operations
   savePlan: () => Promise<void>
-  saveFact: () => Promise<void>
-  transferCompletedTasks: () => void
   evaluate: (router: { push: (path: string) => void }) => Promise<void>
 }
 
@@ -130,7 +127,6 @@ export function useDaily(): UseDailyReturn {
     return format(new Date(), 'yyyy-MM-dd')
   })
   const [planText, setPlanText] = useState('')
-  const [factText, setFactText] = useState('')
   const [weekGoals, setWeekGoals] = useState<string[]>([])
   const [monthGoals, setMonthGoals] = useState<string[]>([])
   const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
@@ -142,6 +138,7 @@ export function useDaily(): UseDailyReturn {
   const [saving, setSaving] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [message, setMessage] = useState('')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editingTaskText, setEditingTaskText] = useState('')
@@ -157,7 +154,8 @@ export function useDaily(): UseDailyReturn {
   const [habits, setHabits] = useState<Habit[]>([])
   const [habitSuggestions, setHabitSuggestions] = useState<HabitSuggestion[]>([])
 
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  // Используем ref вместо state для синхронного обновления (race condition при смене даты)
+  const hasLoadedOnceRef = useRef(false)
 
   // Track the current date to prevent race conditions when switching dates quickly
   const currentDateRef = useRef(selectedDate)
@@ -263,19 +261,22 @@ export function useDaily(): UseDailyReturn {
   const loadData = useCallback(async () => {
     // Используем ref чтобы всегда иметь актуальную дату
     const loadingDate = currentDateRef.current
+    console.log('[useDaily] loadData started for:', loadingDate)
 
     try {
       // Load daily entry
       const dailyRes = await fetch(`/api/daily?date=${loadingDate}`)
 
       // Check if date changed during fetch - prevent race condition
-      if (currentDateRef.current !== loadingDate) return
+      if (currentDateRef.current !== loadingDate) {
+        console.log('[useDaily] Date changed during fetch, aborting. Was:', loadingDate, 'Now:', currentDateRef.current)
+        return
+      }
 
       if (!dailyRes.ok) {
         console.error('Failed to fetch daily entry:', dailyRes.status)
         setDailyEntry(null)
         setPlanText('')
-        setFactText('')
         setTasks([])
         setSelectedTasks(new Set())
         setExtraTasks([])
@@ -295,23 +296,37 @@ export function useDaily(): UseDailyReturn {
             (draft.newTaskText?.trim().length || 0) > 0
           )
 
-          // Never let an empty draft override a non-empty saved plan.
+          // Использовать черновик только если:
+          // 1. Черновик не пустой
+          // 2. Сервер пустой ИЛИ (черновик новее И текст черновика отличается от сервера)
+          // Это защищает от ситуации когда черновик от другой даты случайно записался под эту дату
+          const draftDiffersFromServer = draftPlanText !== serverPlanText
           const shouldUseDraft = draftHasAnything && (
             serverPlanText.length === 0 ||
-            (!serverUpdatedAtMs || draftUpdatedAtMs > serverUpdatedAtMs)
+            (draftDiffersFromServer && draftUpdatedAtMs > serverUpdatedAtMs)
           )
+          
+          console.log('[useDaily] loadData for', loadingDate, {
+            hasDraft: !!draft,
+            draftHasAnything,
+            draftDiffersFromServer,
+            shouldUseDraft,
+            serverPlanText: serverPlanText.substring(0, 50),
+            draftPlanText: draftPlanText.substring(0, 50),
+            serverUpdatedAtMs,
+            draftUpdatedAtMs,
+          })
+          
           if (!shouldUseDraft && draft) {
             // Серверная версия новее — черновик можно смело убрать
             clearPlanDraft(loadingDate)
           }
 
           const effectivePlanText = shouldUseDraft ? draft!.planText : (daily.planText || '')
-          const effectiveFactText = daily.factText || ''
           const effectiveNewTaskText = shouldUseDraft ? (draft!.newTaskText || '') : ''
 
           setDailyEntry(daily)
           setPlanText(effectivePlanText)
-          setFactText(effectiveFactText)
           setNewTaskText(effectiveNewTaskText)
 
           // Extra tasks (перевыполнение)
@@ -358,7 +373,6 @@ export function useDaily(): UseDailyReturn {
         } else {
           setDailyEntry(null)
           setPlanText('')
-          setFactText('')
           setTasks([])
           setSelectedTasks(new Set())
           setExtraTasks([])
@@ -425,7 +439,7 @@ export function useDaily(): UseDailyReturn {
         setHabitSuggestions([])
       }
 
-      setHasLoadedOnce(true)
+      hasLoadedOnceRef.current = true
     } catch (error) {
       console.error('Error loading data:', error)
     }
@@ -433,14 +447,13 @@ export function useDaily(): UseDailyReturn {
 
   useEffect(() => {
     currentDateRef.current = selectedDate
-    // Сначала сбрасываем hasLoadedOnce чтобы предотвратить запись черновика
-    setHasLoadedOnce(false)
+    // Синхронно сбрасываем флаг чтобы предотвратить запись черновика
+    hasLoadedOnceRef.current = false
     // Обновляем ref для черновика
     draftDateRef.current = selectedDate
     // Сбрасываем состояние ДО загрузки данных, чтобы не показывать старые данные
     setDailyEntry(null)
     setPlanText('')
-    setFactText('')
     setTasks([])
     setSelectedTasks(new Set())
     setExtraTasks([])
@@ -452,7 +465,7 @@ export function useDaily(): UseDailyReturn {
 
   // Локальный черновик плана (чтобы не пропадало при refresh)
   useEffect(() => {
-    if (!hasLoadedOnce) return
+    if (!hasLoadedOnceRef.current) return
     // Защита от записи черновика под неправильную дату при быстром переключении
     if (draftDateRef.current !== selectedDate) return
     
@@ -476,7 +489,7 @@ export function useDaily(): UseDailyReturn {
       newTaskText: newTaskText,
     }
     writePlanDraft(selectedDate, draft)
-  }, [hasLoadedOnce, selectedDate, tasks, selectedTasks, newTaskText, planText, writePlanDraft])
+  }, [selectedDate, tasks, selectedTasks, newTaskText, planText, writePlanDraft])
 
   const savePlanWithTasks = useCallback(async (
     taskList: OpenTask[] = tasks,
@@ -630,9 +643,9 @@ export function useDaily(): UseDailyReturn {
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
     setNewTaskText('')
-    // Сохраняем в БД
-    void savePlanWithTasks(updatedTasks, updatedSelected)
-  }, [newTaskText, tasks, selectedTasks, extraTasks, buildTasksFromTexts, remapSelectionByText, showMessage, savePlanWithTasks])
+    // Отмечаем, что есть несохранённые изменения
+    setHasUnsavedChanges(true)
+  }, [newTaskText, tasks, selectedTasks, extraTasks, buildTasksFromTexts, remapSelectionByText, showMessage])
 
   const addGoalToTasks = useCallback((goalText: string) => {
     if (!goalText.trim()) return
@@ -654,9 +667,9 @@ export function useDaily(): UseDailyReturn {
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
     showMessage('Цель добавлена в план')
-    // Сохраняем в БД
-    void savePlanWithTasks(updatedTasks, updatedSelected)
-  }, [tasks, selectedTasks, extraTasks, buildTasksFromTexts, remapSelectionByText, showMessage, savePlanWithTasks])
+    // Отмечаем, что есть несохранённые изменения
+    setHasUnsavedChanges(true)
+  }, [tasks, selectedTasks, extraTasks, buildTasksFromTexts, remapSelectionByText, showMessage])
 
   // Добавить привычки в задачи
   const addHabitsToTasks = useCallback((habitTexts?: string[]) => {
@@ -739,9 +752,9 @@ export function useDaily(): UseDailyReturn {
     const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
-    // Сохраняем изменения в БД
-    void savePlanWithTasks(updatedTasks, updatedSelected)
-  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, savePlanWithTasks])
+    // Отмечаем, что есть несохранённые изменения
+    setHasUnsavedChanges(true)
+  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const toggleTaskSelection = useCallback((taskId: number) => {
     const newSelected = new Set(selectedTasks)
@@ -774,6 +787,8 @@ export function useDaily(): UseDailyReturn {
     setSelectedTasks(updatedSelected)
     setEditingTaskId(null)
     setEditingTaskText('')
+    // Отмечаем, что есть несохранённые изменения
+    setHasUnsavedChanges(true)
   }, [editingTaskText, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const cancelEditingTask = useCallback(() => {
@@ -812,54 +827,10 @@ export function useDaily(): UseDailyReturn {
   const savePlan = useCallback(async () => {
     setSaving(true)
     await savePlanWithTasks()
+    setHasUnsavedChanges(false)
     showMessage('✅ План сохранен!')
     setSaving(false)
   }, [savePlanWithTasks, showMessage])
-
-  const saveFact = useCallback(async () => {
-    setSaving(true)
-    try {
-      const res = await fetch('/api/daily', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: selectedDate,
-          factText,
-        }),
-      })
-
-      const data = await res.json()
-      setDailyEntry(data)
-      showMessage('✅ Факт сохранен!')
-    } catch (error) {
-      console.error('Error saving fact:', error)
-      showMessage('❌ Ошибка при сохранении')
-    } finally {
-      setSaving(false)
-    }
-  }, [selectedDate, factText, showMessage])
-
-  const transferCompletedTasks = useCallback(() => {
-    if (selectedTasks.size === 0) {
-      showMessage('ℹ️ Выберите задачи для переноса', 2000)
-      return
-    }
-
-    const tasksToTransfer: string[] = []
-    tasks.forEach((task) => {
-      if (selectedTasks.has(task.id)) {
-        tasksToTransfer.push(task.taskText)
-      }
-    })
-
-    const currentFact = factText.trim()
-    const newFact = currentFact
-      ? `${currentFact}\n${tasksToTransfer.join('\n')}`
-      : tasksToTransfer.join('\n')
-    setFactText(newFact)
-
-    showMessage(`✅ Перенесено ${tasksToTransfer.length} ${tasksToTransfer.length === 1 ? 'задача' : tasksToTransfer.length < 5 ? 'задачи' : 'задач'}`)
-  }, [selectedTasks, tasks, factText, showMessage])
 
   // Проверка плана ИИ
   const checkPlan = useCallback(async () => {
@@ -991,7 +962,6 @@ export function useDaily(): UseDailyReturn {
           body: JSON.stringify({
             date: selectedDate,
             planText: planTextToSave,
-            factText,
             selectedTasksJson: JSON.stringify(Array.from(selectedTasks)),
           }),
         })
@@ -1030,15 +1000,13 @@ export function useDaily(): UseDailyReturn {
     } finally {
       setEvaluating(false)
     }
-  }, [factText, dailyEntry, tasks, selectedDate, selectedTasks, extraTasks, showMessage])
+  }, [dailyEntry, tasks, selectedDate, selectedTasks, extraTasks, showMessage])
 
   return {
     selectedDate,
     setSelectedDate,
     planText,
     setPlanText,
-    factText,
-    setFactText,
     weekGoals,
     monthGoals,
     dailyEntry,
@@ -1052,6 +1020,7 @@ export function useDaily(): UseDailyReturn {
     saving,
     evaluating,
     message,
+    hasUnsavedChanges,
     checkingPlan,
     checkPlanResult,
     checkPlan,
@@ -1079,8 +1048,6 @@ export function useDaily(): UseDailyReturn {
     handleDragOver,
     handleDrop,
     savePlan,
-    saveFact,
-    transferCompletedTasks,
     evaluate,
     // Habits
     habits,

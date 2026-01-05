@@ -36,6 +36,7 @@ export default function DailyPage() {
     saving,
     evaluating,
     message,
+    hasUnsavedChanges,
     chatMessages,
     chatInput,
     setChatInput,
@@ -237,7 +238,7 @@ export default function DailyPage() {
                 'bg-gray-100 text-gray-600'
               }`}>
                 ✅ {completedCount}/{totalCount} ({completionPercent}%)
-                {extraDoneCount > 0 && ` • ➕ +${extraDoneCount}`}
+                {extraDoneCount > 0 && ` +${extraDoneCount}`}
               </span>
             )}
           </div>
@@ -499,9 +500,9 @@ export default function DailyPage() {
             <button 
               onClick={savePlan} 
               disabled={saving} 
-              className="btn-primary disabled:opacity-50 text-sm py-2"
+              className={`btn-primary disabled:opacity-50 text-sm py-2 ${hasUnsavedChanges ? 'ring-2 ring-orange-400 ring-offset-2' : ''}`}
             >
-              {saving ? '...' : '💾 Сохранить план'}
+              {saving ? '...' : hasUnsavedChanges ? '⚠️ Сохранить план' : '💾 Сохранить план'}
             </button>
             <button 
               onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации. Какие задачи из целей недели/месяца я мог бы ещё добавить?')}
