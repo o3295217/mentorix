@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { parseDateParam, toDateKey } from '@/lib/dates'
 import { splitLines } from '@/lib/fact-utils'
+import { requireUserId } from '@/lib/get-user-id'
 
 const DailyEntrySchema = z.object({
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -16,6 +17,7 @@ const DailyEntrySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const dateStr = searchParams.get('date')
     const from = searchParams.get('from')
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
       
       const entries = await prisma.dailyEntry.findMany({
         where: {
+          userId,
           date: {
             gte: dayBefore,
             lt: dayAfter,
@@ -54,6 +57,7 @@ export async function GET(request: NextRequest) {
     if (from && to) {
       const entries = await prisma.dailyEntry.findMany({
         where: {
+          userId,
           date: {
             gte: parseDateParam(from),
             lte: parseDateParam(to),
@@ -75,6 +79,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     // Validate input using Zod
@@ -90,8 +95,8 @@ export async function POST(request: NextRequest) {
     const { date, planText, factText, selectedTasksJson, extraTasksJson } = validation.data
     const entryDate = parseDateParam(date)
 
-    const existing = await prisma.dailyEntry.findUnique({
-      where: { date: entryDate },
+    const existing = await prisma.dailyEntry.findFirst({
+      where: { userId, date: entryDate },
       select: { id: true, planSnapshotJson: true },
     })
 
@@ -100,25 +105,30 @@ export async function POST(request: NextRequest) {
     const planSnapshotJson = shouldSetSnapshot ? JSON.stringify(planLines) : undefined
 
     // Upsert daily entry
-    const entry = await prisma.dailyEntry.upsert({
-      where: { date: entryDate },
-      update: {
-        ...(planText !== undefined && { planText }),
-        ...(factText !== undefined && { factText }),
-        ...(selectedTasksJson !== undefined && { selectedTasksJson }),
-        ...(extraTasksJson !== undefined && { extraTasksJson }),
-        ...(planSnapshotJson !== undefined && { planSnapshotJson }),
-      },
-      create: {
-        date: entryDate,
-        planText: planText || '',
-        factText: factText || '',
-        selectedTasksJson: selectedTasksJson || null,
-        extraTasksJson: extraTasksJson || '[]',
-        planSnapshotJson: planLines.length > 0 ? JSON.stringify(planLines) : null,
-      },
-      include: { evaluation: true },
-    })
+    const entry = existing
+      ? await prisma.dailyEntry.update({
+          where: { id: existing.id },
+          data: {
+            ...(planText !== undefined && { planText }),
+            ...(factText !== undefined && { factText }),
+            ...(selectedTasksJson !== undefined && { selectedTasksJson }),
+            ...(extraTasksJson !== undefined && { extraTasksJson }),
+            ...(planSnapshotJson !== undefined && { planSnapshotJson }),
+          },
+          include: { evaluation: true },
+        })
+      : await prisma.dailyEntry.create({
+          data: {
+            userId,
+            date: entryDate,
+            planText: planText || '',
+            factText: factText || '',
+            selectedTasksJson: selectedTasksJson || null,
+            extraTasksJson: extraTasksJson || '[]',
+            planSnapshotJson: planLines.length > 0 ? JSON.stringify(planLines) : null,
+          },
+          include: { evaluation: true },
+        })
 
     return NextResponse.json(entry)
   } catch (error) {

@@ -4,9 +4,11 @@ import { evaluatePeriod } from '@/lib/anthropic'
 import { PeriodEvaluationRequest, DayData } from '@/lib/prompts/types'
 import { parseDateParam } from '@/lib/dates'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
+import { requireUserId } from '@/lib/get-user-id'
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { periodType, periodStart, periodEnd } = body
 
@@ -23,6 +25,7 @@ export async function POST(request: NextRequest) {
     // Получить все дневные записи за период
     const dailyEntries = await prisma.dailyEntry.findMany({
       where: {
+        userId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
 
     // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -64,29 +68,30 @@ export async function POST(request: NextRequest) {
     const year = startDate.getFullYear()
     const [currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
       await Promise.all([
-        prisma.yearGoal.findUnique({
-          where: { year },
+        prisma.yearGoal.findFirst({
+          where: { userId, year },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'half_year', periodStart: { lte: startDate } },
+          where: { userId, periodType: 'half_year', periodStart: { lte: startDate } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'quarter', periodStart: { lte: startDate } },
+          where: { userId, periodType: 'quarter', periodStart: { lte: startDate } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'month', periodStart: { lte: startDate } },
+          where: { userId, periodType: 'month', periodStart: { lte: startDate } },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'week', periodStart: { lte: startDate } },
+          where: { userId, periodType: 'week', periodStart: { lte: startDate } },
           orderBy: { createdAt: 'desc' },
         }),
       ])
 
     // Получить профиль пользователя
     const userProfile = await prisma.userProfile.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -148,6 +153,7 @@ export async function POST(request: NextRequest) {
     // Сохранить периодическую оценку
     const periodEvaluation = await prisma.periodEvaluation.create({
       data: {
+        userId,
         periodType,
         periodStart: startDate,
         periodEnd: endDate,

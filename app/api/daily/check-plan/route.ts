@@ -12,6 +12,7 @@ import {
   CheckPlanRequest,
   CheckPlanResponse
 } from '@/lib/prompts/check-plan'
+import { requireUserId } from '@/lib/get-user-id'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = CheckPlanSchema.safeParse(body)
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -68,11 +71,11 @@ export async function POST(request: NextRequest) {
 
     const [weekGoalsRecord, monthGoalsRecord] = await Promise.all([
       prisma.periodGoal.findFirst({
-        where: { periodType: 'week', periodStart: weekPeriod.start },
+        where: { userId, periodType: 'week', periodStart: weekPeriod.start },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.periodGoal.findFirst({
-        where: { periodType: 'month', periodStart: monthPeriod.start },
+        where: { userId, periodType: 'month', periodStart: monthPeriod.start },
         orderBy: { createdAt: 'desc' },
       }),
     ])
@@ -86,6 +89,7 @@ export async function POST(request: NextRequest) {
     
     const recentEntries = await prisma.dailyEntry.findMany({
       where: {
+        userId,
         date: {
           gte: historyStart,
           lt: targetDate,
@@ -111,8 +115,8 @@ export async function POST(request: NextRequest) {
 
     // Получить профиль пользователя и insights
     const [userProfile, userInsights] = await Promise.all([
-      prisma.userProfile.findFirst({ orderBy: { createdAt: 'desc' } }),
-      prisma.userInsights.findFirst(),
+      prisma.userProfile.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      prisma.userInsights.findFirst({ where: { userId } }),
     ])
 
     // Построить запрос

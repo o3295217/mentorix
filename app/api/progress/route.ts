@@ -1,10 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
+    
     // Получить все оценки
     const evaluations = await prisma.evaluation.findMany({
+      where: { userId },
       include: {
         dailyEntry: true,
       },

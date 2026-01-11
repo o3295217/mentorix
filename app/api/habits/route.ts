@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 import { parseDateParam } from '@/lib/dates'
+import { requireUserId } from '@/lib/get-user-id'
 
 const HabitSchema = z.object({
   taskText: z.string().min(1),
@@ -15,12 +16,13 @@ const HabitSchema = z.object({
 // GET - получить все активные привычки + какие нужны сегодня
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const dateStr = searchParams.get('date')
     
     // Получить все активные привычки
     const habits = await prisma.habit.findMany({
-      where: { isActive: true },
+      where: { userId, isActive: true },
       orderBy: { sortOrder: 'asc' },
     })
 
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
 // POST - создать новую привычку
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = HabitSchema.safeParse(body)
@@ -79,13 +82,15 @@ export async function POST(request: NextRequest) {
 
     const { taskText, frequency, daysOfWeek, interval, isActive } = validation.data
 
-    // Получить максимальный sortOrder
+    // Получить максимальный sortOrder для этого пользователя
     const maxSort = await prisma.habit.aggregate({
+      where: { userId },
       _max: { sortOrder: true },
     })
 
     const habit = await prisma.habit.create({
       data: {
+        userId,
         taskText,
         frequency,
         daysOfWeek: daysOfWeek ? JSON.stringify(daysOfWeek) : null,
@@ -105,11 +110,20 @@ export async function POST(request: NextRequest) {
 // PUT - обновить привычку
 export async function PUT(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { id, ...data } = body
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    }
+
+    // Проверяем, что привычка принадлежит пользователю
+    const existing = await prisma.habit.findFirst({
+      where: { id, userId },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Habit not found' }, { status: 404 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -139,12 +153,21 @@ export async function PUT(request: NextRequest) {
 // DELETE - удалить привычку (или деактивировать)
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
     const soft = searchParams.get('soft') === 'true'
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    }
+
+    // Проверяем, что привычка принадлежит пользователю
+    const existing = await prisma.habit.findFirst({
+      where: { id: parseInt(id), userId },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Habit not found' }, { status: 404 })
     }
 
     if (soft) {

@@ -1,0 +1,426 @@
+// МНОГОПОЛЬЗОВАТЕЛЬСКАЯ ВЕРСИЯ СХЕМЫ
+// После тестирования заменить schema.prisma на эту
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== АУТЕНТИФИКАЦИЯ ====================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String    // bcrypt hash
+  role          String    @default("user") // "user" | "admin"
+  isActive      Boolean   @default(true)
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Связи
+  dreamGoals    DreamGoal[]
+  yearGoals     YearGoal[]
+  periodGoals   PeriodGoal[]
+  goals         Goal[]
+  goalTags      GoalTag[]
+  dailyEntries  DailyEntry[]
+  openTasks     OpenTask[]
+  profile       UserProfile?
+  profileBlocks ProfileBlock[]
+  habits        Habit[]
+  insights      UserInsights?
+  stats         UserStats?
+  periodEvaluations PeriodEvaluation[]
+  worldContexts WorldContext[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+// ==================== ЦЕЛИ ====================
+
+model DreamGoal {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalText  String
+  years     Int      @default(5)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("dream_goal")
+}
+
+model YearGoal {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  year      Int
+  goalsJson String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, year])
+  @@index([userId])
+  @@map("year_goals")
+}
+
+model PeriodGoal {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodType  String
+  periodStart DateTime
+  periodEnd   DateTime
+  goalsJson   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, periodType, periodStart])
+  @@map("period_goals")
+}
+
+model Goal {
+  id            Int       @id @default(autoincrement())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text          String
+  periodType    String
+  periodKey     String
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  deadline      DateTime?
+  priority      String    @default("medium")
+  tagsJson      String    @default("[]")
+  blockedByJson String    @default("[]")
+  historyJson   String    @default("[]")
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, periodType, periodKey])
+  @@index([userId, completed])
+  @@map("goals")
+}
+
+model GoalTag {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String   @default("#6B7280")
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("goal_tags")
+}
+
+// ==================== ЕЖЕДНЕВНЫЕ ЗАПИСИ ====================
+
+model DailyEntry {
+  id               Int          @id @default(autoincrement())
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date             DateTime
+  planText         String?
+  factText         String?
+  planSnapshotJson String?
+  extraTasksJson   String       @default("[]")
+  
+  // Контекст дня
+  emotionalState   String?
+  physicalState    String?
+  lifeEvents       String?
+  externalFactors  String?
+  energyLevel      Int?
+  sleepQuality     Int?
+  familyTime       Int?
+  exerciseTime     Int?
+  selectedTasksJson String?
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  evaluation       Evaluation?
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([userId, date])
+  @@map("daily_entries")
+}
+
+model Evaluation {
+  id                    Int        @id @default(autoincrement())
+  dailyEntryId          Int        @unique
+  dailyEntry            DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
+  
+  dreamProgressScore    Int        @default(5)
+  strategyScore         Int
+  operationsScore       Int
+  teamScore             Int
+  efficiencyScore       Int
+  overallScore          Float
+  feedbackText          String
+  planVsFactText        String
+  
+  // Вертикальный alignment
+  alignmentDayWeek      String
+  alignmentWeekMonth    String
+  alignmentMonthQuarter String
+  alignmentQuarterHalf  String
+  alignmentHalfYear     String
+  alignmentYearDream    String
+  
+  // Флаги баланса
+  healthFlag            String?
+  familyFlag            String?
+  energyFlag            String?
+  
+  // Горизонтальный alignment
+  workHealthAlignment   String?
+  workFamilyAlignment   String?
+  workValuesAlignment   String?
+  
+  recommendationsText   String
+  suggestedTasksJson    String?
+  createdAt             DateTime   @default(now())
+
+  @@index([dreamProgressScore])
+  @@index([createdAt])
+  @@map("evaluations")
+}
+
+// ==================== ЗАДАЧИ ====================
+
+model OpenTask {
+  id         Int       @id @default(autoincrement())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskText   String
+  taskType   String
+  originDate DateTime
+  isClosed   Boolean   @default(false)
+  closedAt   DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, isClosed])
+  @@index([userId, taskType, isClosed])
+  @@map("open_tasks")
+}
+
+// ==================== ПРОФИЛЬ ====================
+
+model UserProfile {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String?
+  occupation      String?
+  industry        String?
+  maritalStatus   String?
+  hobbies         String?
+  sports          String?
+  location        String?
+  age             Int?
+  customInterests String?
+  education       String?
+  teamSize        Int?
+  workExperience  String?
+  values          String?
+  challenges      String?
+  other           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("user_profile")
+}
+
+model ProfileBlock {
+  id         Int               @id @default(autoincrement())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  order      Int               @default(0)
+  categories ProfileCategory[]
+  items      ProfileItem[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([userId])
+  @@map("profile_blocks")
+}
+
+model ProfileCategory {
+  id        Int           @id @default(autoincrement())
+  blockId   Int
+  block     ProfileBlock  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  title     String
+  order     Int           @default(0)
+  items     ProfileItem[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("profile_categories")
+}
+
+model ProfileItem {
+  id         Int              @id @default(autoincrement())
+  blockId    Int?
+  block      ProfileBlock?    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  categoryId Int?
+  category   ProfileCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  fieldName  String
+  fieldValue String
+  content    String?
+  order      Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@map("profile_items")
+}
+
+// ==================== ПРИВЫЧКИ ====================
+
+model Habit {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskText    String
+  frequency   String   @default("daily")
+  daysOfWeek  String?
+  interval    Int?
+  isActive    Boolean  @default(true)
+  streak      Int      @default(0)
+  bestStreak  Int      @default(0)
+  totalDone   Int      @default(0)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("habits")
+}
+
+// ==================== ОЦЕНКИ ПЕРИОДОВ ====================
+
+model PeriodEvaluation {
+  id                  Int      @id @default(autoincrement())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodType          String
+  periodStart         DateTime
+  periodEnd           DateTime
+  dreamProgressScore  Float
+  overallScore        Float
+  professionalBlock   String
+  personalBlock       String
+  socialBlock         String
+  balanceBlock        String
+  patterns            String
+  trends              String
+  goalsCompletion     String
+  alignment           String
+  blockers            String?
+  feedbackText        String
+  recommendationsText String
+  insights            String?
+  createdAt           DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, periodType, periodStart])
+  @@map("period_evaluations")
+}
+
+// ==================== КОНТЕКСТ ====================
+
+model WorldContext {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            DateTime
+  marketEvents    String?
+  personalEvents  String?
+  constraints     String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("world_context")
+}
+
+// ==================== АНАЛИТИКА ====================
+
+model UserInsights {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patterns        String?
+  strengths       String?
+  challenges      String?
+  preferences     String?
+  recommendations String?
+  motivators      String?
+  weeklySummary   String?
+  evaluationCount Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("user_insights")
+}
+
+model UserStats {
+  id                   Int      @id @default(autoincrement())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalDays            Int      @default(0)
+  totalPlanned         Int      @default(0)
+  totalCompleted       Int      @default(0)
+  avgCompletionPct     Float    @default(0)
+  avgDailyScore        Float    @default(0)
+  completionByDayJson  String   @default("{}")
+  completionByTypeJson String   @default("{}")
+  frequentCompletedJson String  @default("[]")
+  frequentFailedJson   String   @default("[]")
+  habitsAvgCompletion  Float    @default(0)
+  trendDirection       String?
+  trendPct             Float    @default(0)
+  bestDayOfWeek        String?
+  worstDayOfWeek       String?
+  optimalTaskCount     Int      @default(5)
+  currentStreak        Int      @default(0)
+  bestStreak           Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("user_stats")
+}

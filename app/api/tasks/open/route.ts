@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { parseDateParam } from '@/lib/dates'
+import { requireUserId } from '@/lib/get-user-id'
 
 const OpenTaskSchema = z.object({
   taskText: z.string().min(1, "Task text is required"),
@@ -11,10 +12,11 @@ const OpenTaskSchema = z.object({
   }),
 })
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const tasks = await prisma.openTask.findMany({
-      where: { isClosed: false },
+      where: { userId, isClosed: false },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -27,6 +29,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = OpenTaskSchema.safeParse(body)
@@ -41,6 +44,7 @@ export async function POST(request: NextRequest) {
 
     const task = await prisma.openTask.create({
       data: {
+        userId,
         taskText,
         taskType,
         originDate: parseDateParam(originDate),

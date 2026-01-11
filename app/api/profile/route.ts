@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
 // GET /api/profile - получить профиль пользователя
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const profile = await prisma.userProfile.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -22,6 +25,7 @@ export async function GET() {
 // POST /api/profile - создать или обновить профиль
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
 
     const {
@@ -43,6 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Проверяем, есть ли уже профиль
     const existingProfile = await prisma.userProfile.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -73,6 +78,7 @@ export async function POST(request: NextRequest) {
       // Создаем новый профиль
       profile = await prisma.userProfile.create({
         data: {
+          userId,
           name,
           occupation,
           industry,

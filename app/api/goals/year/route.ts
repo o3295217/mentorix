@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
+import { requireUserId } from '@/lib/get-user-id'
 
 const YearGoalSchema = z.object({
   year: z.number().int().min(2020).max(2100),
@@ -11,6 +12,7 @@ const YearGoalSchema = z.object({
 // GET /api/goals/year?year=2025
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const yearParam = searchParams.get('year')
 
@@ -22,8 +24,8 @@ export async function GET(request: NextRequest) {
     if (isNaN(year)) {
       return NextResponse.json({ error: 'Invalid year parameter' }, { status: 400 })
     }
-    const yearGoal = await prisma.yearGoal.findUnique({
-      where: { year },
+    const yearGoal = await prisma.yearGoal.findFirst({
+      where: { userId, year },
     })
 
     if (!yearGoal) {
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
 // POST /api/goals/year
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = YearGoalSchema.safeParse(body)
@@ -55,17 +58,26 @@ export async function POST(request: NextRequest) {
     
     const { year, goals } = validation.data
 
-    const yearGoal = await prisma.yearGoal.upsert({
-      where: { year },
-      update: {
-        goalsJson: JSON.stringify(goals),
-        updatedAt: new Date(),
-      },
-      create: {
-        year,
-        goalsJson: JSON.stringify(goals),
-      },
+    // Ищем существующую запись
+    const existing = await prisma.yearGoal.findFirst({
+      where: { userId, year },
     })
+
+    const yearGoal = existing
+      ? await prisma.yearGoal.update({
+          where: { id: existing.id },
+          data: {
+            goalsJson: JSON.stringify(goals),
+            updatedAt: new Date(),
+          },
+        })
+      : await prisma.yearGoal.create({
+          data: {
+            userId,
+            year,
+            goalsJson: JSON.stringify(goals),
+          },
+        })
 
     return NextResponse.json({
       year: yearGoal.year,

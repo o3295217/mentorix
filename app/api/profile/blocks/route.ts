@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
 // GET /api/profile/blocks - получить все блоки с категориями и пунктами
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const blocks = await prisma.profileBlock.findMany({
+      where: { userId },
       include: {
         categories: {
           include: {
@@ -32,6 +35,7 @@ export async function GET() {
 // POST /api/profile/blocks - создать новый блок
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { title } = body
 
@@ -41,11 +45,13 @@ export async function POST(request: NextRequest) {
 
     // Получаем максимальный order для нового блока
     const maxOrder = await prisma.profileBlock.aggregate({
+      where: { userId },
       _max: { order: true },
     })
 
     const block = await prisma.profileBlock.create({
       data: {
+        userId,
         title: title.trim(),
         order: (maxOrder._max.order || 0) + 1,
       },
@@ -64,6 +70,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/profile/blocks?id=123 - удалить блок
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
 
@@ -77,7 +84,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await prisma.profileBlock.delete({
-      where: { id: numericId },
+      where: { id: numericId, userId },
     })
 
     return NextResponse.json({ success: true })
@@ -90,6 +97,7 @@ export async function DELETE(request: NextRequest) {
 // PATCH /api/profile/blocks - обновить название или порядок блока
 export async function PATCH(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { id, title, order } = body
 
@@ -107,7 +115,7 @@ export async function PATCH(request: NextRequest) {
     if (order !== undefined) updateData.order = parseInt(order)
 
     const block = await prisma.profileBlock.update({
-      where: { id: numericId },
+      where: { id: numericId, userId },
       data: updateData,
       include: {
         items: {

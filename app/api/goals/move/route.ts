@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
+import { requireUserId } from '@/lib/get-user-id'
 
 const MoveGoalSchema = z.object({
   id: z.number().int().positive(),
@@ -12,6 +13,7 @@ const MoveGoalSchema = z.object({
 // POST - переместить цель в другой период
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = MoveGoalSchema.safeParse(body)
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     
     const { id, toPeriodType, toPeriodKey } = validation.data
 
-    const goal = await prisma.goal.findUnique({ where: { id } })
+    const goal = await prisma.goal.findFirst({ where: { id, userId } })
     if (!goal) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }

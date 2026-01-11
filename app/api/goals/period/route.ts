@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getPeriodDates, parseDateParam, PeriodType } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
+import { requireUserId } from '@/lib/get-user-id'
 
 const PeriodGoalSchema = z.object({
   periodType: z.enum(['week', 'month', 'quarter', 'half_year', 'year']),
@@ -13,6 +14,7 @@ const PeriodGoalSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type') as PeriodType
     const dateStr = searchParams.get('date')
@@ -26,6 +28,7 @@ export async function GET(request: NextRequest) {
 
     const periodGoal = await prisma.periodGoal.findFirst({
       where: {
+        userId,
         periodType: type,
         periodStart: { lte: date },
         periodEnd: { gte: date },
@@ -46,6 +49,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = PeriodGoalSchema.safeParse(body)
@@ -60,6 +64,7 @@ export async function POST(request: NextRequest) {
 
     const periodGoal = await prisma.periodGoal.create({
       data: {
+        userId,
         periodType,
         periodStart: parseDateParam(periodStart),
         periodEnd: parseDateParam(periodEnd),

@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { safeParseJsonArray } from '@/lib/fact-utils'
 import { toDateKey } from '@/lib/dates'
+import { requireUserId } from '@/lib/get-user-id'
 
 // GET /api/daily/indicators?month=2025-11
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const monthParam = searchParams.get('month') // Формат: "2025-11"
 
@@ -22,6 +24,7 @@ export async function GET(request: NextRequest) {
     // Получить все daily entries за месяц
     const entries = await prisma.dailyEntry.findMany({
       where: {
+        userId,
         date: {
           gte: startDate,
           lte: endDate,

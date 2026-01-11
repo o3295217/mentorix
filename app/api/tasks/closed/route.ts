@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const tasks = await prisma.openTask.findMany({
-      where: { isClosed: true },
+      where: { userId, isClosed: true },
       orderBy: { closedAt: 'desc' },
     })
 

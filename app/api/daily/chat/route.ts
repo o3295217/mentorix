@@ -13,6 +13,7 @@ import {
   GoalsProgress,
 } from '@/lib/prompts/plan-chat'
 import { getUserStatsForAI } from '@/lib/user-stats'
+import { requireUserId } from '@/lib/get-user-id'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = ChatSchema.safeParse(body)
@@ -107,20 +109,21 @@ export async function POST(request: NextRequest) {
       trackedGoals,
       cumulativeStats,
     ] = await Promise.all([
-      prisma.dreamGoal.findFirst({ orderBy: { createdAt: 'desc' } }),
+      prisma.dreamGoal.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.periodGoal.findFirst({
-        where: { periodType: 'week', periodStart: weekPeriod.start },
+        where: { userId, periodType: 'week', periodStart: weekPeriod.start },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.periodGoal.findFirst({
-        where: { periodType: 'month', periodStart: monthPeriod.start },
+        where: { userId, periodType: 'month', periodStart: monthPeriod.start },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.userProfile.findFirst({ orderBy: { createdAt: 'desc' } }),
-      prisma.userInsights.findFirst(),
+      prisma.userProfile.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      prisma.userInsights.findFirst({ where: { userId } }),
       // История план/факт за последние 14 дней
       prisma.dailyEntry.findMany({
         where: {
+          userId,
           date: {
             gte: historyStartDate,
             lt: targetDate, // Не включаем текущий день
@@ -143,6 +146,7 @@ export async function POST(request: NextRequest) {
       // Прогресс целей недели и месяца
       prisma.goal.findMany({
         where: {
+          userId,
           OR: [
             { periodKey: { startsWith: `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-W` } },
             { periodKey: `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}` },
@@ -155,7 +159,7 @@ export async function POST(request: NextRequest) {
         },
       }),
       // Накопительная статистика
-      getUserStatsForAI(),
+      getUserStatsForAI(userId),
     ])
 
     const weekGoals = safeParseJson<string[]>(weekGoalsRecord?.goalsJson, [])

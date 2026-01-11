@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { parseDateParam } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
+import { requireUserId } from '@/lib/get-user-id'
 
 // Конвертация числа приоритета в строку
 const priorityNumToStr = (num: number): string => {
@@ -25,11 +26,12 @@ const priorityStrToNum = (str: string): number => {
 // GET - получить цели по периоду
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const periodType = searchParams.get('periodType')
     const periodKey = searchParams.get('periodKey')
 
-    const where: Prisma.GoalWhereInput = {}
+    const where: Prisma.GoalWhereInput = { userId }
     if (periodType) where.periodType = periodType
     if (periodKey) where.periodKey = periodKey
 
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
 // POST - создать новую цель
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { text, periodType, periodKey, deadline, priority, tags } = body
 
@@ -62,6 +65,7 @@ export async function POST(request: NextRequest) {
 
     const goal = await prisma.goal.create({
       data: {
+        userId,
         text,
         periodType,
         periodKey,
@@ -91,10 +95,11 @@ export async function POST(request: NextRequest) {
 // PUT - обновить цель
 export async function PUT(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { id, text, completed, deadline, priority, tags, blockedBy, sortOrder } = body
 
-    const existingGoal = await prisma.goal.findUnique({ where: { id } })
+    const existingGoal = await prisma.goal.findFirst({ where: { id, userId } })
     if (!existingGoal) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
@@ -147,6 +152,7 @@ export async function PUT(request: NextRequest) {
 // DELETE - удалить цель
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
 
@@ -157,6 +163,12 @@ export async function DELETE(request: NextRequest) {
     const numericId = parseInt(id)
     if (isNaN(numericId)) {
       return NextResponse.json({ error: 'Invalid goal ID' }, { status: 400 })
+    }
+
+    // Проверяем, что цель принадлежит пользователю
+    const existing = await prisma.goal.findFirst({ where: { id: numericId, userId } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
     await prisma.goal.delete({ where: { id: numericId } })

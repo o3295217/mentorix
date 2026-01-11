@@ -1,15 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireUserId } from '@/lib/get-user-id';
 
 // GET - получить профиль пользователя
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Берём первую (и единственную) запись или создаём пустую
-    let insights = await prisma.userInsights.findFirst();
+    const userId = await requireUserId(request);
+    
+    // Берём запись пользователя или создаём пустую
+    let insights = await prisma.userInsights.findFirst({
+      where: { userId }
+    });
     
     if (!insights) {
       insights = await prisma.userInsights.create({
-        data: {}
+        data: { userId }
       });
     }
     
@@ -24,16 +29,20 @@ export async function GET() {
 }
 
 // PUT - обновить профиль пользователя
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
+    const userId = await requireUserId(request);
     const data = await request.json();
     
     // Находим существующую запись или создаём
-    let insights = await prisma.userInsights.findFirst();
+    let insights = await prisma.userInsights.findFirst({
+      where: { userId }
+    });
     
     if (!insights) {
       insights = await prisma.userInsights.create({
         data: {
+          userId,
           patterns: data.patterns,
           strengths: data.strengths,
           challenges: data.challenges,

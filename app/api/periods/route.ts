@@ -1,9 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
+    
     const evaluations = await prisma.periodEvaluation.findMany({
+      where: { userId },
       orderBy: {
         createdAt: 'desc',
       },

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
 import { recalculateUserStats } from '@/lib/user-stats'
+import { requireUserId } from '@/lib/get-user-id'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     
     const validation = EvaluateSchema.safeParse(body)
@@ -38,9 +40,9 @@ export async function POST(request: NextRequest) {
 
     const { dailyEntryId } = validation.data
 
-    // Получить daily entry
-    const dailyEntry = await prisma.dailyEntry.findUnique({
-      where: { id: dailyEntryId },
+    // Получить daily entry (проверяем принадлежность пользователю)
+    const dailyEntry = await prisma.dailyEntry.findFirst({
+      where: { id: dailyEntryId, userId },
     })
 
     if (!dailyEntry) {
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -87,35 +90,36 @@ export async function POST(request: NextRequest) {
     const [currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
       await Promise.all([
         // Загружаем цели на год из year_goals
-        prisma.yearGoal.findUnique({
-          where: { year },
+        prisma.yearGoal.findFirst({
+          where: { userId, year },
         }),
         // Остальные цели из period_goals (как раньше)
         prisma.periodGoal.findFirst({
-          where: { periodType: 'half_year', periodStart: halfYearPeriod.start },
+          where: { userId, periodType: 'half_year', periodStart: halfYearPeriod.start },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'quarter', periodStart: quarterPeriod.start },
+          where: { userId, periodType: 'quarter', periodStart: quarterPeriod.start },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'month', periodStart: monthPeriod.start },
+          where: { userId, periodType: 'month', periodStart: monthPeriod.start },
           orderBy: { createdAt: 'desc' },
         }),
         prisma.periodGoal.findFirst({
-          where: { periodType: 'week', periodStart: weekPeriod.start },
+          where: { userId, periodType: 'week', periodStart: weekPeriod.start },
           orderBy: { createdAt: 'desc' },
         }),
       ])
 
     // Получить незакрытые задачи
     const openTasks = await prisma.openTask.findMany({
-      where: { isClosed: false },
+      where: { userId, isClosed: false },
     })
 
     // Получить профиль пользователя
     const userProfile = await prisma.userProfile.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -202,14 +206,16 @@ export async function POST(request: NextRequest) {
     // Сохранить или обновить оценку (upsert для повторных оценок)
     const evaluation = await prisma.evaluation.upsert({
       where: { dailyEntryId },
-      create: { dailyEntryId, ...evaluationData },
+      create: { userId, dailyEntryId, ...evaluationData },
       update: evaluationData,
     })
 
     // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
     try {
       // Получить текущий профиль insights
-      const currentInsights = await prisma.userInsights.findFirst()
+      const currentInsights = await prisma.userInsights.findFirst({
+        where: { userId }
+      })
       
       // Получить историю последних 7 дней для контекста
       const sevenDaysAgo = new Date()
@@ -217,6 +223,7 @@ export async function POST(request: NextRequest) {
       
       const recentEntries = await prisma.dailyEntry.findMany({
         where: {
+          userId,
           date: { gte: sevenDaysAgo },
           evaluation: { isNot: null }
         },
@@ -273,6 +280,7 @@ export async function POST(request: NextRequest) {
       } else {
         await prisma.userInsights.create({
           data: {
+            userId,
             patterns: insightsUpdate.patterns,
             strengths: insightsUpdate.strengths,
             challenges: insightsUpdate.challenges,
@@ -292,7 +300,7 @@ export async function POST(request: NextRequest) {
 
     // === ОБНОВЛЕНИЕ НАКОПИТЕЛЬНОЙ СТАТИСТИКИ ===
     try {
-      await recalculateUserStats()
+      await recalculateUserStats(userId)
     } catch (statsError) {
       console.error('[UserStats] Failed to recalculate stats:', statsError)
     }

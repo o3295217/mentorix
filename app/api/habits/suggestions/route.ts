@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseDateParam, toDateKey } from '@/lib/dates'
+import { requireUserId } from '@/lib/get-user-id'
 
 interface TaskFrequency {
   text: string
@@ -13,6 +14,7 @@ interface TaskFrequency {
 // Ищет задачи которые повторялись 3+ дня подряд
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const dateStr = searchParams.get('date') || toDateKey(new Date())
     const targetDate = parseDateParam(dateStr)
@@ -23,6 +25,7 @@ export async function GET(request: NextRequest) {
 
     const entries = await prisma.dailyEntry.findMany({
       where: {
+        userId,
         date: {
           gte: twoWeeksAgo,
           lt: targetDate,
@@ -34,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     // Получить существующие привычки
     const existingHabits = await prisma.habit.findMany({
-      where: { isActive: true },
+      where: { userId, isActive: true },
     })
     const existingHabitTexts = new Set(
       existingHabits.map(h => normalizeTaskText(h.taskText))

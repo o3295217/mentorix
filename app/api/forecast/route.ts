@@ -5,6 +5,7 @@ import { ForecastRequest, DayDataFull } from '@/lib/prompts/types'
 import { parseDateParam } from '@/lib/dates'
 import { buildFactFromSelection } from '@/lib/fact-utils'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
+import { requireUserId } from '@/lib/get-user-id'
 
 // Подсчет задач в тексте плана/факта
 function countTasks(text: string): { total: number; strategic: number } {
@@ -54,6 +55,7 @@ function countCompletedTasks(planText: string, factText: string): { completed: n
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const {
       // База для анализа (прошлое)
@@ -82,6 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -98,6 +101,7 @@ export async function POST(request: NextRequest) {
 
     const dailyEntries = await prisma.dailyEntry.findMany({
       where: {
+        userId,
         date: {
           gte: baseStart,
           lte: baseEnd,
@@ -160,8 +164,8 @@ export async function POST(request: NextRequest) {
     if (forecastHorizon === 'dream') {
       // Для мечты берем годовые цели
       const currentYear = new Date().getFullYear()
-      const yearGoal = await prisma.yearGoal.findUnique({
-        where: { year: currentYear },
+      const yearGoal = await prisma.yearGoal.findFirst({
+        where: { userId, year: currentYear },
       })
       if (yearGoal) {
         horizonGoals = safeParseJson(yearGoal.goalsJson, [])
@@ -171,7 +175,7 @@ export async function POST(request: NextRequest) {
 
       if (forecastHorizon === 'week') {
         const weekGoal = await prisma.periodGoal.findFirst({
-          where: { periodType: 'week', periodStart: horizonStartDate },
+          where: { userId, periodType: 'week', periodStart: horizonStartDate },
           orderBy: { createdAt: 'desc' },
         })
         if (weekGoal) {
@@ -179,7 +183,7 @@ export async function POST(request: NextRequest) {
         }
       } else if (forecastHorizon === 'month') {
         const monthGoal = await prisma.periodGoal.findFirst({
-          where: { periodType: 'month', periodStart: horizonStartDate },
+          where: { userId, periodType: 'month', periodStart: horizonStartDate },
           orderBy: { createdAt: 'desc' },
         })
         if (monthGoal) {
@@ -187,7 +191,7 @@ export async function POST(request: NextRequest) {
         }
       } else if (forecastHorizon === 'quarter') {
         const quarterGoal = await prisma.periodGoal.findFirst({
-          where: { periodType: 'quarter', periodStart: horizonStartDate },
+          where: { userId, periodType: 'quarter', periodStart: horizonStartDate },
           orderBy: { createdAt: 'desc' },
         })
         if (quarterGoal) {
@@ -195,8 +199,8 @@ export async function POST(request: NextRequest) {
         }
       } else if (forecastHorizon === 'year') {
         const year = horizonStartDate.getFullYear()
-        const yearGoal = await prisma.yearGoal.findUnique({
-          where: { year },
+        const yearGoal = await prisma.yearGoal.findFirst({
+          where: { userId, year },
         })
         if (yearGoal) {
           horizonGoals = safeParseJson(yearGoal.goalsJson, [])
@@ -206,6 +210,7 @@ export async function POST(request: NextRequest) {
 
     // Получить профиль пользователя
     const userProfile = await prisma.userProfile.findFirst({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     })
 

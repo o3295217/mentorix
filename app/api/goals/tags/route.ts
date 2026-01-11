@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
 // GET - получить все теги
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const tags = await prisma.goalTag.findMany({
+      where: { userId },
       orderBy: { name: 'asc' },
     })
     return NextResponse.json(tags)
@@ -17,11 +20,13 @@ export async function GET() {
 // POST - создать новый тег
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { name, color } = body
 
     const tag = await prisma.goalTag.create({
       data: {
+        userId,
         name,
         color: color || '#6B7280',
       },
@@ -37,6 +42,7 @@ export async function POST(request: NextRequest) {
 // DELETE - удалить тег
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
 
@@ -49,7 +55,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid tag ID' }, { status: 400 })
     }
 
-    await prisma.goalTag.delete({ where: { id: numericId } })
+    await prisma.goalTag.delete({ where: { id: numericId, userId } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

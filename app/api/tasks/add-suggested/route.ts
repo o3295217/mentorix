@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseDateParam } from '@/lib/dates'
 import { areTasksSimilar } from '@/lib/task-match'
+import { requireUserId } from '@/lib/get-user-id'
 
 async function removeSuggestedTaskFromEvaluation(params: {
+  userId: string
   originDate: string
   taskText: string
 }): Promise<void> {
   const date = parseDateParam(params.originDate)
-  const dailyEntry = await prisma.dailyEntry.findUnique({
-    where: { date },
+  const dailyEntry = await prisma.dailyEntry.findFirst({
+    where: { userId: params.userId, date },
     include: { evaluation: true },
   })
 
@@ -43,6 +45,7 @@ async function removeSuggestedTaskFromEvaluation(params: {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId(request)
     const body = await request.json()
     const { taskText, taskType, originDate } = body
 
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Проверить, нет ли уже похожей незакрытой задачи
     const openTasks = await prisma.openTask.findMany({
-      where: { isClosed: false },
+      where: { userId, isClosed: false },
       select: {
         id: true,
         taskText: true,
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Важно: даже если задача уже есть, убираем её из блока "Предложенные" (семантика "переноса")
     if (existingTask) {
-      await removeSuggestedTaskFromEvaluation({ originDate, taskText })
+      await removeSuggestedTaskFromEvaluation({ userId, originDate, taskText })
       return NextResponse.json(
         { error: 'Task already exists', task: existingTask },
         { status: 409 }
@@ -82,13 +85,14 @@ export async function POST(request: NextRequest) {
     // Создать задачу
     const task = await prisma.openTask.create({
       data: {
+        userId,
         taskText,
         taskType,
         originDate: parseDateParam(originDate),
       },
     })
 
-    await removeSuggestedTaskFromEvaluation({ originDate, taskText })
+    await removeSuggestedTaskFromEvaluation({ userId, originDate, taskText })
 
     return NextResponse.json(task)
   } catch (error) {

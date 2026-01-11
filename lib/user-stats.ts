@@ -59,10 +59,11 @@ function extractKeywords(text: string): string[] {
 }
 
 // Пересчитать и обновить статистику пользователя
-export async function recalculateUserStats(): Promise<void> {
-  // Получить все оценённые дни
+export async function recalculateUserStats(userId: string): Promise<void> {
+  // Получить все оценённые дни этого пользователя
   const entries = await prisma.dailyEntry.findMany({
     where: {
+      userId,
       evaluation: { isNot: null },
     },
     select: {
@@ -286,51 +287,58 @@ export async function recalculateUserStats(): Promise<void> {
   // Привычки: средний % выполнения
   const habitsAvgCompletion = completionByType['привычки'] || 0
 
-  // Сохранить в БД
-  await prisma.userStats.upsert({
-    where: { id: 1 },
-    update: {
-      totalDays,
-      totalPlanned,
-      totalCompleted,
-      avgCompletionPct,
-      avgDailyScore,
-      completionByDayJson: JSON.stringify(completionByDay),
-      completionByTypeJson: JSON.stringify(completionByType),
-      frequentCompletedJson: JSON.stringify(frequentCompleted),
-      frequentFailedJson: JSON.stringify(frequentFailed),
-      habitsAvgCompletion,
-      trendDirection,
-      trendPct,
-      bestDayOfWeek: bestDay || null,
-      worstDayOfWeek: worstDay || null,
-      optimalTaskCount,
-      currentStreak,
-      bestStreak,
-    },
-    create: {
-      id: 1,
-      totalDays,
-      totalPlanned,
-      totalCompleted,
-      avgCompletionPct,
-      avgDailyScore,
-      completionByDayJson: JSON.stringify(completionByDay),
-      completionByTypeJson: JSON.stringify(completionByType),
-      frequentCompletedJson: JSON.stringify(frequentCompleted),
-      frequentFailedJson: JSON.stringify(frequentFailed),
-      habitsAvgCompletion,
-      trendDirection,
-      trendPct,
-      bestDayOfWeek: bestDay || null,
-      worstDayOfWeek: worstDay || null,
-      optimalTaskCount,
-      currentStreak,
-      bestStreak,
-    },
-  })
+  // Сохранить в БД (ищем по userId)
+  const existingStats = await prisma.userStats.findFirst({ where: { userId } })
+  
+  if (existingStats) {
+    await prisma.userStats.update({
+      where: { id: existingStats.id },
+      data: {
+        totalDays,
+        totalPlanned,
+        totalCompleted,
+        avgCompletionPct,
+        avgDailyScore,
+        completionByDayJson: JSON.stringify(completionByDay),
+        completionByTypeJson: JSON.stringify(completionByType),
+        frequentCompletedJson: JSON.stringify(frequentCompleted),
+        frequentFailedJson: JSON.stringify(frequentFailed),
+        habitsAvgCompletion,
+        trendDirection,
+        trendPct,
+        bestDayOfWeek: bestDay || null,
+        worstDayOfWeek: worstDay || null,
+        optimalTaskCount,
+        currentStreak,
+        bestStreak,
+      },
+    })
+  } else {
+    await prisma.userStats.create({
+      data: {
+        userId,
+        totalDays,
+        totalPlanned,
+        totalCompleted,
+        avgCompletionPct,
+        avgDailyScore,
+        completionByDayJson: JSON.stringify(completionByDay),
+        completionByTypeJson: JSON.stringify(completionByType),
+        frequentCompletedJson: JSON.stringify(frequentCompleted),
+        frequentFailedJson: JSON.stringify(frequentFailed),
+        habitsAvgCompletion,
+        trendDirection,
+        trendPct,
+        bestDayOfWeek: bestDay || null,
+        worstDayOfWeek: worstDay || null,
+        optimalTaskCount,
+        currentStreak,
+        bestStreak,
+      },
+    })
+  }
 
-  console.log('[UserStats] Recalculated stats for', totalDays, 'days')
+  console.log('[UserStats] Recalculated stats for user', userId, ':', totalDays, 'days')
 }
 
 // Вспомогательная функция для расчёта % выполнения
@@ -354,8 +362,8 @@ function calculateCompletionPct(entries: { planText: string | null; selectedTask
 }
 
 // Получить статистику для ИИ
-export async function getUserStatsForAI(): Promise<string> {
-  const stats = await prisma.userStats.findFirst()
+export async function getUserStatsForAI(userId: string): Promise<string> {
+  const stats = await prisma.userStats.findFirst({ where: { userId } })
   
   if (!stats || stats.totalDays === 0) {
     return 'Статистика пока не накоплена (нет оценённых дней).'
