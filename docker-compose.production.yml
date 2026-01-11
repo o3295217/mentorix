@@ -1,0 +1,88 @@
+# Docker Compose для продакшена (многопользовательская версия)
+# 
+# Использование:
+# 1. Скопируйте .env.example в .env.production и заполните переменные
+# 2. docker compose -f docker-compose.production.yml up -d
+#
+# Настройка:
+# - REGISTRATION_MODE: open | invite | closed
+# - MAX_USERS: 0 (без лимита) или число
+# - INVITE_CODE: код для режима invite
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-assistant-production
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/production.db
+      # Аутентификация
+      - AUTH_SECRET=${AUTH_SECRET}
+      - REGISTRATION_MODE=${REGISTRATION_MODE:-open}
+      - MAX_USERS=${MAX_USERS:-0}
+      - INVITE_CODE=${INVITE_CODE:-}
+      # Cookie secure flag (set to 'true' only for HTTPS)
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      # AI API
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      # Persist SQLite database
+      - ./data:/app/data
+      # Backup directory
+      - ./backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Security: run as non-root
+    user: "1001:1001"
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Опционально: автоматический HTTPS с Caddy
+  # Раскомментируйте если нужен HTTPS
+  #
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: ai-assistant-caddy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - app
+  #   restart: unless-stopped
+
+volumes:
+  data:
+    driver: local
+  # caddy_data:
+  #   driver: local
+  # caddy_config:
+  #   driver: local
+
+networks:
+  default:
+    name: ai-assistant-network
