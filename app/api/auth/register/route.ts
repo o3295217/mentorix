@@ -1,9 +1,36 @@
 import { NextResponse } from 'next/server';
 import { registerUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+
+// Rate limiter для регистрации - защита от спама
+const registerRateLimiter = {
+  limit: 3, // 3 попытки
+  windowMs: 60 * 60 * 1000, // 1 час
+  keyPrefix: 'register',
+};
 
 export async function POST(request: Request) {
   try {
+    // Проверяем rate limit
+    const clientId = getClientIdentifier(request);
+    const rateLimit = checkRateLimit(clientId, registerRateLimiter);
+    
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { 
+          error: 'Слишком много попыток регистрации. Попробуйте позже.',
+          retryAfter: Math.ceil((rateLimit.retryAfter || 0) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimit.retryAfter || 0) / 1000))
+          }
+        }
+      );
+    }
+
     const body = await request.json();
     const { email, password, name, inviteCode } = body;
 

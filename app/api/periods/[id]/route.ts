@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireUserId } from '@/lib/get-user-id'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await requireUserId(request)
     const { id } = await params
     const numericId = parseInt(id)
     
@@ -13,8 +15,11 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid period ID' }, { status: 400 })
     }
     
-    const evaluation = await prisma.periodEvaluation.findUnique({
-      where: { id: numericId },
+    const evaluation = await prisma.periodEvaluation.findFirst({
+      where: { 
+        id: numericId,
+        userId,  // Проверка владельца
+      },
     })
 
     if (!evaluation) {

@@ -109,12 +109,18 @@ function LoginForm() {
             </button>
           </div>
 
-          <div className="text-center">
+          <div className="flex items-center justify-between">
+            <Link 
+              href="/forgot-password" 
+              className="text-sm text-gray-600 hover:text-gray-500 dark:text-gray-400"
+            >
+              Забыли пароль?
+            </Link>
             <Link 
               href="/register" 
               className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
             >
-              Нет аккаунта? Зарегистрироваться
+              Зарегистрироваться
             </Link>
           </div>
         </form>

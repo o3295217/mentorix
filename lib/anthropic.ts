@@ -264,14 +264,40 @@ function isForecastResponse(obj: unknown): obj is ForecastResponse {
   return true
 }
 
+// Тип для возврата usage информации
+export interface AIUsageInfo {
+  model: string
+  inputTokens: number
+  outputTokens: number
+  durationMs: number
+}
+
+export interface EvaluationResultWithUsage {
+  result: DailyEvaluationResponse
+  usage: AIUsageInfo
+}
+
 // НОВАЯ функция оценки дня с Prompt Caching
 export async function evaluateDayNew(
   request: DailyEvaluationRequest
 ): Promise<DailyEvaluationResponse> {
+  const { result } = await evaluateDayNewWithUsage(request)
+  return result
+}
+
+// Версия с возвратом usage для логирования
+export async function evaluateDayNewWithUsage(
+  request: DailyEvaluationRequest
+): Promise<EvaluationResultWithUsage> {
+  const startTime = Date.now()
+  
   // Проверка наличия мечты и целей
   const validation = validateGoals(request)
   if (!validation.valid && validation.response) {
-    return validation.response
+    return {
+      result: validation.response,
+      usage: { model: 'none', inputTokens: 0, outputTokens: 0, durationMs: 0 },
+    }
   }
 
   // Sanitize user inputs to prevent prompt injection
@@ -309,6 +335,8 @@ export async function evaluateDayNew(
     })
   })
 
+  const durationMs = Date.now() - startTime
+
   // Логируем статистику кэширования
   logCacheStats('evaluateDayNew', message.usage)
 
@@ -322,7 +350,7 @@ export async function evaluateDayNew(
   )
 
   // Clamp scores to valid range (safety measure)
-  return {
+  const result = {
     ...parsedResponse,
     dream_progress_score: clampScore(parsedResponse.dream_progress_score),
     strategy_score: clampScore(parsedResponse.strategy_score),
@@ -330,6 +358,16 @@ export async function evaluateDayNew(
     team_score: clampScore(parsedResponse.team_score),
     efficiency_score: clampScore(parsedResponse.efficiency_score),
     overall_score: clampScore(parsedResponse.overall_score),
+  }
+
+  return {
+    result,
+    usage: {
+      model: 'claude-sonnet-4-5-20250929',
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+      durationMs,
+    },
   }
 }
 

@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import ThemeToggle from './ThemeToggle'
 
 const navItems = [
@@ -19,12 +20,47 @@ const navItems = [
 
 export default function Navigation() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [userName, setUserName] = useState<string | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  // Скрываем навигацию на страницах авторизации
+  const isAuthPage = pathname === '/login' || pathname === '/register'
+
+  useEffect(() => {
+    // Получаем информацию о текущем пользователе
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) {
+          setUserName(data.user.name || data.user.email)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const isActive = (href: string) => {
     if (href === '/') {
       return pathname === '/'
     }
     return pathname.startsWith(href)
+  }
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
+  // Не рендерим навигацию на страницах авторизации
+  if (isAuthPage) {
+    return null
   }
 
   return (
@@ -50,8 +86,22 @@ export default function Navigation() {
             ))}
           </div>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center space-x-3">
           <ThemeToggle />
+          {userName && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {userName}
+              </span>
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
+              >
+                {isLoggingOut ? '...' : 'Выход'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>

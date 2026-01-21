@@ -14,6 +14,7 @@ import {
 } from '@/lib/prompts/plan-chat'
 import { getUserStatsForAI } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
+import { logAIUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -280,6 +281,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Вызов Claude API
+    const startTime = Date.now()
     const response = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022',  // Haiku для чата - дешевле
       max_tokens: 1024,
@@ -291,6 +293,18 @@ export async function POST(request: NextRequest) {
         },
       ],
       messages: claudeMessages,
+    })
+    const durationMs = Date.now() - startTime
+
+    // Логируем использование AI
+    await logAIUsage({
+      userId,
+      endpoint: 'chat',
+      model: 'claude-3-5-haiku-20241022',
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      durationMs,
+      success: true,
     })
 
     const assistantMessage = response.content[0].type === 'text' 

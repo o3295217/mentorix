@@ -1,8 +1,35 @@
 import { NextResponse } from 'next/server';
 import { loginUser } from '@/lib/auth';
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+
+// Rate limiter для login - строгий для защиты от брутфорса
+const loginRateLimiter = {
+  limit: 5, // 5 попыток
+  windowMs: 15 * 60 * 1000, // 15 минут
+  keyPrefix: 'login',
+};
 
 export async function POST(request: Request) {
   try {
+    // Проверяем rate limit
+    const clientId = getClientIdentifier(request);
+    const rateLimit = checkRateLimit(clientId, loginRateLimiter);
+    
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { 
+          error: 'Слишком много попыток. Попробуйте позже.',
+          retryAfter: Math.ceil((rateLimit.retryAfter || 0) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimit.retryAfter || 0) / 1000))
+          }
+        }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 

@@ -42,6 +42,7 @@ model User {
   periodEvaluations PeriodEvaluation[]
   worldContexts WorldContext[]
   sessions      Session[]
+  aiUsage       AIUsage[]
 
   @@map("users")
 }
@@ -59,6 +60,19 @@ model Session {
   @@index([userId])
   @@index([token])
   @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 // ==================== ЦЕЛИ ====================
@@ -426,4 +440,38 @@ model UserStats {
   updatedAt            DateTime @updatedAt
 
   @@map("user_stats")
+}
+
+// ==================== AI USAGE TRACKING ====================
+
+model AIUsage {
+  id             Int      @id @default(autoincrement())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Тип запроса: evaluate, chat, check-plan, forecast, period-eval
+  endpoint       String
+  
+  // Модель: claude-sonnet-4-5-20250929, claude-3-5-haiku-20241022
+  model          String
+  
+  // Использование токенов
+  inputTokens    Int
+  outputTokens   Int
+  totalTokens    Int
+  
+  // Примерная стоимость в центах (для Sonnet: $3/$15 per 1M tokens)
+  costCents      Float    @default(0)
+  
+  // Дополнительная информация
+  durationMs     Int?     // время выполнения запроса
+  success        Boolean  @default(true)
+  errorMessage   String?
+  
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@map("ai_usage")
 }

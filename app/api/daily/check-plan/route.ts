@@ -13,6 +13,7 @@ import {
   CheckPlanResponse
 } from '@/lib/prompts/check-plan'
 import { requireUserId } from '@/lib/get-user-id'
+import { logAIUsage } from '@/lib/ai-usage'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -158,6 +159,7 @@ export async function POST(request: NextRequest) {
     const userPrompt = buildCheckPlanPrompt(checkRequest)
 
     // Вызов Claude API
+    const startTime = Date.now()
     const message = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022',  // Haiku для проверки плана - дешевле
       max_tokens: 1024,
@@ -174,6 +176,18 @@ export async function POST(request: NextRequest) {
           content: userPrompt,
         },
       ],
+    })
+    const durationMs = Date.now() - startTime
+
+    // Логируем использование AI
+    await logAIUsage({
+      userId,
+      endpoint: 'check-plan',
+      model: 'claude-3-5-haiku-20241022',
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+      durationMs,
+      success: true,
     })
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : ''

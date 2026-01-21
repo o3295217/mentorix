@@ -319,6 +319,46 @@ export class AuthError extends Error {
   }
 }
 
+// Сброс пароля (для админа или CLI)
+export async function resetPassword(
+  email: string,
+  newPassword: string
+): Promise<AuthResult> {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return { success: false, error: 'Пользователь не найден' };
+    }
+
+    if (newPassword.length < 8) {
+      return { success: false, error: 'Пароль должен быть не менее 8 символов' };
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Удаляем все сессии пользователя
+    await prisma.session.deleteMany({ where: { userId: user.id } });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return { success: false, error: 'Ошибка при сбросе пароля' };
+  }
+}
+
+// Хэширование пароля (экспорт для CLI)
+export async function hashPasswordForReset(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + process.env.AUTH_SECRET);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Создание первого админа (использовать при первом запуске)
 export async function createInitialAdmin(
   email: string,

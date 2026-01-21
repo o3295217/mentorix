@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { evaluateDayNew, updateUserInsights } from '@/lib/anthropic'
+import { evaluateDayNewWithUsage, updateUserInsights } from '@/lib/anthropic'
 import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
@@ -9,6 +9,7 @@ import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
 import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
+import { logAIUsage } from '@/lib/ai-usage'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
@@ -169,8 +170,19 @@ export async function POST(request: NextRequest) {
       openTasks: openTasks.map((t) => `[${t.taskType}] ${t.taskText}`),
     }
 
-    // Вызвать Claude API (НОВАЯ ФУНКЦИЯ)
-    const evaluationResponse = await evaluateDayNew(evaluationRequest)
+    // Вызвать Claude API (с логированием usage)
+    const { result: evaluationResponse, usage } = await evaluateDayNewWithUsage(evaluationRequest)
+
+    // Логируем использование AI
+    await logAIUsage({
+      userId,
+      endpoint: 'evaluate',
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      durationMs: usage.durationMs,
+      success: true,
+    })
 
     // Подготовить данные для сохранения (DRY - не дублируем в create/update)
     const evaluationData = {
