@@ -6,6 +6,7 @@ import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { useDaily } from '@/hooks/useDaily'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
+import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 
@@ -13,6 +14,9 @@ export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  const [showUncompletedModal, setShowUncompletedModal] = useState(false)
+  const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
+  const [userName, setUserName] = useState<string>('Вы')
 
   // Модальное окно создания привычки
   const [showHabitModal, setShowHabitModal] = useState(false)
@@ -99,6 +103,72 @@ export default function DailyPage() {
     )
   }
 
+  // Проверка невыполненных задач перед оценкой
+  const handleEvaluateClick = () => {
+    // Найти невыполненные задачи: есть в плане (tasks), но не отмечены (не в selectedTasks)
+    const uncompleted = tasks.filter(t => !selectedTasks.has(t.id))
+    
+    if (uncompleted.length > 0) {
+      // Есть невыполненные — показываем модалку
+      setUncompletedTasks(uncompleted.map(t => ({
+        id: t.id,
+        taskText: t.taskText,
+        transferCount: undefined // TODO: можно добавить отслеживание
+      })))
+      setShowUncompletedModal(true)
+    } else {
+      // Все задачи выполнены — сразу оцениваем
+      evaluate(router)
+    }
+  }
+
+  // Обработка решений по невыполненным задачам
+  const handleUncompletedDecisions = async (decisions: TaskDecision[]) => {
+    setShowUncompletedModal(false)
+    
+    // Отправляем решения на сервер
+    try {
+      const res = await fetch('/api/tasks/process-uncompleted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decisions,
+          sourceDate: selectedDate
+        })
+      })
+      
+      if (!res.ok) {
+        console.error('Error processing uncompleted tasks')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
+    
+    // Продолжаем оценку
+    evaluate(router)
+  }
+
+  // Загрузка имени пользователя
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.user?.name) {
+            setUserName(data.user.name)
+          } else if (data?.user?.email) {
+            // Если нет имени, берём первую часть email
+            setUserName(data.user.email.split('@')[0])
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadUserName()
+  }, [])
+
   // Прокрутка чата вниз при новых сообщениях
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -178,8 +248,8 @@ export default function DailyPage() {
 
       {/* Context from periods */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-          <h3 className="font-medium text-sm text-blue-900 mb-2">🎯 Цели текущей недели:</h3>
+        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
+          <h3 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-2">Цели текущей недели:</h3>
           {weekGoals.length > 0 ? (
             <ul className="text-xs text-blue-800 space-y-0.5">
               {weekGoals.map((goal, index) => (
@@ -201,8 +271,8 @@ export default function DailyPage() {
           )}
         </div>
 
-        <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
-          <h3 className="font-medium text-sm text-purple-900 mb-2">📋 Цели текущего месяца:</h3>
+        <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700">
+          <h3 className="font-medium text-sm text-purple-900 dark:text-purple-100 mb-2">Цели текущего месяца:</h3>
           {monthGoals.length > 0 ? (
             <ul className="text-xs text-purple-800 space-y-0.5">
               {monthGoals.map((goal, index) => (
@@ -228,8 +298,8 @@ export default function DailyPage() {
       {/* Plan and Chat side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Plan - Left */}
-        <div className="card flex flex-col" style={{ minHeight: '500px' }}>
-          <div className="flex items-center justify-between mb-4">
+        <div className="card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
+          <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
             <h2 className="text-xl font-bold">📝 План на день</h2>
             {totalCount > 0 && (
               <span className={`text-sm px-3 py-1 rounded-full ${
@@ -244,7 +314,7 @@ export default function DailyPage() {
           </div>
 
           {/* Добавление новой задачи */}
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex gap-2 flex-shrink-0 pr-6">
             <input
               type="text"
               value={newTaskText}
@@ -256,7 +326,7 @@ export default function DailyPage() {
                 }
               }}
               placeholder="Добавить задачу..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
             />
             <button
               onClick={addTask}
@@ -272,9 +342,9 @@ export default function DailyPage() {
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
 
             return (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-amber-900 text-sm">🔄 Привычки на сегодня</h3>
+                  <h3 className="font-medium text-amber-900 dark:text-amber-100 text-sm">🔄 Привычки на сегодня</h3>
                   {habitsNotInPlan.length > 0 && (
                     <button
                       onClick={() => addHabitsToTasks()}
@@ -292,8 +362,8 @@ export default function DailyPage() {
                         key={habit.id}
                         className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
                           isInPlan
-                            ? 'bg-green-100 text-green-700 line-through opacity-60'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 line-through opacity-60'
+                            : 'bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200'
                         }`}
                       >
                         <button
@@ -328,7 +398,7 @@ export default function DailyPage() {
 
           {/* Предложения создать привычки */}
           {habitSuggestions.length > 0 && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg mr-6">
               <h3 className="font-medium text-blue-900 text-sm mb-2">💡 Сделать привычкой?</h3>
               <div className="space-y-2">
                 {habitSuggestions.slice(0, 3).map((suggestion, index) => (
@@ -349,7 +419,7 @@ export default function DailyPage() {
           )}
 
           {/* Список задач */}
-          <div className="space-y-2 flex-1 overflow-y-auto">
+          <div className="space-y-2 flex-1 overflow-y-auto pr-6 chat-scrollbar">
             {tasks.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
                 Добавьте задачи на день...
@@ -366,13 +436,13 @@ export default function DailyPage() {
                     editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
                   } ${
                     selectedTasks.has(task.id)
-                      ? 'bg-green-50 border-green-300'
+                      ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700'
                       : savedFlags[index]
-                        ? 'bg-white border-gray-200 hover:border-gray-300'
-                        : 'bg-white border-gray-200 hover:border-gray-300 opacity-60'
+                        ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 opacity-60'
                   } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                 >
-                  <span className="text-gray-400 cursor-grab active:cursor-grabbing">⋮⋮</span>
+                  <span className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">⋮⋮</span>
                   <input
                     type="checkbox"
                     checked={selectedTasks.has(task.id)}
@@ -395,11 +465,11 @@ export default function DailyPage() {
                       }}
                       onBlur={() => saveEditedTask(task.id)}
                       autoFocus
-                      className="flex-1 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="flex-1 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white dark:border-primary-600"
                     />
                   ) : (
                     <span
-                      className={`flex-1 text-sm ${selectedTasks.has(task.id) ? 'line-through text-gray-500' : ''}`}
+                      className={`flex-1 text-sm text-gray-900 dark:text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-500 dark:text-gray-400' : ''}`}
                       onDoubleClick={() => startEditingTask(task.id, task.taskText)}
                       title="Дважды кликните для редактирования"
                     >
@@ -454,8 +524,8 @@ export default function DailyPage() {
           </div>
 
           {/* Вне плана (перевыполнение) */}
-          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <h3 className="font-medium text-sm text-gray-700 mb-2">➕ Вне плана (перевыполнение)</h3>
+          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mr-6">
+            <h3 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">➕ Вне плана (перевыполнение)</h3>
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
@@ -468,7 +538,7 @@ export default function DailyPage() {
                   }
                 }}
                 placeholder="Добавить сделанное вне плана..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
               />
               <button onClick={addExtraTask} className="btn-primary text-sm py-2">
                 Добавить
@@ -476,11 +546,11 @@ export default function DailyPage() {
             </div>
 
             {extraTasks.length === 0 ? (
-              <p className="text-xs text-gray-500">Нет</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Нет</p>
             ) : (
               <div className="space-y-1">
                 {extraTasks.map((text, index) => (
-                  <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-white border border-gray-200 rounded px-2 py-1">
+                  <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100">
                     <span className="flex-1">{text}</span>
                     <button
                       onClick={() => removeExtraTask(index)}
@@ -495,34 +565,26 @@ export default function DailyPage() {
             )}
           </div>
 
-          {/* Три кнопки - закреплены внизу */}
-          <div className="grid grid-cols-3 gap-2 mt-auto pt-4">
+          {/* Кнопка сохранения - закреплена внизу */}
+          <div className="mt-auto pt-4 flex-shrink-0 pr-6">
             <button 
               onClick={savePlan} 
               disabled={saving} 
-              className={`btn-primary disabled:opacity-50 text-sm py-2 ${hasUnsavedChanges ? 'ring-2 ring-orange-400 ring-offset-2' : ''}`}
+              className={`btn-primary disabled:opacity-50 w-full ${hasUnsavedChanges ? 'ring-2 ring-orange-400 ring-offset-2' : ''}`}
             >
-              {saving ? '...' : hasUnsavedChanges ? '⚠️ Сохранить план' : '💾 Сохранить план'}
-            </button>
-            <button 
-              onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации. Какие задачи из целей недели/месяца я мог бы ещё добавить?')}
-              disabled={sendingChat || tasks.length === 0} 
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 text-sm"
-              title="ИИ проверит план"
-            >
-              {sendingChat ? '...' : '🔍 Оценка'}
+              {saving ? 'Сохранение...' : hasUnsavedChanges ? '⚠️ Сохранить план' : '💾 Сохранить план'}
             </button>
           </div>
         </div>
 
         {/* Chat - Right */}
-        <div className="card flex flex-col" style={{ minHeight: '500px' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">💬 Обсуждение с ИИ</h2>
+        <div className="card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
+          <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
+            <h2 className="text-xl font-bold">💬 Обсуждение плана с ION</h2>
             {chatMessages.length > 0 && (
               <button 
                 onClick={clearChat}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 title="Очистить чат"
               >
                 🗑️ Очистить
@@ -530,16 +592,43 @@ export default function DailyPage() {
             )}
           </div>
 
-          {/* Сообщения чата */}
+          {/* Сообщения чата - занимает всё свободное пространство */}
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 mb-4 p-2 bg-gray-50 rounded-lg"
-            style={{ maxHeight: '350px' }}
+            className="flex-1 overflow-y-auto space-y-3 py-2 pl-2 pr-6 bg-gray-50 dark:bg-gray-800 rounded-l-lg chat-scrollbar"
           >
             {chatMessages.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">
-                <p className="mb-2">Нажмите "🔍 Оценка" чтобы получить рекомендации по плану</p>
-                <p className="text-sm">Или напишите вопрос ИИ-помощнику</p>
+              <div className="py-4 space-y-3">
+                <p className="text-center text-gray-400 dark:text-gray-500 text-sm mb-4">Спросите ION:</p>
+                <button
+                  onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации')}
+                  disabled={sendingChat || tasks.length === 0}
+                  className="w-full p-3 text-left bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <span className="text-lg mr-2">🔍</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Проанализировать план</span>
+                </button>
+                <button
+                  onClick={() => sendChatMessage('Оцени временные затраты на каждую задачу и скажи, реалистичен ли план по времени')}
+                  disabled={sendingChat || tasks.length === 0}
+                  className="w-full p-3 text-left bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <span className="text-lg mr-2">⏰</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Оценить время</span>
+                </button>
+                <button
+                  onClick={() => sendChatMessage('Как мой план связан с целями недели и месяца? Какие задачи стоит добавить?')}
+                  disabled={sendingChat || tasks.length === 0}
+                  className="w-full p-3 text-left bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <span className="text-lg mr-2">🎯</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Связь с целями</span>
+                </button>
+                {tasks.length === 0 && (
+                  <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    Добавьте задачи в план
+                  </p>
+                )}
               </div>
             ) : (
               chatMessages.map((msg, index) => (
@@ -547,13 +636,13 @@ export default function DailyPage() {
                   key={index}
                   className={`p-3 rounded-lg ${
                     msg.role === 'user'
-                      ? 'bg-primary-100 ml-8'
-                      : 'bg-white border border-gray-200 mr-8'
+                      ? 'bg-primary-100 dark:bg-primary-900/30'
+                      : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium">
-                      {msg.role === 'user' ? '👤 Вы' : '🤖 ИИ'}
+                      {msg.role === 'user' ? `👤 ${userName}` : '🤖 ION'}
                     </span>
                   </div>
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -561,21 +650,25 @@ export default function DailyPage() {
               ))
             )}
             {sendingChat && (
-              <div className="p-3 rounded-lg bg-white border border-gray-200 mr-8">
+              <div className="p-3 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">🤖 ИИ</span>
+                  <span className="text-sm font-medium">🤖 ION</span>
                   <span className="text-sm text-gray-400">печатает...</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Ввод сообщения */}
-          <div className="flex gap-2">
-            <input
-              type="text"
+          {/* Ввод сообщения - прижато к низу */}
+          <div className="flex gap-2 items-center mt-3 flex-shrink-0 pr-6">
+            <textarea
               value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
+              onChange={(e) => {
+                setChatInput(e.target.value)
+                // Автоматическое расширение
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -584,12 +677,14 @@ export default function DailyPage() {
               }}
               placeholder="Напишите сообщение..."
               disabled={sendingChat}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
+              rows={1}
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-800 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
+              style={{ minHeight: '42px' }}
             />
             <button
               onClick={() => sendChatMessage()}
               disabled={sendingChat || !chatInput.trim()}
-              className="btn-primary disabled:opacity-50"
+              className="self-end mb-0.5 w-10 h-10 flex items-center justify-center bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
             >
               ➤
             </button>
@@ -598,28 +693,28 @@ export default function DailyPage() {
       </div>
 
       {/* Evaluate */}
-      <div className="card bg-gradient-to-r from-primary-50 to-purple-50 border border-primary-200">
-        <h2 className="text-xl font-bold mb-4">🤖 Получить оценку дня от ИИ</h2>
-        <p className="text-gray-700 mb-4">
+      <div className="card bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-900/30 dark:to-purple-900/30 border border-primary-200 dark:border-primary-700">
+        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Получить оценку дня от ION</h2>
+        <p className="text-gray-700 dark:text-gray-300 mb-4">
           После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
         </p>
         <button
-          onClick={() => evaluate(router)}
+          onClick={handleEvaluateClick}
           disabled={evaluating || selectedTasks.size === 0}
           className="btn-primary disabled:opacity-50"
         >
           {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
         </button>
         {dailyEntry?.evaluation && (
-          <p className="mt-4 text-sm text-green-700">
+          <p className="mt-4 text-sm text-green-700 dark:text-green-400">
             ✅ Оценка за этот день уже получена. Вы можете получить новую оценку.
           </p>
         )}
       </div>
 
       {message && (
-        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
-          <p className="font-medium">{message}</p>
+        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
+          <p className="font-medium text-gray-900 dark:text-white">{message}</p>
         </div>
       )}
 
@@ -713,6 +808,16 @@ export default function DailyPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Модалка невыполненных задач */}
+      {showUncompletedModal && (
+        <UncompletedTasksModal
+          tasks={uncompletedTasks}
+          currentDate={selectedDate}
+          onComplete={handleUncompletedDecisions}
+          onCancel={() => setShowUncompletedModal(false)}
+        />
       )}
     </div>
   )

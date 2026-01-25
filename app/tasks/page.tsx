@@ -170,7 +170,7 @@ export default function TasksPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600">Загрузка...</div>
+        <div className="text-lg text-gray-600 dark:text-gray-400">Загрузка...</div>
       </div>
     )
   }
@@ -181,27 +181,27 @@ export default function TasksPage() {
 
       {openTasks.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-gray-600">Все задачи закрыты! 🎉</p>
+          <p className="text-gray-600 dark:text-gray-400">Все задачи закрыты! 🎉</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Strategic Tasks */}
           <div className="card">
-            <h2 className="text-xl font-bold mb-4 text-purple-700">🎯 Стратегические задачи</h2>
+            <h2 className="text-xl font-bold mb-4 text-purple-700 dark:text-purple-400">🎯 Стратегические задачи</h2>
             {strategicOpen.length === 0 ? (
-              <p className="text-gray-600 text-sm">Нет стратегических задач</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Нет стратегических задач</p>
             ) : (
               <div className="space-y-3">
                 {strategicOpen.map((task) => (
-                  <div key={task.id} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <p className="text-gray-800 mb-2">{task.taskText}</p>
+                  <div key={task.id} className="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <p className="text-gray-800 dark:text-gray-200 mb-2">{task.taskText}</p>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">
+                      <span className="text-gray-600 dark:text-gray-400">
                         {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
                       <div className="flex gap-3 items-center">
                         {tasksInPlan[task.id] ? (
-                          <span className="text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
+                          <span className="text-green-600 dark:text-green-400 font-medium bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded">
                             ✓ в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
                               ? '' 
                               : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
@@ -230,21 +230,21 @@ export default function TasksPage() {
 
           {/* Operational Tasks */}
           <div className="card">
-            <h2 className="text-xl font-bold mb-4 text-blue-700">⚙️ Операционные задачи</h2>
+            <h2 className="text-xl font-bold mb-4 text-blue-700 dark:text-blue-400">⚙️ Операционные задачи</h2>
             {operationalOpen.length === 0 ? (
-              <p className="text-gray-600 text-sm">Нет операционных задач</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Нет операционных задач</p>
             ) : (
               <div className="space-y-3">
                 {operationalOpen.map((task) => (
-                  <div key={task.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-gray-800 mb-2">{task.taskText}</p>
+                  <div key={task.id} className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <p className="text-gray-800 dark:text-gray-200 mb-2">{task.taskText}</p>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">
+                      <span className="text-gray-600 dark:text-gray-400">
                         {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
                       <div className="flex gap-3 items-center">
                         {tasksInPlan[task.id] ? (
-                          <span className="text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
+                          <span className="text-green-600 dark:text-green-400 font-medium bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded">
                             ✓ в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
                               ? '' 
                               : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
@@ -278,7 +278,7 @@ export default function TasksPage() {
         <div className="mt-8">
           <button
             onClick={() => setShowClosed(!showClosed)}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-medium"
           >
             <span className={`transition-transform ${showClosed ? 'rotate-90' : ''}`}>▶</span>
             Закрытые задачи ({closedTasks.length})
@@ -287,17 +287,17 @@ export default function TasksPage() {
           {showClosed && (
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Closed Strategic */}
-              <div className="card bg-gray-50">
-                <h2 className="text-xl font-bold mb-4 text-gray-500">🎯 Стратегические (закрытые)</h2>
+              <div className="card bg-gray-50 dark:bg-gray-800">
+                <h2 className="text-xl font-bold mb-4 text-gray-500 dark:text-gray-400">🎯 Стратегические (закрытые)</h2>
                 {strategicClosed.length === 0 ? (
-                  <p className="text-gray-500 text-sm">Нет закрытых стратегических задач</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Нет закрытых стратегических задач</p>
                 ) : (
                   <div className="space-y-3">
                     {strategicClosed.map((task) => (
-                      <div key={task.id} className="p-4 bg-white rounded-lg border border-gray-200">
-                        <p className="text-gray-500 line-through mb-2">{task.taskText}</p>
+                      <div key={task.id} className="p-4 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <p className="text-gray-500 dark:text-gray-400 line-through mb-2">{task.taskText}</p>
                         <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-500">
+                          <div className="text-gray-500 dark:text-gray-400">
                             {task.closedAt && format(new Date(task.closedAt), 'd MMM yyyy', { locale: ru })}
                           </div>
                           <button
@@ -314,17 +314,17 @@ export default function TasksPage() {
               </div>
 
               {/* Closed Operational */}
-              <div className="card bg-gray-50">
-                <h2 className="text-xl font-bold mb-4 text-gray-500">⚙️ Операционные (закрытые)</h2>
+              <div className="card bg-gray-50 dark:bg-gray-800">
+                <h2 className="text-xl font-bold mb-4 text-gray-500 dark:text-gray-400">⚙️ Операционные (закрытые)</h2>
                 {operationalClosed.length === 0 ? (
-                  <p className="text-gray-500 text-sm">Нет закрытых операционных задач</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Нет закрытых операционных задач</p>
                 ) : (
                   <div className="space-y-3">
                     {operationalClosed.map((task) => (
-                      <div key={task.id} className="p-4 bg-white rounded-lg border border-gray-200">
-                        <p className="text-gray-500 line-through mb-2">{task.taskText}</p>
+                      <div key={task.id} className="p-4 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <p className="text-gray-500 dark:text-gray-400 line-through mb-2">{task.taskText}</p>
                         <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-500">
+                          <div className="text-gray-500 dark:text-gray-400">
                             {task.closedAt && format(new Date(task.closedAt), 'd MMM yyyy', { locale: ru })}
                           </div>
                           <button
@@ -345,23 +345,23 @@ export default function TasksPage() {
       )}
 
       {message && (
-        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
-          <p className="font-medium">{message}</p>
+        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
+          <p className="font-medium text-gray-900 dark:text-gray-100">{message}</p>
         </div>
       )}
 
       {/* Модальное окно выбора даты */}
       {showDateModal && selectedTask && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-            <h3 className="text-xl font-bold mb-4">📅 Добавить в план</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">📅 Добавить в план</h3>
             
-            <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
               {selectedTask.taskText}
             </p>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">На какой день?</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">На какой день?</label>
               
               {/* Быстрые кнопки */}
               <div className="flex gap-2 mb-3">
@@ -370,7 +370,7 @@ export default function TasksPage() {
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                     selectedDate === format(new Date(), 'yyyy-MM-dd')
                       ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   Сегодня
@@ -380,7 +380,7 @@ export default function TasksPage() {
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                     selectedDate === format(addDays(new Date(), 1), 'yyyy-MM-dd')
                       ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   Завтра
@@ -393,14 +393,14 @@ export default function TasksPage() {
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 min={format(new Date(), 'yyyy-MM-dd')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               />
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => setShowDateModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
               >
                 Отмена
               </button>

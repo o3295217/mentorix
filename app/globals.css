@@ -6,6 +6,13 @@
   body {
     @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
   }
+  
+  /* Dark mode для нативных date picker */
+  .dark input[type="date"],
+  .dark input[type="datetime-local"],
+  .dark input[type="time"] {
+    color-scheme: dark;
+  }
 }
 
 @layer components {
@@ -51,5 +58,41 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  /* Тонкий скроллбар для чата - как в VS Code */
+  .chat-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  
+  .chat-scrollbar:hover {
+    scrollbar-color: rgba(100, 100, 100, 0.4) transparent;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    background: transparent;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+  }
+  
+  .chat-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 100, 100, 0.4);
+  }
+  
+  .dark .chat-scrollbar:hover {
+    scrollbar-color: rgba(150, 150, 150, 0.4) transparent;
+  }
+  
+  .dark .chat-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(150, 150, 150, 0.4);
   }
 }

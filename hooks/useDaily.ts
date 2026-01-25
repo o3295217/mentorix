@@ -145,10 +145,34 @@ export function useDaily(): UseDailyReturn {
   const [checkingPlan, setCheckingPlan] = useState(false)
   const [checkPlanResult, setCheckPlanResult] = useState<CheckPlanResult | null>(null)
   
-  // Chat state
+  // Chat state - привязан к дате
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [sendingChat, setSendingChat] = useState(false)
+  
+  // Функция получения ключа чата для даты
+  const getChatKey = useCallback((date: string) => `daily:chat:${date}`, [])
+  
+  // Очистка старых чатов (>14 дней)
+  const cleanupOldChats = useCallback(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const keys = Object.keys(window.localStorage)
+      const chatKeys = keys.filter(k => k.startsWith('daily:chat:'))
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - 14)
+      
+      chatKeys.forEach(key => {
+        const dateStr = key.replace('daily:chat:', '')
+        const chatDate = new Date(dateStr)
+        if (!isNaN(chatDate.getTime()) && chatDate < cutoffDate) {
+          window.localStorage.removeItem(key)
+        }
+      })
+    } catch {
+      // ignore
+    }
+  }, [])
   
   // Habits state
   const [habits, setHabits] = useState<Habit[]>([])
@@ -159,6 +183,9 @@ export function useDaily(): UseDailyReturn {
 
   // Track the current date to prevent race conditions when switching dates quickly
   const currentDateRef = useRef(selectedDate)
+  
+  // Ref для предыдущей даты (для сохранения чата при смене)
+  const previousDateRef = useRef(selectedDate)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -168,6 +195,73 @@ export function useDaily(): UseDailyReturn {
       // ignore
     }
   }, [selectedDate])
+
+  // Ref для хранения текущих сообщений (избегаем зависимости от chatMessages в useEffect)
+  const chatMessagesRef = useRef<ChatMessage[]>([])
+  chatMessagesRef.current = chatMessages
+
+  // Ref для предыдущей даты
+  const prevDateForChatRef = useRef<string | null>(null)
+  
+  // Ref чтобы пропустить первое сохранение после смены даты
+  const skipNextChatSaveRef = useRef(false)
+
+  // Единый useEffect для загрузки/сохранения чата при смене даты
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const currentDate = selectedDate
+    const prevDate = prevDateForChatRef.current
+    
+    // Если это та же дата - ничего не делаем
+    if (prevDate === currentDate) return
+    
+    // Сохраняем чат предыдущей даты (если была)
+    if (prevDate && chatMessagesRef.current.length > 0) {
+      try {
+        window.localStorage.setItem(`daily:chat:${prevDate}`, JSON.stringify(chatMessagesRef.current))
+      } catch {}
+    }
+    
+    // Устанавливаем флаг чтобы не перезаписать загруженные данные
+    skipNextChatSaveRef.current = true
+    
+    // Загружаем чат для новой даты
+    try {
+      const saved = window.localStorage.getItem(`daily:chat:${currentDate}`)
+      const messages = saved ? JSON.parse(saved) : []
+      setChatMessages(messages)
+    } catch {
+      setChatMessages([])
+    }
+    
+    // Обновляем ref
+    prevDateForChatRef.current = currentDate
+    
+    // Очищаем старые чаты (один раз)
+    cleanupOldChats()
+  }, [selectedDate, cleanupOldChats])
+  
+  // Сохраняем чат при изменении сообщений
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!prevDateForChatRef.current) return // Ещё не было первой загрузки
+    
+    // Пропускаем сохранение сразу после смены даты (данные только что загружены)
+    if (skipNextChatSaveRef.current) {
+      skipNextChatSaveRef.current = false
+      return
+    }
+    
+    try {
+      if (chatMessages.length > 0) {
+        window.localStorage.setItem(`daily:chat:${selectedDate}`, JSON.stringify(chatMessages))
+      } else {
+        // Если чат пустой — удаляем ключ
+        window.localStorage.removeItem(`daily:chat:${selectedDate}`)
+      }
+    } catch {}
+  }, [chatMessages, selectedDate])
 
   // Ref для отслеживания даты при записи черновика (чтобы не записать старые данные под новую дату)
   const draftDateRef = useRef(selectedDate)
@@ -458,7 +552,7 @@ export function useDaily(): UseDailyReturn {
     setSelectedTasks(new Set())
     setExtraTasks([])
     setNewTaskText('')
-    setChatMessages([])
+    // НЕ сбрасываем chatMessages — они загружаются отдельным useEffect из localStorage
     setCheckPlanResult(null)
     loadData()
   }, [selectedDate]) // Intentionally not including loadData to prevent infinite loops
@@ -938,7 +1032,15 @@ export function useDaily(): UseDailyReturn {
   const clearChat = useCallback(() => {
     setChatMessages([])
     setChatInput('')
-  }, [])
+    // Удаляем чат из localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem(getChatKey(selectedDate))
+      } catch {
+        // ignore
+      }
+    }
+  }, [selectedDate, getChatKey])
 
   const evaluate = useCallback(async (router: { push: (path: string) => void }) => {
     // Факт = отмеченные задачи
