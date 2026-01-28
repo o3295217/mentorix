@@ -410,14 +410,14 @@ export default function DailyPage() {
                     <div className="flex gap-1 flex-shrink-0">
                       <button
                         onClick={() => createHabitFromTask(suggestion.text)}
-                        className="w-7 h-7 flex items-center justify-center bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded transition-colors"
+                        className="w-6 h-6 flex items-center justify-center bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white text-sm rounded transition-colors"
                         title="Создать привычку"
                       >
                         ✓
                       </button>
                       <button
                         onClick={() => setDismissedSuggestions(prev => new Set([...prev, suggestion.text]))}
-                        className="w-7 h-7 flex items-center justify-center bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500 text-white rounded transition-colors"
+                        className="w-6 h-6 flex items-center justify-center bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500 text-white text-sm rounded transition-colors"
                         title="Скрыть"
                       >
                         ✕
@@ -503,7 +503,7 @@ export default function DailyPage() {
                               deleteHabit(habit.id)
                             }
                           }}
-                          className="text-amber-500 hover:text-red-500 text-sm px-1 py-1 opacity-70 hover:opacity-100 transition-all"
+                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-all"
                           title="Снять цикличность (удалить привычку)"
                         >
                           ⏹️
@@ -514,7 +514,7 @@ export default function DailyPage() {
                       return (
                         <button
                           onClick={() => openHabitModal(task.taskText)}
-                          className="text-amber-500 hover:text-amber-700 text-sm px-1 py-1 opacity-50 hover:opacity-100 transition-opacity"
+                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
                           title="Сделать привычкой"
                         >
                           🔄
@@ -524,7 +524,7 @@ export default function DailyPage() {
                   })()}
                   <button
                     onClick={() => removeTask(task.id)}
-                    className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
+                    className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                     title="Удалить задачу"
                   >
                     ✕
