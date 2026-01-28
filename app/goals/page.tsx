@@ -175,7 +175,7 @@ export default function GoalsPage() {
       <h1 className="text-3xl font-bold">Управление целями</h1>
 
       {/* Панель поиска и фильтров */}
-      <div className="card bg-white border border-gray-200">
+      <div className="card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-4 items-center">
           {/* Поиск */}
           <div className="flex-1 min-w-[200px]">
@@ -184,7 +184,7 @@ export default function GoalsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 Поиск целей..."
-              className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
+              className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50 focus:border-blue-400"
             />
           </div>
           
@@ -192,7 +192,7 @@ export default function GoalsPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'completed')}
-            className="px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50"
           >
             <option value="all">📋 Все</option>
             <option value="active">⏳ Активные</option>
@@ -203,7 +203,7 @@ export default function GoalsPage() {
           <select
             value={filterPriority ?? ''}
             onChange={(e) => setFilterPriority(e.target.value ? parseInt(e.target.value) : null)}
-            className="px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50"
           >
             <option value="">🎯 Все приоритеты</option>
             <option value="3">🔴 Высокий</option>
@@ -216,7 +216,7 @@ export default function GoalsPage() {
           <select
             value={filterTag ?? ''}
             onChange={(e) => setFilterTag(e.target.value || null)}
-            className="px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50"
           >
             <option value="">🏷️ Все теги</option>
             {(tags || []).map(tag => (
@@ -226,9 +226,9 @@ export default function GoalsPage() {
         </div>
         
         {/* Управление тегами */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm text-gray-500 font-medium">Теги:</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Теги:</span>
             {(tags || []).map(tag => (
               <span 
                 key={tag.id}
@@ -251,7 +251,7 @@ export default function GoalsPage() {
                 onChange={(e) => setNewTagName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
                 placeholder="Новый тег..."
-                className="px-2 py-1 text-xs border border-gray-200 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-800/50"
               />
               <input
                 type="color"
@@ -278,7 +278,7 @@ export default function GoalsPage() {
 
       {/* Иерархическое дерево целей */}
       {dreamGoal && (
-        <div className="card bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="card bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900/30 dark:to-blue-900/20">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
             <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-2 rounded-lg">📊</span>
             План достижения мечты
@@ -306,8 +306,8 @@ export default function GoalsPage() {
                   onCopyGoal={handleCopyGoal}
                 >
                   {detailLevel !== 'year' && (
-                    <div className="border-t border-gray-100 pt-4 space-y-3">
-                      <h4 className="font-semibold text-gray-600 text-sm flex items-center gap-2">
+                    <div className="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-3">
+                      <h4 className="font-semibold text-gray-600 dark:text-gray-300 text-sm flex items-center gap-2">
                         <span>📋</span>
                         Детализация по периодам:
                       </h4>
@@ -353,7 +353,7 @@ export default function GoalsPage() {
                                       <p className="text-base text-gray-500 font-medium">📅 Детализация по месяцам:</p>
                                       <button
                                         onClick={() => setShowAllPeriods(!showAllPeriods)}
-                                        className="text-base text-blue-500 hover:text-blue-700 transition-colors px-3 py-1.5 rounded hover:bg-blue-50"
+                                        className="text-base text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 transition-colors px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                       >
                                         {showAllPeriods ? '🙈 Скрыть пустые' : '👁 Показать все'}
                                       </button>
@@ -465,8 +465,8 @@ export default function GoalsPage() {
 
       {/* Message Toast */}
       {message && (
-        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
-          <p className="font-medium">{message}</p>
+        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
+          <p className="font-medium text-gray-900 dark:text-white">{message}</p>
         </div>
       )}
     </div>

@@ -15,6 +15,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(evaluations)
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error fetching period evaluations:', error)
     return NextResponse.json(
       { error: 'Failed to fetch period evaluations' },

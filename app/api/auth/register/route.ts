@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { registerUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 
 // Rate limiter для регистрации - защита от спама
 const registerRateLimiter = {
@@ -97,6 +98,15 @@ export async function POST(request: Request) {
       expires: result.session.expiresAt,
       path: '/',
     });
+
+    // Устанавливаем cookie темы (по умолчанию system)
+    response.cookies.set(THEME_COOKIE_KEY, DEFAULT_THEME_PREFERENCE, {
+      httpOnly: false,
+      secure: useSecureCookie,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    })
 
     return response;
   } catch (error) {

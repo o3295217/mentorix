@@ -15,7 +15,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Month parameter is required (format: YYYY-MM)' }, { status: 400 })
     }
 
+    if (!/^\d{4}-\d{2}$/.test(monthParam)) {
+      return NextResponse.json({ error: 'Invalid month format (expected: YYYY-MM)' }, { status: 400 })
+    }
+
     const [year, month] = monthParam.split('-').map(Number)
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+      return NextResponse.json({ error: 'Invalid month value (expected: YYYY-MM)' }, { status: 400 })
+    }
 
     // Начало и конец месяца
     const startDate = new Date(year, month - 1, 1)
@@ -56,10 +63,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(indicators)
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     console.error('Error fetching daily indicators:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch indicators', details: String(error) },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch indicators' }, { status: 500 })
   }
 }

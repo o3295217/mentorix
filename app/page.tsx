@@ -65,7 +65,7 @@ export default function HomePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600">Загрузка...</div>
+        <div className="text-lg text-gray-600 dark:text-gray-300">Загрузка...</div>
       </div>
     )
   }
@@ -74,7 +74,7 @@ export default function HomePage() {
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Добро пожаловать!</h1>
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Добро пожаловать!</h1>
         <p className="text-lg text-gray-600">{format(today, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
       </div>
 
@@ -98,8 +98,8 @@ export default function HomePage() {
         <h2 className="text-2xl font-bold mb-4">Сегодняшний день</h2>
         <div className="space-y-4">
           {!dailyEntry?.planText && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800">План на сегодня еще не создан</p>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+              <p className="text-yellow-800 dark:text-yellow-200">План на сегодня еще не создан</p>
               <Link href="/daily" className="btn-primary mt-2 inline-block">
                 Создать план
               </Link>
@@ -107,8 +107,8 @@ export default function HomePage() {
           )}
 
           {dailyEntry?.planText && !dailyEntry?.factText && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-800 mb-2">План на сегодня создан</p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+              <p className="text-blue-800 dark:text-blue-200 mb-2">План на сегодня создан</p>
               <Link href="/daily" className="btn-primary inline-block">
                 Добавить факт выполнения
               </Link>
@@ -116,8 +116,8 @@ export default function HomePage() {
           )}
 
           {dailyEntry?.factText && !dailyEntry?.evaluation && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-green-800 mb-2">План и факт заполнены</p>
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+              <p className="text-green-800 dark:text-green-200 mb-2">План и факт заполнены</p>
               <Link href="/daily" className="btn-primary inline-block">
                 Получить оценку
               </Link>
@@ -125,8 +125,8 @@ export default function HomePage() {
           )}
 
           {dailyEntry?.evaluation && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <p className="text-purple-800 mb-2">
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
+              <p className="text-purple-800 dark:text-purple-200 mb-2">
                 Оценка за сегодня: <span className="font-bold text-2xl">{dailyEntry.evaluation.overallScore}</span>/10
               </p>
               <Link href={`/evaluation/${format(today, 'yyyy-MM-dd')}`} className="btn-primary inline-block">
@@ -142,32 +142,32 @@ export default function HomePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link href="/daily" className="card hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold mb-2">📝 Ежедневное планирование</h3>
-          <p className="text-gray-600">Создайте план на день и добавьте факт выполнения</p>
+          <p className="text-gray-600 dark:text-gray-300">Создайте план на день и добавьте факт выполнения</p>
         </Link>
 
         <Link href="/goals" className="card hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold mb-2">🎯 Управление целями</h3>
-          <p className="text-gray-600">Установите цели на неделю, месяц, квартал и год</p>
+          <p className="text-gray-600 dark:text-gray-300">Установите цели на неделю, месяц, квартал и год</p>
         </Link>
 
-        <Link href="/periods" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50">
+        <Link href="/periods" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30">
           <h3 className="text-lg font-semibold mb-2">📊 Периодические оценки</h3>
-          <p className="text-gray-600">Получите оценку недели, месяца, квартала или года от ИИ</p>
+          <p className="text-gray-600 dark:text-gray-300">Получите оценку недели, месяца, квартала или года от ИИ</p>
         </Link>
 
-        <Link href="/forecast" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-purple-50">
+        <Link href="/forecast" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30">
           <h3 className="text-lg font-semibold mb-2">🔮 Прогнозы</h3>
-          <p className="text-gray-600">Узнайте прогноз достижения мечты и выполнения целей</p>
+          <p className="text-gray-600 dark:text-gray-300">Узнайте прогноз достижения мечты и выполнения целей</p>
         </Link>
 
         <Link href="/analytics" className="card hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold mb-2">📈 Аналитика</h3>
-          <p className="text-gray-600">Просмотрите статистику и тренды вашей эффективности</p>
+          <p className="text-gray-600 dark:text-gray-300">Просмотрите статистику и тренды вашей эффективности</p>
         </Link>
 
         <Link href="/tasks" className="card hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold mb-2">✅ Задачи</h3>
-          <p className="text-gray-600">Управляйте незакрытыми задачами и приоритетами</p>
+          <p className="text-gray-600 dark:text-gray-300">Управляйте незакрытыми задачами и приоритетами</p>
         </Link>
       </div>
     </div>

@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
     // Сохранить или обновить оценку (upsert для повторных оценок)
     const evaluation = await prisma.evaluation.upsert({
       where: { dailyEntryId },
-      create: { userId, dailyEntryId, ...evaluationData },
+      create: { dailyEntryId, ...evaluationData },
       update: evaluationData,
     })
 

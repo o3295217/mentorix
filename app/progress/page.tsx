@@ -78,9 +78,9 @@ export default function ProgressPage() {
       </div>
 
       {/* Спидометр - центральный элемент */}
-      <div className="card bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+      <div className="card bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/30 dark:to-slate-800/30 border-slate-200 dark:border-slate-700">
         <div className="text-center mb-4">
-          <h2 className="text-2xl font-bold text-slate-700">Скорость к мечте</h2>
+          <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-200">Скорость к мечте</h2>
         </div>
         <Speedometer 
           speed={stats.currentSpeed}
@@ -92,21 +92,21 @@ export default function ProgressPage() {
 
       {/* Dashboard метрик */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card text-center bg-gradient-to-br from-blue-50 to-blue-100">
+        <div className="card text-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/30">
           <div className="text-3xl mb-2">🛣️</div>
           <div className="text-3xl font-bold text-blue-600">{stats.productiveDays}</div>
           <div className="text-sm text-gray-600 mt-1">дней пройдено</div>
           <div className="text-xs text-gray-500 mt-1">из {stats.targetDays}</div>
         </div>
 
-        <div className="card text-center bg-gradient-to-br from-green-50 to-green-100">
+        <div className="card text-center bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/30">
           <div className="text-3xl mb-2">⛽</div>
           <div className="text-3xl font-bold text-green-600">{stats.fuelLevel}%</div>
           <div className="text-sm text-gray-600 mt-1">топливо (баланс)</div>
           <div className="text-xs text-gray-500 mt-1">здоровье + семья + энергия</div>
         </div>
 
-        <div className="card text-center bg-gradient-to-br from-purple-50 to-purple-100">
+        <div className="card text-center bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/30">
           <div className="text-3xl mb-2">🎯</div>
           <div className="text-3xl font-bold text-purple-600">
             {milestones.filter(m => m.achieved).length}/{milestones.length}
@@ -115,7 +115,7 @@ export default function ProgressPage() {
           <div className="text-xs text-gray-500 mt-1">достижения</div>
         </div>
 
-        <div className="card text-center bg-gradient-to-br from-orange-50 to-orange-100">
+        <div className="card text-center bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/30">
           <div className="text-3xl mb-2">📊</div>
           <div className="text-3xl font-bold text-orange-600">{stats.avgSpeed30d}</div>
           <div className="text-sm text-gray-600 mt-1">средняя скорость</div>
@@ -124,21 +124,21 @@ export default function ProgressPage() {
       </div>
 
       {/* Дорожная карта с вехами */}
-      <div className="card bg-gradient-to-r from-indigo-50 to-purple-50">
-        <h2 className="text-2xl font-bold mb-6 text-indigo-900">🗺️ Дорожная карта</h2>
+      <div className="card bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30">
+        <h2 className="text-2xl font-bold mb-6 text-indigo-900 dark:text-indigo-200">🗺️ Дорожная карта</h2>
 
         {/* Текущий уровень */}
-        <div className="mb-6 p-4 bg-white rounded-lg border-2 border-indigo-200">
+        <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-indigo-200 dark:border-indigo-700">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xl font-bold text-indigo-900">{level.name}</div>
+            <div className="text-xl font-bold text-indigo-900 dark:text-indigo-200">{level.name}</div>
             {level.next && (
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-300">
                 До следующего: <span className="font-bold">{level.next - stats.productiveDays}</span> дней
               </div>
             )}
           </div>
           {level.next && (
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500"
                 style={{ width: `${level.progress}%` }}

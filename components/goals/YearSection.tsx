@@ -60,16 +60,16 @@ export default function YearSection({
     : 'from-amber-500 to-orange-500 border-amber-300 bg-amber-50'
 
   const headerBg = distance === 0 
-    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100' 
+    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30' 
     : distance === 1 
-    ? 'bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100' 
+    ? 'bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 dark:from-blue-900/20 dark:to-cyan-900/20 dark:hover:from-blue-900/30 dark:hover:to-cyan-900/30' 
     : distance <= 3 
-    ? 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100' 
-    : 'bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100'
+    ? 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30' 
+    : 'bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 dark:hover:from-amber-900/30 dark:hover:to-orange-900/30'
 
-  const borderColor = distance === 0 ? 'border-emerald-200' : distance === 1 ? 'border-blue-200' : distance <= 3 ? 'border-purple-200' : 'border-amber-200'
+  const borderColor = distance === 0 ? 'border-emerald-200 dark:border-emerald-700' : distance === 1 ? 'border-blue-200 dark:border-blue-700' : distance <= 3 ? 'border-purple-200 dark:border-purple-700' : 'border-amber-200 dark:border-amber-700'
   const textColor = distance === 0 ? 'text-emerald-600' : distance === 1 ? 'text-blue-600' : distance <= 3 ? 'text-purple-600' : 'text-amber-600'
-  const badgeColor = distance === 0 ? 'bg-emerald-100 text-emerald-700' : distance === 1 ? 'bg-blue-100 text-blue-700' : distance <= 3 ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
+  const badgeColor = distance === 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-200' : distance === 1 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200' : distance <= 3 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-200' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200'
   const buttonColor = distance === 0 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : distance === 1 ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : distance <= 3 ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'
 
   const handleAdd = () => {
@@ -164,7 +164,7 @@ export default function YearSection({
 
       {/* Содержимое года */}
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-4 bg-white">
+        <div className="px-4 pb-4 space-y-4 bg-white dark:bg-gray-800">
           {/* Цели на год */}
           <div className="pt-4">
             <h4 className={`font-semibold mb-3 flex items-center gap-2 ${distance === 0 ? 'text-emerald-700' : distance === 1 ? 'text-blue-700' : distance <= 3 ? 'text-purple-700' : 'text-amber-700'}`}>
@@ -195,14 +195,14 @@ export default function YearSection({
               {goals.length === 0 ? (
                 <div className={`text-center py-6 rounded-lg border-2 border-dashed ${borderColor} bg-opacity-10`}>
                   <span className="text-3xl block mb-2">🎯</span>
-                  <p className="text-gray-500 text-sm">Добавьте цели на {year} год...</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Добавьте цели на {year} год...</p>
                 </div>
               ) : (
                 goalsWithCopiedTo.map(({ goal, copiedTo }, index) => {
                   return (
                     <div
                       key={index}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-l-4 bg-white shadow-sm hover:shadow transition-shadow ${distance === 0 ? 'border-l-emerald-400' : distance === 1 ? 'border-l-blue-400' : distance <= 3 ? 'border-l-purple-400' : 'border-l-amber-400'}`}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-l-4 bg-white dark:bg-gray-800 shadow-sm hover:shadow transition-shadow ${distance === 0 ? 'border-l-emerald-400' : distance === 1 ? 'border-l-blue-400' : distance <= 3 ? 'border-l-purple-400' : 'border-l-amber-400'}`}
                     >
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${distance === 0 ? 'bg-emerald-500' : distance === 1 ? 'bg-blue-500' : distance <= 3 ? 'bg-purple-500' : 'bg-amber-500'}`}>
                         {index + 1}
@@ -310,8 +310,8 @@ export default function YearSection({
                             ↓
                           </button>
                           {copyDropdownIndex === index && (
-                            <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[160px] max-h-[400px] overflow-y-auto">
-                              <div className="px-3 py-1 text-xs text-gray-500 font-medium border-b border-gray-100">Кварталы</div>
+                            <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 min-w-[160px] max-h-[400px] overflow-y-auto">
+                              <div className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-gray-700">Кварталы</div>
                               {[1, 2, 3, 4].map(q => (
                                 <button
                                   key={q}
@@ -319,12 +319,12 @@ export default function YearSection({
                                     onCopyGoal(goal, 'quarter', `${year}-Q${q}`)
                                     setCopyDropdownIndex(null)
                                   }}
-                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                                 >
                                   → Q{q}
                                 </button>
                               ))}
-                              <div className="px-3 py-1 text-xs text-gray-500 font-medium border-b border-t border-gray-100 mt-1">Месяцы</div>
+                              <div className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 font-medium border-b border-t border-gray-100 dark:border-gray-700 mt-1">Месяцы</div>
                               {monthNames.map((mName, mIdx) => (
                                 <button
                                   key={mIdx}
@@ -332,7 +332,7 @@ export default function YearSection({
                                     onCopyGoal(goal, 'month', `${year}-${String(mIdx + 1).padStart(2, '0')}`)
                                     setCopyDropdownIndex(null)
                                   }}
-                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                                 >
                                   → {mName}
                                 </button>
@@ -359,7 +359,7 @@ export default function YearSection({
                                 
                                 return (
                                   <>
-                                    <div className="px-3 py-1 text-xs text-gray-500 font-medium border-b border-t border-gray-100 mt-1">
+                                    <div className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 font-medium border-b border-t border-gray-100 dark:border-gray-700 mt-1">
                                       Недели {monthNames[currMonth]}
                                     </div>
                                     {weeksData.map(w => (
@@ -369,7 +369,7 @@ export default function YearSection({
                                           onCopyGoal(goal, 'week', `${year}-${String(currMonth + 1).padStart(2, '0')}-W${w.num}`)
                                           setCopyDropdownIndex(null)
                                         }}
-                                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-amber-50 transition-colors"
+                                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                                       >
                                         → W{w.num} ({w.start.getDate()}-{w.end.getDate()})
                                       </button>

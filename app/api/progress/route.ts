@@ -6,9 +6,13 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
     
-    // Получить все оценки
+    // Получить все оценки через dailyEntry
     const evaluations = await prisma.evaluation.findMany({
-      where: { userId },
+      where: { 
+        dailyEntry: {
+          userId 
+        }
+      },
       include: {
         dailyEntry: true,
       },
@@ -128,6 +132,13 @@ export async function GET(request: NextRequest) {
       targetDays,
     })
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error fetching progress stats:', error)
     return NextResponse.json(
       { error: 'Failed to fetch progress stats' },

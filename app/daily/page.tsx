@@ -721,16 +721,16 @@ export default function DailyPage() {
       {/* Модальное окно создания привычки */}
       {showHabitModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-xl font-bold mb-4">🔄 Создать привычку</h3>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">🔄 Создать привычку</h3>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Задача:</label>
-              <p className="text-gray-900 bg-gray-50 p-2 rounded">{habitTaskText}</p>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Задача:</label>
+              <p className="text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-2 rounded">{habitTaskText}</p>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Повторять:</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Повторять:</label>
               <div className="space-y-2">
                 {[
                   { value: 'daily', label: '📅 Ежедневно' },
@@ -743,8 +743,8 @@ export default function DailyPage() {
                     key={option.value} 
                     className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors ${
                       habitFrequency === option.value 
-                        ? 'border-amber-500 bg-amber-50' 
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' 
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     <input
@@ -764,7 +764,7 @@ export default function DailyPage() {
             {/* Выбор дней для weekly и custom */}
             {(habitFrequency === 'weekly' || habitFrequency === 'custom') && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Дни недели:</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дни недели:</label>
                 <div className="flex gap-1">
                   {[
                     { day: 1, label: 'Пн' },
@@ -781,7 +781,7 @@ export default function DailyPage() {
                       className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                         habitDays.includes(day)
                           ? 'bg-amber-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                       }`}
                     >
                       {label}
@@ -794,7 +794,7 @@ export default function DailyPage() {
             <div className="flex gap-2 mt-6">
               <button
                 onClick={() => setShowHabitModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 Отмена
               </button>

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { loginUser } from '@/lib/auth';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { prisma } from '@/lib/prisma'
+import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY, type ThemePreference } from '@/lib/theme'
 
 // Rate limiter для login - строгий для защиты от брутфорса
 const loginRateLimiter = {
@@ -70,6 +72,19 @@ export async function POST(request: Request) {
       expires: result.session.expiresAt,
       path: '/',
     });
+
+    // Устанавливаем cookie темы (multi-user)
+    const user = (await prisma.user.findUnique({
+      where: { id: result.session.user.id },
+    })) as unknown as { themePreference?: ThemePreference } | null
+    const theme = user?.themePreference ?? DEFAULT_THEME_PREFERENCE
+    response.cookies.set(THEME_COOKIE_KEY, theme, {
+      httpOnly: false,
+      secure: useSecureCookie,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    })
 
     return response;
   } catch (error) {

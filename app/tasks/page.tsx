@@ -209,14 +209,14 @@ export default function TasksPage() {
                         ) : (
                           <button
                             onClick={() => openDateModal(task)}
-                            className="text-green-600 hover:text-green-800 font-medium"
+                            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-medium"
                           >
                             + В план
                           </button>
                         )}
                         <button
                           onClick={() => closeTask(task.id)}
-                          className="text-purple-600 hover:text-purple-800 font-medium"
+                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium"
                         >
                           Закрыть
                         </button>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logoutUser, getTokenFromRequest } from '@/lib/auth';
+import { THEME_COOKIE_KEY } from '@/lib/theme'
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +20,15 @@ export async function POST(request: Request) {
       expires: new Date(0),
       path: '/',
     });
+
+    // Удаляем cookie темы
+    response.cookies.set(THEME_COOKIE_KEY, '', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: new Date(0),
+      path: '/',
+    })
 
     return response;
   } catch (error) {

@@ -37,10 +37,10 @@ export default function ProgressIndicator({
   const displayName = userName || 'Вы'
 
   return (
-    <div className={`card border-2 ${isAlert ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200' : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'}`}>
+    <div className={`card border-2 ${isAlert ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200 dark:from-red-950/30 dark:to-orange-950/30 dark:border-red-900' : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 dark:from-green-950/30 dark:to-emerald-950/30 dark:border-green-900'}`}> 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">🌟 Прогресс к мечте</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">🌟 Прогресс к мечте</h2>
           <Link
             href="/progress"
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
@@ -51,15 +51,15 @@ export default function ProgressIndicator({
 
         {/* Главный акцент — одна строка */}
         <div className="flex items-baseline flex-wrap gap-x-2">
-          <span className="text-lg text-gray-600">При текущей скорости {displayName} достигнет цель через</span>
+          <span className="text-lg text-gray-600 dark:text-gray-300">При текущей скорости {displayName} достигнет цель через</span>
           <span className="text-4xl font-bold" style={{ color }}>{formatYears(yearsToGoal)}</span>
-          <span className="text-lg text-gray-500">лет</span>
-          <span className="text-lg text-gray-400">(план: {targetYears} лет)</span>
+          <span className="text-lg text-gray-500 dark:text-gray-400">лет</span>
+          <span className="text-lg text-gray-400 dark:text-gray-500">(план: {targetYears} лет)</span>
         </div>
 
         {/* Прогресс-бар */}
         <div className="relative">
-          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
             <div
               className={`h-2 rounded-full transition-all duration-500 ${isAlert ? 'bg-gradient-to-r from-red-400 to-orange-500' : 'bg-gradient-to-r from-green-400 to-emerald-500'}`}
               style={{ width: `${Math.min(100, progressPercent)}%` }}
@@ -67,7 +67,7 @@ export default function ProgressIndicator({
           </div>
         </div>
 
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>{productiveDays} / {targetDays} дней</span>
           <span>{progressPercent.toFixed(1)}%</span>
         </div>

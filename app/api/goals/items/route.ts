@@ -48,6 +48,13 @@ export async function GET(request: NextRequest) {
       history: safeParseJson<Array<{ type: string; date: string }>>(g.historyJson, []),
     })))
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error fetching goals:', error)
     return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 })
   }
@@ -87,6 +94,13 @@ export async function POST(request: NextRequest) {
       history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
     })
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error creating goal:', error)
     return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 })
   }
@@ -144,6 +158,13 @@ export async function PUT(request: NextRequest) {
       history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
     })
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error updating goal:', error)
     return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 })
   }
@@ -175,6 +196,13 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error deleting goal:', error)
     return NextResponse.json({ error: 'Failed to delete goal' }, { status: 500 })
   }

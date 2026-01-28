@@ -31,7 +31,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (40)
+## API Endpoints (41)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -68,6 +68,7 @@
 | `/api/profile/categories` | GET, POST, DELETE, PATCH |
 | `/api/profile/insights` | GET, PUT |
 | `/api/profile/items` | POST, DELETE, PATCH |
+| `/api/profile/theme` | GET, POST |
 | `/api/progress` | GET |
 | `/api/tasks/[id]/close` | POST |
 | `/api/tasks/[id]/reopen` | POST |
@@ -106,6 +107,7 @@
 | passwordHash | `String` |
 | role | `String` |
 | isActive | `Boolean` |
+| themePreference | `ThemePreference` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 | lastLoginAt | `DateTime?` |

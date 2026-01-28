@@ -2,12 +2,13 @@
  * Helper для получения userId в API routes
  * 
  * В однопользовательском режиме (AUTH_ENABLED=false) возвращает "local-user"
- * В многопользовательском режиме (AUTH_ENABLED=true) возвращает ID из сессии
+ * В многопользовательском режиме (по умолчанию) возвращает ID из сессии
  */
 
-import { getAuthUser } from './auth';
+import { getAuthUser, requireAuth } from './auth';
 
-const AUTH_ENABLED = process.env.AUTH_ENABLED === 'true';
+// По умолчанию авторизация включена, отключается только AUTH_ENABLED=false
+const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
 const LOCAL_USER_ID = 'local-user';
 
 /**
@@ -31,13 +32,14 @@ export async function getUserId(request: Request): Promise<string | null> {
  * Для использования в защищённых routes
  */
 export async function requireUserId(request: Request): Promise<string> {
-  const userId = await getUserId(request);
-  
-  if (!userId) {
-    throw new Error('Unauthorized');
+  // Однопользовательский режим
+  if (!AUTH_ENABLED) {
+    return LOCAL_USER_ID;
   }
-  
-  return userId;
+
+  // Многопользовательский режим: возвращаем userId или бросаем AuthError(401)
+  const user = await requireAuth(request);
+  return user.id;
 }
 
 /**

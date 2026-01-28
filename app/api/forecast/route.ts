@@ -274,6 +274,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     return ApiErrors.serverError('Failed to generate forecast', error)
   }
 }

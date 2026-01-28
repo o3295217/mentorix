@@ -30,6 +30,12 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
       const monthStr = format(currentMonth, 'yyyy-MM')
       const res = await fetch(`/api/daily/indicators?month=${monthStr}`)
       if (!res.ok) {
+        // Если не авторизован (или сессия истекла) — просто не показываем индикаторы
+        if (res.status === 401) {
+          setIndicators({})
+          return
+        }
+
         console.error('Failed to load indicators:', res.status)
         return
       }

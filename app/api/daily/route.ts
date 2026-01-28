@@ -90,6 +90,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(entries)
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error fetching daily entries:', error)
     return NextResponse.json({ error: 'Failed to fetch daily entries' }, { status: 500 })
   }
@@ -150,6 +157,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(entry)
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error creating daily entry:', error)
     return NextResponse.json({ error: 'Failed to create daily entry' }, { status: 500 })
   }

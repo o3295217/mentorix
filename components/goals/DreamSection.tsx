@@ -42,9 +42,9 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
 
   if (!dreamGoal && !isEditing) {
     return (
-      <div className="bg-gradient-to-r from-purple-100 to-blue-100 p-8 rounded-2xl shadow-sm border border-purple-200 text-center">
-        <h2 className="text-2xl font-bold text-purple-900 mb-4">🌟 У тебя пока нет Мечты</h2>
-        <p className="text-purple-800 mb-6 max-w-2xl mx-auto">
+      <div className="bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-950/40 dark:to-blue-950/40 p-8 rounded-2xl shadow-sm border border-purple-200 dark:border-purple-900/40 text-center">
+        <h2 className="text-2xl font-bold text-purple-900 dark:text-purple-100 mb-4">🌟 У тебя пока нет Мечты</h2>
+        <p className="text-purple-800 dark:text-purple-200 mb-6 max-w-2xl mx-auto">
           "Человек без мечты, как птица без крыльев". Давай определим твою главную цель на ближайшие годы.
           Это станет фундаментом для всей системы планирования.
         </p>
@@ -59,19 +59,19 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-2xl shadow-sm border border-purple-100">
+    <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 p-6 rounded-2xl shadow-sm border border-purple-100 dark:border-purple-900/30">
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className="text-4xl">🌟</span>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Твоя Мечта</h2>
-            <p className="text-sm text-gray-500">Горизонт планирования: {years} {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Твоя Мечта</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Горизонт планирования: {years} {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}</p>
           </div>
         </div>
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="text-gray-400 hover:text-purple-600 transition-colors p-2 hover:bg-white/50 rounded-lg"
+            className="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors p-2 hover:bg-white/50 dark:hover:bg-gray-800/60 rounded-lg"
             title="Редактировать мечту"
           >
             ✏️
@@ -80,15 +80,15 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
       </div>
 
       {isEditing ? (
-        <div className="space-y-4 bg-white/50 p-4 rounded-xl border border-purple-100">
+        <div className="space-y-4 bg-white/50 dark:bg-gray-800/60 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Опиши свою мечту (чего ты хочешь достичь?):
             </label>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-purple-200 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 transition-all resize-none text-lg"
+              className="w-full px-4 py-3 rounded-xl border-2 border-purple-200 dark:border-purple-900/40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all resize-none text-lg"
               rows={3}
               placeholder="Например: Построить международную IT-компанию и жить у океана..."
               autoFocus
@@ -96,7 +96,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Горизонт планирования (лет):
             </label>
             <div className="flex gap-2">
@@ -107,7 +107,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     years === y
                       ? 'bg-purple-600 text-white shadow-md'
-                      : 'bg-white text-gray-600 hover:bg-purple-50 border border-gray-200'
+                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
                   {y} {y === 1 ? 'год' : y < 5 ? 'года' : 'лет'}
@@ -125,7 +125,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
                   setYears(dreamGoal.years)
                 }
               }}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               Отмена
             </button>
@@ -139,8 +139,8 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
           </div>
         </div>
       ) : (
-        <div className="bg-white/60 p-6 rounded-xl border border-purple-100 backdrop-blur-sm">
-          <p className="text-xl text-gray-800 leading-relaxed font-medium italic">
+        <div className="bg-white/60 dark:bg-gray-800/60 p-6 rounded-xl border border-purple-100 dark:border-purple-900/30 backdrop-blur-sm">
+          <p className="text-xl text-gray-800 dark:text-gray-100 leading-relaxed font-medium italic">
             "{dreamGoal?.goalText}"
           </p>
         </div>

@@ -12,6 +12,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(tasks)
   } catch (error) {
+    const statusCode = (error as any)?.statusCode
+    if (typeof statusCode === 'number') {
+      return NextResponse.json(
+        { error: (error as Error)?.message || 'Unauthorized' },
+        { status: statusCode }
+      )
+    }
     console.error('Error fetching closed tasks:', error)
     return NextResponse.json({ error: 'Failed to fetch closed tasks' }, { status: 500 })
   }

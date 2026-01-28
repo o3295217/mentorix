@@ -1,4 +1,0 @@
-#!/bin/bash
-# Post-commit hook: автоматическое обновление документации
-
-node scripts/auto-changelog.js

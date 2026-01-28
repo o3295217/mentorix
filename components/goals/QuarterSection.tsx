@@ -51,7 +51,12 @@ export default function QuarterSection({
   }, [])
 
   const quarterColors = ['from-rose-400 to-pink-500', 'from-amber-400 to-orange-500', 'from-emerald-400 to-teal-500', 'from-blue-400 to-indigo-500']
-  const quarterBgColors = ['bg-rose-50 border-rose-200', 'bg-amber-50 border-amber-200', 'bg-emerald-50 border-emerald-200', 'bg-blue-50 border-indigo-200']
+  const quarterBgColors = [
+    'bg-rose-50 border-rose-200 dark:bg-rose-900/15 dark:border-rose-700',
+    'bg-amber-50 border-amber-200 dark:bg-amber-900/15 dark:border-amber-700',
+    'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/15 dark:border-emerald-700',
+    'bg-blue-50 border-indigo-200 dark:bg-indigo-900/15 dark:border-indigo-700',
+  ]
   const quarterTextColors = ['text-rose-600', 'text-amber-600', 'text-emerald-600', 'text-blue-600']
   
   const colorIndex = quarter - 1
@@ -76,7 +81,7 @@ export default function QuarterSection({
     <div id={`quarter-${year}-Q${quarter}`} className={`rounded-lg border-2 overflow-hidden ${quarterBgColors[colorIndex]}`}>
       <button
         onClick={onToggle}
-        className={`w-full px-3 py-2 flex items-center justify-between hover:bg-white/50 transition-colors`}
+        className={`w-full px-3 py-2 flex items-center justify-between hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors`}
       >
         <div className="flex items-center gap-2 flex-1">
           <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${quarterColors[colorIndex]} flex items-center justify-center text-white text-sm shadow-sm`}>
@@ -84,7 +89,7 @@ export default function QuarterSection({
           </span>
           <span className="font-semibold">
             📊 Q{quarter}
-            {isCurrent && <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">сейчас</span>}
+            {isCurrent && <span className="ml-2 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 px-2 py-0.5 rounded-full">сейчас</span>}
           </span>
           <span className={`text-sm ${quarterTextColors[colorIndex]}`}>
             {goals.length} {goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'}
@@ -92,20 +97,20 @@ export default function QuarterSection({
           {/* Прогресс-бар квартала */}
           {goals.length > 0 && (
             <div className="flex items-center gap-2 ml-auto">
-              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all bg-gradient-to-r ${quarterColors[colorIndex]}`}
                   style={{ width: `${progress.percent}%` }}
                 />
               </div>
-              <span className="text-xs text-gray-500 font-medium">{progress.completed}/{progress.total}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{progress.completed}/{progress.total}</span>
             </div>
           )}
         </div>
       </button>
 
       {isExpanded && (
-        <div className="px-3 pb-3 space-y-3 bg-white/70">
+        <div className="px-3 pb-3 space-y-3 bg-white/70 dark:bg-gray-800/60">
           {/* Поле добавления новой цели для квартала */}
           <div className="flex gap-2 pt-2">
             <input
@@ -114,7 +119,7 @@ export default function QuarterSection({
               onChange={(e) => setNewGoal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder={`Цель на Q${quarter}...`}
-              className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-700"
             />
             <button
               onClick={handleAdd}
@@ -171,7 +176,7 @@ export default function QuarterSection({
                 return (
                   <div
                     key={index}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-white border border-gray-100 shadow-sm"
+                    className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm"
                   >
                     <span className={`w-5 h-5 rounded-full bg-gradient-to-br ${quarterColors[colorIndex]} flex items-center justify-center text-white text-xs`}>
                       {index + 1}
@@ -261,8 +266,8 @@ export default function QuarterSection({
                           ↓
                         </button>
                         {copyDropdownIndex === index && (
-                          <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[140px] max-h-[300px] overflow-y-auto">
-                            <div className="px-3 py-1 text-xs text-gray-500 font-medium border-b border-gray-100">Месяцы Q{quarter}</div>
+                            <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 min-w-[140px] max-h-[300px] overflow-y-auto">
+                              <div className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-gray-700">Месяцы Q{quarter}</div>
                             {[0, 1, 2].map(offset => {
                               const m = (quarter - 1) * 3 + offset
                               return (
@@ -272,7 +277,7 @@ export default function QuarterSection({
                                     onCopyGoal(goal, 'month', `${year}-${String(m + 1).padStart(2, '0')}`)
                                     setCopyDropdownIndex(null)
                                   }}
-                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                                 >
                                   → {monthNames[m]}
                                 </button>
@@ -297,7 +302,7 @@ export default function QuarterSection({
                               }
                               return (
                                 <>
-                                  <div className="px-3 py-1 text-xs text-gray-500 font-medium border-b border-t border-gray-100 mt-1">
+                                  <div className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 font-medium border-b border-t border-gray-100 dark:border-gray-700 mt-1">
                                     Недели {monthNames[currMonth]}
                                   </div>
                                   {weeksData.map(w => (
@@ -307,7 +312,7 @@ export default function QuarterSection({
                                         onCopyGoal(goal, 'week', `${year}-${String(currMonth + 1).padStart(2, '0')}-W${w.num}`)
                                         setCopyDropdownIndex(null)
                                       }}
-                                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-amber-50 transition-colors"
+                                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                                     >
                                       → W{w.num} ({w.start.getDate()}-{w.end.getDate()})
                                     </button>

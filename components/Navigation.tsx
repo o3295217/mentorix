@@ -25,19 +25,46 @@ export default function Navigation() {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Скрываем навигацию на страницах авторизации
-  const isAuthPage = pathname === '/login' || pathname === '/register'
+  const isAuthPage =
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password'
 
   useEffect(() => {
-    // Получаем информацию о текущем пользователе
+    // Layout не размонтируется при переходе /login -> /, поэтому
+    // после логина нужно заново подгрузить пользователя.
+    if (isAuthPage) {
+      setUserName(null)
+      return
+    }
+
+    let cancelled = false
+
     fetch('/api/auth/me')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.user) {
-          setUserName(data.user.name || data.user.email)
+      .then((res) => {
+        if (res.status === 401) {
+          // Невалидный токен — редиректим на логин
+          if (!cancelled) {
+            router.push(`/login?redirect=${encodeURIComponent(pathname || '/')}`)
+          }
+          return null
         }
+        return res.ok ? res.json() : null
       })
-      .catch(() => {})
-  }, [])
+      .then((data) => {
+        if (cancelled || !data) return
+        const user = data?.user ?? data
+        setUserName(user?.name || user?.email || null)
+      })
+      .catch(() => {
+        if (!cancelled) setUserName(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthPage, pathname, router])
 
   const isActive = (href: string) => {
     if (href === '/') {

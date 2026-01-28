@@ -1,5 +1,5 @@
 // МНОГОПОЛЬЗОВАТЕЛЬСКАЯ ВЕРСИЯ СХЕМЫ
-// После тестирования заменить schema.prisma на эту
+// PostgreSQL для production
 
 generator client {
   provider = "prisma-client-js"
@@ -7,11 +7,17 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // ==================== АУТЕНТИФИКАЦИЯ ====================
+
+enum ThemePreference {
+  light
+  dark
+  system
+}
 
 model User {
   id            String    @id @default(cuid())
@@ -20,6 +26,7 @@ model User {
   passwordHash  String    // bcrypt hash
   role          String    @default("user") // "user" | "admin"
   isActive      Boolean   @default(true)
+  themePreference ThemePreference @default(system)
   
   // Timestamps
   createdAt     DateTime  @default(now())
@@ -42,7 +49,8 @@ model User {
   periodEvaluations PeriodEvaluation[]
   worldContexts WorldContext[]
   sessions      Session[]
-  aiUsage       AIUsage[]
+  passwordResetTokens PasswordResetToken[]
+  chatMessages  ChatMessage[]
 
   @@map("users")
 }
@@ -60,19 +68,6 @@ model Session {
   @@index([userId])
   @@index([token])
   @@map("sessions")
-}
-
-model PasswordResetToken {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([token])
-  @@index([userId])
-  @@map("password_reset_tokens")
 }
 
 // ==================== ЦЕЛИ ====================
@@ -192,7 +187,6 @@ model DailyEntry {
 
 model Evaluation {
   id                    Int        @id @default(autoincrement())
-  userId                String
   dailyEntryId          Int        @unique
   dailyEntry            DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
   
@@ -227,7 +221,6 @@ model Evaluation {
   suggestedTasksJson    String?
   createdAt             DateTime   @default(now())
 
-  @@index([userId])
   @@index([dreamProgressScore])
   @@index([createdAt])
   @@map("evaluations")
@@ -442,36 +435,34 @@ model UserStats {
   @@map("user_stats")
 }
 
-// ==================== AI USAGE TRACKING ====================
+// ==================== СБРОС ПАРОЛЯ ====================
 
-model AIUsage {
-  id             Int      @id @default(autoincrement())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Тип запроса: evaluate, chat, check-plan, forecast, period-eval
-  endpoint       String
-  
-  // Модель: claude-sonnet-4-5-20250929, claude-3-5-haiku-20241022
-  model          String
-  
-  // Использование токенов
-  inputTokens    Int
-  outputTokens   Int
-  totalTokens    Int
-  
-  // Примерная стоимость в центах (для Sonnet: $3/$15 per 1M tokens)
-  costCents      Float    @default(0)
-  
-  // Дополнительная информация
-  durationMs     Int?     // время выполнения запроса
-  success        Boolean  @default(true)
-  errorMessage   String?
-  
-  createdAt      DateTime @default(now())
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
-  @@index([endpoint])
-  @@index([createdAt])
-  @@map("ai_usage")
+  @@index([token])
+  @@map("password_reset_tokens")
+}
+
+// ==================== ЧАТ ====================
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, date])
+  @@map("chat_messages")
 }

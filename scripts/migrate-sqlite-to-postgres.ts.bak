@@ -1,0 +1,361 @@
+/**
+ * Скрипт миграции данных из SQLite в PostgreSQL
+ * Запуск: npx ts-node scripts/migrate-sqlite-to-postgres.ts
+ */
+
+import Database from 'better-sqlite3';
+import { PrismaClient } from '@prisma/client';
+
+const sqlite = new Database('./prisma/dev.db', { readonly: true });
+const prisma = new PrismaClient();
+
+async function migrateTable(tableName: string, transform?: (row: any) => any) {
+  console.log(`\n📦 Migrating ${tableName}...`);
+  
+  const rows = sqlite.prepare(`SELECT * FROM ${tableName}`).all();
+  console.log(`   Found ${rows.length} rows`);
+  
+  if (rows.length === 0) return;
+  
+  const transformedRows = transform ? rows.map(transform) : rows;
+  
+  try {
+    // @ts-ignore - dynamic table access
+    await prisma[toPrismaModel(tableName)].createMany({
+      data: transformedRows,
+      skipDuplicates: true,
+    });
+    console.log(`   ✅ Migrated ${rows.length} rows`);
+  } catch (error: any) {
+    console.log(`   ❌ Error: ${error.message}`);
+  }
+}
+
+// Map SQLite table names to Prisma model names
+function toPrismaModel(tableName: string): string {
+  const map: Record<string, string> = {
+    'users': 'user',
+    'sessions': 'session',
+    'password_reset_tokens': 'passwordResetToken',
+    'dream_goal': 'dreamGoal',
+    'year_goals': 'yearGoal',
+    'period_goals': 'periodGoal',
+    'goals': 'goal',
+    'goal_tags': 'goalTag',
+    'daily_entries': 'dailyEntry',
+    'evaluations': 'evaluation',
+    'open_tasks': 'openTask',
+    'user_profile': 'userProfile',
+    'profile_blocks': 'profileBlock',
+    'profile_categories': 'profileCategory',
+    'profile_items': 'profileItem',
+    'habits': 'habit',
+    'period_evaluations': 'periodEvaluation',
+    'world_context': 'worldContext',
+    'user_insights': 'userInsights',
+    'user_stats': 'userStats',
+    'ai_usage': 'aIUsage',
+    'chat_messages': 'chatMessage',
+  };
+  return map[tableName] || tableName;
+}
+
+// Convert SQLite timestamps (milliseconds) to Date
+function convertTimestamp(ms: number | null): Date | null {
+  if (!ms) return null;
+  return new Date(ms);
+}
+
+// Convert boolean from SQLite (0/1) to boolean
+function convertBoolean(val: number | null): boolean {
+  return val === 1;
+}
+
+async function main() {
+  console.log('🚀 Starting SQLite to PostgreSQL migration...\n');
+  
+  // 1. Users
+  await migrateTable('users', (row) => ({
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    passwordHash: row.passwordHash,
+    role: row.role || 'user',
+    isActive: convertBoolean(row.isActive),
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+    lastLoginAt: convertTimestamp(row.lastLoginAt),
+  }));
+  
+  // 2. Sessions (skip - will need to re-login)
+  console.log('\n⏭️  Skipping sessions (users will need to re-login)');
+  
+  // 3. Dream Goals
+  await migrateTable('dream_goal', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    goalText: row.goalText,
+    years: row.years || 5,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 4. Year Goals
+  await migrateTable('year_goals', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    year: row.year,
+    goalsJson: row.goalsJson,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 5. Period Goals
+  await migrateTable('period_goals', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    periodType: row.periodType,
+    periodStart: convertTimestamp(row.periodStart),
+    periodEnd: convertTimestamp(row.periodEnd),
+    goalsJson: row.goalsJson,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 6. Goals
+  await migrateTable('goals', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    text: row.text,
+    periodType: row.periodType,
+    periodKey: row.periodKey,
+    completed: convertBoolean(row.completed),
+    completedAt: convertTimestamp(row.completedAt),
+    deadline: convertTimestamp(row.deadline),
+    priority: row.priority || 'medium',
+    tagsJson: row.tagsJson || '[]',
+    blockedByJson: row.blockedByJson || '[]',
+    historyJson: row.historyJson || '[]',
+    sortOrder: row.sortOrder || 0,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 7. Goal Tags
+  await migrateTable('goal_tags', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    color: row.color || '#6B7280',
+    createdAt: convertTimestamp(row.createdAt),
+  }));
+  
+  // 8. Daily Entries
+  await migrateTable('daily_entries', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    date: convertTimestamp(row.date),
+    planText: row.planText,
+    factText: row.factText,
+    planSnapshotJson: row.planSnapshotJson,
+    extraTasksJson: row.extraTasksJson || '[]',
+    emotionalState: row.emotionalState,
+    physicalState: row.physicalState,
+    lifeEvents: row.lifeEvents,
+    externalFactors: row.externalFactors,
+    energyLevel: row.energyLevel,
+    sleepQuality: row.sleepQuality,
+    familyTime: row.familyTime,
+    exerciseTime: row.exerciseTime,
+    selectedTasksJson: row.selectedTasksJson,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 9. Evaluations
+  await migrateTable('evaluations', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    dailyEntryId: row.dailyEntryId,
+    dreamProgressScore: row.dreamProgressScore || 5,
+    strategyScore: row.strategyScore,
+    executionScore: row.executionScore,
+    adaptabilityScore: row.adaptabilityScore,
+    overallScore: row.overallScore,
+    summary: row.summary,
+    recommendations: row.recommendations,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 10. Open Tasks
+  await migrateTable('open_tasks', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    taskText: row.taskText,
+    description: row.description,
+    source: row.source || 'manual',
+    sourceId: row.sourceId,
+    sourceDate: row.sourceDate,
+    priority: row.priority || 'medium',
+    deadline: convertTimestamp(row.deadline),
+    status: row.status || 'open',
+    sortOrder: row.sortOrder || 0,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+    closedAt: convertTimestamp(row.closedAt),
+  }));
+  
+  // 11. User Profile
+  await migrateTable('user_profile', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    occupation: row.occupation,
+    lifeGoals: row.lifeGoals,
+    values: row.values,
+    strengths: row.strengths,
+    challenges: row.challenges,
+    context: row.context,
+    customInterests: row.customInterests,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 12. Profile Blocks
+  await migrateTable('profile_blocks', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    blockType: row.blockType,
+    title: row.title,
+    description: row.description,
+    isExpanded: convertBoolean(row.isExpanded),
+    sortOrder: row.sortOrder || 0,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 13. Habits
+  await migrateTable('habits', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    taskText: row.taskText,
+    frequency: row.frequency || 'daily',
+    daysOfWeek: row.daysOfWeek,
+    interval: row.interval,
+    isActive: convertBoolean(row.isActive),
+    streak: row.streak || 0,
+    bestStreak: row.bestStreak || 0,
+    totalDone: row.totalDone || 0,
+    lastDoneDate: row.lastDoneDate,
+    sortOrder: row.sortOrder || 0,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 14. Period Evaluations
+  await migrateTable('period_evaluations', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    periodType: row.periodType,
+    periodKey: row.periodKey,
+    score: row.score,
+    summary: row.summary,
+    achievements: row.achievements,
+    improvements: row.improvements,
+    nextPeriodFocus: row.nextPeriodFocus,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 15. World Context
+  await migrateTable('world_context', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    date: convertTimestamp(row.date),
+    context: row.context,
+    source: row.source,
+    createdAt: convertTimestamp(row.createdAt),
+  }));
+  
+  // 16. User Insights
+  await migrateTable('user_insights', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    insightsJson: row.insightsJson || '{}',
+    lastAnalyzedDate: row.lastAnalyzedDate,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 17. User Stats
+  await migrateTable('user_stats', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    totalDays: row.totalDays || 0,
+    totalPlans: row.totalPlans || 0,
+    totalEvaluations: row.totalEvaluations || 0,
+    avgScore: row.avgScore,
+    currentStreak: row.currentStreak || 0,
+    bestStreak: row.bestStreak || 0,
+    lastActiveDate: row.lastActiveDate,
+    createdAt: convertTimestamp(row.createdAt),
+    updatedAt: convertTimestamp(row.updatedAt),
+  }));
+  
+  // 18. AI Usage
+  await migrateTable('ai_usage', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    endpoint: row.endpoint,
+    model: row.model,
+    inputTokens: row.inputTokens || 0,
+    outputTokens: row.outputTokens || 0,
+    totalTokens: row.totalTokens || 0,
+    costCents: row.costCents || 0,
+    durationMs: row.durationMs,
+    success: convertBoolean(row.success),
+    errorMessage: row.errorMessage,
+    createdAt: convertTimestamp(row.createdAt),
+  }));
+  
+  // 19. Chat Messages
+  await migrateTable('chat_messages', (row) => ({
+    id: row.id,
+    userId: row.userId,
+    date: row.date,
+    role: row.role,
+    content: row.content,
+    createdAt: convertTimestamp(row.createdAt),
+  }));
+  
+  console.log('\n✅ Migration completed!');
+  console.log('\n⚠️  Note: Sessions were not migrated. Users need to log in again.');
+  
+  // Reset sequences for auto-increment IDs
+  console.log('\n🔄 Resetting ID sequences...');
+  
+  const tables = [
+    'dream_goal', 'year_goals', 'period_goals', 'goals', 'goal_tags',
+    'daily_entries', 'evaluations', 'open_tasks', 'user_profile',
+    'profile_blocks', 'habits', 'period_evaluations', 'world_context',
+    'user_insights', 'user_stats', 'ai_usage', 'chat_messages'
+  ];
+  
+  for (const table of tables) {
+    try {
+      await prisma.$executeRawUnsafe(
+        `SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1, false);`
+      );
+    } catch {
+      // Table might not have serial sequence
+    }
+  }
+  
+  console.log('   ✅ Sequences reset');
+  
+  await prisma.$disconnect();
+  sqlite.close();
+}
+
+main().catch(console.error);

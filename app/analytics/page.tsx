@@ -118,7 +118,7 @@ export default function AnalyticsPage() {
               <h2 className="text-xl font-bold mb-4 text-green-700">🏆 Лучшие дни</h2>
               <div className="space-y-2">
                 {stats.topDays.map((day) => (
-                  <div key={day.date} className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                  <div key={day.date} className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800/40">
                     <span className="text-sm">{day.date}</span>
                     <span className="font-bold text-green-700">{day.overallScore}</span>
                   </div>
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
               <h2 className="text-xl font-bold mb-4 text-red-700">📉 Худшие дни</h2>
               <div className="space-y-2">
                 {stats.worstDays.map((day) => (
-                  <div key={day.date} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                  <div key={day.date} className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/40">
                     <span className="text-sm">{day.date}</span>
                     <span className="font-bold text-red-700">{day.overallScore}</span>
                   </div>

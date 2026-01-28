@@ -169,7 +169,7 @@ export default function MonthSection({
   }
 
   return (
-    <div id={`month-${year}-${String(month + 1).padStart(2, '0')}`} className={`rounded-lg p-3 ${isCurrent ? 'bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-200' : 'bg-gray-50 border border-gray-100'}`}>
+    <div id={`month-${year}-${String(month + 1).padStart(2, '0')}`} className={`rounded-lg p-3 ${isCurrent ? 'bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-200 dark:from-sky-900/30 dark:to-blue-900/30 dark:border-sky-700' : 'bg-gray-50 border border-gray-100 dark:bg-gray-900/30 dark:border-gray-700'}`}>
       <div 
         className="flex items-center gap-2 mb-2 cursor-pointer"
         onClick={onToggle}
@@ -181,19 +181,19 @@ export default function MonthSection({
           {monthNames[month]}
           {isCurrent && <span className="ml-2 text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">сейчас</span>}
         </span>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           ({goals.length} {goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'})
         </span>
         {/* Прогресс-бар месяца */}
         {progress.total > 0 && (
           <div className="flex items-center gap-2 ml-auto">
-            <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all bg-gradient-to-r ${monthGradients[monthOffset]}`}
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500">{progress.percent}%</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{progress.percent}%</span>
           </div>
         )}
       </div>
@@ -209,7 +209,7 @@ export default function MonthSection({
               onChange={(e) => setNewGoal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="Добавить цель..."
-              className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300"
+              className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300 dark:focus:ring-sky-800/50"
               onClick={(e) => e.stopPropagation()}
             />
             <button
@@ -238,7 +238,7 @@ export default function MonthSection({
                 return sorted.map(({ goal, origIndex, inWeeks }, displayIndex) => (
                   <div
                     key={origIndex}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-white border border-gray-100 shadow-sm"
+                    className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm"
                   >
                     <span className={`w-5 h-5 rounded-full ${monthColors[monthOffset]} flex items-center justify-center text-white text-xs`}>
                       {displayIndex + 1}
@@ -299,7 +299,7 @@ export default function MonthSection({
                                       }, 2000)
                                     }
                                   }}
-                                  className="text-xs px-2 py-1 rounded-md border bg-amber-50 text-amber-700 border-amber-300 font-medium cursor-pointer hover:bg-amber-100 hover:scale-105 transition-transform"
+                                  className="text-xs px-2 py-1 rounded-md border bg-amber-50 dark:bg-amber-900/25 text-amber-700 dark:text-amber-200 border-amber-300 dark:border-amber-700 font-medium cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/35 hover:scale-105 transition-transform"
                                   title={`Перейти к W${wNum}`}
                                 >
                                   W{wNum}
@@ -316,13 +316,13 @@ export default function MonthSection({
                       <div className="relative" ref={copyDropdownIndex === origIndex ? dropdownRef : null}>
                         <button
                           onClick={() => setCopyDropdownIndex(copyDropdownIndex === origIndex ? null : origIndex)}
-                          className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors"
+                          className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition-colors"
                           title="Копировать в неделю"
                         >
                           ↓
                         </button>
                         {copyDropdownIndex === origIndex && (
-                          <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 min-w-[100px]">
+                          <div className="absolute right-0 top-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 min-w-[100px]">
                             {weeksInMonth.map(w => (
                               <button
                                 key={w.num}
@@ -330,7 +330,7 @@ export default function MonthSection({
                                   onCopyGoal(goal, 'week', w.key)
                                   setCopyDropdownIndex(null)
                                 }}
-                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 transition-colors"
+                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                               >
                                 → Неделя {w.num}
                               </button>
@@ -345,7 +345,7 @@ export default function MonthSection({
                         setEditingIndex(origIndex)
                         setEditingText(goal)
                       }}
-                      className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors text-xs"
+                      className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition-colors text-xs"
                       title="Редактировать"
                     >
                       ✏️
@@ -385,10 +385,10 @@ export default function MonthSection({
                       id={`week-${weekKey}`} 
                       className={`rounded-lg p-3 flex flex-col transition-all ${
                         isDragOver 
-                          ? 'bg-blue-100 border-2 border-blue-400 border-dashed scale-105' 
+                          ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-400 dark:border-blue-700 border-dashed scale-105' 
                           : isCurrentWeek 
-                            ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-amber-200' 
-                            : 'bg-white border border-gray-100'
+                            ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-amber-200 dark:from-yellow-900/20 dark:to-amber-900/20 dark:border-amber-700' 
+                            : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'
                       }`}
                       onDragOver={(e) => {
                         e.preventDefault()
@@ -422,7 +422,7 @@ export default function MonthSection({
                           {isCurrentWeek && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full w-fit">сейчас</span>}
                           {/* Прогресс-бар недели */}
                           {weekProgress.total > 0 && (
-                            <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-1">
+                            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
                               <div 
                                 className={`h-full rounded-full transition-all ${isCurrentWeek ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-gradient-to-r from-gray-400 to-gray-500'}`}
                                 style={{ width: `${weekProgress.percent}%` }}
@@ -446,7 +446,7 @@ export default function MonthSection({
                             }
                           }}
                           placeholder="Цель..."
-                          className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300"
+                          className="flex-1 px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-800/50"
                         />
                         <button
                           onClick={(e) => {
@@ -503,7 +503,7 @@ export default function MonthSection({
                                 style={{ touchAction: 'none', userSelect: 'none' }}
                                 className={`p-1.5 rounded-lg border shadow-sm cursor-grab active:cursor-grabbing transition-all select-none ${
                                   isDragging ? 'opacity-50 scale-95' : 'hover:shadow-md'
-                                } ${isCompleted ? 'bg-green-50/80 border-green-200' : isDeadlineOverdue ? 'bg-red-50/80 border-red-300' : 'bg-white/80 border-gray-100 hover:border-gray-200'}`}
+                                } ${isCompleted ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-700' : isDeadlineOverdue ? 'bg-red-50/80 border-red-300 dark:bg-red-900/20 dark:border-red-700' : 'bg-white/80 border-gray-100 hover:border-gray-200 dark:bg-gray-800/60 dark:border-gray-700 dark:hover:border-gray-600'}`}
                               >
                                 {editingWeekGoal?.weekKey === weekKey && editingWeekGoal?.index === index ? (
                                   <textarea
@@ -586,7 +586,7 @@ export default function MonthSection({
                                       if (isProcessing) return
                                       onSetGoalPriority(weekKey, goal, parseInt(e.target.value))
                                     }}
-                                    className={`text-xs px-1 py-0.5 border border-gray-200 rounded bg-white hover:bg-gray-50 ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                                    className={`text-xs px-1 py-0.5 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                                     title="Приоритет"
                                   >
                                     <option value="0">⚪</option>
@@ -600,7 +600,7 @@ export default function MonthSection({
                                       setEditingWeekGoal({ weekKey, index })
                                       setEditingWeekText(goal)
                                     }}
-                                    className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-0.5 transition-colors text-xs"
+                                    className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-0.5 transition-colors text-xs"
                                     title="Редактировать"
                                   >
                                     ✏️
@@ -609,7 +609,7 @@ export default function MonthSection({
                                     draggable={false}
                                     onMouseDown={(e) => e.stopPropagation()}
                                     onClick={() => onRemoveWeekGoal(weekKey, index)}
-                                    className="text-red-400 hover:text-red-600 text-xs px-1 hover:bg-red-50 rounded transition-colors"
+                                    className="text-red-400 hover:text-red-600 text-xs px-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                                   >
                                     ✕
                                   </button>

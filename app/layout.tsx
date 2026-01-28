@@ -1,16 +1,47 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Navigation from '@/components/Navigation'
+import AuthGuard from '@/components/AuthGuard'
 import { Providers } from '@/components/Providers'
+import { cookies } from 'next/headers'
+import { DEFAULT_THEME_PREFERENCE, isThemePreference, THEME_COOKIE_KEY, type ThemePreference } from '@/lib/theme'
 
 export const metadata: Metadata = {
   title: 'AI Effectiveness Assistant',
   description: 'Личный ИИ-ассистент для управления эффективностью',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies()
+  const themeCookie = cookieStore.get(THEME_COOKIE_KEY)?.value
+  const initialTheme: ThemePreference = isThemePreference(themeCookie)
+    ? themeCookie
+    : DEFAULT_THEME_PREFERENCE
+
+  const initialHtmlClassName = initialTheme === 'dark' ? 'dark' : undefined
+
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html
+      lang="ru"
+      suppressHydrationWarning
+      className={initialHtmlClassName}
+      data-theme={initialTheme}
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => {
+  try {
+    const d = document.documentElement;
+    const pref = d.dataset.theme;
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = pref === 'dark' || (pref === 'system' && prefersDark);
+    if (isDark) d.classList.add('dark'); else d.classList.remove('dark');
+  } catch (_) {}
+})();`,
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <Providers>
           <div className="min-h-screen flex flex-col">
@@ -19,7 +50,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </header>
 
             <main className="flex-1">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</div>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <AuthGuard>{children}</AuthGuard>
+              </div>
             </main>
 
             <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">

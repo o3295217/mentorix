@@ -8,9 +8,9 @@ import { DailyEntry, OpenTask, SuggestedTask } from '@/lib/types'
 import { areTasksSimilar } from '@/lib/task-match'
 
 function getScoreColor(score: number): string {
-  if (score >= 7) return 'text-green-600'
-  if (score >= 5) return 'text-yellow-600'
-  return 'text-red-600'
+  if (score >= 7) return 'text-green-600 dark:text-green-400'
+  if (score >= 5) return 'text-yellow-600 dark:text-yellow-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 // Структура для задач с статусом
@@ -34,7 +34,9 @@ function computeTasksWithStatus(
       if (Array.isArray(parsed)) {
         selectedIds = parsed.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0 && id <= planTasks.length)
       }
-    } catch {}
+    } catch {
+      // Игнорируем ошибки парсинга JSON
+    }
   }
   
   const selectedSet = new Set(selectedIds)
@@ -142,16 +144,16 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const tasksWithStatus = useMemo(() => {
     if (!dailyEntry) return []
     return computeTasksWithStatus(
-      dailyEntry.planText,
-      dailyEntry.selectedTasksJson || null,
-      dailyEntry.extraTasksJson || null
+      dailyEntry.planText ?? null,
+      dailyEntry.selectedTasksJson ?? null,
+      dailyEntry.extraTasksJson ?? null
     )
   }, [dailyEntry])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600">Загрузка...</div>
+        <div className="text-lg text-gray-600 dark:text-gray-400">Загрузка...</div>
       </div>
     )
   }
@@ -159,8 +161,8 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   if (!dailyEntry || !dailyEntry.evaluation) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold mb-4">Оценка не найдена</h2>
-        <p className="text-gray-600 mb-6">Для этого дня еще нет оценки</p>
+        <h2 className="text-2xl font-bold mb-4 dark:text-white">Оценка не найдена</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">Для этого дня еще нет оценки</p>
         <Link href="/daily" className="btn-primary">
           Создать оценку
         </Link>

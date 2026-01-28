@@ -605,10 +605,16 @@ export function useDaily(): UseDailyReturn {
         }),
       })
 
+      // Handle 401 - redirect to login
+      if (res.status === 401) {
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+        return
+      }
+
       const data = await res.json()
       if (!res.ok) {
-        console.error('Failed to save plan:', data)
-        showMessage('❌ Ошибка при сохранении')
+        console.error('Failed to save plan:', res.status, data)
+        showMessage(`❌ Ошибка при сохранении: ${data.error || res.status}`)
         return
       }
       // Update local state immediately so UI (saved/draft indicators) reacts even if

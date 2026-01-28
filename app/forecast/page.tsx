@@ -166,11 +166,11 @@ export default function ForecastPage() {
 
   const getRiskColor = (risk: string) => {
     const colors: Record<string, string> = {
-      'низкий': 'bg-green-100 text-green-800 border-green-300',
-      'средний': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      'высокий': 'bg-red-100 text-red-800 border-red-300',
+      'низкий': 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/40 dark:text-green-200 dark:border-green-700/60',
+      'средний': 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/35 dark:text-yellow-200 dark:border-yellow-700/60',
+      'высокий': 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/35 dark:text-red-200 dark:border-red-700/60',
     }
-    return colors[risk] || 'bg-gray-100 text-gray-800 border-gray-300'
+    return colors[risk] || 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800/60 dark:text-gray-200 dark:border-gray-700'
   }
 
   const getImpactColor = (impact: string) => {
@@ -184,18 +184,18 @@ export default function ForecastPage() {
 
   const getProbabilityColor = (probability: string) => {
     const colors: Record<string, string> = {
-      'низкая': 'text-gray-600',
-      'средняя': 'text-yellow-600',
-      'высокая': 'text-red-600',
+      'низкая': 'text-gray-600 dark:text-gray-300',
+      'средняя': 'text-yellow-600 dark:text-yellow-400',
+      'высокая': 'text-red-600 dark:text-red-400',
     }
-    return colors[probability] || 'text-gray-600'
+    return colors[probability] || 'text-gray-600 dark:text-gray-300'
   }
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Прогнозы и предсказания</h1>
-        <Link href="/" className="text-blue-600 hover:text-blue-800">
+        <Link href="/" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
           ← На главную
         </Link>
       </div>
