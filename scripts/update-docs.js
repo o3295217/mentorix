@@ -2,10 +2,16 @@
 /**
  * Автоматическое обновление документации при коммите
  * Запускается через pre-commit hook
+ * 
+ * Что обновляется:
+ * 1. PROJECT_STATUS.md — полная регенерация (страницы, API, компоненты, модели)
+ * 2. CHANGELOG.md — добавление записи о коммите с классификацией изменений
+ * 3. ARCHITECTURE.md — обновление секций (компоненты, API endpoints)
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -132,7 +138,213 @@ function getPrismaModels() {
 }
 
 // ============================================================
-// 2. Генерируем PROJECT_STATUS.md
+// 3. Получаем информацию о коммите и изменённых файлах
+// ============================================================
+
+function getStagedFiles() {
+  try {
+    const output = execSync('git diff --cached --name-only', { cwd: ROOT, encoding: 'utf8' });
+    return output.trim().split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function getCommitMessage() {
+  // Читаем сообщение из .git/COMMIT_EDITMSG если есть, иначе парсим из git log
+  const commitMsgPath = path.join(ROOT, '.git/COMMIT_EDITMSG');
+  if (fs.existsSync(commitMsgPath)) {
+    return fs.readFileSync(commitMsgPath, 'utf8').trim().split('\n')[0];
+  }
+  return 'обновление';
+}
+
+function classifyChanges(files) {
+  const categories = {
+    api: [],
+    components: [],
+    pages: [],
+    lib: [],
+    prisma: [],
+    docs: [],
+    config: [],
+    other: []
+  };
+
+  for (const file of files) {
+    if (file.startsWith('app/api/')) {
+      categories.api.push(file);
+    } else if (file.startsWith('components/')) {
+      categories.components.push(file);
+    } else if (file.startsWith('app/') && file.endsWith('page.tsx')) {
+      categories.pages.push(file);
+    } else if (file.startsWith('lib/')) {
+      categories.lib.push(file);
+    } else if (file.startsWith('prisma/')) {
+      categories.prisma.push(file);
+    } else if (file.startsWith('docs/') || file.endsWith('.md')) {
+      categories.docs.push(file);
+    } else if (file.includes('config') || file.endsWith('.json') || file.endsWith('.js') && !file.includes('/')) {
+      categories.config.push(file);
+    } else {
+      categories.other.push(file);
+    }
+  }
+
+  return categories;
+}
+
+// ============================================================
+// 4. Обновляем CHANGELOG.md
+// ============================================================
+
+function updateChangelog(files, commitMsg) {
+  const changelogPath = path.join(ROOT, 'CHANGELOG.md');
+  if (!fs.existsSync(changelogPath)) return;
+
+  const content = fs.readFileSync(changelogPath, 'utf8');
+  const now = new Date().toISOString().split('T')[0];
+  const categories = classifyChanges(files);
+
+  // Формируем запись
+  let entry = `### ${now} — ${commitMsg}\n`;
+
+  if (categories.api.length > 0) {
+    entry += `- 🔌 API: ${categories.api.length} файлов (${categories.api.slice(0, 3).map(f => path.basename(f, '.ts')).join(', ')}${categories.api.length > 3 ? '...' : ''})\n`;
+  }
+  if (categories.components.length > 0) {
+    entry += `- 🧩 Компоненты: ${categories.components.length} файлов (${categories.components.slice(0, 3).map(f => path.basename(f, '.tsx')).join(', ')}${categories.components.length > 3 ? '...' : ''})\n`;
+  }
+  if (categories.pages.length > 0) {
+    entry += `- 📄 Страницы: ${categories.pages.length} файлов\n`;
+  }
+  if (categories.lib.length > 0) {
+    entry += `- 📚 Библиотеки: ${categories.lib.length} файлов (${categories.lib.slice(0, 3).map(f => path.basename(f, '.ts')).join(', ')}${categories.lib.length > 3 ? '...' : ''})\n`;
+  }
+  if (categories.prisma.length > 0) {
+    entry += `- 🗄️ База данных: ${categories.prisma.length} файлов\n`;
+  }
+  if (categories.config.length > 0) {
+    entry += `- ⚙️ Конфигурация: ${categories.config.length} файлов\n`;
+  }
+  if (categories.docs.length > 0) {
+    entry += `- 📝 Документация: ${categories.docs.length} файлов\n`;
+  }
+  if (categories.other.length > 0) {
+    entry += `- 📦 Другое: ${categories.other.length} файлов\n`;
+  }
+
+  entry += '\n';
+
+  // Вставляем после ## [Unreleased]
+  const marker = '## [Unreleased]\n';
+  const markerIndex = content.indexOf(marker);
+  
+  if (markerIndex === -1) {
+    console.log('⚠️  CHANGELOG.md: не найден маркер [Unreleased]');
+    return;
+  }
+
+  const insertPos = markerIndex + marker.length;
+  const newContent = content.slice(0, insertPos) + '\n' + entry + content.slice(insertPos);
+
+  fs.writeFileSync(changelogPath, newContent);
+  console.log('✅ CHANGELOG.md обновлён');
+
+  try {
+    execSync(`git add "${changelogPath}"`, { cwd: ROOT });
+  } catch {}
+}
+
+// ============================================================
+// 5. Обновляем ARCHITECTURE.md
+// ============================================================
+
+function updateArchitecture(files) {
+  const archPath = path.join(ROOT, 'docs/ARCHITECTURE.md');
+  if (!fs.existsSync(archPath)) return;
+
+  let content = fs.readFileSync(archPath, 'utf8');
+  let updated = false;
+
+  // Обновляем список компонентов если были изменены
+  const componentFiles = files.filter(f => f.startsWith('components/'));
+  if (componentFiles.length > 0) {
+    const components = getComponents();
+    
+    // Находим секцию компонентов и обновляем
+    const componentsSectionRegex = /(## 7\. КОМПОНЕНТЫ[\s\S]*?)(---\n\n## 8\.)/;
+    const match = content.match(componentsSectionRegex);
+    
+    if (match) {
+      // Генерируем новую секцию
+      const allComponents = components.filter(c => !c.includes('/'));
+      const goalComponents = components.filter(c => c.startsWith('goals/'));
+      
+      const newSection = `## 7. КОМПОНЕНТЫ
+
+### Список компонентов (${allComponents.length} основных + ${goalComponents.length} для целей)
+
+**Основные:**
+${allComponents.map(c => `- \`${c}\``).join('\n')}
+
+**Компоненты целей (goals/):**
+${goalComponents.map(c => `- \`${c}\``).join('\n')}
+
+### Иерархия компонентов целей
+
+\`\`\`
+app/goals/page.tsx
+├── DreamSection.tsx         # Мечта
+├── YearSection.tsx          # Годовые цели (для каждого года до мечты)
+│   └── [копирование в Q/M/W]
+├── HalfYearSection.tsx      # Полугодия (H1/H2)
+├── QuarterSection.tsx       # Кварталы (Q1-Q4)
+│   └── [копирование в M/W]
+└── MonthSection.tsx         # Месяцы
+    └── [копирование в W, показ недель]
+\`\`\`
+
+### Компоненты страницы Daily
+
+\`\`\`
+app/daily/page.tsx
+├── DatePickerWithIndicators  # Календарь с индикаторами
+├── [список задач]            # Чекбоксы, drag & drop
+├── [чат с AI]                # Сообщения, input
+└── [результат check-plan]    # Рекомендации AI
+\`\`\`
+
+### Компоненты Dashboard
+
+\`\`\`
+app/page.tsx
+├── Speedometer              # Прогресс к мечте
+├── DreamProgress            # Детали прогресса
+├── BalanceFlags             # Здоровье, семья, энергия
+└── [график оценок]          # Recharts LineChart
+\`\`\`
+
+---
+
+## 8.`;
+      
+      content = content.replace(componentsSectionRegex, newSection);
+      updated = true;
+      console.log('✅ ARCHITECTURE.md: обновлена секция компонентов');
+    }
+  }
+
+  if (updated) {
+    fs.writeFileSync(archPath, content);
+    try {
+      execSync(`git add "${archPath}"`, { cwd: ROOT });
+    } catch {}
+  }
+}
+
+// ============================================================
+// 6. Генерируем PROJECT_STATUS.md
 // ============================================================
 
 function generateProjectStatus() {
@@ -193,12 +405,27 @@ ${pkg.devDependencies.map(d => `- ${d}`).join('\n')}
 }
 
 // ============================================================
-// 3. Запускаем
+// 7. Запускаем
 // ============================================================
 
 function main() {
   console.log('📝 Обновляю документацию...');
   
+  // Получаем изменённые файлы
+  const stagedFiles = getStagedFiles();
+  const commitMsg = getCommitMessage();
+  
+  // 1. Обновляем CHANGELOG.md
+  if (stagedFiles.length > 0) {
+    updateChangelog(stagedFiles, commitMsg);
+  }
+  
+  // 2. Обновляем ARCHITECTURE.md при изменении компонентов/API
+  if (stagedFiles.some(f => f.startsWith('components/') || f.startsWith('app/api/'))) {
+    updateArchitecture(stagedFiles);
+  }
+  
+  // 3. Генерируем PROJECT_STATUS.md (всегда)
   const statusContent = generateProjectStatus();
   const statusPath = path.join(ROOT, 'PROJECT_STATUS.md');
   
@@ -206,12 +433,11 @@ function main() {
   console.log('✅ PROJECT_STATUS.md обновлён');
   
   // Добавляем в staged файлы
-  const { execSync } = require('child_process');
   try {
     execSync(`git add "${statusPath}"`, { cwd: ROOT });
     console.log('✅ PROJECT_STATUS.md добавлен в коммит');
   } catch (e) {
-    console.log('⚠️  Не удалось добавить в git (возможно не в репозитории)');
+    console.log('⚠️  Не удалось добавить в git');
   }
 }
 
