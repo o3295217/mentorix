@@ -131,7 +131,7 @@ ai-assistant-spec/
 | **Styling** | Tailwind CSS | 3.4.17 | Стили |
 | **Charts** | Recharts | 2.15.0 | Графики |
 | **ORM** | Prisma | 5.22.0 | База данных |
-| **Database** | SQLite | - | Локальное хранение |
+| **Database** | PostgreSQL | 15+ | Production БД в Docker |
 | **AI** | Anthropic SDK | latest | Claude API |
 | **Validation** | Zod | 4.1.13 | Schema validation |
 | **Dates** | date-fns | 4.1.0 | Работа с датами |
@@ -886,6 +886,32 @@ week:      "2025-01-W1", "2025-01-W2", ..., "2025-01-W5"
 ---
 
 ## 11. БЕЗОПАСНОСТЬ
+
+### Аутентификация и защита роутов
+
+```
+middleware.ts                 # Server-side защита роутов
+├── Проверяет auth_token cookie
+├── Публичные пути: /login, /register, /forgot-password, /reset-password, /api/auth/*, /api/health
+├── API: возвращает 401 без токена
+└── Страницы: редирект на /login
+
+components/AuthGuard.tsx      # Client-side защита
+├── Проверяет /api/auth/me
+├── Публичные пути пропускает
+├── При 401: редирект на /login
+└── При загрузке: показывает спиннер
+
+components/Navigation.tsx     # Дополнительная защита
+├── Запрос /api/auth/me для данных пользователя
+├── При 401: window.location.href = '/login'
+└── Показывает имя пользователя в header
+```
+
+**Поток аутентификации:**
+1. `middleware.ts` — первая линия защиты (server)
+2. `AuthGuard` — вторая линия (client, для SPA-навигации)
+3. `Navigation` — третья линия (обработка истечения сессии)
 
 ### Защита от Prompt Injection
 

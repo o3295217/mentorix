@@ -18,9 +18,10 @@
 ## 🔴 КРИТИЧНО (для production)
 
 ### База данных
-- [ ] **Миграция на PostgreSQL** — SQLite не подходит для multi-user production
+- [x] **Миграция на PostgreSQL** ✅ Выполнено 28.01.2026
   - Файлы: `prisma/schema.prisma`, `docker-compose.yml`
-  - Причина: concurrent writes, backup, scaling
+  - PostgreSQL в Docker контейнере `ai-assistant-db`
+  - Все данные успешно мигрированы из SQLite
 
 ### Безопасность
 - [ ] **Rate limiting на AI endpoints** — защита от abuse
@@ -137,6 +138,11 @@
 - [x] UncompletedTasksModal — обработка невыполненных задач
 - [x] Quick action buttons в пустом чате
 - [x] Ребрендинг "ИИ" → "ION"
+- [x] **Миграция на PostgreSQL** — полный перенос из SQLite (28.01.2026)
+- [x] **AuthGuard компонент** — клиентская защита авторизации
+- [x] **Middleware восстановлен** — серверная защита роутов
+- [x] **ThemeToggle исправлен** — корректные иконки для режимов темы
+- [x] **Docker локальный деплой** — контейнер на порту 3000
 
 ---
 
