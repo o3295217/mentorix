@@ -295,10 +295,10 @@ export default function DailyPage() {
         </div>
       </div>
 
-      {/* Plan and Chat side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Plan - Left */}
-        <div className="card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
+      {/* Plan and Chat side by side - 60/40 */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Plan - Left (60%) */}
+        <div className="lg:col-span-3 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
             <h2 className="text-xl font-bold">📝 План на день</h2>
             {totalCount > 0 && (
@@ -577,8 +577,8 @@ export default function DailyPage() {
           </div>
         </div>
 
-        {/* Chat - Right */}
-        <div className="card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
+        {/* Chat - Right (40%) */}
+        <div className="lg:col-span-2 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
             <h2 className="text-xl font-bold">💬 Обсуждение плана с ION</h2>
             {chatMessages.length > 0 && (
