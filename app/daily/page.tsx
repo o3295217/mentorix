@@ -242,7 +242,7 @@ export default function DailyPage() {
         <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
       </div>
 
-      <p className="text-lg text-gray-600">
+      <p className="text-lg text-gray-600 dark:text-gray-400">
         {mounted ? format(new Date(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
       </p>
 
@@ -303,9 +303,9 @@ export default function DailyPage() {
             <h2 className="text-xl font-bold">📝 План на день</h2>
             {totalCount > 0 && (
               <span className={`text-sm px-3 py-1 rounded-full ${
-                completionPercent === 100 ? 'bg-green-100 text-green-700' :
-                completionPercent >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-100 text-gray-600'
+                completionPercent === 100 ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' :
+                completionPercent >= 50 ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300' :
+                'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
               }`}>
                 ✅ {completedCount}/{totalCount} ({completionPercent}%)
                 {extraDoneCount > 0 && ` +${extraDoneCount}`}
@@ -398,17 +398,17 @@ export default function DailyPage() {
 
           {/* Предложения создать привычки */}
           {habitSuggestions.length > 0 && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg mr-6">
-              <h3 className="font-medium text-blue-900 text-sm mb-2">💡 Сделать привычкой?</h3>
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6">
+              <h3 className="font-medium text-amber-900 dark:text-amber-100 text-sm mb-2">💡 Сделать привычкой?</h3>
               <div className="space-y-2">
                 {habitSuggestions.slice(0, 3).map((suggestion, index) => (
                   <div key={index} className="flex items-center justify-between text-sm">
-                    <span className="text-blue-800 truncate flex-1 mr-2">
+                    <span className="text-amber-800 dark:text-amber-200 truncate flex-1 mr-2">
                       "{suggestion.text}" — {suggestion.totalCount} раз
                     </span>
                     <button
                       onClick={() => createHabitFromTask(suggestion.text)}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors flex-shrink-0"
+                      className="text-xs bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 text-white px-2 py-1 rounded transition-colors flex-shrink-0"
                     >
                       Создать
                     </button>
