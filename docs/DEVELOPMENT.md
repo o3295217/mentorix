@@ -4393,3 +4393,8 @@ docker compose -f docker-compose.production.yml up --build -d
 - `.husky/post-commit`
 - `.husky/pre-commit`
 - `scripts/auto-changelog.js`
+
+### 2026-01-28 — feat: автоматическое обновление документации после коммита
+- `.husky/post-commit`
+- `.husky/pre-commit`
+- `scripts/auto-changelog.js`
