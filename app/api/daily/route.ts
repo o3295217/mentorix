@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
             gte: parseDateParam(from),
             lte: parseDateParam(to),
           },
+          // Фильтруем пустые записи (без плана И без факта)
+          OR: [
+            { planText: { not: null } },
+            { factText: { not: null } },
+          ],
         },
         include: { evaluation: true },
         orderBy: { date: 'desc' },
@@ -70,7 +75,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(entries)
     }
 
-    return NextResponse.json({ error: 'date or from/to is required' }, { status: 400 })
+    // Получить все записи (для истории)
+    const entries = await prisma.dailyEntry.findMany({
+      where: {
+        userId,
+        OR: [
+          { planText: { not: null } },
+          { factText: { not: null } },
+        ],
+      },
+      include: { evaluation: true },
+      orderBy: { date: 'desc' },
+    })
+
+    return NextResponse.json(entries)
   } catch (error) {
     console.error('Error fetching daily entries:', error)
     return NextResponse.json({ error: 'Failed to fetch daily entries' }, { status: 500 })
