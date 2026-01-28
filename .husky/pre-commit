@@ -55,18 +55,7 @@ if echo "$STAGED_FILES" | grep -q "^package.json"; then
     echo -e "${YELLOW}⚠️  Изменён package.json → проверь README.md (секция Технологии)${NC}"
 fi
 
-# Проверяем CHANGELOG
-if ! echo "$STAGED_FILES" | grep -q "CHANGELOG.md"; then
-    echo -e "${RED}❌ CHANGELOG.md не обновлён!${NC}"
-    echo -e "${YELLOW}   Добавь описание изменений в CHANGELOG.md${NC}"
-    echo ""
-    echo -e "Продолжить без обновления CHANGELOG? [y/N]"
-    read -r response < /dev/tty
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo -e "${RED}Коммит отменён. Обнови CHANGELOG.md и попробуй снова.${NC}"
-        exit 1
-    fi
-fi
+# CHANGELOG обновляется автоматически в post-commit
 
 echo ""
 echo -e "${GREEN}✅ Pre-commit проверки пройдены${NC}"
