@@ -8,7 +8,7 @@ import ThemeToggle from './ThemeToggle'
 const navItems = [
   { href: '/', label: 'Главная' },
   { href: '/goals', label: 'Цели' },
-  { href: '/daily', label: 'Планирование' },
+  { href: '/daily', label: 'План дня' },
   { href: '/progress', label: 'Прогресс' },
   { href: '/periods', label: 'Периоды' },
   { href: '/forecast', label: 'Прогнозы' },

@@ -675,6 +675,28 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
+### Список компонентов (11 основных + 5 для целей)
+
+**Основные:**
+- `AuthGuard`
+- `BalanceFlags`
+- `DatePickerWithIndicators`
+- `DreamProgress`
+- `Navigation`
+- `ProgressIndicator`
+- `Providers`
+- `Speedometer`
+- `ThemeProvider`
+- `ThemeToggle`
+- `UncompletedTasksModal`
+
+**Компоненты целей (goals/):**
+- `goals/DreamSection`
+- `goals/HalfYearSection`
+- `goals/MonthSection`
+- `goals/QuarterSection`
+- `goals/YearSection`
+
 ### Иерархия компонентов целей
 
 ```
