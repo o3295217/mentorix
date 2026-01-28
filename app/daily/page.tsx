@@ -23,6 +23,7 @@ export default function DailyPage() {
   const [habitTaskText, setHabitTaskText] = useState('')
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set())
   
   const {
     selectedDate,
@@ -397,21 +398,31 @@ export default function DailyPage() {
           })()}
 
           {/* Предложения создать привычки */}
-          {habitSuggestions.length > 0 && (
+          {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).length > 0 && (
             <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6">
               <h3 className="font-medium text-amber-900 dark:text-amber-100 text-sm mb-2">💡 Сделать привычкой?</h3>
               <div className="space-y-2">
-                {habitSuggestions.slice(0, 3).map((suggestion, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm">
-                    <span className="text-amber-800 dark:text-amber-200 truncate flex-1 mr-2">
+                {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).slice(0, 3).map((suggestion, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm gap-2">
+                    <span className="text-amber-800 dark:text-amber-200 truncate flex-1">
                       "{suggestion.text}" — {suggestion.totalCount} раз
                     </span>
-                    <button
-                      onClick={() => createHabitFromTask(suggestion.text)}
-                      className="text-xs bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 text-white px-2 py-1 rounded transition-colors flex-shrink-0"
-                    >
-                      Создать
-                    </button>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => createHabitFromTask(suggestion.text)}
+                        className="w-7 h-7 flex items-center justify-center bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded transition-colors"
+                        title="Создать привычку"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setDismissedSuggestions(prev => new Set([...prev, suggestion.text]))}
+                        className="w-7 h-7 flex items-center justify-center bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500 text-white rounded transition-colors"
+                        title="Скрыть"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
