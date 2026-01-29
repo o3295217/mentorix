@@ -206,62 +206,55 @@ export function useDaily(): UseDailyReturn {
   // Ref чтобы пропустить первое сохранение после смены даты
   const skipNextChatSaveRef = useRef(false)
 
-  // Единый useEffect для загрузки/сохранения чата при смене даты
+  // Единый useEffect для загрузки чата при смене даты (из БД)
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    
     const currentDate = selectedDate
     const prevDate = prevDateForChatRef.current
     
     // Если это та же дата - ничего не делаем
     if (prevDate === currentDate) return
     
-    // Сохраняем чат предыдущей даты (если была)
-    if (prevDate && chatMessagesRef.current.length > 0) {
-      try {
-        window.localStorage.setItem(`daily:chat:${prevDate}`, JSON.stringify(chatMessagesRef.current))
-      } catch {}
-    }
-    
     // Устанавливаем флаг чтобы не перезаписать загруженные данные
     skipNextChatSaveRef.current = true
     
-    // Загружаем чат для новой даты
-    try {
-      const saved = window.localStorage.getItem(`daily:chat:${currentDate}`)
-      const messages = saved ? JSON.parse(saved) : []
-      setChatMessages(messages)
-    } catch {
-      setChatMessages([])
+    // Загружаем чат из БД
+    const loadChatHistory = async () => {
+      try {
+        const res = await fetch(`/api/daily/chat/messages?date=${currentDate}`)
+        if (res.ok) {
+          const data = await res.json()
+          const messages = (data.messages || []).map((m: { role: string; content: string }) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          }))
+          setChatMessages(messages)
+        } else {
+          setChatMessages([])
+        }
+      } catch {
+        // Fallback на localStorage для обратной совместимости
+        if (typeof window !== 'undefined') {
+          try {
+            const saved = window.localStorage.getItem(`daily:chat:${currentDate}`)
+            const messages = saved ? JSON.parse(saved) : []
+            setChatMessages(messages)
+          } catch {
+            setChatMessages([])
+          }
+        } else {
+          setChatMessages([])
+        }
+      }
     }
+    
+    loadChatHistory()
     
     // Обновляем ref
     prevDateForChatRef.current = currentDate
-    
-    // Очищаем старые чаты (один раз)
-    cleanupOldChats()
-  }, [selectedDate, cleanupOldChats])
+  }, [selectedDate])
   
-  // Сохраняем чат при изменении сообщений
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!prevDateForChatRef.current) return // Ещё не было первой загрузки
-    
-    // Пропускаем сохранение сразу после смены даты (данные только что загружены)
-    if (skipNextChatSaveRef.current) {
-      skipNextChatSaveRef.current = false
-      return
-    }
-    
-    try {
-      if (chatMessages.length > 0) {
-        window.localStorage.setItem(`daily:chat:${selectedDate}`, JSON.stringify(chatMessages))
-      } else {
-        // Если чат пустой — удаляем ключ
-        window.localStorage.removeItem(`daily:chat:${selectedDate}`)
-      }
-    } catch {}
-  }, [chatMessages, selectedDate])
+  // Сообщения теперь сохраняются на сервере через API,
+  // localStorage больше не нужен для этого
 
   // Ref для отслеживания даты при записи черновика (чтобы не записать старые данные под новую дату)
   const draftDateRef = useRef(selectedDate)
@@ -1035,10 +1028,16 @@ export function useDaily(): UseDailyReturn {
     }
   }, [chatInput, chatMessages, tasks, selectedTasks, selectedDate, showMessage])
 
-  const clearChat = useCallback(() => {
+  const clearChat = useCallback(async () => {
     setChatMessages([])
     setChatInput('')
-    // Удаляем чат из localStorage
+    // Удаляем чат из БД
+    try {
+      await fetch(`/api/daily/chat/messages?date=${selectedDate}`, { method: 'DELETE' })
+    } catch {
+      // ignore
+    }
+    // Также удаляем из localStorage для совместимости
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.removeItem(getChatKey(selectedDate))

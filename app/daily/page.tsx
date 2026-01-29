@@ -23,7 +23,24 @@ export default function DailyPage() {
   const [habitTaskText, setHabitTaskText] = useState('')
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
-  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set())
+  
+  // Отклонённые предложения привычек - загружаем из localStorage
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const saved = localStorage.getItem('dismissedHabitSuggestions')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+  
+  // Сохраняем отклонённые предложения в localStorage
+  useEffect(() => {
+    if (dismissedSuggestions.size > 0) {
+      localStorage.setItem('dismissedHabitSuggestions', JSON.stringify([...dismissedSuggestions]))
+    }
+  }, [dismissedSuggestions])
   
   const {
     selectedDate,

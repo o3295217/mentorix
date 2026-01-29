@@ -239,45 +239,60 @@ export async function POST(request: NextRequest) {
     }
 
     const context = buildPlanChatContext(chatRequest)
+    
+    // Формируем секцию плана
+    const planSection = planTasks.length > 0 
+      ? `📋 ТЕКУЩИЙ ПЛАН НА ДЕНЬ (${planTasks.length} задач):\n${planTasks.map((t, i) => `${i + 1}. ${completedTasks.includes(t) ? '✅' : '☐'} ${t}`).join('\n')}`
+      : '📋 ПЛАН НА ДЕНЬ: пусто'
+    
+    // Определяем, нужно ли показывать план
+    // План показываем если пользователь просит его посмотреть или это первое сообщение
+    const planKeywords = ['план', 'задач', 'посмотри', 'смотри', 'анализ', 'проверь', 'оцен', 'что сегодня', 'что делать', 'что у меня', 'покажи']
+    const needPlan = messages.length === 0 || planKeywords.some(kw => userMessage.toLowerCase().includes(kw))
+    
+    // Логирование для отладки
+    console.log(`[Plan Chat] Date: ${date}, Tasks: ${planTasks.length}, Completed: ${completedTasks.length}, History: ${messages.length}`)
+    console.log(`[Plan Chat] Task list: ${planTasks.join(' | ').substring(0, 200)}`)
+    console.log(`[Plan Chat] Need plan context: ${needPlan}, User message: "${userMessage.substring(0, 50)}"`)
 
     // Собрать историю сообщений для Claude
     const claudeMessages: { role: 'user' | 'assistant'; content: string }[] = []
     
-    // Первое сообщение - контекст + первый вопрос или просто контекст
-    if (messages.length === 0) {
-      // Первое сообщение в чате - добавить контекст
+    // Добавить историю сообщений как есть
+    for (const msg of messages) {
       claudeMessages.push({
-        role: 'user',
-        content: `${context}\n\n---\n\nСообщение пользователя: ${userMessage}`,
+        role: msg.role,
+        content: msg.content,
       })
-    } else {
-      // Есть история - первое сообщение с контекстом, потом история
-      claudeMessages.push({
-        role: 'user',
-        content: `${context}\n\n---\n\nНачало диалога.`,
-      })
-      
-      // Добавить первый ответ ассистента если был
-      if (messages.length > 0 && messages[0].role === 'assistant') {
-        claudeMessages.push({
-          role: 'assistant',
-          content: messages[0].content,
-        })
+    }
+    
+    // Формируем сообщение пользователя
+    // Если нужен план — добавляем его к сообщению
+    const userContent = needPlan 
+      ? `${planSection}\n\n---\n\n${userMessage}`
+      : userMessage
+    
+    claudeMessages.push({
+      role: 'user',
+      content: userContent,
+    })
+    
+    // Claude требует чередование user/assistant, исправляем если нужно
+    // Если два user подряд — объединяем
+    const fixedMessages: { role: 'user' | 'assistant'; content: string }[] = []
+    for (const msg of claudeMessages) {
+      const last = fixedMessages[fixedMessages.length - 1]
+      if (last && last.role === msg.role) {
+        // Объединяем сообщения одной роли
+        last.content += '\n\n' + msg.content
+      } else {
+        fixedMessages.push({ ...msg })
       }
-      
-      // Добавить остальную историю
-      for (let i = messages[0]?.role === 'assistant' ? 1 : 0; i < messages.length; i++) {
-        claudeMessages.push({
-          role: messages[i].role,
-          content: messages[i].content,
-        })
-      }
-      
-      // Добавить новое сообщение пользователя
-      claudeMessages.push({
-        role: 'user',
-        content: userMessage,
-      })
+    }
+    
+    // Если первое сообщение не user — добавляем пустое user
+    if (fixedMessages.length > 0 && fixedMessages[0].role === 'assistant') {
+      fixedMessages.unshift({ role: 'user', content: 'Привет' })
     }
 
     // Вызов Claude API
@@ -287,12 +302,18 @@ export async function POST(request: NextRequest) {
       max_tokens: 1024,
       system: [
         {
+          // Статический промпт - кешируется
           type: 'text',
           text: PLAN_CHAT_SYSTEM_PROMPT,
           cache_control: { type: 'ephemeral' },
         },
+        {
+          // Динамический контекст - не кешируется (меняется каждый день)
+          type: 'text',
+          text: `\n---\n\n${context}`,
+        },
       ],
-      messages: claudeMessages,
+      messages: fixedMessages,
     })
     const durationMs = Date.now() - startTime
 
@@ -312,6 +333,19 @@ export async function POST(request: NextRequest) {
       : ''
 
     console.log('[Plan Chat] Response length:', assistantMessage.length)
+
+    // Сохраняем оба сообщения в БД
+    try {
+      await prisma.chatMessage.createMany({
+        data: [
+          { userId, date, role: 'user', content: userMessage },
+          { userId, date, role: 'assistant', content: assistantMessage },
+        ],
+      })
+    } catch (saveError) {
+      console.error('[Plan Chat] Failed to save messages to DB:', saveError)
+      // Не блокируем ответ если сохранение не удалось
+    }
 
     return NextResponse.json({
       message: assistantMessage,

@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-01-28**
+> Последнее обновление: **2026-01-29**
 
 ## Общая информация
 
@@ -31,7 +31,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (41)
+## API Endpoints (42)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -46,6 +46,7 @@
 | `/api/chat` | GET, POST, DELETE |
 | `/api/daily` | GET, POST |
 | `/api/daily/chat` | POST |
+| `/api/daily/chat/messages` | GET, POST, DELETE |
 | `/api/daily/check-plan` | POST |
 | `/api/daily/indicators` | GET |
 | `/api/evaluate` | POST |
