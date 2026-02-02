@@ -102,6 +102,7 @@ interface UseDailyReturn {
   removeExtraTask: (index: number) => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
+  postponeTask: (taskId: number, taskText: string) => Promise<void>
   toggleTaskSelection: (taskId: number) => void
   startEditingTask: (taskId: number, currentText: string) => void
   saveEditedTask: (taskId: number) => void
@@ -849,6 +850,44 @@ export function useDaily(): UseDailyReturn {
     setHasUnsavedChanges(true)
   }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
+  // Перенести задачу на следующий день
+  const postponeTask = useCallback(async (taskId: number, taskText: string) => {
+    try {
+      // Вычисляем завтрашнюю дату
+      const tomorrow = format(new Date(new Date(selectedDate).getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+      
+      // Отправляем на сервер
+      const res = await fetch('/api/tasks/process-uncompleted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decisions: [{
+            taskId,
+            taskText,
+            action: { type: 'transfer', date: tomorrow }
+          }],
+          sourceDate: selectedDate
+        })
+      })
+
+      if (res.ok) {
+        // Удаляем задачу из текущего списка
+        const updatedTexts = tasks.filter((t) => t.id !== taskId).map((t) => t.taskText)
+        const updatedTasks = buildTasksFromTexts(updatedTexts)
+        const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
+        setTasks(updatedTasks)
+        setSelectedTasks(updatedSelected)
+        setHasUnsavedChanges(true)
+        showMessage('➡️ Задача перенесена на завтра')
+      } else {
+        showMessage('❌ Не удалось перенести задачу')
+      }
+    } catch (error) {
+      console.error('Error postponing task:', error)
+      showMessage('❌ Ошибка при переносе задачи')
+    }
+  }, [selectedDate, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, showMessage])
+
   const toggleTaskSelection = useCallback((taskId: number) => {
     const newSelected = new Set(selectedTasks)
     if (newSelected.has(taskId)) {
@@ -1143,6 +1182,7 @@ export function useDaily(): UseDailyReturn {
     removeExtraTask,
     addGoalToTasks,
     removeTask,
+    postponeTask,
     toggleTaskSelection,
     startEditingTask,
     saveEditedTask,

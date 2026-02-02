@@ -70,6 +70,7 @@ export default function DailyPage() {
     removeExtraTask,
     addGoalToTasks,
     removeTask,
+    postponeTask,
     toggleTaskSelection,
     startEditingTask,
     saveEditedTask,
@@ -507,6 +508,19 @@ export default function DailyPage() {
                       )}
                     </span>
                   )}
+
+                  {/* Кнопка перенести на завтра */}
+                  <button
+                    onClick={() => {
+                      if (confirm('Переносим задачу на следующий день?')) {
+                        postponeTask(task.id, task.taskText)
+                      }
+                    }}
+                    className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
+                    title="Перенести на завтра"
+                  >
+                    ➡️
+                  </button>
 
                   {/* Кнопка создать/удалить привычку */}
                   {(() => {
