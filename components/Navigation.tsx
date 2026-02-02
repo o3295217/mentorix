@@ -96,15 +96,15 @@ export default function Navigation() {
         <div className="flex space-x-8">
           <Link href="/" className="flex items-center">
             {/* Буква A */}
-            <svg width="28" height="32" viewBox="0 0 24 28" className="flex-shrink-0">
+            <svg width="36" height="42" viewBox="0 0 24 28" className="flex-shrink-0">
               <path d="M12 1 L1 27 M12 1 L12 27 M4 18 L12 18" 
                     fill="none" stroke="#4a7c9b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <span className="flex flex-col justify-center leading-tight -ml-2">
-              <span className="text-sm font-semibold tracking-tight">
-                <span className="text-[#4a7c9b]">I</span><span className="text-gray-900 dark:text-white">On</span>
+            <span className="flex flex-col justify-center leading-tight -ml-1">
+              <span className="text-base font-semibold tracking-tight">
+                <span className="text-gray-400 dark:text-gray-500 font-light text-lg">[</span><span className="text-[#4a7c9b] font-bold text-xl">I</span><span className="text-gray-400 dark:text-gray-500 font-light text-lg">]</span><span className="text-gray-900 dark:text-white text-lg">On</span>
               </span>
-              <span className="text-sm text-gray-900 dark:text-white tracking-tight">ssistant</span>
+              <span className="text-base text-gray-900 dark:text-white tracking-tight">ssistant</span>
             </span>
           </Link>
           <div className="flex space-x-1 items-center">

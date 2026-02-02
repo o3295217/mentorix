@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-02-02 — fix: исправлен поиск записей по дате с учётом часовых поясов в POST /api/daily
+- 🧩 Компоненты: 1 файлов (Navigation)
+
+
 ### 2026-02-02 — fix: docker-compose использует PostgreSQL вместо SQLite
 - 🔌 API: 1 файлов (route)
 - 📦 Другое: 1 файлов
