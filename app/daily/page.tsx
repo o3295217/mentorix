@@ -24,6 +24,12 @@ export default function DailyPage() {
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
   
+  // Inline-подтверждение действий (taskId + тип действия)
+  const [confirmAction, setConfirmAction] = useState<{ taskId: number; type: 'delete' | 'postpone' } | null>(null)
+  
+  // Сворачивание выполненных задач
+  const [showCompleted, setShowCompleted] = useState(false)
+  
   // Отклонённые предложения привычек - загружаем из localStorage
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
@@ -361,55 +367,83 @@ export default function DailyPage() {
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
 
             return (
-              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-amber-900 dark:text-amber-100 text-sm">🔄 Привычки на сегодня</h3>
+              <div className="group mb-4 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6 transition-all duration-200 hover:p-3">
+                {/* Компактный вид — одна строка */}
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-600 dark:text-amber-400">🔄</span>
+                  <span className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                    Привычки ({habits.length})
+                  </span>
+                  <div className="flex-1 flex gap-1 overflow-hidden group-hover:hidden">
+                    {habits.slice(0, 3).map((habit) => {
+                      const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
+                      return (
+                        <span
+                          key={habit.id}
+                          className={`text-xs px-2 py-0.5 rounded-full truncate max-w-[120px] ${
+                            isInPlan
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400'
+                              : 'bg-amber-100 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300'
+                          }`}
+                        >
+                          {isInPlan && '✓ '}{habit.taskText}
+                        </span>
+                      )
+                    })}
+                    {habits.length > 3 && (
+                      <span className="text-xs text-amber-500">+{habits.length - 3}</span>
+                    )}
+                  </div>
                   {habitsNotInPlan.length > 0 && (
                     <button
                       onClick={() => addHabitsToTasks()}
-                      className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors"
+                      className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
                     >
                       + Все в план
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {habits.map((habit) => {
-                    const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
-                    return (
-                      <span
-                        key={habit.id}
-                        className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
-                          isInPlan
-                            ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 line-through opacity-60'
-                            : 'bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200'
-                        }`}
-                      >
-                        <button
-                          onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
-                          className={isInPlan ? 'cursor-default' : 'hover:text-amber-900 transition-colors'}
-                          title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
-                          disabled={isInPlan}
+                
+                {/* Развёрнутый вид — при наведении */}
+                <div className="hidden group-hover:block mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
+                  <div className="flex flex-wrap gap-1">
+                    {habits.map((habit) => {
+                      const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
+                      return (
+                        <span
+                          key={habit.id}
+                          className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
+                            isInPlan
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 line-through opacity-60'
+                              : 'bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200'
+                          }`}
                         >
-                          {isInPlan && '✓ '}
-                          {habit.taskText}
-                          {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>🔥{habit.streak}</span>}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (confirm(`Удалить привычку "${habit.taskText}"?`)) {
-                              deleteHabit(habit.id)
-                            }
-                          }}
-                          className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
-                          title="Удалить привычку"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    )
-                  })}
+                          <button
+                            onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
+                            className={isInPlan ? 'cursor-default' : 'hover:text-amber-900 transition-colors'}
+                            title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
+                            disabled={isInPlan}
+                          >
+                            {isInPlan && '✓ '}
+                            {habit.taskText}
+                            {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>🔥{habit.streak}</span>}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (confirm(`Удалить привычку "${habit.taskText}"?`)) {
+                                deleteHabit(habit.id)
+                              }
+                            }}
+                            className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
+                            title="Удалить привычку"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             )
@@ -454,16 +488,20 @@ export default function DailyPage() {
                 Добавьте задачи на день...
               </p>
             ) : (
-              tasks.map((task, index) => (
-                <div
-                  key={task.id}
-                  draggable={editingTaskId !== task.id}
-                  onDragStart={() => handleDragStart(task.id)}
-                  onDragOver={handleDragOver}
-                  onDrop={() => handleDrop(task.id)}
-                  className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
-                    editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
-                  } ${
+              <>
+                {/* Невыполненные задачи */}
+                {tasks.filter(t => !selectedTasks.has(t.id)).map((task) => {
+                  const index = tasks.findIndex(t => t.id === task.id)
+                  return (
+                    <div
+                      key={task.id}
+                      draggable={editingTaskId !== task.id}
+                      onDragStart={() => handleDragStart(task.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(task.id)}
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+                        editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
+                      } ${
                     selectedTasks.has(task.id)
                       ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700'
                       : savedFlags[index]
@@ -510,17 +548,34 @@ export default function DailyPage() {
                   )}
 
                   {/* Кнопка перенести на завтра */}
-                  <button
-                    onClick={() => {
-                      if (confirm('Переносим задачу на следующий день?')) {
-                        postponeTask(task.id, task.taskText)
-                      }
-                    }}
-                    className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
-                    title="Перенести на завтра"
-                  >
-                    ➡️
-                  </button>
+                  {confirmAction?.taskId === task.id && confirmAction.type === 'postpone' ? (
+                    <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/50 rounded px-1">
+                      <span className="text-xs text-blue-700 dark:text-blue-300">На завтра?</span>
+                      <button
+                        onClick={() => {
+                          postponeTask(task.id, task.taskText)
+                          setConfirmAction(null)
+                        }}
+                        className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setConfirmAction(null)}
+                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmAction({ taskId: task.id, type: 'postpone' })}
+                      className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
+                      title="Перенести на завтра"
+                    >
+                      ➡️
+                    </button>
+                  )}
 
                   {/* Кнопка создать/удалить привычку */}
                   {(() => {
@@ -553,15 +608,115 @@ export default function DailyPage() {
                       )
                     }
                   })()}
-                  <button
-                    onClick={() => removeTask(task.id)}
-                    className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                    title="Удалить задачу"
-                  >
-                    ✕
-                  </button>
+                  {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
+                    <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/50 rounded px-1">
+                      <span className="text-xs text-red-700 dark:text-red-300">Удалить?</span>
+                      <button
+                        onClick={() => {
+                          removeTask(task.id)
+                          setConfirmAction(null)
+                        }}
+                        className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setConfirmAction(null)}
+                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmAction({ taskId: task.id, type: 'delete' })}
+                      className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      title="Удалить задачу"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-              ))
+                  )
+                })}
+
+                {/* Выполненные задачи — карточка-триггер + список */}
+                {tasks.filter(t => selectedTasks.has(t.id)).length > 0 && (
+                  <>
+                    {/* Карточка "Выполнено" в стиле задачи */}
+                    <div
+                      onClick={() => setShowCompleted(!showCompleted)}
+                      className="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 dark:hover:border-green-600"
+                    >
+                      <span className="text-gray-400 dark:text-gray-500 text-xs w-4 text-center">
+                        {showCompleted ? '▼' : '▶'}
+                      </span>
+                      <span className="text-green-600 dark:text-green-400">✅</span>
+                      <span className="flex-1 text-sm text-green-700 dark:text-green-300 font-medium">
+                        Выполнено ({tasks.filter(t => selectedTasks.has(t.id)).length})
+                      </span>
+                    </div>
+                    
+                    {/* Выполненные задачи — появляются с анимацией */}
+                    <div className={`space-y-2 overflow-hidden transition-all duration-200 ${
+                      showCompleted ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+                    }`}>
+                      {tasks.filter(t => selectedTasks.has(t.id)).map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-2 p-2 rounded-lg border transition-colors bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 opacity-50 hover:opacity-70"
+                        >
+                          <span className="text-gray-400 dark:text-gray-500 w-4"></span>
+                          <input
+                            type="checkbox"
+                            checked={true}
+                            onChange={() => toggleTaskSelection(task.id)}
+                            className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                          />
+                          <span className="flex-1 text-sm text-gray-500 dark:text-gray-400 line-through">
+                            {task.taskText}
+                          </span>
+                          {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
+                            <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/50 rounded px-1">
+                              <span className="text-xs text-red-700 dark:text-red-300">Удалить?</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeTask(task.id)
+                                  setConfirmAction(null)
+                                }}
+                                className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmAction(null)
+                                }}
+                                className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setConfirmAction({ taskId: task.id, type: 'delete' })
+                              }}
+                              className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                              title="Удалить задачу"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </div>
 

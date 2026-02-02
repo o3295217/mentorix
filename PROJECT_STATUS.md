@@ -31,7 +31,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (42)
+## API Endpoints (43)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -72,6 +72,7 @@
 | `/api/profile/theme` | GET, POST |
 | `/api/progress` | GET |
 | `/api/tasks/[id]/close` | POST |
+| `/api/tasks/[id]/delete` | DELETE |
 | `/api/tasks/[id]/reopen` | POST |
 | `/api/tasks/add-suggested` | POST |
 | `/api/tasks/closed` | GET |

@@ -21,6 +21,12 @@ export default function TasksPage() {
   const [showDateModal, setShowDateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<OpenTask | null>(null)
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  
+  // Inline-подтверждение удаления
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  
+  // Inline-подтверждение закрытия
+  const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
 
   useEffect(() => {
     loadTasks()
@@ -82,6 +88,30 @@ export default function TasksPage() {
       }
     } catch (error) {
       console.error('Error reopening task:', error)
+    }
+  }
+
+  // Удалить задачу полностью
+  const deleteTask = async (taskId: number, isClosed: boolean = false) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/delete`, { method: 'DELETE' })
+      if (!res.ok) return
+
+      if (isClosed) {
+        setClosedTasks(closedTasks.filter((t) => t.id !== taskId))
+      } else {
+        setOpenTasks(openTasks.filter((t) => t.id !== taskId))
+      }
+      // Убираем из "в плане"
+      setTasksInPlan(prev => {
+        const updated = { ...prev }
+        delete updated[taskId]
+        return updated
+      })
+      setMessage('🗑️ Задача удалена')
+      setTimeout(() => setMessage(''), 3000)
+    } catch (error) {
+      console.error('Error deleting task:', error)
     }
   }
 
@@ -214,12 +244,60 @@ export default function TasksPage() {
                             + В план
                           </button>
                         )}
-                        <button
-                          onClick={() => closeTask(task.id)}
-                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium"
-                        >
-                          Закрыть
-                        </button>
+                        {confirmCloseId === task.id ? (
+                          <div className="flex items-center gap-1 bg-green-50 dark:bg-green-900/50 rounded px-2 py-0.5">
+                            <span className="text-xs text-green-700 dark:text-green-300">Задача выполнена?</span>
+                            <button
+                              onClick={() => {
+                                closeTask(task.id)
+                                setConfirmCloseId(null)
+                              }}
+                              className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                            >
+                              Да
+                            </button>
+                            <button
+                              onClick={() => setConfirmCloseId(null)}
+                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                            >
+                              Нет
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmCloseId(task.id)}
+                            className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium"
+                          >
+                            Закрыть
+                          </button>
+                        )}
+                        {confirmDeleteId === task.id ? (
+                          <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/50 rounded px-2 py-0.5">
+                            <span className="text-xs text-red-700 dark:text-red-300">Удалить?</span>
+                            <button
+                              onClick={() => {
+                                deleteTask(task.id)
+                                setConfirmDeleteId(null)
+                              }}
+                              className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(task.id)}
+                            className="text-red-500 hover:text-red-700 font-medium"
+                          >
+                            Удалить
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -257,12 +335,60 @@ export default function TasksPage() {
                             + В план
                           </button>
                         )}
-                        <button
-                          onClick={() => closeTask(task.id)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Закрыть
-                        </button>
+                        {confirmCloseId === task.id ? (
+                          <div className="flex items-center gap-1 bg-green-50 dark:bg-green-900/50 rounded px-2 py-0.5">
+                            <span className="text-xs text-green-700 dark:text-green-300">Задача выполнена?</span>
+                            <button
+                              onClick={() => {
+                                closeTask(task.id)
+                                setConfirmCloseId(null)
+                              }}
+                              className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                            >
+                              Да
+                            </button>
+                            <button
+                              onClick={() => setConfirmCloseId(null)}
+                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                            >
+                              Нет
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmCloseId(task.id)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Закрыть
+                          </button>
+                        )}
+                        {confirmDeleteId === task.id ? (
+                          <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/50 rounded px-2 py-0.5">
+                            <span className="text-xs text-red-700 dark:text-red-300">Удалить?</span>
+                            <button
+                              onClick={() => {
+                                deleteTask(task.id)
+                                setConfirmDeleteId(null)
+                              }}
+                              className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(task.id)}
+                            className="text-red-500 hover:text-red-700 font-medium"
+                          >
+                            Удалить
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

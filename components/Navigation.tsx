@@ -94,8 +94,18 @@ export default function Navigation() {
     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between h-16">
         <div className="flex space-x-8">
-          <Link href="/" className="flex items-center text-xl font-bold text-primary-600">
-            AI Assistant
+          <Link href="/" className="flex items-center">
+            {/* Буква A */}
+            <svg width="28" height="32" viewBox="0 0 24 28" className="flex-shrink-0">
+              <path d="M12 1 L1 27 M12 1 L12 27 M4 18 L12 18" 
+                    fill="none" stroke="#4a7c9b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="flex flex-col justify-center leading-tight -ml-2">
+              <span className="text-sm font-semibold tracking-tight">
+                <span className="text-[#4a7c9b]">I</span><span className="text-gray-900 dark:text-white">On</span>
+              </span>
+              <span className="text-sm text-gray-900 dark:text-white tracking-tight">ssistant</span>
+            </span>
           </Link>
           <div className="flex space-x-1 items-center">
             {navItems.map((item) => (
