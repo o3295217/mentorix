@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-02-02 — fix: docker-compose использует PostgreSQL вместо SQLite
+- 🔌 API: 1 файлов (route)
+- 📦 Другое: 1 файлов
+
+
 ### 2026-02-02 — Обновлён логотип: SVG буква A + IOn/ssistant
 - 📦 Другое: 1 файлов
 

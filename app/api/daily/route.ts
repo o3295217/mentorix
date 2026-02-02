@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
       
       // Фильтруем по локальной дате
       const entry = entries.find(e => toDateKey(e.date) === requestedDateKey)
+      
+      console.log('[API daily GET]', requestedDateKey, 'userId:', userId, 'found:', !!entry, 'planText length:', entry?.planText?.length, 'selectedTasksJson:', entry?.selectedTasksJson)
 
       return NextResponse.json(entry || null)
     }
@@ -118,12 +120,34 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, planText, factText, selectedTasksJson, extraTasksJson } = validation.data
-    const entryDate = parseDateParam(date)
-
-    const existing = await prisma.dailyEntry.findFirst({
-      where: { userId, date: entryDate },
-      select: { id: true, planSnapshotJson: true },
+    
+    // Нормализуем дату к формату YYYY-MM-DD
+    const requestedDateKey = date.match(/^\d{4}-\d{2}-\d{2}$/) 
+      ? date 
+      : toDateKey(parseDateParam(date))
+    const entryDate = parseDateParam(requestedDateKey)
+    
+    // Ищем в диапазоне ±1 день для учёта часовых поясов (как в GET)
+    const dayBefore = new Date(entryDate)
+    dayBefore.setDate(dayBefore.getDate() - 1)
+    const dayAfter = new Date(entryDate)
+    dayAfter.setDate(dayAfter.getDate() + 2)
+    
+    const existingEntries = await prisma.dailyEntry.findMany({
+      where: { 
+        userId, 
+        date: {
+          gte: dayBefore,
+          lt: dayAfter,
+        },
+      },
+      select: { id: true, date: true, planSnapshotJson: true },
     })
+    
+    // Находим запись по локальной дате
+    const existing = existingEntries.find(e => toDateKey(e.date) === requestedDateKey)
+    
+    console.log('[API daily POST]', requestedDateKey, 'userId:', userId, 'existingId:', existing?.id, 'entriesFound:', existingEntries.length)
 
     const planLines = planText !== undefined ? splitLines(planText) : []
     const shouldSetSnapshot = planText !== undefined && planLines.length > 0 && !existing?.planSnapshotJson

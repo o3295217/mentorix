@@ -442,11 +442,15 @@ export function useDaily(): UseDailyReturn {
             setTasks(tasksWithIds)
 
             if (shouldUseDraft) {
+              console.log('[useDaily] Using draft, selectedTaskIds:', draft!.selectedTaskIds)
               setSelectedTasks(sanitizeSelectedForTotal(draft!.selectedTaskIds, tasksWithIds.length))
             } else if (daily.selectedTasksJson) {
               try {
                 const selected = JSON.parse(daily.selectedTasksJson) as (string | number)[]
-                setSelectedTasks(sanitizeSelectedForTotal(selected, tasksWithIds.length))
+                console.log('[useDaily] Loaded selectedTasksJson from DB:', selected, 'tasksCount:', tasksWithIds.length)
+                const sanitized = sanitizeSelectedForTotal(selected, tasksWithIds.length)
+                console.log('[useDaily] After sanitize:', Array.from(sanitized))
+                setSelectedTasks(sanitized)
               } catch {
                 setSelectedTasks(new Set())
               }
