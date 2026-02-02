@@ -8,12 +8,9 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/dev.db
+      - DATABASE_URL=postgresql://ai_assistant:ai_assistant_dev@host.docker.internal:5432/ai_assistant
     env_file:
       - .env.local
-    volumes:
-      # Persist SQLite database
-      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
