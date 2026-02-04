@@ -274,7 +274,7 @@ export default function DailyPage() {
       {/* Context from periods */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
-          <h3 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-2">Цели текущей недели:</h3>
+          <h3 className="font-medium text-base text-blue-900 dark:text-blue-100 mb-2">Цели текущей недели:</h3>
           {weekGoals.length > 0 ? (
             <ul className="text-xs text-blue-800 space-y-0.5">
               {weekGoals.map((goal, index) => (
@@ -297,7 +297,7 @@ export default function DailyPage() {
         </div>
 
         <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700">
-          <h3 className="font-medium text-sm text-purple-900 dark:text-purple-100 mb-2">Цели текущего месяца:</h3>
+          <h3 className="font-medium text-base text-purple-900 dark:text-purple-100 mb-2">Цели текущего месяца:</h3>
           {monthGoals.length > 0 ? (
             <ul className="text-xs text-purple-800 space-y-0.5">
               {monthGoals.map((goal, index) => (
@@ -339,19 +339,25 @@ export default function DailyPage() {
           </div>
 
           {/* Добавление новой задачи */}
-          <div className="mb-4 flex gap-2 flex-shrink-0 pr-6">
-            <input
-              type="text"
+          <div className="mb-4 flex gap-2 items-start flex-shrink-0 pr-6">
+            <textarea
               value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   addTask()
                 }
               }}
               placeholder="Добавить задачу..."
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+              rows={1}
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
+              style={{ minHeight: '42px', height: 'auto' }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement
+                target.style.height = 'auto'
+                target.style.height = target.scrollHeight + 'px'
+              }}
             />
             <button
               onClick={addTask}
@@ -499,7 +505,7 @@ export default function DailyPage() {
                       onDragStart={() => handleDragStart(task.id)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(task.id)}
-                      className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+                      className={`flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors ${
                         editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
                       } ${
                     selectedTasks.has(task.id)
@@ -514,7 +520,7 @@ export default function DailyPage() {
                     type="checkbox"
                     checked={selectedTasks.has(task.id)}
                     onChange={() => toggleTaskSelection(task.id)}
-                    className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                   />
 
                   {editingTaskId === task.id ? (
@@ -532,11 +538,11 @@ export default function DailyPage() {
                       }}
                       onBlur={() => saveEditedTask(task.id)}
                       autoFocus
-                      className="flex-1 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white dark:border-primary-600"
+                      className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white dark:border-primary-600"
                     />
                   ) : (
                     <span
-                      className={`flex-1 text-sm text-gray-900 dark:text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-500 dark:text-gray-400' : ''}`}
+                      className={`flex-1 text-base text-gray-900 dark:text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-500 dark:text-gray-400' : ''}`}
                       onDoubleClick={() => startEditingTask(task.id, task.taskText)}
                       title="Дважды кликните для редактирования"
                     >
@@ -646,13 +652,13 @@ export default function DailyPage() {
                     {/* Карточка "Выполнено" в стиле задачи */}
                     <div
                       onClick={() => setShowCompleted(!showCompleted)}
-                      className="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 dark:hover:border-green-600"
+                      className="flex items-center gap-2 py-1 px-2 rounded-lg border cursor-pointer transition-colors bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 dark:hover:border-green-600"
                     >
                       <span className="text-gray-400 dark:text-gray-500 text-xs w-4 text-center">
                         {showCompleted ? '▼' : '▶'}
                       </span>
                       <span className="text-green-600 dark:text-green-400">✅</span>
-                      <span className="flex-1 text-sm text-green-700 dark:text-green-300 font-medium">
+                      <span className="flex-1 text-base text-green-700 dark:text-green-300 font-medium">
                         Выполнено ({tasks.filter(t => selectedTasks.has(t.id)).length})
                       </span>
                     </div>
@@ -664,16 +670,16 @@ export default function DailyPage() {
                       {tasks.filter(t => selectedTasks.has(t.id)).map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-2 p-2 rounded-lg border transition-colors bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 opacity-50 hover:opacity-70"
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 opacity-50 hover:opacity-70"
                         >
                           <span className="text-gray-400 dark:text-gray-500 w-4"></span>
                           <input
                             type="checkbox"
                             checked={true}
                             onChange={() => toggleTaskSelection(task.id)}
-                            className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                            className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                           />
-                          <span className="flex-1 text-sm text-gray-500 dark:text-gray-400 line-through">
+                          <span className="flex-1 text-base text-gray-500 dark:text-gray-400 line-through">
                             {task.taskText}
                           </span>
                           {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
