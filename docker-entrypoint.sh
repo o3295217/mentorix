@@ -2,7 +2,7 @@
 set -e
 
 echo "🔄 Running Prisma migrations..."
-npx prisma migrate deploy 2>&1 || {
+node ./node_modules/prisma/build/index.js migrate deploy 2>&1 || {
   echo "⚠️  Migration failed, but starting the app anyway..."
 }
 

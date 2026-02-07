@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-02-07 — fix: 4 critical security & performance issues from code review
+- 📦 Другое: 1 файлов
+
+
 ### 2026-02-07 — refactor(goals): унифицирована цветовая схема — заменены разноцветные градиенты на единую палитру primary
 - 🔌 API: 5 файлов (route, route, route...)
 - 🧩 Компоненты: 4 файлов (AuthGuard, AuthProvider, Navigation...)
