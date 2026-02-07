@@ -278,9 +278,9 @@ export default function GoalsPage() {
 
       {/* Иерархическое дерево целей */}
       {dreamGoal && (
-        <div className="card bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900/30 dark:to-blue-900/20">
+        <div className="card bg-white dark:bg-gray-800">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-2 rounded-lg">📊</span>
+            <span className="bg-primary-500 text-white p-2 rounded-lg">📊</span>
             План достижения мечты
           </h2>
 

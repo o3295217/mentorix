@@ -42,15 +42,15 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
 
   if (!dreamGoal && !isEditing) {
     return (
-      <div className="bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-950/40 dark:to-blue-950/40 p-8 rounded-2xl shadow-sm border border-purple-200 dark:border-purple-900/40 text-center">
-        <h2 className="text-2xl font-bold text-purple-900 dark:text-purple-100 mb-4">🌟 У тебя пока нет Мечты</h2>
-        <p className="text-purple-800 dark:text-purple-200 mb-6 max-w-2xl mx-auto">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 text-center">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">🌟 У тебя пока нет Мечты</h2>
+        <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
           "Человек без мечты, как птица без крыльев". Давай определим твою главную цель на ближайшие годы.
           Это станет фундаментом для всей системы планирования.
         </p>
         <button
           onClick={() => setIsEditing(true)}
-          className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
+          className="bg-primary-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-600 transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
         >
           Создать Мечту
         </button>
@@ -59,7 +59,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 p-6 rounded-2xl shadow-sm border border-purple-100 dark:border-purple-900/30">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className="text-4xl">🌟</span>
@@ -71,7 +71,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors p-2 hover:bg-white/50 dark:hover:bg-gray-800/60 rounded-lg"
+            className="text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
             title="Редактировать мечту"
           >
             ✏️
@@ -80,7 +80,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
       </div>
 
       {isEditing ? (
-        <div className="space-y-4 bg-white/50 dark:bg-gray-800/60 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30">
+        <div className="space-y-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Опиши свою мечту (чего ты хочешь достичь?):
@@ -88,7 +88,7 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-purple-200 dark:border-purple-900/40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all resize-none text-lg"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-400 focus:ring-4 focus:ring-primary-100 dark:focus:ring-primary-900/30 transition-all resize-none text-lg"
               rows={3}
               placeholder="Например: Построить международную IT-компанию и жить у океана..."
               autoFocus
@@ -106,8 +106,8 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
                   onClick={() => setYears(y)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     years === y
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-gray-700'
+                      ? 'bg-primary-500 text-white shadow-md'
+                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
                   {y} {y === 1 ? 'год' : y < 5 ? 'года' : 'лет'}
@@ -132,14 +132,14 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
             <button
               onClick={handleSave}
               disabled={saving || !text.trim()}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saving ? 'Сохранение...' : 'Сохранить Мечту'}
             </button>
           </div>
         </div>
       ) : (
-        <div className="bg-white/60 dark:bg-gray-800/60 p-6 rounded-xl border border-purple-100 dark:border-purple-900/30 backdrop-blur-sm">
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
           <p className="text-xl text-gray-800 dark:text-gray-100 leading-relaxed font-medium italic">
             "{dreamGoal?.goalText}"
           </p>

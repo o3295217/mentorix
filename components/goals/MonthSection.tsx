@@ -90,11 +90,6 @@ export default function MonthSection({
   }, [])
 
 
-  const monthColors = ['bg-gradient-to-r from-sky-400 to-blue-500', 'bg-gradient-to-r from-violet-400 to-purple-500', 'bg-gradient-to-r from-pink-400 to-rose-500']
-  const monthGradients = ['from-sky-400 to-blue-500', 'from-violet-400 to-purple-500', 'from-pink-400 to-rose-500']
-  
-  // Determine color based on month index in quarter (0, 1, 2)
-  const monthOffset = month % 3
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -169,17 +164,17 @@ export default function MonthSection({
   }
 
   return (
-    <div id={`month-${year}-${String(month + 1).padStart(2, '0')}`} className={`rounded-lg p-3 ${isCurrent ? 'bg-gradient-to-r from-sky-50 to-blue-50 border-2 border-sky-200 dark:from-sky-900/30 dark:to-blue-900/30 dark:border-sky-700' : 'bg-gray-50 border border-gray-100 dark:bg-gray-900/30 dark:border-gray-700'}`}>
-      <div 
+    <div id={`month-${year}-${String(month + 1).padStart(2, '0')}`} className={`rounded-lg p-3 ${isCurrent ? 'bg-primary-50 border-2 border-primary-200 dark:bg-primary-900/15 dark:border-primary-700' : 'bg-gray-50 border border-gray-100 dark:bg-gray-900/30 dark:border-gray-700'}`}>
+      <div
         className="flex items-center gap-2 mb-2 cursor-pointer"
         onClick={onToggle}
       >
-        <span className={`w-7 h-7 rounded-lg ${monthColors[monthOffset]} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+        <span className="w-7 h-7 rounded-lg bg-primary-400 flex items-center justify-center text-white text-sm font-bold shadow-sm">
           {isExpanded ? '▼' : '▶'}
         </span>
         <span className="font-medium text-sm">
           {monthNames[month]}
-          {isCurrent && <span className="ml-2 text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">сейчас</span>}
+          {isCurrent && <span className="ml-2 text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 px-2 py-0.5 rounded-full">сейчас</span>}
         </span>
         <span className="text-xs text-gray-500 dark:text-gray-400">
           ({goals.length} {goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'})
@@ -188,8 +183,8 @@ export default function MonthSection({
         {progress.total > 0 && (
           <div className="flex items-center gap-2 ml-auto">
             <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all bg-gradient-to-r ${monthGradients[monthOffset]}`}
+              <div
+                className="h-full rounded-full transition-all bg-primary-500"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
@@ -209,12 +204,12 @@ export default function MonthSection({
               onChange={(e) => setNewGoal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="Добавить цель..."
-              className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300 dark:focus:ring-sky-800/50"
+              className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 dark:focus:ring-primary-800/50"
               onClick={(e) => e.stopPropagation()}
             />
             <button
               onClick={(e) => { e.stopPropagation(); handleAdd() }}
-              className={`${monthColors[monthOffset]} text-white text-sm px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity`}
+              className="bg-primary-500 hover:bg-primary-600 text-white text-sm px-3 py-1.5 rounded-lg transition-colors"
             >
               +
             </button>
@@ -240,7 +235,7 @@ export default function MonthSection({
                     key={origIndex}
                     className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm"
                   >
-                    <span className={`w-5 h-5 rounded-full ${monthColors[monthOffset]} flex items-center justify-center text-white text-xs`}>
+                    <span className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center text-white text-xs">
                       {displayIndex + 1}
                     </span>
                     {editingIndex === origIndex ? (
@@ -299,7 +294,7 @@ export default function MonthSection({
                                       }, 2000)
                                     }
                                   }}
-                                  className="text-xs px-2 py-1 rounded-md border bg-amber-50 dark:bg-amber-900/25 text-amber-700 dark:text-amber-200 border-amber-300 dark:border-amber-700 font-medium cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/35 hover:scale-105 transition-transform"
+                                  className="text-xs px-2 py-1 rounded-md border bg-primary-50 dark:bg-primary-900/25 text-primary-700 dark:text-primary-200 border-primary-200 dark:border-primary-700 font-medium cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-900/35 hover:scale-105 transition-transform"
                                   title={`Перейти к W${wNum}`}
                                 >
                                   W{wNum}
@@ -385,9 +380,9 @@ export default function MonthSection({
                       id={`week-${weekKey}`} 
                       className={`rounded-lg p-3 flex flex-col transition-all ${
                         isDragOver 
-                          ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-400 dark:border-blue-700 border-dashed scale-105' 
-                          : isCurrentWeek 
-                            ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-amber-200 dark:from-yellow-900/20 dark:to-amber-900/20 dark:border-amber-700' 
+                          ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-400 dark:border-blue-700 border-dashed scale-105'
+                          : isCurrentWeek
+                            ? 'bg-primary-50 border-2 border-primary-200 dark:bg-primary-900/15 dark:border-primary-700'
                             : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'
                       }`}
                       onDragOver={(e) => {
@@ -407,7 +402,7 @@ export default function MonthSection({
                       }}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`w-7 h-7 rounded-full ${isCurrentWeek ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-gradient-to-r from-gray-400 to-gray-500'} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
+                        <span className={`w-7 h-7 rounded-full ${isCurrentWeek ? 'bg-primary-500' : 'bg-gray-400'} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
                           W{week.num}
                         </span>
                         <div className="flex flex-col flex-1">
@@ -419,12 +414,12 @@ export default function MonthSection({
                               <span className="text-xs text-gray-400">{weekProgress.completed}/{weekProgress.total}</span>
                             )}
                           </div>
-                          {isCurrentWeek && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full w-fit">сейчас</span>}
+                          {isCurrentWeek && <span className="text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 px-1.5 py-0.5 rounded-full w-fit">сейчас</span>}
                           {/* Прогресс-бар недели */}
                           {weekProgress.total > 0 && (
                             <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
                               <div 
-                                className={`h-full rounded-full transition-all ${isCurrentWeek ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-gradient-to-r from-gray-400 to-gray-500'}`}
+                                className={`h-full rounded-full transition-all ${isCurrentWeek ? 'bg-primary-500' : 'bg-gray-400'}`}
                                 style={{ width: `${weekProgress.percent}%` }}
                               />
                             </div>
@@ -446,7 +441,7 @@ export default function MonthSection({
                             }
                           }}
                           placeholder="Цель..."
-                          className="flex-1 px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-800/50"
+                          className="flex-1 px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 dark:focus:ring-primary-800/50"
                         />
                         <button
                           onClick={(e) => {
@@ -456,7 +451,7 @@ export default function MonthSection({
                               input.value = ''
                             }
                           }}
-                          className={`${isCurrentWeek ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-gradient-to-r from-gray-400 to-gray-500'} text-white text-xs px-2 py-1 rounded-lg hover:opacity-90 transition-opacity`}
+                          className={`${isCurrentWeek ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-400 hover:bg-gray-500'} text-white text-xs px-2 py-1 rounded-lg transition-colors`}
                         >
                           +
                         </button>

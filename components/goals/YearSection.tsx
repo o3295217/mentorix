@@ -50,27 +50,22 @@ export default function YearSection({
   const distance = year - currentYear
 
 
-  // Цветовая схема
-  const yearColors = distance === 0 
-    ? 'from-emerald-500 to-teal-500 border-emerald-300 bg-emerald-50'
-    : distance === 1 
-    ? 'from-blue-500 to-cyan-500 border-blue-300 bg-blue-50'
-    : distance <= 3
-    ? 'from-purple-500 to-pink-500 border-purple-300 bg-purple-50'
-    : 'from-amber-500 to-orange-500 border-amber-300 bg-amber-50'
+  // Unified color scheme
+  const isCurrent = distance === 0
 
-  const headerBg = distance === 0 
-    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30' 
-    : distance === 1 
-    ? 'bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 dark:from-blue-900/20 dark:to-cyan-900/20 dark:hover:from-blue-900/30 dark:hover:to-cyan-900/30' 
-    : distance <= 3 
-    ? 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30' 
-    : 'bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 dark:hover:from-amber-900/30 dark:hover:to-orange-900/30'
+  const borderColor = isCurrent
+    ? 'border-primary-200 dark:border-primary-700'
+    : 'border-gray-200 dark:border-gray-700'
 
-  const borderColor = distance === 0 ? 'border-emerald-200 dark:border-emerald-700' : distance === 1 ? 'border-blue-200 dark:border-blue-700' : distance <= 3 ? 'border-purple-200 dark:border-purple-700' : 'border-amber-200 dark:border-amber-700'
-  const textColor = distance === 0 ? 'text-emerald-600' : distance === 1 ? 'text-blue-600' : distance <= 3 ? 'text-purple-600' : 'text-amber-600'
-  const badgeColor = distance === 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-200' : distance === 1 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200' : distance <= 3 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-200' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200'
-  const buttonColor = distance === 0 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : distance === 1 ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : distance <= 3 ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'
+  const headerBg = isCurrent
+    ? 'bg-primary-50 hover:bg-primary-100 dark:bg-primary-900/20 dark:hover:bg-primary-900/30'
+    : 'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-750'
+
+  const textColor = 'text-gray-500 dark:text-gray-400'
+
+  const badgeColor = isCurrent
+    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-200'
+    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -145,12 +140,12 @@ export default function YearSection({
         className={`w-full px-4 py-3 flex items-center justify-between ${headerBg} transition-colors`}
       >
         <div className="flex items-center gap-3">
-          <span className={`w-10 h-10 rounded-lg bg-gradient-to-br ${yearColors.split(' ')[0]} ${yearColors.split(' ')[1]} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
+          <span className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
             {isExpanded ? '▼' : '▶'}
           </span>
           <div className="text-left">
             <span className="font-bold text-lg block">
-              🎯 {year} {distance === 0 && <span className="text-emerald-600 text-sm font-normal">(текущий)</span>}
+              🎯 {year} {isCurrent && <span className="text-primary-600 dark:text-primary-400 text-sm font-normal">(текущий)</span>}
             </span>
             <span className={`text-sm ${textColor}`}>
               {goals.length > 0 ? `${goals.length} ${goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'}` : 'Добавьте цели →'}
@@ -167,7 +162,7 @@ export default function YearSection({
         <div className="px-4 pb-4 space-y-4 bg-white dark:bg-gray-800">
           {/* Цели на год */}
           <div className="pt-4">
-            <h4 className={`font-semibold mb-3 flex items-center gap-2 ${distance === 0 ? 'text-emerald-700' : distance === 1 ? 'text-blue-700' : distance <= 3 ? 'text-purple-700' : 'text-amber-700'}`}>
+            <h4 className="font-semibold mb-3 flex items-center gap-2 text-primary-700 dark:text-primary-300">
               <span className="text-lg">🎯</span>
               Цели на {year} год:
             </h4>
@@ -180,11 +175,11 @@ export default function YearSection({
                 onChange={(e) => setNewGoal(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
                 placeholder="Введите цель и нажмите Enter..."
-                className={`flex-1 px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${borderColor} focus:ring-opacity-50`}
+                className="flex-1 px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 border-gray-200 dark:border-gray-600 focus:ring-primary-300 dark:focus:ring-primary-800/50 dark:bg-gray-900 dark:text-gray-100"
               />
               <button
                 onClick={handleAdd}
-                className={`px-4 py-2 rounded-lg font-medium text-white transition-all hover:scale-105 ${buttonColor}`}
+                className="px-4 py-2 rounded-lg font-medium text-white transition-all hover:scale-105 bg-primary-500 hover:bg-primary-600"
               >
                 + Добавить
               </button>
@@ -193,7 +188,7 @@ export default function YearSection({
             {/* Список целей */}
             <div className="space-y-2">
               {goals.length === 0 ? (
-                <div className={`text-center py-6 rounded-lg border-2 border-dashed ${borderColor} bg-opacity-10`}>
+                <div className="text-center py-6 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-600">
                   <span className="text-3xl block mb-2">🎯</span>
                   <p className="text-gray-500 dark:text-gray-400 text-sm">Добавьте цели на {year} год...</p>
                 </div>
@@ -202,9 +197,9 @@ export default function YearSection({
                   return (
                     <div
                       key={index}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-l-4 bg-white dark:bg-gray-800 shadow-sm hover:shadow transition-shadow ${distance === 0 ? 'border-l-emerald-400' : distance === 1 ? 'border-l-blue-400' : distance <= 3 ? 'border-l-purple-400' : 'border-l-amber-400'}`}
+                      className="flex items-center gap-3 p-3 rounded-lg border-l-4 bg-white dark:bg-gray-800 shadow-sm hover:shadow transition-shadow border-l-primary-500"
                     >
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${distance === 0 ? 'bg-emerald-500' : distance === 1 ? 'bg-blue-500' : distance <= 3 ? 'bg-purple-500' : 'bg-amber-500'}`}>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold bg-primary-500">
                         {index + 1}
                       </span>
                       
@@ -284,11 +279,7 @@ export default function YearSection({
                                       }, 2000)
                                     }
                                   }}
-                                  className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer hover:scale-105 transition-transform ${
-                                    c.type === 'quarter' ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100' : 
-                                    c.type === 'month' ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100' : 
-                                    'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-                                  }`}
+                                  className="text-xs px-2 py-1 rounded-md border font-medium cursor-pointer hover:scale-105 transition-transform bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-200 dark:border-primary-700 dark:hover:bg-primary-900/30"
                                   title={`Перейти к ${c.label}`}
                                 >
                                   {c.label}
@@ -369,7 +360,7 @@ export default function YearSection({
                                           onCopyGoal(goal, 'week', `${year}-${String(currMonth + 1).padStart(2, '0')}-W${w.num}`)
                                           setCopyDropdownIndex(null)
                                         }}
-                                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                                       >
                                         → W{w.num} ({w.start.getDate()}-{w.end.getDate()})
                                       </button>

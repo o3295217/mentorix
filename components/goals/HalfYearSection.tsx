@@ -23,13 +23,7 @@ export default function HalfYearSection({
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingText, setEditingText] = useState('')
 
-  const halfColors = half === 1 
-    ? 'from-cyan-400 to-teal-500' 
-    : 'from-indigo-400 to-purple-500'
-  const halfBgColors = half === 1 
-    ? 'bg-gradient-to-r from-cyan-50 to-teal-50 border-cyan-200 dark:from-cyan-950/40 dark:to-teal-950/40 dark:border-cyan-800/60' 
-    : 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 dark:from-indigo-950/40 dark:to-purple-950/40 dark:border-indigo-800/60'
-  const halfTextColor = half === 1 ? 'text-cyan-600 dark:text-cyan-300' : 'text-indigo-600 dark:text-indigo-300'
+  const bgClass = 'bg-gray-50 border-gray-200 dark:bg-gray-800/50 dark:border-gray-700'
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -47,15 +41,15 @@ export default function HalfYearSection({
   }
 
   return (
-    <div className={`rounded-lg border-2 p-3 ${halfBgColors}`}>
+    <div className={`rounded-lg border-2 p-3 ${bgClass}`}>
       <div className="flex items-center gap-2 mb-3">
-        <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${halfColors} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+        <span className="w-8 h-8 rounded-lg bg-primary-400 flex items-center justify-center text-white text-sm font-bold shadow-sm">
           H{half}
         </span>
         <span className="font-semibold">
           {half === 1 ? 'Первое полугодие' : 'Второе полугодие'}
         </span>
-        <span className={`text-sm ${halfTextColor}`}>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
           ({goals.length} {goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'})
         </span>
       </div>
@@ -72,7 +66,7 @@ export default function HalfYearSection({
         />
         <button
           onClick={handleAdd}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r ${halfColors} hover:opacity-90 transition-opacity`}
+          className="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 transition-colors"
         >
           + Добавить
         </button>
@@ -93,7 +87,7 @@ export default function HalfYearSection({
               key={index}
               className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm"
             >
-              <span className={`w-5 h-5 rounded-full bg-gradient-to-br ${halfColors} flex items-center justify-center text-white text-xs`}>
+              <span className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center text-white text-xs">
                 {index + 1}
               </span>
               {editingIndex === index ? (
