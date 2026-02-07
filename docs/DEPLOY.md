@@ -83,26 +83,10 @@ MAX_USERS=5
 
 ---
 
-## Шаг 4: Миграция на многопользовательскую схему
+## Шаг 4: Запуск
 
 ```bash
-# Заменяем схему БД
-cp prisma/schema-multiuser.prisma prisma/schema.prisma
-
-# Если есть старые данные и нужно их сохранить:
-# 1. Сделайте бекап
-cp data/dev.db data/dev.db.backup
-
-# 2. Создайте новую БД (старые данные не мигрируются автоматически)
-rm -f data/production.db
-```
-
----
-
-## Шаг 5: Запуск
-
-```bash
-# Сборка и запуск
+# Сборка и запуск (PostgreSQL стартует автоматически, миграции применяются при старте)
 docker compose -f docker-compose.production.yml up -d --build
 
 # Проверяем логи
@@ -164,8 +148,8 @@ docker compose -f docker-compose.production.yml down
 # Логи
 docker logs -f ai-assistant-production
 
-# Бекап БД
-cp ~/ai-assistant/data/production.db ~/ai-assistant/backups/production-$(date +%Y%m%d).db
+# Бэкап БД (PostgreSQL)
+./scripts/backup-db.sh
 
 # Обновление
 git pull
@@ -220,12 +204,14 @@ docker logs ai-assistant-production
 
 ### Проблемы с БД
 ```bash
-# Проверяем права
-ls -la ~/ai-assistant/data/
+# Проверяем логи PostgreSQL
+docker logs ai-assistant-db
 
-# Пересоздаём БД
-docker compose -f docker-compose.production.yml down
-rm -f ~/ai-assistant/data/production.db
+# Подключаемся к БД
+docker exec -it ai-assistant-db psql -U ai_assistant
+
+# Пересоздать БД (осторожно — данные будут утеряны!)
+docker compose -f docker-compose.production.yml down -v
 docker compose -f docker-compose.production.yml up -d
 ```
 
@@ -240,7 +226,7 @@ crontab -e
 
 Добавьте:
 ```
-0 3 * * * cp /home/oleg_d_b/ai-assistant/data/production.db /home/oleg_d_b/ai-assistant/backups/production-$(date +\%Y\%m\%d).db
+0 3 * * * cd /home/oleg_d_b/ai-assistant && ./scripts/backup-db.sh
 ```
 
 ---

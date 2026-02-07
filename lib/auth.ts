@@ -1,14 +1,24 @@
 /**
- * Библиотека аутентификации (без внешних зависимостей)
- * Использует JWT токены и bcrypt для хеширования
+ * Библиотека аутентификации
+ * Использует JWT токены и bcrypt для хеширования паролей
  */
 
+import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
 
-// Простая реализация без bcrypt (для MVP, потом можно заменить)
-// В проде используйте: npm install bcryptjs
+const BCRYPT_ROUNDS = 12;
+
+/**
+ * Хеширование пароля через bcrypt с salt
+ */
 async function hashPassword(password: string): Promise<string> {
-  // Простой hash для начала (заменить на bcrypt в проде)
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+/**
+ * Legacy SHA-256 хеш (только для миграции существующих паролей)
+ */
+async function legacySha256Hash(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password + process.env.AUTH_SECRET);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -16,9 +26,34 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+/**
+ * Проверка пароля с прозрачной миграцией legacy SHA-256 → bcrypt.
+ * Если хеш старого формата и пароль верный — перехешируем на bcrypt.
+ */
+async function verifyPassword(
+  password: string,
+  hash: string,
+  userId?: string
+): Promise<boolean> {
+  // bcrypt хеши начинаются с $2a$ / $2b$
+  if (hash.startsWith('$2')) {
+    return bcrypt.compare(password, hash);
+  }
+
+  // Legacy SHA-256: проверяем и мигрируем
+  const legacyHash = await legacySha256Hash(password);
+  if (legacyHash !== hash) return false;
+
+  // Пароль верный — перехешируем на bcrypt
+  if (userId) {
+    const newHash = await hashPassword(password);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    }).catch(err => console.error('Failed to migrate password hash:', err));
+  }
+
+  return true;
 }
 
 // Генерация токена сессии
@@ -117,7 +152,7 @@ export async function loginUser(
       return { success: false, error: 'Аккаунт деактивирован' };
     }
 
-    const isValid = await verifyPassword(password, user.passwordHash);
+    const isValid = await verifyPassword(password, user.passwordHash, user.id);
     if (!isValid) {
       return { success: false, error: 'Неверный email или пароль' };
     }
@@ -232,7 +267,7 @@ export async function changePassword(
       return { success: false, error: 'Пользователь не найден' };
     }
 
-    const isValid = await verifyPassword(currentPassword, user.passwordHash);
+    const isValid = await verifyPassword(currentPassword, user.passwordHash, user.id);
     if (!isValid) {
       return { success: false, error: 'Неверный текущий пароль' };
     }
@@ -350,13 +385,9 @@ export async function resetPassword(
   }
 }
 
-// Хэширование пароля (экспорт для CLI)
+// Хэширование пароля (экспорт для CLI и API)
 export async function hashPasswordForReset(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + process.env.AUTH_SECRET);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 // Создание первого админа (использовать при первом запуске)

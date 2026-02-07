@@ -94,18 +94,28 @@ export function checkRateLimit(
 }
 
 /**
- * Get client identifier from request
- * Uses X-Forwarded-For header or falls back to a default
+ * Get client identifier from request for pre-auth endpoints (login, register, etc.)
+ * 
+ * SECURITY: НЕ доверяет X-Forwarded-For — клиент может его подменить.
+ * В production за reverse proxy (nginx) используем только заголовок,
+ * который proxy устанавливает (X-Real-IP). Для дополнительной защиты
+ * rate limit аутентифицированных эндпоинтов используйте userId напрямую.
  */
 export function getClientIdentifier(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) {
-    return forwarded.split(',')[0].trim()
-  }
-
+  // X-Real-IP устанавливается reverse proxy и не может быть подменён клиентом
+  // (при правильной конфигурации nginx: proxy_set_header X-Real-IP $remote_addr)
   const realIp = request.headers.get('x-real-ip')
   if (realIp) {
     return realIp
+  }
+
+  // Fallback: X-Forwarded-For — менее надёжен, но лучше чем ничего
+  // Берём последний IP в цепочке (добавленный нашим proxy), а не первый (контролируемый клиентом)
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const ips = forwarded.split(',').map(ip => ip.trim())
+    // Последний IP в цепочке — добавлен нашим reverse proxy
+    return ips[ips.length - 1]
   }
 
   // For local development, use a default

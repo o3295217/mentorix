@@ -6,7 +6,7 @@ import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { z } from 'zod'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
-import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
+import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
@@ -16,19 +16,17 @@ const EvaluateSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  // Rate limiting for AI endpoints
-  const clientId = getClientIdentifier(request)
-  const rateLimit = checkRateLimit(clientId, rateLimiters.ai)
-
-  if (!rateLimit.success) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait before requesting another evaluation.', retryAfter: rateLimit.retryAfter },
-      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
-    )
-  }
-
   try {
     const userId = await requireUserId(request)
+
+    // Rate limiting by userId (not spoofable IP)
+    const rateLimit = checkRateLimit(userId, rateLimiters.ai)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before requesting another evaluation.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
     const body = await request.json()
     
     const validation = EvaluateSchema.safeParse(body)

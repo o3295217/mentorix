@@ -33,7 +33,7 @@
 - [ ] **Input sanitization** — проверка всех входных данных
 
 ### Инфраструктура
-- [ ] **Health check endpoint** — для мониторинга
+- [x] **Health check endpoint** — для мониторинга (`/api/health`)
 - [ ] **Proper logging** — структурированные логи (winston/pino)
 - [ ] **Error tracking** — Sentry или аналог
 

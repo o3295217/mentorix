@@ -1,7 +1,7 @@
 # Docker Compose для продакшена (многопользовательская версия)
 # 
 # Использование:
-# 1. Скопируйте .env.example в .env.production и заполните переменные
+# 1. Скопируйте .env.production.example в .env.production и заполните переменные
 # 2. docker compose -f docker-compose.production.yml up -d
 #
 # Настройка:
@@ -10,6 +10,37 @@
 # - INVITE_CODE: код для режима invite
 
 services:
+  # ---- PostgreSQL ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-assistant-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ai_assistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_assistant}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_assistant}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---- Next.js приложение ----
   app:
     build:
       context: .
@@ -19,7 +50,7 @@ services:
       - "${APP_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/production.db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_assistant}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_assistant}
       # Аутентификация
       - AUTH_SECRET=${AUTH_SECRET}
       - REGISTRATION_MODE=${REGISTRATION_MODE:-open}
@@ -30,10 +61,11 @@ services:
       # AI API
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     volumes:
-      # Persist SQLite database
-      - ./data:/app/data
       # Backup directory
       - ./backups:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
@@ -76,7 +108,7 @@ services:
   #   restart: unless-stopped
 
 volumes:
-  data:
+  pgdata:
     driver: local
   # caddy_data:
   #   driver: local

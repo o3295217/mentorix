@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import ThemeToggle from './ThemeToggle'
+import { useAuth } from './AuthProvider'
 
 const navItems = [
   { href: '/', label: 'Главная' },
@@ -20,8 +21,7 @@ const navItems = [
 
 export default function Navigation() {
   const pathname = usePathname()
-  const router = useRouter()
-  const [userName, setUserName] = useState<string | null>(null)
+  const { user, logout } = useAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Скрываем навигацию на страницах авторизации
@@ -31,58 +31,22 @@ export default function Navigation() {
     pathname === '/forgot-password' ||
     pathname === '/reset-password'
 
-  useEffect(() => {
-    // Layout не размонтируется при переходе /login -> /, поэтому
-    // после логина нужно заново подгрузить пользователя.
-    if (isAuthPage) {
-      setUserName(null)
-      return
+  const userName = user?.name || user?.email || null
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+    } finally {
+      setIsLoggingOut(false)
     }
-
-    let cancelled = false
-
-    fetch('/api/auth/me')
-      .then((res) => {
-        if (res.status === 401) {
-          // Невалидный токен — редиректим на логин
-          if (!cancelled) {
-            router.push(`/login?redirect=${encodeURIComponent(pathname || '/')}`)
-          }
-          return null
-        }
-        return res.ok ? res.json() : null
-      })
-      .then((data) => {
-        if (cancelled || !data) return
-        const user = data?.user ?? data
-        setUserName(user?.name || user?.email || null)
-      })
-      .catch(() => {
-        if (!cancelled) setUserName(null)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [isAuthPage, pathname, router])
+  }
 
   const isActive = (href: string) => {
     if (href === '/') {
       return pathname === '/'
     }
     return pathname.startsWith(href)
-  }
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true)
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      router.push('/login')
-    } catch (error) {
-      console.error('Logout error:', error)
-    } finally {
-      setIsLoggingOut(false)
-    }
   }
 
   // Не рендерим навигацию на страницах авторизации

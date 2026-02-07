@@ -1,6 +1,6 @@
 # АРХИТЕКТУРА ПРОЕКТА: AI Effectiveness Assistant
 
-> Техническая документация для разработчиков. Актуальность: январь 2026.
+> Техническая документация для разработчиков. Актуальность: февраль 2026.
 
 ---
 
@@ -151,219 +151,363 @@ ai-assistant-spec/
 
 ## 3. БАЗА ДАННЫХ
 
+PostgreSQL 16 (в Docker-контейнере). ORM — Prisma 5.22, миграции через `prisma migrate deploy`.
+
 ### Схема (prisma/schema.prisma)
 
 ```prisma
-// МЕЧТА (5 лет)
+// ==================== АУТЕНТИФИКАЦИЯ ====================
+
+enum ThemePreference { light, dark, system }
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  passwordHash    String
+  role            String    @default("user")
+  isActive        Boolean   @default(true)
+  themePreference ThemePreference @default(system)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+  // ... связи со всеми моделями
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// ==================== ЦЕЛИ ====================
+
 model DreamGoal {
   id        Int      @id @default(autoincrement())
-  goalText  String   // Текст мечты
-  years     Int      @default(5)  // Горизонт в годах
+  userId    String
+  goalText  String
+  years     Int      @default(5)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// ГОДОВЫЕ ЦЕЛИ
 model YearGoal {
   id        Int      @id @default(autoincrement())
-  year      Int      @unique
-  goalsJson String   // JSON array of strings
+  userId    String
+  year      Int
+  goalsJson String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@unique([userId, year])
 }
 
-// ПЕРИОДИЧЕСКИЕ ЦЕЛИ (legacy)
 model PeriodGoal {
   id          Int      @id @default(autoincrement())
+  userId      String
   periodType  String   // 'week', 'month', 'quarter', 'half_year', 'year'
   periodStart DateTime
   periodEnd   DateTime
-  goalsJson   String   // JSON array of strings
+  goalsJson   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  @@index([periodType, periodStart])
 }
 
-// TRACKED GOALS (новая модель с метаданными)
 model Goal {
-  id           Int       @id @default(autoincrement())
-  text         String
-  periodType   String    // 'year', 'half_year', 'quarter', 'month', 'week'
-  periodKey    String    // '2025', '2025-Q1', '2025-01', '2025-01-W1'
-  completed    Boolean   @default(false)
-  completedAt  DateTime?
-  deadline     DateTime?
-  priority     String    @default("none")  // 'high', 'medium', 'none'
-  tagsJson     String    @default("[]")
-  blockedByJson String   @default("[]")
-  historyJson  String    @default("[]")
-  sortOrder    Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  @@index([periodType, periodKey])
-  @@index([completed])
-  @@index([periodType, periodKey, completed])
+  id            Int       @id @default(autoincrement())
+  userId        String
+  text          String
+  periodType    String    // 'year', 'half_year', 'quarter', 'month', 'week'
+  periodKey     String    // '2025', '2025-Q1', '2025-01', '2025-01-W1'
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  deadline      DateTime?
+  priority      String    @default("medium")  // 'high', 'medium', 'low'
+  tagsJson      String    @default("[]")
+  blockedByJson String    @default("[]")
+  historyJson   String    @default("[]")
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
-// ДНЕВНАЯ ЗАПИСЬ
+model GoalTag {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  name      String
+  color     String   @default("#6B7280")
+  createdAt DateTime @default(now())
+  @@unique([userId, name])
+}
+
+// ==================== ЕЖЕДНЕВНЫЕ ЗАПИСИ ====================
+
 model DailyEntry {
-  id                Int         @id @default(autoincrement())
-  date              DateTime    @unique
-  planText          String?     // План на день
-  factText          String?     // Факт выполнения
-  selectedTasksJson String?     // Выбранные задачи (JSON)
+  id                Int          @id @default(autoincrement())
+  userId            String
+  date              DateTime
+  planText          String?
+  factText          String?
+  planSnapshotJson  String?      // Снимок плана на момент создания
+  extraTasksJson    String       @default("[]")
+  selectedTasksJson String?
   // Контекст дня
   emotionalState    String?
   physicalState     String?
-  importantEvents   String?
-  energyLevel       Int?        // 1-10
-  sleepQuality      Int?        // 1-10
-  familyTimeMinutes Int?
-  sportTimeMinutes  Int?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  lifeEvents        String?      // Жизненные события
+  externalFactors   String?      // Внешние факторы
+  energyLevel       Int?         // 1-10
+  sleepQuality      Int?         // 1-10
+  familyTime        Int?         // Минуты
+  exerciseTime      Int?         // Минуты
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   evaluation        Evaluation?
+  @@unique([userId, date])
 }
 
-// ОЦЕНКА ДНЯ
 model Evaluation {
-  id                   Int        @id @default(autoincrement())
-  dailyEntryId         Int        @unique
-  dailyEntry           DailyEntry @relation(...)
-
-  // ГЛАВНАЯ МЕТРИКА
-  dreamProgressScore   Int        @default(5)  // 1-10
-
-  // Классические метрики
-  strategyScore        Int        // 1-10
-  operationsScore      Int        // 1-10
-  teamScore            Int        // 1-10
-  efficiencyScore      Int        // 1-10
-  overallScore         Float      // Среднее
-
+  id                    Int        @id @default(autoincrement())
+  dailyEntryId          Int        @unique
+  dailyEntry            DailyEntry @relation(...)
+  // Основные метрики
+  dreamProgressScore    Int        @default(5)  // 1-10
+  strategyScore         Int        // 1-10
+  operationsScore       Int        // 1-10
+  teamScore             Int        // 1-10
+  efficiencyScore       Int        // 1-10
+  overallScore          Float      // Средневзвешенное
   // Текстовые поля
-  feedbackText         String?
-  planVsFactText       String?
-  recommendationsText  String?
-
-  // Alignment (день → неделя → месяц → ... → мечта)
-  alignmentDayWeek     String?
-  alignmentWeekMonth   String?
-  alignmentMonthQuarter String?
-  alignmentQuarterHalf String?
-  alignmentHalfYear    String?
-  alignmentYearDream   String?
-
+  feedbackText          String     // Обратная связь от AI
+  planVsFactText        String     // Анализ план vs факт
+  recommendationsText   String     // Рекомендации
+  // Вертикальный alignment (день → мечта)
+  alignmentDayWeek      String
+  alignmentWeekMonth    String
+  alignmentMonthQuarter String
+  alignmentQuarterHalf  String
+  alignmentHalfYear     String
+  alignmentYearDream    String
   // Флаги баланса
-  healthFlag           String?    // 'норма', 'внимание', 'критично'
-  familyFlag           String?
-  energyFlag           String?
-
-  // Horizontal alignment
-  workHealthAlignment  Int?       // 1-10
-  workFamilyAlignment  Int?       // 1-10
-  workValuesAlignment  Int?       // 1-10
-
+  healthFlag            String?    // 'норма', 'внимание', 'критично'
+  familyFlag            String?
+  energyFlag            String?
+  // Горизонтальный alignment
+  workHealthAlignment   String?
+  workFamilyAlignment   String?
+  workValuesAlignment   String?
   // AI suggestions
-  suggestedTasksJson   String?
-  suggestedTasksFromYesterday String?
-
-  createdAt            DateTime   @default(now())
-  @@index([dreamProgressScore])
-  @@index([createdAt])
+  suggestedTasksJson    String?
+  createdAt             DateTime   @default(now())
 }
 
-// ПРИВЫЧКИ
+// ==================== ПРИВЫЧКИ ====================
+
 model Habit {
-  id          Int      @id @default(autoincrement())
-  taskText    String
-  frequency   String   @default("daily")  // daily, weekdays, weekends, weekly, custom
-  daysOfWeek  String?  // JSON: [1,2,3,4,5]
-  interval    Int?     // Каждые N дней
-  isActive    Boolean  @default(true)
-  streak      Int      @default(0)
-  bestStreak  Int      @default(0)
-  totalDone   Int      @default(0)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@index([isActive])
-  @@index([isActive, sortOrder])
+  id         Int      @id @default(autoincrement())
+  userId     String
+  taskText   String
+  frequency  String   @default("daily")
+  daysOfWeek String?  // JSON: [1,2,3,4,5]
+  interval   Int?     // Каждые N дней
+  isActive   Boolean  @default(true)
+  streak     Int      @default(0)
+  bestStreak Int      @default(0)
+  totalDone  Int      @default(0)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
-// ОТКРЫТЫЕ ЗАДАЧИ
+// ==================== ЗАДАЧИ ====================
+
 model OpenTask {
   id         Int       @id @default(autoincrement())
+  userId     String
   taskText   String
   taskType   String    // 'strategic', 'operational'
   originDate DateTime
   isClosed   Boolean   @default(false)
   closedAt   DateTime?
   createdAt  DateTime  @default(now())
-  @@index([isClosed])
-  @@index([taskType, isClosed])
 }
 
-// USER INSIGHTS (AI понимание пользователя)
+// ==================== ПРОФИЛЬ ====================
+
+model UserProfile {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique
+  name            String?
+  occupation      String?
+  industry        String?
+  maritalStatus   String?
+  hobbies         String?
+  sports          String?
+  location        String?
+  age             Int?
+  customInterests String?
+  education       String?
+  teamSize        Int?
+  workExperience  String?
+  values          String?
+  challenges      String?
+  other           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ProfileBlock {
+  id         Int               @id @default(autoincrement())
+  userId     String
+  title      String
+  order      Int               @default(0)
+  categories ProfileCategory[]
+  items      ProfileItem[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model ProfileCategory {
+  id        Int           @id @default(autoincrement())
+  blockId   Int
+  title     String
+  order     Int           @default(0)
+  items     ProfileItem[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ProfileItem {
+  id         Int     @id @default(autoincrement())
+  blockId    Int?
+  categoryId Int?
+  fieldName  String
+  fieldValue String
+  content    String?
+  order      Int     @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ==================== ОЦЕНКИ ПЕРИОДОВ ====================
+
+model PeriodEvaluation {
+  id                  Int      @id @default(autoincrement())
+  userId              String
+  periodType          String
+  periodStart         DateTime
+  periodEnd           DateTime
+  dreamProgressScore  Float
+  overallScore        Float
+  professionalBlock   String
+  personalBlock       String
+  socialBlock         String
+  balanceBlock        String
+  patterns            String
+  trends              String
+  goalsCompletion     String
+  alignment           String
+  blockers            String?
+  feedbackText        String
+  recommendationsText String
+  insights            String?
+  createdAt           DateTime @default(now())
+}
+
+// ==================== АНАЛИТИКА ====================
+
 model UserInsights {
   id              Int      @id @default(autoincrement())
-  patterns        String?  // Выявленные паттерны поведения
-  strengths       String?  // Сильные стороны
-  challenges      String?  // Сложности и зоны роста
-  preferences     String?  // Предпочтения в планировании
-  recommendations String?  // Рекомендации от AI
-  motivators      String?  // Что мотивирует
-  values          String?  // Ценности
-  weeklySummary   String?  // Еженедельная сводка
-  updatedAt       DateTime @updatedAt
+  userId          String   @unique
+  patterns        String?
+  strengths       String?
+  challenges      String?
+  preferences     String?
+  recommendations String?
+  motivators      String?
+  weeklySummary   String?
+  evaluationCount Int      @default(0)
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
-// НАКОПИТЕЛЬНАЯ СТАТИСТИКА ПОЛЬЗОВАТЕЛЯ
 model UserStats {
   id                    Int      @id @default(autoincrement())
-  totalDays             Int      @default(0)   // Всего оценённых дней
-  totalPlanned          Int      @default(0)   // Всего запланировано задач
-  totalCompleted        Int      @default(0)   // Всего выполнено задач
-  avgCompletionPct      Float    @default(0)   // Средний % выполнения
-  avgDailyScore         Float    @default(0)   // Средняя оценка дня
-  completionByDayJson   String   @default("{}") // По дням недели
-  completionByTypeJson  String   @default("{}") // По типам задач
-  frequentCompletedJson String   @default("[]") // Часто выполняемые
-  frequentFailedJson    String   @default("[]") // Часто проваливаемые
-  habitsAvgCompletion   Float    @default(0)   // Средний % привычек
-  trendDirection        String?  // up, down, stable
-  trendPct              Float    @default(0)   // % изменения тренда
-  bestDayOfWeek         String?  // Лучший день недели
-  worstDayOfWeek        String?  // Худший день недели
-  optimalTaskCount      Int      @default(5)   // Оптимальное кол-во задач
-  currentStreak         Int      @default(0)   // Текущий streak
-  bestStreak            Int      @default(0)   // Лучший streak
+  userId                String   @unique
+  totalDays             Int      @default(0)
+  totalPlanned          Int      @default(0)
+  totalCompleted        Int      @default(0)
+  avgCompletionPct      Float    @default(0)
+  avgDailyScore         Float    @default(0)
+  completionByDayJson   String   @default("{}")
+  completionByTypeJson  String   @default("{}")
+  frequentCompletedJson String   @default("[]")
+  frequentFailedJson    String   @default("[]")
+  habitsAvgCompletion   Float    @default(0)
+  trendDirection        String?
+  trendPct              Float    @default(0)
+  bestDayOfWeek         String?
+  worstDayOfWeek        String?
+  optimalTaskCount      Int      @default(5)
+  currentStreak         Int      @default(0)
+  bestStreak            Int      @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
 
-// КОНТЕКСТ МИРА (внешние события)
+// ==================== КОНТЕКСТ ====================
+
 model WorldContext {
   id             Int      @id @default(autoincrement())
-  date           DateTime @unique
-  marketEvents   String?  // Рыночные события
-  personalEvents String?  // Личные события
-  constraints    String?  // Ограничения
-  notes          String?  // Заметки
+  userId         String
+  date           DateTime
+  marketEvents   String?
+  personalEvents String?
+  constraints    String?
+  notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  @@unique([userId, date])
+}
+
+// ==================== ЧАТ ====================
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  date      String
+  role      String   // 'user', 'assistant'
+  content   String
+  createdAt DateTime @default(now())
 }
 ```
+
+**Важно:** Все модели (кроме Session/PasswordResetToken/ChatMessage) содержат `userId` и relation к `User` с `onDelete: Cascade`. Данные каждого пользователя изолированы.
 
 ### Индексы для производительности
 
 Добавлены индексы на часто запрашиваемые поля:
-- `Goal`: periodType + periodKey, completed
+- `Goal`: userId + periodType + periodKey, userId + completed
+- `DailyEntry`: userId + date
 - `Evaluation`: dreamProgressScore, createdAt
-- `OpenTask`: isClosed, taskType + isClosed
-- `Habit`: isActive, isActive + sortOrder
-- `PeriodGoal`: periodType + periodStart
+- `OpenTask`: userId + isClosed, userId + taskType + isClosed
+- `Habit`: userId + isActive
+- `PeriodGoal`: userId + periodType + periodStart
+- `PeriodEvaluation`: userId + periodType + periodStart
+- `Session`: userId, token
+- `ChatMessage`: userId + date
 
 ---
 
@@ -675,10 +819,11 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (11 основных + 5 для целей)
+### Список компонентов (12 основных + 5 для целей)
 
 **Основные:**
 - `AuthGuard`
+- `AuthProvider`
 - `BalanceFlags`
 - `DatePickerWithIndicators`
 - `DreamProgress`
@@ -1070,4 +1215,4 @@ if (!validation.success) {
 
 ---
 
-*Последнее обновление: 6 января 2026*
+*Последнее обновление: 7 февраля 2026*

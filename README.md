@@ -23,7 +23,7 @@
 
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Backend:** Next.js API Routes
-- **Database:** SQLite + Prisma ORM
+- **Database:** PostgreSQL + Prisma ORM
 - **AI:** Anthropic Claude API
   - `claude-sonnet-4-5-20250929` — для оценки дней и прогнозов
   - `claude-3-5-haiku-20241022` — для чата и проверки плана (дешевле)
@@ -49,13 +49,17 @@ npm install
 Создайте файл `.env.local`:
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://ai_assistant:ai_assistant_dev@localhost:5432/ai_assistant"
 ANTHROPIC_API_KEY="ваш-api-ключ-здесь"
 ```
 
-### 4. Инициализировать базу данных
+### 4. Запустить PostgreSQL и инициализировать базу данных
 
 ```bash
+# Если PostgreSQL не запущен локально:
+docker run -d --name postgres-dev -e POSTGRES_USER=ai_assistant -e POSTGRES_PASSWORD=ai_assistant_dev -e POSTGRES_DB=ai_assistant -p 5432:5432 postgres:16-alpine
+
+# Применить миграции
 npx prisma migrate dev
 ```
 
@@ -227,7 +231,7 @@ npx prisma migrate reset
 
 | Переменная | Описание | Обязательно |
 |------------|----------|-------------|
-| `DATABASE_URL` | Путь к SQLite файлу | Да |
+| `DATABASE_URL` | PostgreSQL connection string | Да |
 | `ANTHROPIC_API_KEY` | API ключ Anthropic | Да |
 
 ## Лицензия

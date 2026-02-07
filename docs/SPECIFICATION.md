@@ -25,7 +25,7 @@
 - Node.js
 
 **База данных:**
-- SQLite (локальное хранение)
+- PostgreSQL (основная СУБД)
 - Prisma ORM (для работы с БД)
 
 **AI Integration:**
@@ -632,7 +632,7 @@ created_at: DATETIME
 
 ### Environment Variables (.env.local)
 ```
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://ai_assistant:ai_assistant_dev@localhost:5432/ai_assistant"
 ANTHROPIC_API_KEY="sk-ant-..."
 ```
 

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { getPeriodDates, parseDateParam, toDateKey } from '@/lib/dates'
 import { buildFactFromSelection, splitLines } from '@/lib/fact-utils'
 import { safeParseJson } from '@/lib/api-utils'
-import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
+import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import {
   CHECK_PLAN_SYSTEM_PROMPT,
   buildCheckPlanPrompt,
@@ -34,19 +34,17 @@ function getDayOfWeek(dateStr: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  // Rate limiting for AI endpoints
-  const clientId = getClientIdentifier(request)
-  const rateLimit = checkRateLimit(clientId, rateLimiters.ai)
-
-  if (!rateLimit.success) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait before checking the plan again.', retryAfter: rateLimit.retryAfter },
-      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
-    )
-  }
-
   try {
     const userId = await requireUserId(request)
+
+    // Rate limiting by userId (not spoofable IP)
+    const rateLimit = checkRateLimit(userId, rateLimiters.ai)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before checking the plan again.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
     const body = await request.json()
     
     const validation = CheckPlanSchema.safeParse(body)

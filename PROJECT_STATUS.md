@@ -79,9 +79,10 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (16)
+## Компоненты (17)
 
 - `AuthGuard`
+- `AuthProvider`
 - `BalanceFlags`
 - `DatePickerWithIndicators`
 - `DreamProgress`
@@ -451,10 +452,11 @@
 
 ## Зависимости
 
-### Production (10)
+### Production (11)
 - @anthropic-ai/sdk
 - @prisma/client
 - @types/nodemailer
+- bcryptjs
 - date-fns
 - next
 - nodemailer
@@ -465,12 +467,12 @@
 
 ### Development (16)
 - @eslint/js
+- @types/bcryptjs
 - @types/node
 - @types/react
 - @types/react-dom
 - autoprefixer
 - baseline-browser-mapping
-- better-sqlite3
 - eslint
 - eslint-config-next
 - husky

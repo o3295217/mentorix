@@ -39,11 +39,23 @@ cd /home/oleg_d_b/ai-assistant && docker compose -f docker-compose.production.ym
 ```
 
 ### База данных
-- **Файл:** `/home/oleg_d_b/ai-assistant/data/production.db` (SQLite)
-- **Проверка таблиц:** `sqlite3 /home/oleg_d_b/ai-assistant/data/production.db ".tables"`
+- **СУБД:** PostgreSQL 16 (контейнер `ai-assistant-db`)
+- **Данные:** Docker volume `pgdata`
+- **Подключение из хоста:** `docker exec -it ai-assistant-db psql -U ai_assistant`
+- **Проверка таблиц:** `\dt` внутри psql
+
+### Бэкап
+```bash
+# Ручной бэкап
+./scripts/backup-db.sh
+
+# Автоматический (cron)
+0 3 * * * cd /home/oleg_d_b/ai-assistant && ./scripts/backup-db.sh
+```
 
 ## Переменные окружения (на сервере)
 Файл: `/home/oleg_d_b/ai-assistant/.env.production`
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` - креды PostgreSQL
 - `AUTH_SECRET` - секрет для JWT
 - `ANTHROPIC_API_KEY` - ключ API Claude
 - `APP_PORT` - порт (3010)
@@ -52,4 +64,5 @@ cd /home/oleg_d_b/ai-assistant && docker compose -f docker-compose.production.ym
 ## Известные особенности
 - Проект на сервере НЕ git-репозиторий — синхронизация через rsync
 - Cookie: флаг `Secure` управляется через `COOKIE_SECURE` env var
-- Prisma: используется SQLite, миграции в `/prisma/migrations`
+- Prisma: используется PostgreSQL, миграции в `/prisma/migrations`
+- При старте контейнера автоматически применяются миграции (`prisma migrate deploy`)

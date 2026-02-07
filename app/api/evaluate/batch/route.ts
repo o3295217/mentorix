@@ -5,7 +5,7 @@ import { DailyEvaluationRequest } from '@/lib/prompts/types'
 import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
-import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit'
+import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
@@ -81,19 +81,17 @@ export async function GET(request: NextRequest) {
 
 // POST - оценить все неоценённые дни
 export async function POST(request: NextRequest) {
-  // Rate limiting for AI endpoints (более строгий для batch)
-  const clientId = getClientIdentifier(request)
-  const rateLimit = checkRateLimit(clientId, rateLimiters.ai)
-
-  if (!rateLimit.success) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait before requesting batch evaluation.', retryAfter: rateLimit.retryAfter },
-      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
-    )
-  }
-
   try {
     const userId = await requireUserId(request)
+
+    // Rate limiting by userId (not spoofable IP)
+    const rateLimit = checkRateLimit(userId, rateLimiters.ai)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before requesting batch evaluation.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
 
     // Проверить lock - если уже идёт batch для этого пользователя
     const activeBatch = batchProgress.get(userId)

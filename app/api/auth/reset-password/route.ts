@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hashPasswordForReset as hashPassword } from '@/lib/auth';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 
 // Rate limiter
@@ -8,15 +9,6 @@ const resetPasswordRateLimiter = {
   windowMs: 15 * 60 * 1000, // 15 минут
   keyPrefix: 'reset-password',
 };
-
-// Хеширование пароля (копия из auth.ts)
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + process.env.AUTH_SECRET);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 // GET - проверка валидности токена
 export async function GET(request: Request) {

@@ -184,6 +184,9 @@ export function useDaily(): UseDailyReturn {
 
   // Track the current date to prevent race conditions when switching dates quickly
   const currentDateRef = useRef(selectedDate)
+
+  // AbortController для отмены fetch при быстрой смене даты
+  const abortControllerRef = useRef<AbortController | null>(null)
   
   // Ref для предыдущей даты (для сохранения чата при смене)
   const previousDateRef = useRef(selectedDate)
@@ -346,14 +349,14 @@ export function useDaily(): UseDailyReturn {
     }
   }, [])
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
     // Используем ref чтобы всегда иметь актуальную дату
     const loadingDate = currentDateRef.current
     console.log('[useDaily] loadData started for:', loadingDate)
 
     try {
       // Load daily entry
-      const dailyRes = await fetch(`/api/daily?date=${loadingDate}`)
+      const dailyRes = await fetch(`/api/daily?date=${loadingDate}`, { signal })
 
       // Check if date changed during fetch - prevent race condition
       if (currentDateRef.current !== loadingDate) {
@@ -491,7 +494,7 @@ export function useDaily(): UseDailyReturn {
       // Load week goals
       const date = new Date(loadingDate)
       const { start: weekStart } = getPeriodDates(date, 'week')
-      const weekRes = await fetch(`/api/goals/period?type=week&date=${weekStart.toISOString()}`)
+      const weekRes = await fetch(`/api/goals/period?type=week&date=${weekStart.toISOString()}`, { signal })
       if (weekRes.ok) {
         const weekData = await weekRes.json()
         setWeekGoals(weekData?.goals || [])
@@ -501,7 +504,7 @@ export function useDaily(): UseDailyReturn {
 
       // Load month goals
       const { start: monthStart } = getPeriodDates(date, 'month')
-      const monthRes = await fetch(`/api/goals/period?type=month&date=${monthStart.toISOString()}`)
+      const monthRes = await fetch(`/api/goals/period?type=month&date=${monthStart.toISOString()}`, { signal })
       if (monthRes.ok) {
         const monthData = await monthRes.json()
         setMonthGoals(monthData?.goals || [])
@@ -510,7 +513,7 @@ export function useDaily(): UseDailyReturn {
       }
 
       // Load habits for today
-      const habitsRes = await fetch(`/api/habits?date=${loadingDate}`)
+      const habitsRes = await fetch(`/api/habits?date=${loadingDate}`, { signal })
       let loadedHabits: Habit[] = []
       if (habitsRes.ok) {
         const habitsData = await habitsRes.json()
@@ -523,7 +526,7 @@ export function useDaily(): UseDailyReturn {
       // Привычки НЕ автозаполняют план — пользователь сам добавляет через кнопку "+ Все в план"
 
       // Load habit suggestions
-      const suggestionsRes = await fetch(`/api/habits/suggestions?date=${loadingDate}`)
+      const suggestionsRes = await fetch(`/api/habits/suggestions?date=${loadingDate}`, { signal })
       if (suggestionsRes.ok) {
         const suggestionsData = await suggestionsRes.json()
         setHabitSuggestions(suggestionsData?.suggestions || [])
@@ -533,11 +536,18 @@ export function useDaily(): UseDailyReturn {
 
       hasLoadedOnceRef.current = true
     } catch (error) {
+      // Не логируем AbortError — это штатная отмена при смене даты
+      if (error instanceof DOMException && error.name === 'AbortError') return
       console.error('Error loading data:', error)
     }
   }, [readPlanDraft, clearPlanDraft, sanitizeSelectedForTotal])
 
   useEffect(() => {
+    // Отменяем предыдущие запросы при смене даты
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     currentDateRef.current = selectedDate
     // Синхронно сбрасываем флаг чтобы предотвратить запись черновика
     hasLoadedOnceRef.current = false
@@ -552,7 +562,11 @@ export function useDaily(): UseDailyReturn {
     setNewTaskText('')
     // НЕ сбрасываем chatMessages — они загружаются отдельным useEffect из localStorage
     setCheckPlanResult(null)
-    loadData()
+    loadData(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
   }, [selectedDate]) // Intentionally not including loadData to prevent infinite loops
 
   // Локальный черновик плана (чтобы не пропадало при refresh)
