@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-02-07 — fix: use direct prisma path in docker-entrypoint (npx not available in standalone)
+- 🗄️ База данных: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-02-07 — fix: 4 critical security & performance issues from code review
 - 📦 Другое: 1 файлов
 
