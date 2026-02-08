@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-02-08 — perf: native bcrypt, fix login theme query, deploy-vk script, hmac middleware
+- ⚙️ Конфигурация: 1 файлов
+
+
 ### 2026-02-08 — fix: use prisma db push for production, fix migration_lock provider
 - 🔌 API: 3 файлов (route, route, route)
 - 🧩 Компоненты: 1 файлов (YearSection)
