@@ -1,6 +1,6 @@
 /**
  * Simple in-memory rate limiter for API routes
- * Uses sliding window algorithm
+ * Uses fixed window algorithm
  */
 
 interface RateLimitEntry {
@@ -129,17 +129,5 @@ export const rateLimiters = {
     limit: 10, // 10 requests
     windowMs: 60 * 1000, // per minute
     keyPrefix: 'ai',
-  },
-  // Regular API endpoints
-  api: {
-    limit: 100, // 100 requests
-    windowMs: 60 * 1000, // per minute
-    keyPrefix: 'api',
-  },
-  // Write operations
-  write: {
-    limit: 30, // 30 requests
-    windowMs: 60 * 1000, // per minute
-    keyPrefix: 'write',
   },
 } as const

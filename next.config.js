@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
-  serverExternalPackages: ['bcryptjs'],
+  serverExternalPackages: ['bcrypt'],
 }
 
 module.exports = nextConfig

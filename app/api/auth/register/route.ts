@@ -3,6 +3,7 @@ import { registerUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
+import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 
 // Rate limiter для регистрации - защита от спама
 const registerRateLimiter = {
@@ -21,12 +22,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           error: 'Слишком много попыток регистрации. Попробуйте позже.',
-          retryAfter: Math.ceil((rateLimit.retryAfter || 0) / 1000)
+          retryAfter: rateLimit.retryAfter
         },
         { 
           status: 429,
           headers: {
-            'Retry-After': String(Math.ceil((rateLimit.retryAfter || 0) / 1000))
+            'Retry-After': String(rateLimit.retryAfter)
           }
         }
       );
@@ -92,6 +93,17 @@ export async function POST(request: Request) {
     // Secure только если явно указано (для HTTPS)
     const useSecureCookie = process.env.COOKIE_SECURE === 'true';
     response.cookies.set('auth_token', result.session.token, {
+      httpOnly: true,
+      secure: useSecureCookie,
+      sameSite: 'lax',
+      expires: result.session.expiresAt,
+      path: '/',
+    });
+
+    // HMAC-подпись токена для верификации в middleware (без обращения к БД)
+    const authSecret = process.env.AUTH_SECRET || 'default-secret';
+    const sig = await signToken(result.session.token, authSecret);
+    response.cookies.set(AUTH_SIG_COOKIE, sig, {
       httpOnly: true,
       secure: useSecureCookie,
       sameSite: 'lax',

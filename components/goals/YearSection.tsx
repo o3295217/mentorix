@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { monthNames } from '@/lib/goals-utils'
+import { getDetailLevel } from '@/lib/dates'
 
 interface YearSectionProps {
   year: number
@@ -82,14 +83,7 @@ export default function YearSection({
     setEditingText('')
   }
 
-  const getDetailLevel = (): 'month' | 'quarter' | 'half' | 'year' => {
-    if (distance === 0) return 'month'
-    if (distance === 1) return 'quarter'
-    if (distance <= 3) return 'half'
-    return 'year'
-  }
-  
-  const detailLevel = getDetailLevel()
+  const detailLevel = getDetailLevel(year, currentYear)
 
   // Мемоизация вычисления copiedTo для каждой цели
   const goalsWithCopiedTo = useMemo(() => {

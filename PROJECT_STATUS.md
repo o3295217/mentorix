@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-02-07**
+> Последнее обновление: **2026-02-08**
 
 ## Общая информация
 
@@ -456,7 +456,7 @@
 - @anthropic-ai/sdk
 - @prisma/client
 - @types/nodemailer
-- bcryptjs
+- bcrypt
 - date-fns
 - next
 - nodemailer
@@ -467,7 +467,7 @@
 
 ### Development (16)
 - @eslint/js
-- @types/bcryptjs
+- @types/bcrypt
 - @types/node
 - @types/react
 - @types/react-dom

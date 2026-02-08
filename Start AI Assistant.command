@@ -98,15 +98,32 @@ echo -e "${YELLOW}Настройка базы данных...${NC}"
 npx prisma db push --schema=./prisma/schema.prisma 2>/dev/null
 echo -e "${GREEN}✓ База данных готова${NC}"
 
-# Остановка существующих процессов
+# Удаление файла блокировки для предотвращения конфликтов
 echo ""
-echo -e "${YELLOW}Проверка порта 3000...${NC}"
-if lsof -ti:3000 &> /dev/null; then
-    echo -e "${YELLOW}Остановка существующего процесса...${NC}"
-    lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-    sleep 1
+echo -e "${YELLOW}Удаление файла блокировки (.next/dev/lock)...${NC}"
+rm -f ".next/dev/lock"
+echo -e "${GREEN}✓ Файл блокировки удален${NC}"
+
+# Функция для поиска свободного порта
+find_free_port() {
+    local port=$1
+    while lsof -ti:$port &> /dev/null; do
+        port=$((port + 1))
+    done
+    echo $port
+}
+
+# Остановка существующих процессов и поиск свободного порта
+BASE_PORT=3003
+echo ""
+echo -e "${YELLOW}Проверка порта ${BASE_PORT}...${NC}"
+PORT=$(find_free_port ${BASE_PORT})
+
+if [ "$PORT" != "$BASE_PORT" ]; then
+    echo -e "${YELLOW}Порт ${BASE_PORT} занят. Используется следующий свободный порт: ${PORT}${NC}"
+else
+    echo -e "${GREEN}✓ Порт ${PORT} свободен${NC}"
 fi
-echo -e "${GREEN}✓ Порт 3000 свободен${NC}"
 
 # Запуск сервера
 echo ""
@@ -115,14 +132,14 @@ echo -e "${GREEN}  Запуск сервера разработки...${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Приложение будет доступно по адресу:${NC}"
-echo -e "${GREEN}  → http://localhost:3000${NC}"
+echo -e "${GREEN}  → http://localhost:${PORT}${NC}"
 echo ""
 echo -e "${YELLOW}Браузер откроется автоматически через 3 секунды${NC}"
 echo -e "${YELLOW}Нажмите Ctrl+C для остановки сервера${NC}"
 echo ""
 
 # Открыть браузер через 3 секунды
-(sleep 3 && open "http://localhost:3000") &
+(sleep 3 && open "http://localhost:${PORT}") &
 
 # Запустить сервер
-npm run dev
+npm run dev -- -p ${PORT}

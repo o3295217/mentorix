@@ -52,7 +52,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_assistant}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_assistant}
       # Аутентификация
-      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_SECRET=${AUTH_SECRET:?Set AUTH_SECRET in .env.production}
       - REGISTRATION_MODE=${REGISTRATION_MODE:-open}
       - MAX_USERS=${MAX_USERS:-0}
       - INVITE_CODE=${INVITE_CODE:-}

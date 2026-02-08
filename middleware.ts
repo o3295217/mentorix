@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verifyToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 
 // Проверяем, включена ли авторизация
 // AUTH_ENABLED=false — однопользовательский режим (для локальной разработки)
@@ -35,7 +36,7 @@ function isStaticPath(pathname: string): boolean {
   )
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Если авторизация отключена — пропускаем всё
   if (!AUTH_ENABLED) {
     return NextResponse.next()
@@ -55,22 +56,43 @@ export function middleware(request: NextRequest) {
 
   // Проверяем наличие токена авторизации
   const token = request.cookies.get('auth_token')?.value
+  const sig = request.cookies.get(AUTH_SIG_COOKIE)?.value
 
-  if (!token) {
-    // Для API возвращаем 401
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Для страниц редиректим на логин
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
+  if (!token || !sig) {
+    return redirectToLogin(request, pathname)
   }
 
-  // Токен есть, пропускаем запрос
-  // Валидация токена происходит в API routes
+  // Верифицируем HMAC-подпись токена (без обращения к БД)
+  const authSecret = process.env.AUTH_SECRET || 'default-secret'
+  const isValid = await verifyToken(token, sig, authSecret)
+
+  if (!isValid) {
+    // Подпись невалидна — токен подделан или повреждён
+    const response = redirectToLogin(request, pathname)
+    // Удаляем невалидные cookie
+    response.cookies.set('auth_token', '', { expires: new Date(0), path: '/' })
+    response.cookies.set(AUTH_SIG_COOKIE, '', { expires: new Date(0), path: '/' })
+    return response
+  }
+
+  // Подпись валидна — токен выдан сервером, пропускаем запрос
+  // Полная валидация сессии (экспирация, активность) — в API routes
   return NextResponse.next()
+}
+
+/**
+ * Редирект неавторизованного пользователя
+ */
+function redirectToLogin(request: NextRequest, pathname: string) {
+  // Для API возвращаем 401
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Для страниц редиректим на логин
+  const loginUrl = new URL('/login', request.url)
+  loginUrl.searchParams.set('redirect', pathname)
+  return NextResponse.redirect(loginUrl)
 }
 
 export const config = {

@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-02-08 — fix: use prisma db push for production, fix migration_lock provider
+- 🔌 API: 3 файлов (route, route, route)
+- 🧩 Компоненты: 1 файлов (YearSection)
+- 📚 Библиотеки: 6 файлов (ai-usage, api-utils, auth...)
+- ⚙️ Конфигурация: 2 файлов
+- 📦 Другое: 9 файлов
+
+
 ### 2026-02-07 — fix: use direct prisma path in docker-entrypoint (npx not available in standalone)
 - 🗄️ База данных: 1 файлов
 - 📦 Другое: 1 файлов

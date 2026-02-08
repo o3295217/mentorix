@@ -61,10 +61,4 @@ export const getPeriodKey = (periodType: 'quarter' | 'month' | 'week', date: Dat
   }
 }
 
-// Определение уровня детализации в зависимости от года
-export const getDetailLevel = (year: number, currentYear: number): 'year' | 'quarter' | 'month' => {
-  const diff = year - currentYear
-  if (diff <= 1) return 'month'
-  if (diff <= 3) return 'quarter'
-  return 'year'
-}
+

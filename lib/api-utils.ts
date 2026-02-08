@@ -65,19 +65,6 @@ export function safeParseJson<T>(json: string | null | undefined, fallback: T): 
   }
 }
 
-/**
- * Safely parse JSON array with type validation
- */
-export function safeParseJsonArray<T>(
-  json: string | null | undefined,
-  validator?: (item: unknown) => item is T
-): T[] {
-  const parsed = safeParseJson(json, [])
-  if (!Array.isArray(parsed)) return []
-  if (!validator) return parsed as T[]
-  return parsed.filter(validator)
-}
-
 // ============================================================================
 // INPUT SANITIZATION
 // ============================================================================

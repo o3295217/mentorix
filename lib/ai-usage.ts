@@ -1,28 +1,10 @@
 /**
  * AI Usage Tracking
- * Логирование и статистика использования AI API
+ * Логирование использования AI API
  * 
  * NOTE: Модель AIUsage была временно удалена из схемы Prisma.
  * Функции сохранены, но не записывают данные в БД.
  */
-
-// Цены Anthropic (за 1M токенов)
-const PRICING = {
-  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
-  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
-  // Fallback
-  'default': { input: 3.00, output: 15.00 },
-} as const
-
-type ModelName = keyof typeof PRICING
-
-function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const pricing = PRICING[model as ModelName] || PRICING['default']
-  const inputCost = (inputTokens / 1_000_000) * pricing.input
-  const outputCost = (outputTokens / 1_000_000) * pricing.output
-  return (inputCost + outputCost) * 100 // в центах
-}
 
 export interface AIUsageData {
   userId: string

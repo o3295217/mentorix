@@ -3,7 +3,7 @@
  * Использует JWT токены и bcrypt для хеширования паролей
  */
 
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { prisma } from './prisma';
 
 const BCRYPT_ROUNDS = 12;
@@ -69,6 +69,7 @@ export interface AuthUser {
   email: string;
   name: string | null;
   role: string;
+  themePreference?: string;
 }
 
 export interface AuthSession {
@@ -174,6 +175,7 @@ export async function loginUser(
           email: user.email,
           name: user.name,
           role: user.role,
+          themePreference: user.themePreference,
         },
         token: session.token,
         expiresAt: session.expiresAt,

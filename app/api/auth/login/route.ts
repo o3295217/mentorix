@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { loginUser } from '@/lib/auth';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
-import { prisma } from '@/lib/prisma'
-import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY, type ThemePreference } from '@/lib/theme'
+import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
+import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 
 // Rate limiter для login - строгий для защиты от брутфорса
 const loginRateLimiter = {
@@ -21,12 +21,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           error: 'Слишком много попыток. Попробуйте позже.',
-          retryAfter: Math.ceil((rateLimit.retryAfter || 0) / 1000)
+          retryAfter: rateLimit.retryAfter
         },
         { 
           status: 429,
           headers: {
-            'Retry-After': String(Math.ceil((rateLimit.retryAfter || 0) / 1000))
+            'Retry-After': String(rateLimit.retryAfter)
           }
         }
       );
@@ -73,11 +73,19 @@ export async function POST(request: Request) {
       path: '/',
     });
 
-    // Устанавливаем cookie темы (multi-user)
-    const user = (await prisma.user.findUnique({
-      where: { id: result.session.user.id },
-    })) as unknown as { themePreference?: ThemePreference } | null
-    const theme = user?.themePreference ?? DEFAULT_THEME_PREFERENCE
+    // HMAC-подпись токена для верификации в middleware (без обращения к БД)
+    const authSecret = process.env.AUTH_SECRET || 'default-secret';
+    const sig = await signToken(result.session.token, authSecret);
+    response.cookies.set(AUTH_SIG_COOKIE, sig, {
+      httpOnly: true,
+      secure: useSecureCookie,
+      sameSite: 'lax',
+      expires: result.session.expiresAt,
+      path: '/',
+    });
+
+    // Устанавливаем cookie темы (берём из уже загруженных данных сессии)
+    const theme = result.session.user.themePreference ?? DEFAULT_THEME_PREFERENCE
     response.cookies.set(THEME_COOKIE_KEY, theme, {
       httpOnly: false,
       secure: useSecureCookie,
