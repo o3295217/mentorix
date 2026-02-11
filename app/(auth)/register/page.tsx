@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showInviteCode, setShowInviteCode] = useState(false);
+  const [requiresVerification, setRequiresVerification] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +50,12 @@ export default function RegisterPage() {
         return;
       }
 
+      // Требуется верификация email
+      if (data.requiresVerification) {
+        setRequiresVerification(true);
+        return;
+      }
+
       // Успешная регистрация - редирект на главную
       router.push('/');
       router.refresh();
@@ -60,12 +67,39 @@ export default function RegisterPage() {
     }
   };
 
+  // Показываем сообщение о необходимости верификации
+  if (requiresVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 text-center">
+            <svg className="w-16 h-16 text-blue-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-200 mb-2">
+              Проверьте почту
+            </h2>
+            <p className="text-blue-600 dark:text-blue-400 mb-4">
+              Мы отправили письмо на <strong>{email}</strong>. Перейдите по ссылке для активации аккаунта.
+            </p>
+            <Link
+              href="/verify-email"
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Не получили письмо? Отправить повторно
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
-            AI Assistant
+            ION Assistant
           </h1>
           <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
             Регистрация

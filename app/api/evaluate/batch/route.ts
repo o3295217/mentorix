@@ -235,6 +235,7 @@ export async function POST(request: NextRequest) {
           date: date.toLocaleDateString('ru-RU'),
           planText: planTextForEval,
           factText: derived.factText,
+          uncompletedTasks: derived.uncompletedTasks,
           extraTasks,
           goals: {
             dreamGoal: dream?.goalText || 'Не указана',

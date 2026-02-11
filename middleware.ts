@@ -14,11 +14,14 @@ const PUBLIC_PATHS = [
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/verify-email',
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
+  '/api/auth/verify-email',
+  '/api/auth/resend-verification',
   '/api/health',
 ]
 
@@ -63,7 +66,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Верифицируем HMAC-подпись токена (без обращения к БД)
-  const authSecret = process.env.AUTH_SECRET || 'default-secret'
+  const authSecret = process.env.AUTH_SECRET
+  if (!authSecret) {
+    console.error('CRITICAL: AUTH_SECRET environment variable is not set!')
+    return new NextResponse('Server configuration error', { status: 500 })
+  }
   const isValid = await verifyToken(token, sig, authSecret)
 
   if (!isValid) {

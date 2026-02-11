@@ -43,7 +43,7 @@ Thumbs.db
 
 # Docker
 Dockerfile
-docker-compose.yml
+docker-compose.local.yml
 .dockerignore
 
 # Misc

@@ -19,7 +19,7 @@
 
 ### База данных
 - [x] **Миграция на PostgreSQL** ✅ Выполнено 28.01.2026
-  - Файлы: `prisma/schema.prisma`, `docker-compose.yml`
+  - Файлы: `prisma/schema.prisma`, `docker-compose.local.yml`
   - PostgreSQL в Docker контейнере `ai-assistant-db`
   - Все данные успешно мигрированы из SQLite
 

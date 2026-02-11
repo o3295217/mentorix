@@ -89,13 +89,25 @@ echo -e "${YELLOW}Setting up database...${NC}"
 npx prisma db push
 echo -e "${GREEN}✓ Database ready${NC}"
 
-# Остановка существующих процессов на порту 3000
+# Функция для поиска свободного порта
+find_free_port() {
+    local port=$1
+    while lsof -ti:$port &> /dev/null; do
+        port=$((port + 1))
+    done
+    echo $port
+}
+
+# Поиск свободного порта начиная с 3003
+BASE_PORT=3003
 echo ""
-echo -e "${YELLOW}Checking for existing processes on port 3000...${NC}"
-if lsof -ti:3000 &> /dev/null; then
-    echo -e "${YELLOW}Stopping existing process on port 3000...${NC}"
-    lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-    sleep 1
+echo -e "${YELLOW}Checking port ${BASE_PORT}...${NC}"
+PORT=$(find_free_port ${BASE_PORT})
+
+if [ "$PORT" != "$BASE_PORT" ]; then
+    echo -e "${YELLOW}Port ${BASE_PORT} is busy. Using next free port: ${PORT}${NC}"
+else
+    echo -e "${GREEN}✓ Port ${PORT} is free${NC}"
 fi
 
 # Запуск сервера разработки
@@ -105,9 +117,9 @@ echo -e "${GREEN}  Starting development server...${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Application will be available at:${NC}"
-echo -e "${GREEN}  → http://localhost:3000${NC}"
+echo -e "${GREEN}  → http://localhost:${PORT}${NC}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
 echo ""
 
-npm run dev
+npm run dev -- -p ${PORT}

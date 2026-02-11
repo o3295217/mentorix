@@ -13,6 +13,8 @@ const PUBLIC_PATHS = [
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/verify-email',
+  '/onboarding',
 ]
 
 export default function AuthGuard({ children }: AuthGuardProps) {

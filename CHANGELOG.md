@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-02-11 — fix: update lockfile for native bcrypt
+- 🔌 API: 7 файлов (route, route, route...)
+- 🧩 Компоненты: 3 файлов (AuthGuard, AuthProvider, Navigation)
+- 📄 Страницы: 7 файлов
+- 📚 Библиотеки: 5 файлов (auth, email, fact-utils...)
+- 🗄️ База данных: 1 файлов
+- 📝 Документация: 3 файлов
+- 📦 Другое: 15 файлов
+
+
 ### 2026-02-08 — perf: native bcrypt, fix login theme query, deploy-vk script, hmac middleware
 - ⚙️ Конфигурация: 1 файлов
 

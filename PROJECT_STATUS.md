@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-02-08**
+> Последнее обновление: **2026-02-11**
 
 ## Общая информация
 
@@ -11,7 +11,7 @@
 - **Фреймворк:** Next.js
 - **База данных:** PostgreSQL + Prisma
 
-## Страницы (15)
+## Страницы (17)
 
 | Путь |
 |------|
@@ -19,19 +19,21 @@
 | `/login` |
 | `/register` |
 | `/reset-password` |
+| `/verify-email` |
 | `/analytics` |
 | `/daily` |
 | `/evaluation/[date]` |
 | `/forecast` |
 | `/goals` |
 | `/history` |
+| `/onboarding` |
 | `/periods` |
 | `/periods/[id]` |
 | `/profile` |
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (43)
+## API Endpoints (46)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -41,8 +43,11 @@
 | `/api/auth/login` | POST |
 | `/api/auth/logout` | POST |
 | `/api/auth/me` | GET, PUT |
+| `/api/auth/onboarding` | GET, POST |
 | `/api/auth/register` | POST |
+| `/api/auth/resend-verification` | POST |
 | `/api/auth/reset-password` | GET, POST |
+| `/api/auth/verify-email` | GET, POST |
 | `/api/chat` | GET, POST, DELETE |
 | `/api/daily` | GET, POST |
 | `/api/daily/chat` | POST |
@@ -99,7 +104,7 @@
 - `goals/QuarterSection`
 - `goals/YearSection`
 
-## Модели БД (21)
+## Модели БД (22)
 
 ### User
 | Поле | Тип |
@@ -110,6 +115,8 @@
 | passwordHash | `String` |
 | role | `String` |
 | isActive | `Boolean` |
+| emailVerified | `Boolean` |
+| onboardingCompleted | `Boolean` |
 | themePreference | `ThemePreference` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
@@ -130,6 +137,7 @@
 | worldContexts | `WorldContext[]` |
 | sessions | `Session[]` |
 | passwordResetTokens | `PasswordResetToken[]` |
+| emailVerificationTokens | `EmailVerificationToken[]` |
 | chatMessages | `ChatMessage[]` |
 
 ### Session
@@ -428,6 +436,17 @@
 | completionByDayJson | `String` |
 
 ### PasswordResetToken
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String` |
+| user | `User` |
+| token | `String` |
+| expiresAt | `DateTime` |
+| usedAt | `DateTime?` |
+| createdAt | `DateTime` |
+
+### EmailVerificationToken
 | Поле | Тип |
 |------|-----|
 | id | `Int` |

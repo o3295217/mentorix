@@ -24,12 +24,14 @@ export default function Navigation() {
   const { user, logout } = useAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
-  // Скрываем навигацию на страницах авторизации
+  // Скрываем навигацию на страницах авторизации и онбординга
   const isAuthPage =
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/forgot-password' ||
-    pathname === '/reset-password'
+    pathname === '/reset-password' ||
+    pathname === '/verify-email' ||
+    pathname === '/onboarding'
 
   const userName = user?.name || user?.email || null
 

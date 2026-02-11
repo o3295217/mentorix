@@ -147,7 +147,7 @@ ai-assistant-spec/
 │   ├── SPECIFICATION.md       # Техническая спецификация
 │   └── USER_GUIDE.md          # Руководство пользователя
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.local.yml
 └── package.json
 ```
 

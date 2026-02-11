@@ -26,6 +26,8 @@ model User {
   passwordHash  String    // bcrypt hash
   role          String    @default("user") // "user" | "admin"
   isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  onboardingCompleted Boolean @default(false)
   themePreference ThemePreference @default(system)
   
   // Timestamps
@@ -50,6 +52,7 @@ model User {
   worldContexts WorldContext[]
   sessions      Session[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   chatMessages  ChatMessage[]
 
   @@map("users")
@@ -449,6 +452,22 @@ model PasswordResetToken {
   @@index([userId])
   @@index([token])
   @@map("password_reset_tokens")
+}
+
+// ==================== ВЕРИФИКАЦИЯ EMAIL ====================
+
+model EmailVerificationToken {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("email_verification_tokens")
 }
 
 // ==================== ЧАТ ====================

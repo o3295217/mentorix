@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { registerUser } from '@/lib/auth';
+import { registerUser, createEmailVerificationToken, isEmailVerificationRequired } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
+import { sendEmail, getEmailVerificationContent } from '@/lib/email';
 
 // Rate limiter для регистрации - защита от спама
 const registerRateLimiter = {
@@ -43,9 +44,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Проверяем invite code (опционально, можно включить для закрытой регистрации)
     const registrationMode = process.env.REGISTRATION_MODE || 'open';
     
+    // Проверяем invite code для режима invite
     if (registrationMode === 'invite') {
       const validInviteCode = process.env.INVITE_CODE;
       if (!inviteCode || inviteCode !== validInviteCode) {
@@ -55,7 +56,6 @@ export async function POST(request: Request) {
         );
       }
     } else if (registrationMode === 'closed') {
-      // Регистрация закрыта
       return NextResponse.json(
         { error: 'Регистрация закрыта' },
         { status: 403 }
@@ -74,23 +74,63 @@ export async function POST(request: Request) {
       }
     }
 
-    const result = await registerUser(email, password, name);
+    // Определяем, нужна ли верификация email
+    const requiresVerification = isEmailVerificationRequired();
+    
+    // При режиме invite — сразу верифицируем email
+    const emailVerified = registrationMode === 'invite';
+    
+    // Регистрируем пользователя
+    const result = await registerUser(email, password, name, {
+      skipSession: requiresVerification && !emailVerified,
+      emailVerified,
+    });
 
-    if (!result.success || !result.session) {
+    if (!result.success) {
       return NextResponse.json(
         { error: result.error || 'Ошибка регистрации' },
         { status: 400 }
       );
     }
 
-    // Создаём ответ с cookie
+    // Если нужна верификация — отправляем письмо
+    if (requiresVerification && !emailVerified && result.userId) {
+      const token = await createEmailVerificationToken(result.userId);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const verifyUrl = `${appUrl}/verify-email?token=${token}`;
+      
+      const emailContent = getEmailVerificationContent(verifyUrl, name);
+      const emailResult = await sendEmail({
+        to: email,
+        ...emailContent,
+      });
+
+      if (!emailResult.success) {
+        console.error('Failed to send verification email:', emailResult.error);
+        // Не блокируем регистрацию, но логируем ошибку
+      }
+
+      return NextResponse.json({
+        success: true,
+        requiresVerification: true,
+        message: 'Проверьте почту для подтверждения email',
+      });
+    }
+
+    // Сессия создана — устанавливаем cookies
+    if (!result.session) {
+      return NextResponse.json(
+        { error: 'Ошибка создания сессии' },
+        { status: 500 }
+      );
+    }
+
     const response = NextResponse.json({
       success: true,
       user: result.session.user,
     });
 
     // Устанавливаем cookie
-    // Secure только если явно указано (для HTTPS)
     const useSecureCookie = process.env.COOKIE_SECURE === 'true';
     response.cookies.set('auth_token', result.session.token, {
       httpOnly: true,
@@ -100,8 +140,16 @@ export async function POST(request: Request) {
       path: '/',
     });
 
-    // HMAC-подпись токена для верификации в middleware (без обращения к БД)
-    const authSecret = process.env.AUTH_SECRET || 'default-secret';
+    // HMAC-подпись токена
+    const authSecret = process.env.AUTH_SECRET;
+    if (!authSecret) {
+      console.error('AUTH_SECRET not set');
+      return NextResponse.json(
+        { error: 'Ошибка конфигурации сервера' },
+        { status: 500 }
+      );
+    }
+    
     const sig = await signToken(result.session.token, authSecret);
     response.cookies.set(AUTH_SIG_COOKIE, sig, {
       httpOnly: true,
@@ -111,14 +159,14 @@ export async function POST(request: Request) {
       path: '/',
     });
 
-    // Устанавливаем cookie темы (по умолчанию system)
+    // Cookie темы
     response.cookies.set(THEME_COOKIE_KEY, DEFAULT_THEME_PREFERENCE, {
       httpOnly: false,
       secure: useSecureCookie,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 365,
-    })
+    });
 
     return response;
   } catch (error) {

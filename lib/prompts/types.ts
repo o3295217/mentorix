@@ -88,6 +88,7 @@ export interface DailyEvaluationRequest {
   date: string
   planText: string
   factText: string
+  uncompletedTasks?: string[] // Задачи из плана, которые НЕ были выполнены
   extraTasks?: string[]
   goals: GoalsHierarchy
   userProfile?: UserProfile

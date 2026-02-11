@@ -50,6 +50,17 @@ export async function POST(request: Request) {
     const result = await loginUser(email, password, userAgent, ipAddress);
 
     if (!result.success || !result.session) {
+      // Email не подтверждён
+      if (result.emailNotVerified) {
+        return NextResponse.json(
+          { 
+            error: 'Email не подтверждён',
+            emailNotVerified: true
+          },
+          { status: 403 }
+        );
+      }
+      
       return NextResponse.json(
         { error: result.error || 'Ошибка авторизации' },
         { status: 401 }
@@ -74,7 +85,15 @@ export async function POST(request: Request) {
     });
 
     // HMAC-подпись токена для верификации в middleware (без обращения к БД)
-    const authSecret = process.env.AUTH_SECRET || 'default-secret';
+    const authSecret = process.env.AUTH_SECRET;
+    if (!authSecret) {
+      console.error('AUTH_SECRET not set');
+      return NextResponse.json(
+        { error: 'Ошибка конфигурации сервера' },
+        { status: 500 }
+      );
+    }
+    
     const sig = await signToken(result.session.token, authSecret);
     response.cookies.set(AUTH_SIG_COOKIE, sig, {
       httpOnly: true,

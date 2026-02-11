@@ -273,49 +273,49 @@ export default function DailyPage() {
 
       {/* Context from periods */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
-          <h3 className="font-medium text-base text-blue-900 dark:text-blue-100 mb-2">Цели текущей недели:</h3>
+        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
+          <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-100 mb-3">Цели текущей недели:</h3>
           {weekGoals.length > 0 ? (
-            <ul className="text-xs text-blue-800 space-y-0.5">
+            <ul className="text-base text-blue-800 dark:text-blue-200 space-y-1.5">
               {weekGoals.map((goal, index) => (
-                <li key={index} className="flex items-center gap-1.5 leading-tight">
+                <li key={index} className="flex items-center gap-2 leading-normal">
                   <span>•</span>
                   <span className="flex-1">{goal}</span>
                   <button
                     onClick={() => addGoalToTasks(goal)}
-                    className="text-blue-600 hover:text-blue-800 text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded whitespace-nowrap"
-                    title="Добавить в план"
+                    className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100 text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded-md whitespace-nowrap font-medium"
+                    title="Добавить в план дня"
                   >
-                    → в план
+                    → в план дня
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-blue-600">Не установлены</p>
+            <p className="text-base text-blue-600 dark:text-blue-300">Не установлены</p>
           )}
         </div>
 
-        <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700">
-          <h3 className="font-medium text-base text-purple-900 dark:text-purple-100 mb-2">Цели текущего месяца:</h3>
+        <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700">
+          <h3 className="font-semibold text-lg text-purple-900 dark:text-purple-100 mb-3">Цели текущего месяца:</h3>
           {monthGoals.length > 0 ? (
-            <ul className="text-xs text-purple-800 space-y-0.5">
+            <ul className="text-base text-purple-800 dark:text-purple-200 space-y-1.5">
               {monthGoals.map((goal, index) => (
-                <li key={index} className="flex items-center gap-1.5 leading-tight">
+                <li key={index} className="flex items-center gap-2 leading-normal">
                   <span>•</span>
                   <span className="flex-1">{goal}</span>
                   <button
                     onClick={() => addGoalToTasks(goal)}
-                    className="text-purple-600 hover:text-purple-800 text-xs px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 rounded whitespace-nowrap"
-                    title="Добавить в план"
+                    className="text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-800 hover:bg-purple-200 dark:hover:bg-purple-700 rounded-md whitespace-nowrap font-medium"
+                    title="Добавить в план дня"
                   >
-                    → в план
+                    → в план дня
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-purple-600">Не установлены</p>
+            <p className="text-base text-purple-600 dark:text-purple-300">Не установлены</p>
           )}
         </div>
       </div>
@@ -679,7 +679,7 @@ export default function DailyPage() {
                             onChange={() => toggleTaskSelection(task.id)}
                             className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                           />
-                          <span className="flex-1 text-base text-gray-500 dark:text-gray-400 line-through">
+                          <span className="flex-1 text-base text-gray-500 dark:text-gray-400">
                             {task.taskText}
                           </span>
                           {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (

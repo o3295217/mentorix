@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-MODE="dev"        # dev -> docker-compose.yml, prod -> docker-compose.production.yml
+MODE="dev"        # dev -> docker-compose.local.yml, prod -> docker-compose.production.yml
 DO_GIT_PULL=0
 NO_CACHE=0
 PROJECT_NAME=""
@@ -108,7 +108,7 @@ if [[ "$DO_GIT_PULL" == "1" ]]; then
   git pull --ff-only
 fi
 
-COMPOSE_FILE="docker-compose.yml"
+COMPOSE_FILE="docker-compose.local.yml"
 if [[ "$MODE" == "prod" ]]; then
   COMPOSE_FILE="docker-compose.production.yml"
 fi

@@ -8,6 +8,7 @@ interface AuthUser {
   email: string
   name: string | null
   role: string
+  onboardingCompleted?: boolean
 }
 
 interface AuthContextValue {
@@ -21,7 +22,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password']
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email']
 
 function isPublicPath(pathname: string | null): boolean {
   return PUBLIC_PATHS.some(p => pathname?.startsWith(p))
@@ -54,6 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // API может возвращать { user: {...} } или напрямую {...}
         const userData = data?.user ?? data
         setUser(userData)
+        
+        // Редирект на онбординг для новых пользователей
+        if (!userData.onboardingCompleted && pathname !== '/onboarding') {
+          router.push('/onboarding')
+        }
       }
     } catch (error) {
       console.error('Auth check error:', error)

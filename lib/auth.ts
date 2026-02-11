@@ -19,8 +19,12 @@ async function hashPassword(password: string): Promise<string> {
  * Legacy SHA-256 хеш (только для миграции существующих паролей)
  */
 async function legacySha256Hash(password: string): Promise<string> {
+  const authSecret = process.env.AUTH_SECRET;
+  if (!authSecret) {
+    throw new Error('AUTH_SECRET environment variable is required for legacy password verification');
+  }
   const encoder = new TextEncoder();
-  const data = encoder.encode(password + process.env.AUTH_SECRET);
+  const data = encoder.encode(password + authSecret);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -70,6 +74,7 @@ export interface AuthUser {
   name: string | null;
   role: string;
   themePreference?: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface AuthSession {
@@ -84,12 +89,19 @@ export interface AuthResult {
   session?: AuthSession;
 }
 
+// Расширенный результат регистрации
+export interface RegisterResult extends AuthResult {
+  userId?: string;
+  requiresVerification?: boolean;
+}
+
 // Регистрация пользователя
 export async function registerUser(
   email: string,
   password: string,
-  name?: string
-): Promise<AuthResult> {
+  name?: string,
+  options?: { skipSession?: boolean; emailVerified?: boolean }
+): Promise<RegisterResult> {
   try {
     // Проверяем, существует ли пользователь
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -104,20 +116,33 @@ export async function registerUser(
 
     // Хешируем пароль и создаём пользователя
     const passwordHash = await hashPassword(password);
+    const emailVerified = options?.emailVerified ?? false;
+    
     const user = await prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
         role: 'user',
+        emailVerified,
       },
     });
+
+    // Если нужна верификация — не создаём сессию
+    if (options?.skipSession) {
+      return {
+        success: true,
+        userId: user.id,
+        requiresVerification: true,
+      };
+    }
 
     // Создаём сессию
     const session = await createSession(user.id);
     
     return {
       success: true,
+      userId: user.id,
       session: {
         user: {
           id: user.id,
@@ -141,7 +166,7 @@ export async function loginUser(
   password: string,
   userAgent?: string,
   ipAddress?: string
-): Promise<AuthResult> {
+): Promise<AuthResult & { emailNotVerified?: boolean }> {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     
@@ -156,6 +181,15 @@ export async function loginUser(
     const isValid = await verifyPassword(password, user.passwordHash, user.id);
     if (!isValid) {
       return { success: false, error: 'Неверный email или пароль' };
+    }
+
+    // Проверяем верификацию email (только если включена в настройках)
+    if (isEmailVerificationRequired() && !user.emailVerified) {
+      return { 
+        success: false, 
+        error: 'Email не подтверждён. Проверьте почту или запросите письмо повторно.',
+        emailNotVerified: true,
+      };
     }
 
     // Обновляем lastLoginAt
@@ -187,8 +221,8 @@ export async function loginUser(
   }
 }
 
-// Создание сессии
-async function createSession(
+// Создание сессии (экспортируется для использования после верификации email)
+export async function createSession(
   userId: string,
   userAgent?: string,
   ipAddress?: string
@@ -207,6 +241,28 @@ async function createSession(
   });
 
   return session;
+}
+
+// Получить пользователя по ID (для создания сессии после верификации)
+export async function getUserById(userId: string): Promise<AuthUser | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    themePreference: user.themePreference,
+  };
+}
+
+// Получить пользователя по email (для повторной отправки верификации)
+export async function getUserByEmail(email: string): Promise<{ id: string; name: string | null; emailVerified: boolean } | null> {
+  const user = await prisma.user.findUnique({ 
+    where: { email },
+    select: { id: true, name: true, emailVerified: true }
+  });
+  return user;
 }
 
 // Проверка сессии
@@ -230,6 +286,7 @@ export async function validateSession(token: string): Promise<AuthUser | null> {
       email: session.user.email,
       name: session.user.name,
       role: session.user.role,
+      onboardingCompleted: session.user.onboardingCompleted,
     };
   } catch (error) {
     console.error('Session validation error:', error);
@@ -390,6 +447,95 @@ export async function resetPassword(
 // Хэширование пароля (экспорт для CLI и API)
 export async function hashPasswordForReset(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+// ==================== EMAIL VERIFICATION ====================
+
+/**
+ * Генерация токена для верификации email
+ */
+export async function createEmailVerificationToken(userId: string): Promise<string> {
+  // Удаляем старые неиспользованные токены
+  await prisma.emailVerificationToken.deleteMany({
+    where: {
+      userId,
+      usedAt: null,
+    },
+  });
+
+  // Генерируем новый токен (64 символа hex)
+  const tokenArray = new Uint8Array(32);
+  crypto.getRandomValues(tokenArray);
+  const token = Array.from(tokenArray, b => b.toString(16).padStart(2, '0')).join('');
+
+  // Токен действителен 24 часа
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId,
+      token,
+      expiresAt,
+    },
+  });
+
+  return token;
+}
+
+/**
+ * Верификация email по токену
+ */
+export async function verifyEmailToken(token: string): Promise<{
+  success: boolean;
+  error?: string;
+  userId?: string;
+}> {
+  const verificationToken = await prisma.emailVerificationToken.findUnique({
+    where: { token },
+    include: { user: true },
+  });
+
+  if (!verificationToken) {
+    return { success: false, error: 'Неверная ссылка для подтверждения' };
+  }
+
+  if (verificationToken.usedAt) {
+    return { success: false, error: 'Ссылка уже была использована' };
+  }
+
+  if (verificationToken.expiresAt < new Date()) {
+    return { success: false, error: 'Срок действия ссылки истёк. Запросите новую.' };
+  }
+
+  // Помечаем токен как использованный и верифицируем email
+  await prisma.$transaction([
+    prisma.emailVerificationToken.update({
+      where: { id: verificationToken.id },
+      data: { usedAt: new Date() },
+    }),
+    prisma.user.update({
+      where: { id: verificationToken.userId },
+      data: { emailVerified: true },
+    }),
+  ]);
+
+  return { success: true, userId: verificationToken.userId };
+}
+
+/**
+ * Проверяет, нужна ли верификация email (для текущего режима работы)
+ */
+export function isEmailVerificationRequired(): boolean {
+  // Если регистрация открыта и SKIP_EMAIL_VERIFICATION не установлен — верификация обязательна
+  const registrationMode = process.env.REGISTRATION_MODE || 'open';
+  const skipVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
+  
+  // При закрытой регистрации или режиме invite — верификация не нужна
+  if (registrationMode === 'closed' || registrationMode === 'invite') {
+    return false;
+  }
+  
+  return !skipVerification;
 }
 
 // Создание первого админа (использовать при первом запуске)

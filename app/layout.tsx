@@ -7,7 +7,7 @@ import { cookies } from 'next/headers'
 import { DEFAULT_THEME_PREFERENCE, isThemePreference, THEME_COOKIE_KEY, type ThemePreference } from '@/lib/theme'
 
 export const metadata: Metadata = {
-  title: 'AI Effectiveness Assistant',
+  title: 'ION Assistant',
   description: 'Личный ИИ-ассистент для управления эффективностью',
 }
 
