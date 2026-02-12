@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-02-12 — fix: передача невыполненных задач в промпт ИИ для корректного % выполнения
+- 🔌 API: 1 файлов (route)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 1 файлов (plan-chat)
+- 📦 Другое: 1 файлов
+
+
 ### 2026-02-11 — fix: update lockfile for native bcrypt
 - 🔌 API: 7 файлов (route, route, route...)
 - 🧩 Компоненты: 3 файлов (AuthGuard, AuthProvider, Navigation)

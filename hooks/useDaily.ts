@@ -1054,11 +1054,16 @@ export function useDaily(): UseDailyReturn {
         .filter(t => selectedTasks.has(t.id))
         .map(t => t.taskText)
 
+      // Получаем текущее время пользователя
+      const now = new Date()
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
       const res = await fetch('/api/daily/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate,
+          currentTime,
           planTasks,
           completedTasks,
           messages: chatMessages,

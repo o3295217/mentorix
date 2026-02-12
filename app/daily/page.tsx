@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { format } from 'date-fns'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { format, startOfWeek, endOfWeek } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { useDaily } from '@/hooks/useDaily'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
+import { areTasksSimilar } from '@/lib/task-match'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 
@@ -97,6 +98,37 @@ export default function DailyPage() {
     createHabitFromTask,
     deleteHabit,
   } = useDaily()
+
+  // Список текстов выполненных задач для проверки целей
+  const completedTaskTexts = useMemo(() => {
+    return tasks
+      .filter(t => selectedTasks.has(t.id))
+      .map(t => t.taskText)
+  }, [tasks, selectedTasks])
+
+  // Проверка, выполнена ли цель (fuzzy-match с выполненными задачами)
+  const isGoalCompleted = useCallback((goalText: string): boolean => {
+    return completedTaskTexts.some(taskText => areTasksSimilar(goalText, taskText))
+  }, [completedTaskTexts])
+
+  // Заголовок для блока целей недели с датами
+  const weekLabel = useMemo(() => {
+    const date = new Date(selectedDate)
+    const weekStart = startOfWeek(date, { weekStartsOn: 1 })
+    const weekEnd = endOfWeek(date, { weekStartsOn: 1 })
+    const startDay = format(weekStart, 'd', { locale: ru })
+    const endDay = format(weekEnd, 'd', { locale: ru })
+    const month = format(weekEnd, 'MMM', { locale: ru }).replace('.', '')
+    return `План на неделю ${startDay}-${endDay} ${month}`
+  }, [selectedDate])
+
+  // Заголовок для блока целей месяца
+  const monthLabel = useMemo(() => {
+    const date = new Date(selectedDate)
+    const monthName = format(date, 'LLLL', { locale: ru })
+    // Первая буква заглавная
+    return `План на ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`
+  }, [selectedDate])
 
   // Проверить, является ли задача привычкой
   const getHabitForTask = (taskText: string) => {
@@ -274,22 +306,31 @@ export default function DailyPage() {
       {/* Context from periods */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
-          <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-100 mb-3">Цели текущей недели:</h3>
+          <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-100 mb-3">{weekLabel}:</h3>
           {weekGoals.length > 0 ? (
             <ul className="text-base text-blue-800 dark:text-blue-200 space-y-1.5">
-              {weekGoals.map((goal, index) => (
-                <li key={index} className="flex items-center gap-2 leading-normal">
-                  <span>•</span>
-                  <span className="flex-1">{goal}</span>
-                  <button
-                    onClick={() => addGoalToTasks(goal)}
-                    className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100 text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded-md whitespace-nowrap font-medium"
-                    title="Добавить в план дня"
-                  >
-                    → в план дня
-                  </button>
-                </li>
-              ))}
+              {weekGoals.map((goal, index) => {
+                const completed = isGoalCompleted(goal)
+                return (
+                  <li key={index} className="flex items-center gap-2 leading-normal">
+                    <span className={completed ? 'text-green-600 dark:text-green-400' : ''}>
+                      {completed ? '✅' : '•'}
+                    </span>
+                    <span className={`flex-1 ${completed ? 'text-green-700 dark:text-green-300' : ''}`}>
+                      {goal}
+                    </span>
+                    {!completed && (
+                      <button
+                        onClick={() => addGoalToTasks(goal)}
+                        className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100 text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded-md whitespace-nowrap font-medium"
+                        title="Добавить в план дня"
+                      >
+                        → в план дня
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           ) : (
             <p className="text-base text-blue-600 dark:text-blue-300">Не установлены</p>
@@ -297,22 +338,31 @@ export default function DailyPage() {
         </div>
 
         <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700">
-          <h3 className="font-semibold text-lg text-purple-900 dark:text-purple-100 mb-3">Цели текущего месяца:</h3>
+          <h3 className="font-semibold text-lg text-purple-900 dark:text-purple-100 mb-3">{monthLabel}:</h3>
           {monthGoals.length > 0 ? (
             <ul className="text-base text-purple-800 dark:text-purple-200 space-y-1.5">
-              {monthGoals.map((goal, index) => (
-                <li key={index} className="flex items-center gap-2 leading-normal">
-                  <span>•</span>
-                  <span className="flex-1">{goal}</span>
-                  <button
-                    onClick={() => addGoalToTasks(goal)}
-                    className="text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-800 hover:bg-purple-200 dark:hover:bg-purple-700 rounded-md whitespace-nowrap font-medium"
-                    title="Добавить в план дня"
-                  >
-                    → в план дня
-                  </button>
-                </li>
-              ))}
+              {monthGoals.map((goal, index) => {
+                const completed = isGoalCompleted(goal)
+                return (
+                  <li key={index} className="flex items-center gap-2 leading-normal">
+                    <span className={completed ? 'text-green-600 dark:text-green-400' : ''}>
+                      {completed ? '✅' : '•'}
+                    </span>
+                    <span className={`flex-1 ${completed ? 'text-green-700 dark:text-green-300' : ''}`}>
+                      {goal}
+                    </span>
+                    {!completed && (
+                      <button
+                        onClick={() => addGoalToTasks(goal)}
+                        className="text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-800 hover:bg-purple-200 dark:hover:bg-purple-700 rounded-md whitespace-nowrap font-medium"
+                        title="Добавить в план дня"
+                      >
+                        → в план дня
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           ) : (
             <p className="text-base text-purple-600 dark:text-purple-300">Не установлены</p>
@@ -848,7 +898,7 @@ export default function DailyPage() {
                       {msg.role === 'user' ? `👤 ${userName}` : '🤖 ION'}
                     </span>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
                 </div>
               ))
             )}

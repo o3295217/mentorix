@@ -24,6 +24,7 @@ const anthropic = new Anthropic({
 
 const ChatSchema = z.object({
   date: z.string(),
+  currentTime: z.string().optional(), // HH:MM время пользователя
   planTasks: z.array(z.string()),
   completedTasks: z.array(z.string()),
   messages: z.array(z.object({
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { date, planTasks, completedTasks, messages, userMessage } = validation.data
+    const { date, currentTime, planTasks, completedTasks, messages, userMessage } = validation.data
     const targetDate = parseDateParam(date)
 
     // Даты для выборки истории (последние 14 дней)
@@ -200,6 +201,7 @@ export async function POST(request: NextRequest) {
     const chatRequest: PlanChatRequest = {
       date,
       dayOfWeek: getDayOfWeek(date),
+      currentTime: currentTime || undefined,
       planTasks,
       completedTasks,
       weekGoals,
