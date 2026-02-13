@@ -4,6 +4,7 @@ import { getPeriodDates, parseDateParam, PeriodType } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 import { requireUserId } from '@/lib/get-user-id'
+import { areTasksSimilar } from '@/lib/task-match'
 
 const PeriodGoalSchema = z.object({
   periodType: z.enum(['week', 'month', 'quarter', 'half_year', 'year']),
@@ -11,6 +12,63 @@ const PeriodGoalSchema = z.object({
   periodEnd: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid date' }),
   goals: z.array(z.string()),
 })
+
+// Собрать все выполненные задачи за период
+async function getCompletedTasksForPeriod(userId: string, start: Date, end: Date): Promise<string[]> {
+  // Получаем все DailyEntry за период
+  const entries = await prisma.dailyEntry.findMany({
+    where: {
+      userId,
+      date: { gte: start, lte: end },
+    },
+    select: {
+      selectedTasksJson: true,
+      planSnapshotJson: true,
+      extraTasksJson: true,
+    },
+  })
+
+  const completedTexts: string[] = []
+
+  for (const entry of entries) {
+    // Получаем выбранные (выполненные) ID задач
+    const selectedIds = safeParseJson<number[]>(entry.selectedTasksJson || '[]', [])
+    if (selectedIds.length === 0) continue
+
+    // Получаем снэпшот плана (это массив строк)
+    const planSnapshot = safeParseJson<string[]>(entry.planSnapshotJson || '[]', [])
+    
+    // Получаем дополнительные задачи (могут быть также выполнены)
+    const extraTasks = safeParseJson<string[]>(entry.extraTasksJson || '[]', [])
+
+    // ID-шники соответствуют индексам в planSnapshot (1-based)
+    for (const id of selectedIds) {
+      if (id > 0 && id <= planSnapshot.length) {
+        completedTexts.push(planSnapshot[id - 1])
+      }
+    }
+
+    // Также добавляем все extraTasks (если они помечены как выполненные)
+    // extraTasks обычно заполняются как выполненные по факту
+    completedTexts.push(...extraTasks)
+  }
+
+  // Также проверяем закрытые OpenTask за период
+  const closedTasks = await prisma.openTask.findMany({
+    where: {
+      userId,
+      isClosed: true,
+      closedAt: { gte: start, lte: end },
+    },
+    select: { taskText: true },
+  })
+
+  for (const task of closedTasks) {
+    completedTexts.push(task.taskText)
+  }
+
+  return completedTexts
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,10 +94,21 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    const goals = periodGoal ? safeParseJson<string[]>(periodGoal.goalsJson, []) : []
+
+    // Получаем все выполненные задачи за период для проверки целей
+    const completedTasks = await getCompletedTasksForPeriod(userId, start, end)
+
+    // Формируем объекты целей с флагом выполнения
+    const goalsWithStatus = goals.map(goalText => ({
+      text: goalText,
+      completed: completedTasks.some(taskText => areTasksSimilar(goalText, taskText)),
+    }))
+
     return NextResponse.json(
       periodGoal
-        ? { ...periodGoal, goals: safeParseJson<string[]>(periodGoal.goalsJson, []) }
-        : { periodType: type, periodStart: start, periodEnd: end, goals: [] }
+        ? { ...periodGoal, goals: goalsWithStatus }
+        : { periodType: type, periodStart: start, periodEnd: end, goals: goalsWithStatus }
     )
   } catch (error) {
     console.error('Error fetching period goals:', error)

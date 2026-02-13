@@ -310,18 +310,22 @@ export default function DailyPage() {
           {weekGoals.length > 0 ? (
             <ul className="text-base text-blue-800 dark:text-blue-200 space-y-1.5">
               {weekGoals.map((goal, index) => {
-                const completed = isGoalCompleted(goal)
+                // Используем статус из API (за весь период) или проверяем задачи текущего дня
+                const goalText = typeof goal === 'string' ? goal : goal.text
+                const completedInPeriod = typeof goal === 'string' ? false : goal.completed
+                const completedToday = isGoalCompleted(goalText)
+                const completed = completedInPeriod || completedToday
                 return (
                   <li key={index} className="flex items-center gap-2 leading-normal">
                     <span className={completed ? 'text-green-600 dark:text-green-400' : ''}>
                       {completed ? '✅' : '•'}
                     </span>
                     <span className={`flex-1 ${completed ? 'text-green-700 dark:text-green-300' : ''}`}>
-                      {goal}
+                      {goalText}
                     </span>
                     {!completed && (
                       <button
-                        onClick={() => addGoalToTasks(goal)}
+                        onClick={() => addGoalToTasks(goalText)}
                         className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100 text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded-md whitespace-nowrap font-medium"
                         title="Добавить в план дня"
                       >
@@ -342,18 +346,22 @@ export default function DailyPage() {
           {monthGoals.length > 0 ? (
             <ul className="text-base text-purple-800 dark:text-purple-200 space-y-1.5">
               {monthGoals.map((goal, index) => {
-                const completed = isGoalCompleted(goal)
+                // Используем статус из API (за весь период) или проверяем задачи текущего дня
+                const goalText = typeof goal === 'string' ? goal : goal.text
+                const completedInPeriod = typeof goal === 'string' ? false : goal.completed
+                const completedToday = isGoalCompleted(goalText)
+                const completed = completedInPeriod || completedToday
                 return (
                   <li key={index} className="flex items-center gap-2 leading-normal">
                     <span className={completed ? 'text-green-600 dark:text-green-400' : ''}>
                       {completed ? '✅' : '•'}
                     </span>
                     <span className={`flex-1 ${completed ? 'text-green-700 dark:text-green-300' : ''}`}>
-                      {goal}
+                      {goalText}
                     </span>
                     {!completed && (
                       <button
-                        onClick={() => addGoalToTasks(goal)}
+                        onClick={() => addGoalToTasks(goalText)}
                         className="text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-800 hover:bg-purple-200 dark:hover:bg-purple-700 rounded-md whitespace-nowrap font-medium"
                         title="Добавить в план дня"
                       >

@@ -55,13 +55,19 @@ export interface HabitSuggestion {
   reason: string
 }
 
+// Цель периода с флагом выполнения
+export interface PeriodGoalItem {
+  text: string
+  completed: boolean
+}
+
 interface UseDailyReturn {
   selectedDate: string
   setSelectedDate: (date: string) => void
   planText: string
   setPlanText: (text: string) => void
-  weekGoals: string[]
-  monthGoals: string[]
+  weekGoals: PeriodGoalItem[]
+  monthGoals: PeriodGoalItem[]
   dailyEntry: DailyEntry | null
   tasks: OpenTask[]
   selectedTasks: Set<number>
@@ -128,8 +134,8 @@ export function useDaily(): UseDailyReturn {
     return format(new Date(), 'yyyy-MM-dd')
   })
   const [planText, setPlanText] = useState('')
-  const [weekGoals, setWeekGoals] = useState<string[]>([])
-  const [monthGoals, setMonthGoals] = useState<string[]>([])
+  const [weekGoals, setWeekGoals] = useState<PeriodGoalItem[]>([])
+  const [monthGoals, setMonthGoals] = useState<PeriodGoalItem[]>([])
   const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
   const [tasks, setTasks] = useState<OpenTask[]>([])
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
