@@ -273,11 +273,11 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         })()}
 
         {/* Список задач */}
-        <div className="space-y-2 mb-6">
+        <div className="space-y-1.5 mb-6">
           {tasksWithStatus.map((task, index) => (
-            <div 
+            <div
               key={index}
-              className={`flex items-start gap-3 p-3 rounded-lg border ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
                 task.status === 'completed'
                   ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                   : task.status === 'not_completed'
@@ -285,14 +285,14 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
                   : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
               }`}
             >
-              <span className="text-lg flex-shrink-0">
+              <span className="text-sm flex-shrink-0">
                 {task.status === 'completed' ? '✅' : task.status === 'not_completed' ? '❌' : '➕'}
               </span>
               <span className={`flex-1 ${
                 task.status === 'completed' 
                   ? 'text-green-900 dark:text-green-100' 
                   : task.status === 'not_completed'
-                  ? 'text-red-900 dark:text-red-100 line-through opacity-70'
+                  ? 'text-red-900 dark:text-red-100'
                   : 'text-blue-900 dark:text-blue-100'
               }`}>
                 {task.text}
