@@ -1,6 +1,6 @@
 # ROADMAP: Задачи на будущее
 
-> Актуальность: 25 января 2026
+> Актуальность: 16 февраля 2026
 
 ---
 
@@ -33,9 +33,14 @@
 - [ ] **Input sanitization** — проверка всех входных данных
 
 ### Инфраструктура
-- [x] **Health check endpoint** — для мониторинга (`/api/health`)
+- [x] **Health check endpoint** — для мониторинга (`/api/health`) ✅
+- [x] **SSL сертификаты** — Let's Encrypt + nginx ✅
+- [x] **VK Cloud деплой** — Production на assist.labaiion.ru ✅
+- [x] **Systemd автозапуск** ✅
 - [ ] **Proper logging** — структурированные логи (winston/pino)
 - [ ] **Error tracking** — Sentry или аналог
+- [ ] **CI/CD** — GitHub Actions для автодеплоя
+- [ ] **Backup strategy** — автоматические бэкапы БД по cron
 
 ---
 
@@ -129,6 +134,14 @@
 
 ## ✅ ВЫПОЛНЕНО
 
+### Февраль 2026
+- [x] **Миграция на VK Cloud** — production-деплой на 212.233.76.195
+- [x] **Домен + SSL** — assist.labaiion.ru, Let's Encrypt, nginx reverse proxy
+- [x] **Email-верификация** — SMTP через Gmail, сброс пароля
+- [x] **Открытая регистрация** — REGISTRATION_MODE=open с подтверждением email
+- [x] **Исправление багов** — g.trim() в useGoals, SMTP переменные в Docker
+- [x] **Systemd автозапуск** — контейнеры стартуют при загрузке сервера
+
 ### Январь 2026
 - [x] Чаты перенесены в БД (было localStorage)
 - [x] Dark mode на всех страницах
@@ -159,7 +172,8 @@
 - baseline-browser-mapping — outdated warning
 
 ### Для деплоя
+- [x] Настроить production сервер (VK Cloud) ✅
+- [x] SSL сертификаты (Let's Encrypt) ✅
 - [ ] Настроить CI/CD (GitHub Actions)
 - [ ] Docker image optimization
-- [ ] SSL сертификаты
-- [ ] Backup strategy для БД
+- [ ] Cron-бэкапы БД

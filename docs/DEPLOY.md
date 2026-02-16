@@ -1,6 +1,21 @@
-# Деплой AI Assistant на домашний сервер
+# Деплой AI Assistant
 
-> Пошаговое руководство по развёртыванию многопользовательской версии
+> Пошаговое руководство по развёртыванию на VK Cloud (или любом Ubuntu-сервере)
+> 
+> Актуальность: 16 февраля 2026
+
+---
+
+## Текущий production
+
+| Параметр | Значение |
+|----------|----------|
+| **URL** | https://assist.labaiion.ru |
+| **Сервер** | VK Cloud, 212.233.76.195 |
+| **SSH** | `ssh vk` |
+| **ОС** | Ubuntu, 4 vCPU, 4GB RAM, 60GB SSD |
+| **Docker** | 29.2.1 + Compose v5.0.2 |
+| **SSL** | Let's Encrypt (nginx + certbot) |
 
 ---
 
@@ -9,12 +24,10 @@
 | Компонент | Минимум | Рекомендуется |
 |-----------|---------|---------------|
 | CPU | 2 ядра | 4+ ядра |
-| RAM | 1 GB | 2+ GB |
-| Диск | 5 GB | 20+ GB |
-| Docker | 20.10+ | 24.0+ |
-| Docker Compose | 2.0+ | 2.20+ |
-
-Ваш сервер (i7-7700K, 16GB RAM) — **более чем достаточно** ✅
+| RAM | 2 GB | 4+ GB |
+| Диск | 10 GB | 20+ GB |
+| Docker | 20.10+ | 29.0+ |
+| Docker Compose | 2.0+ | 5.0+ |
 
 ---
 
@@ -34,23 +47,21 @@ cd ~/ai-assistant
 
 ## Шаг 2: Копирование проекта
 
-### Вариант A: Git clone
+### rsync (рекомендуется)
 ```bash
-git clone <your-repo-url> .
+# С мака:
+rsync -avz --delete \
+  -e "ssh -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
+  --exclude 'node_modules' --exclude '.next' --exclude '.git' \
+  --exclude 'data/*.db' --exclude '.env' --exclude '.env.local' \
+  --exclude '.env.production' --exclude 'backups/*' \
+  --exclude 'vkcloud-key/*.pem' \
+  /Users/oleggluskov/Documents/GooglDisk/ai-assistant-spec/ vk:/home/ubuntu/ai-assistant-spec/
 ```
 
-### Вариант B: SCP с Mac
+### Или скрипт деплоя
 ```bash
-# На Mac:
-scp -r /Users/oleggluskov/Documents/GooglDisk/ai-assistant-spec/* oleg_d_b@192.168.2.74:~/ai-assistant/
-```
-
-### Вариант C: rsync (рекомендую)
-```bash
-# На Mac:
-rsync -avz --exclude 'node_modules' --exclude '.next' --exclude 'data' \
-  /Users/oleggluskov/Documents/GooglDisk/ai-assistant-spec/ \
-  oleg_d_b@192.168.2.74:~/ai-assistant/
+./deploy-vk.sh
 ```
 
 ---
@@ -76,9 +87,16 @@ nano .env.production
 ```env
 AUTH_SECRET=<сгенерированный-ключ>
 ANTHROPIC_API_KEY=<ваш-api-key>
-REGISTRATION_MODE=invite  # Рекомендую для начала
-INVITE_CODE=your-secret-code
-MAX_USERS=5
+REGISTRATION_MODE=open
+COOKIE_SECURE=true
+
+# SMTP для отправки писем (верификация, сброс пароля)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=<app-password>
+SMTP_FROM=your@gmail.com
+NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
 ---
@@ -86,53 +104,74 @@ MAX_USERS=5
 ## Шаг 4: Запуск
 
 ```bash
-# Сборка и запуск (PostgreSQL стартует автоматически, миграции применяются при старте)
-docker compose -f docker-compose.production.yml up -d --build
+# Сборка и запуск
+cd ~/ai-assistant-spec
+docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache
+docker compose --env-file .env.production -f docker-compose.production.yml up -d
 
 # Проверяем логи
 docker logs -f ai-assistant-production
 
 # Проверяем статус
-docker ps
+docker ps --format 'table {{.Names}}\t{{.Status}}'
 ```
+
+> **Важно:** всегда указывайте `--env-file .env.production` — Docker Compose не читает его автоматически.
+
+---
+
+## Шаг 5: Настройка Nginx + SSL
+
+### Установка Nginx
+```bash
+sudo apt install nginx -y
+```
+
+### Конфигурация reverse proxy
+```bash
+sudo nano /etc/nginx/sites-available/ai-assistant
+```
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/ai-assistant /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### SSL (Let's Encrypt)
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d your-domain.com
+```
+
+Certbot автоматически обновит конфиг nginx для HTTPS и настроит автопродление.
 
 ---
 
 ## Шаг 6: Первый пользователь
 
-1. Откройте в браузере: `http://192.168.2.74:3000`
-2. Перейдите на `/register`
-3. Введите код приглашения (если REGISTRATION_MODE=invite)
-4. Создайте аккаунт
-
----
-
-## Доступ из интернета (опционально)
-
-### Вариант A: VPN (рекомендую для безопасности)
-```bash
-# Установите WireGuard
-sudo apt install wireguard
-
-# Настройте VPN и подключайтесь через него
-```
-
-### Вариант B: Reverse Proxy с HTTPS
-
-Создайте файл `Caddyfile`:
-```
-your-domain.com {
-    reverse_proxy localhost:3000
-}
-```
-
-Раскомментируйте секцию Caddy в `docker-compose.production.yml`.
-
-### Вариант C: Port Forwarding
-```bash
-# На роутере настройте проброс порта 3000 → 192.168.2.74:3000
-# НЕ РЕКОМЕНДУЕТСЯ без HTTPS!
-```
+1. Откройте `https://your-domain.com/register`
+2. Введите имя, email и пароль
+3. На почту придёт ссылка для подтверждения email
+4. Перейдите по ссылке и войдите
 
 ---
 
@@ -140,10 +179,11 @@ your-domain.com {
 
 ```bash
 # Перезапуск
-docker compose -f docker-compose.production.yml restart
+cd ~/ai-assistant-spec
+docker compose --env-file .env.production -f docker-compose.production.yml restart
 
 # Остановка
-docker compose -f docker-compose.production.yml down
+docker compose --env-file .env.production -f docker-compose.production.yml down
 
 # Логи
 docker logs -f ai-assistant-production
@@ -151,9 +191,8 @@ docker logs -f ai-assistant-production
 # Бэкап БД (PostgreSQL)
 ./scripts/backup-db.sh
 
-# Обновление
-git pull
-docker compose -f docker-compose.production.yml up -d --build
+# Обновление (с мака)
+./deploy-vk.sh
 ```
 
 ---
@@ -174,10 +213,10 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/oleg_d_b/ai-assistant
-ExecStart=/usr/bin/docker compose -f docker-compose.production.yml up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.production.yml down
-User=oleg_d_b
+WorkingDirectory=/home/ubuntu/ai-assistant-spec
+ExecStart=/usr/bin/docker compose --env-file .env.production -f docker-compose.production.yml up -d
+ExecStop=/usr/bin/docker compose --env-file .env.production -f docker-compose.production.yml down
+User=ubuntu
 
 [Install]
 WantedBy=multi-user.target
@@ -194,7 +233,7 @@ sudo systemctl start ai-assistant
 
 ### Ошибка "permission denied"
 ```bash
-sudo chown -R 1001:1001 ~/ai-assistant/data
+sudo chown -R 1001:1001 ~/ai-assistant-spec/backups
 ```
 
 ### Не запускается контейнер
@@ -211,8 +250,8 @@ docker logs ai-assistant-db
 docker exec -it ai-assistant-db psql -U ai_assistant
 
 # Пересоздать БД (осторожно — данные будут утеряны!)
-docker compose -f docker-compose.production.yml down -v
-docker compose -f docker-compose.production.yml up -d
+docker compose --env-file .env.production -f docker-compose.production.yml down -v
+docker compose --env-file .env.production -f docker-compose.production.yml up -d
 ```
 
 ---
@@ -226,7 +265,7 @@ crontab -e
 
 Добавьте:
 ```
-0 3 * * * cd /home/oleg_d_b/ai-assistant && ./scripts/backup-db.sh
+0 3 * * * cd /home/ubuntu/ai-assistant-spec && ./scripts/backup-db.sh
 ```
 
 ---
