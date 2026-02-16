@@ -208,7 +208,11 @@ export function useGoals(): UseGoalsReturn {
       }
 
       if (key && data?.goals) {
-        setPeriodGoals(prev => new Map(prev).set(key, data.goals))
+        // API может вернуть массив строк или массив объектов {text, completed}
+        const goalStrings: string[] = data.goals.map((g: string | { text: string }) =>
+          typeof g === 'string' ? g : g.text
+        )
+        setPeriodGoals(prev => new Map(prev).set(key, goalStrings))
       }
     } catch (error) {
       console.error(`Error loading period goals:`, error)

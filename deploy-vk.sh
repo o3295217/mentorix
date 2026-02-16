@@ -42,16 +42,16 @@ rsync -avz --delete \
     --exclude '.env.local' \
     --exclude '.env.production' \
     --exclude 'backups/*' \
-    --exclude 'vkcloud/*.pem' \
+    --exclude 'vkcloud-key/*.pem' \
     "$LOCAL_PATH/" "$SERVER:$REMOTE_PATH/"
 
 # 3. Пересборка на сервере
 echo -e "\n${GREEN}4. Пересборка Docker на VK Cloud...${NC}"
-ssh "$SERVER" "cd $REMOTE_PATH && docker compose -f docker-compose.production.yml build --no-cache"
+ssh "$SERVER" "cd $REMOTE_PATH && docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache"
 
 # 4. Перезапуск контейнера
 echo -e "\n${GREEN}5. Перезапуск контейнера...${NC}"
-ssh "$SERVER" "cd $REMOTE_PATH && docker compose -f docker-compose.production.yml up -d"
+ssh "$SERVER" "cd $REMOTE_PATH && docker compose --env-file .env.production -f docker-compose.production.yml up -d"
 
 # 5. Проверка статуса
 echo -e "\n${GREEN}6. Проверка статуса...${NC}"
@@ -59,4 +59,4 @@ sleep 5
 ssh "$SERVER" "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep ai-assistant"
 
 echo -e "\n${GREEN}✅ Деплой на VK Cloud завершён!${NC}"
-echo "Приложение: http://212.233.76.70:3000"
+echo "Приложение: https://assist.labaiion.ru"

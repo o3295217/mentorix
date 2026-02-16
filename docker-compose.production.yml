@@ -58,6 +58,14 @@ services:
       - INVITE_CODE=${INVITE_CODE:-}
       # Cookie secure flag (set to 'true' only for HTTPS)
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      # App URL (для ссылок в email)
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # SMTP (для отправки email: сброс пароля, верификация)
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
       # AI API
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     volumes:
