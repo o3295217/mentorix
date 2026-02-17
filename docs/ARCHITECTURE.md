@@ -880,13 +880,29 @@ app/page.tsx
 
 ## 8. AI INTEGRATION
 
+### Cloudflare Worker прокси
+
+Anthropic блокирует API-запросы с российских IP. Для production-сервера на VK Cloud используется Cloudflare Worker + Durable Object в качестве прокси:
+
+```
+VK Cloud (РФ) → Cloudflare Worker (PoP) → Durable Object (US, wnam) → Anthropic API
+```
+
+- **Код прокси:** `cloudflare-proxy/src/index.js`
+- **Конфигурация:** `cloudflare-proxy/wrangler.toml`
+- **URL:** `https://anthropic-proxy.o3295217.workers.dev`
+- **Защита:** заголовок `x-proxy-secret`
+- **Env-переменные:** `ANTHROPIC_PROXY_URL`, `ANTHROPIC_PROXY_SECRET`
+
+Все вызовы Anthropic SDK идут через единый клиент `getAnthropicClient()` из `lib/anthropic.ts`, который автоматически настраивает `baseURL` и `defaultHeaders` при наличии переменных прокси.
+
 ### Потоки взаимодействия с AI
 
 ```
 1. Оценка дня (POST /api/evaluate)
    ├── Собираем: мечту, годовые цели, периодические цели, план, факт, контекст
    ├── Формируем промпт (buildUserDataPrompt)
-   ├── Вызываем Claude Sonnet (evaluateDay)
+   ├── Вызываем Claude Sonnet через getAnthropicClient()
    ├── Парсим JSON ответ
    ├── Валидируем структуру
    ├── Сохраняем в Evaluation
@@ -895,20 +911,20 @@ app/page.tsx
 2. Проверка плана (POST /api/daily/check-plan)
    ├── Собираем: цели периодов, текущий план, историю
    ├── Формируем промпт (buildCheckPlanPrompt)
-   ├── Вызываем Claude Haiku
+   ├── Вызываем Claude Haiku через getAnthropicClient()
    ├── Парсим JSON ответ
    └── Возвращаем рекомендации
 
 3. Чат о плане (POST /api/daily/chat)
    ├── Собираем: цели, план, insights, история сообщений
    ├── Формируем промпт (buildPlanChatContext)
-   ├── Вызываем Claude Haiku
+   ├── Вызываем Claude Haiku через getAnthropicClient()
    └── Возвращаем ответ
 
 4. Прогноз (GET /api/forecast)
    ├── Собираем: мечту, историю оценок, текущий темп
    ├── Формируем промпт (buildForecastPrompt)
-   ├── Вызываем Claude Sonnet
+   ├── Вызываем Claude Sonnet через getAnthropicClient()
    └── Возвращаем прогноз
 ```
 

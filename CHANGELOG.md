@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-02-17 — fix: chat и check-plan используют общий Anthropic клиент с прокси
+- 📝 Документация: 3 файлов
+
+
 ### 2026-02-17 — feat: добавлен Cloudflare Worker прокси для Anthropic API (обход гео-блокировки РФ)
 - 🔌 API: 2 файлов (route, route)
 - 📚 Библиотеки: 1 файлов (anthropic)

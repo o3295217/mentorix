@@ -1,6 +1,6 @@
 # Инфраструктура проекта AI Assistant
 
-> Актуальность: 16 февраля 2026
+> Актуальность: 17 февраля 2026
 
 ## Серверы
 
@@ -78,6 +78,22 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 0 3 * * * cd /home/ubuntu/ai-assistant-spec && ./scripts/backup-db.sh
 ```
 
+## Cloudflare Worker — прокси для Anthropic API
+
+Anthropic блокирует API-запросы с российских IP. Для обхода используется Cloudflare Worker + Durable Object:
+
+- **Worker URL:** `https://anthropic-proxy.o3295217.workers.dev`
+- **Расположение кода:** `cloudflare-proxy/` в корне проекта
+- **Механизм:** Worker принимает запрос → передаёт Durable Object (location hint: wnam/US) → DO вызывает Anthropic API с американского IP
+- **Защита:** заголовок `x-proxy-secret` (секрет хранится в Cloudflare Secrets и в `.env.production`)
+- **Деплой Worker:** `cd cloudflare-proxy && wrangler deploy`
+- **Аккаунт Cloudflare:** авторизация через `wrangler login`
+
+### Локальная разработка
+На маке прокси не нужен — API Anthropic работает напрямую. Переменные `ANTHROPIC_PROXY_URL` и `ANTHROPIC_PROXY_SECRET` в `.env.local` не задаются.
+
+---
+
 ## Переменные окружения (на сервере)
 Файл: `/home/ubuntu/ai-assistant-spec/.env.production`
 
@@ -86,6 +102,8 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AUTH_SECRET` | Секрет для JWT |
 | `ANTHROPIC_API_KEY` | Ключ API Claude |
+| `ANTHROPIC_PROXY_URL` | URL Cloudflare Worker прокси |
+| `ANTHROPIC_PROXY_SECRET` | Секрет для аутентификации прокси |
 | `COOKIE_SECURE` | `true` (HTTPS) |
 | `REGISTRATION_MODE` | `open` (регистрация с верификацией email) |
 | `SMTP_HOST` / `SMTP_PORT` | smtp.gmail.com:587 |
@@ -112,3 +130,5 @@ Host vk
 - Docker Compose требует флаг `--env-file .env.production` (не читает автоматически)
 - Nginx слушает порты 80 и 443, проксирует на localhost:3000
 - SSH может быть нестабильным при множестве параллельных сессий
+- Anthropic API блокирует запросы с IP в РФ — используется Cloudflare Worker прокси
+- Все вызовы Anthropic SDK идут через `getAnthropicClient()` из `lib/anthropic.ts` (с автоматическим проксированием)

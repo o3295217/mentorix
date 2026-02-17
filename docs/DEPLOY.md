@@ -2,7 +2,7 @@
 
 > Пошаговое руководство по развёртыванию на VK Cloud (или любом Ubuntu-сервере)
 > 
-> Актуальность: 16 февраля 2026
+> Актуальность: 17 февраля 2026
 
 ---
 
@@ -90,6 +90,11 @@ ANTHROPIC_API_KEY=<ваш-api-key>
 REGISTRATION_MODE=open
 COOKIE_SECURE=true
 
+# Cloudflare Worker прокси для Anthropic API (обход гео-блокировки РФ)
+# Если сервер в РФ — обязательно. С других локаций — не нужно.
+ANTHROPIC_PROXY_URL=https://anthropic-proxy.o3295217.workers.dev
+ANTHROPIC_PROXY_SECRET=<секрет-прокси>
+
 # SMTP для отправки писем (верификация, сброс пароля)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -98,6 +103,8 @@ SMTP_PASS=<app-password>
 SMTP_FROM=your@gmail.com
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
+
+> **Примечание:** Anthropic блокирует запросы с российских IP. Если сервер в РФ, необходимо использовать Cloudflare Worker прокси. Подробнее — см. [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 ---
 
