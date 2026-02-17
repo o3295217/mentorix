@@ -30,10 +30,18 @@ function getAnthropicClient(): Anthropic {
         'Please set it in your .env.local file or environment.'
       )
     }
+    
+    // Если задан ANTHROPIC_PROXY_URL — используем Cloudflare Worker прокси
+    // для обхода гео-блокировки Anthropic API
+    const proxyUrl = process.env.ANTHROPIC_PROXY_URL
+    const proxySecret = process.env.ANTHROPIC_PROXY_SECRET
+    
     _anthropic = new Anthropic({
       apiKey,
       maxRetries: 2,
       timeout: 5 * 60 * 1000, // 5 minutes timeout for the HTTP client
+      ...(proxyUrl ? { baseURL: proxyUrl } : {}),
+      ...(proxyUrl && proxySecret ? { defaultHeaders: { 'x-proxy-secret': proxySecret } } : {}),
     })
   }
   return _anthropic
