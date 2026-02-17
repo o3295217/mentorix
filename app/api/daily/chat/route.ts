@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { getPeriodDates, parseDateParam, toDateKey } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
@@ -15,12 +14,9 @@ import {
 import { getUserStatsForAI } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
+import { getAnthropicClient } from '@/lib/anthropic'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  maxRetries: 2,
-  timeout: 60 * 1000,
-})
+const anthropic = getAnthropicClient()
 
 const ChatSchema = z.object({
   date: z.string(),

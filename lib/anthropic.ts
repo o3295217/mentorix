@@ -21,7 +21,7 @@ import { extractJsonFromAIResponse, isValidScore, clampScore, sanitizeUserInput 
 
 let _anthropic: Anthropic | null = null
 
-function getAnthropicClient(): Anthropic {
+export function getAnthropicClient(): Anthropic {
   if (!_anthropic) {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
