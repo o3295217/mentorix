@@ -25,6 +25,8 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email']
 
 function isPublicPath(pathname: string | null): boolean {
+  // Главная страница публична (показывает Landing или Dashboard)
+  if (pathname === '/') return true
   return PUBLIC_PATHS.some(p => pathname?.startsWith(p))
 }
 
