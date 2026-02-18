@@ -69,14 +69,18 @@ export default function ProgressPage() {
           <div className="space-y-3 text-left max-w-sm mx-auto mb-8">
             <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
               <span className="text-2xl">1️⃣</span>
-              <span>Поставьте цели в разделе «Цели»</span>
+              <span>Опишите свою мечту в Профиле</span>
             </div>
             <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
               <span className="text-2xl">2️⃣</span>
-              <span>Планируйте задачи на день</span>
+              <span>Поставьте цели в разделе «Цели»</span>
             </div>
             <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
               <span className="text-2xl">3️⃣</span>
+              <span>Планируйте задачи на день</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+              <span className="text-2xl">4️⃣</span>
               <span>Оценивайте прошедший день</span>
             </div>
           </div>
