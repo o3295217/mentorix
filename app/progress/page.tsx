@@ -46,6 +46,48 @@ export default function ProgressPage() {
     )
   }
 
+  // Проверка на отсутствие данных для анализа
+  if (!stats.distribution || stats.totalDays === 0) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">🚗 Путешествие к мечте</h1>
+          <Link href="/" className="btn-secondary">
+            ← Назад
+          </Link>
+        </div>
+        
+        <div className="card bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30 text-center py-16">
+          <div className="text-6xl mb-6">🚀</div>
+          <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">
+            Ваше путешествие только начинается!
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            Здесь будет отображаться ваш прогресс к целям. 
+            Начните с планирования дня и оценки его результатов.
+          </p>
+          <div className="space-y-3 text-left max-w-sm mx-auto mb-8">
+            <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+              <span className="text-2xl">1️⃣</span>
+              <span>Поставьте цели в разделе «Цели»</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+              <span className="text-2xl">2️⃣</span>
+              <span>Планируйте задачи на день</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+              <span className="text-2xl">3️⃣</span>
+              <span>Оценивайте прошедший день</span>
+            </div>
+          </div>
+          <Link href="/daily" className="btn-primary inline-block">
+            Начать планирование →
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   // Определение уровня
   const getLevel = (days: number) => {
     if (days >= 1000) return { name: '🏆 Легенда', next: null, progress: 100 }
