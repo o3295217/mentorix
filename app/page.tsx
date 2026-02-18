@@ -6,6 +6,8 @@ import { format, startOfWeek } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import DreamProgress from '@/components/DreamProgress'
 import ProgressIndicator from '@/components/ProgressIndicator'
+import Landing from '@/components/Landing'
+import { useAuth } from '@/components/AuthProvider'
 import { DreamGoal, DailyEntry, ProgressStats } from '@/lib/types'
 
 interface UserProfile {
@@ -31,6 +33,7 @@ function getGreeting(): string {
 }
 
 export default function HomePage() {
+  const { user, loading: authLoading } = useAuth()
   const [today] = useState(new Date())
   const [dreamGoal, setDreamGoal] = useState<DreamGoal | null>(null)
   const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
@@ -40,8 +43,13 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    // Загружаем данные только если пользователь авторизован
+    if (user) {
+      fetchData()
+    } else if (!authLoading) {
+      setLoading(false)
+    }
+  }, [user, authLoading])
 
   const fetchData = async () => {
     try {
@@ -88,12 +96,18 @@ export default function HomePage() {
     }
   }
 
-  if (loading) {
+  // Показываем загрузку пока проверяется авторизация
+  if (authLoading || (user && loading)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-lg text-gray-600 dark:text-gray-300">Загрузка...</div>
       </div>
     )
+  }
+
+  // Показываем Landing для неавторизованных
+  if (!user) {
+    return <Landing />
   }
 
   return (

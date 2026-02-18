@@ -21,7 +21,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const pathname = usePathname()
   const { loading, isAuthenticated } = useAuth()
 
-  const isPublicPath = PUBLIC_PATHS.some(p => pathname?.startsWith(p))
+  // Главная страница публична (показывает Landing или Dashboard в зависимости от auth)
+  const isHomePage = pathname === '/'
+  const isPublicPath = isHomePage || PUBLIC_PATHS.some(p => pathname?.startsWith(p))
 
   // На публичных страницах всегда рендерим
   if (isPublicPath) {

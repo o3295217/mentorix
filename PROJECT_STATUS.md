@@ -84,13 +84,14 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (17)
+## Компоненты (18)
 
 - `AuthGuard`
 - `AuthProvider`
 - `BalanceFlags`
 - `DatePickerWithIndicators`
 - `DreamProgress`
+- `Landing`
 - `Navigation`
 - `ProgressIndicator`
 - `Providers`

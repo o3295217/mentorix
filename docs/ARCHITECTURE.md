@@ -819,7 +819,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (12 основных + 5 для целей)
+### Список компонентов (13 основных + 5 для целей)
 
 **Основные:**
 - `AuthGuard`
@@ -827,6 +827,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `BalanceFlags`
 - `DatePickerWithIndicators`
 - `DreamProgress`
+- `Landing`
 - `Navigation`
 - `ProgressIndicator`
 - `Providers`

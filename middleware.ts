@@ -27,6 +27,8 @@ const PUBLIC_PATHS = [
 
 // Проверка, является ли путь публичным
 function isPublicPath(pathname: string): boolean {
+  // Главная страница / - публичная (показывает landing или dashboard)
+  if (pathname === '/') return true
   return PUBLIC_PATHS.some((path) => pathname.startsWith(path))
 }
 

@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-02-18 — feat: улучшения страницы задач
+- 🧩 Компоненты: 3 файлов (AuthGuard, Landing, Navigation)
+- 📄 Страницы: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-02-18 — docs: обновлена документация — Cloudflare Worker прокси для Anthropic API
 - 🔌 API: 4 файлов (route, route, route...)
 - 🧩 Компоненты: 3 файлов (DreamProgress, Navigation, ProgressIndicator)

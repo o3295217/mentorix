@@ -39,6 +39,9 @@ export default function Navigation() {
     pathname === '/verify-email' ||
     pathname === '/onboarding'
 
+  // Скрываем навигацию на главной для неавторизованных (показывается Landing)
+  const isLandingPage = pathname === '/' && !user
+
   const userName = user?.name || user?.email || null
 
   const handleLogout = async () => {
@@ -57,8 +60,8 @@ export default function Navigation() {
     return pathname.startsWith(href)
   }
 
-  // Не рендерим навигацию на страницах авторизации
-  if (isAuthPage) {
+  // Не рендерим навигацию на страницах авторизации и Landing
+  if (isAuthPage || isLandingPage) {
     return null
   }
 
