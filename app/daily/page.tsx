@@ -786,7 +786,7 @@ export default function DailyPage() {
 
           {/* Вне плана (перевыполнение) */}
           <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mr-6">
-            <h3 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">➕ Вне плана (перевыполнение)</h3>
+            <h3 className="font-medium text-base text-gray-700 dark:text-gray-300 mb-2">➕ Вне плана (перевыполнение)</h3>
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
@@ -806,9 +806,7 @@ export default function DailyPage() {
               </button>
             </div>
 
-            {extraTasks.length === 0 ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">Нет</p>
-            ) : (
+            {extraTasks.length > 0 && (
               <div className="space-y-1">
                 {extraTasks.map((text, index) => (
                   <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100">
@@ -956,7 +954,7 @@ export default function DailyPage() {
       {/* Evaluate */}
       <div className="card bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-900/30 dark:to-purple-900/30 border border-primary-200 dark:border-primary-700">
         <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Получить оценку дня от ION</h2>
-        <p className="text-gray-700 dark:text-gray-300 mb-4">
+        <p className="text-base text-gray-700 dark:text-gray-300 mb-4">
           После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
         </p>
         <button
@@ -967,7 +965,7 @@ export default function DailyPage() {
           {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
         </button>
         {dailyEntry?.evaluation && (
-          <p className="mt-4 text-sm text-green-700 dark:text-green-400">
+          <p className="mt-4 text-base text-green-700 dark:text-green-400">
             ✅ Оценка за этот день уже получена. Вы можете получить новую оценку.
           </p>
         )}

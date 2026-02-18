@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { format, startOfWeek } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import DreamProgress from '@/components/DreamProgress'
 import ProgressIndicator from '@/components/ProgressIndicator'
@@ -12,12 +12,31 @@ interface UserProfile {
   name?: string
 }
 
+interface WeekGoal {
+  text: string
+  completed: boolean
+}
+
+interface WeekGoalsResponse {
+  goals: WeekGoal[]
+}
+
+// Функция для определения приветствия по времени суток
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'Доброе утро'
+  if (hour >= 12 && hour < 17) return 'Добрый день'
+  if (hour >= 17 && hour < 22) return 'Добрый вечер'
+  return 'Доброй ночи'
+}
+
 export default function HomePage() {
   const [today] = useState(new Date())
   const [dreamGoal, setDreamGoal] = useState<DreamGoal | null>(null)
   const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
   const [progressStats, setProgressStats] = useState<ProgressStats | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [weekGoals, setWeekGoals] = useState<WeekGoal[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,13 +46,15 @@ export default function HomePage() {
   const fetchData = async () => {
     try {
       const dateStr = format(today, 'yyyy-MM-dd')
+      const weekStart = startOfWeek(today, { weekStartsOn: 1 })
       
       // Параллельная загрузка всех данных
-      const [dreamRes, dailyRes, progressRes, profileRes] = await Promise.all([
+      const [dreamRes, dailyRes, progressRes, profileRes, weekGoalsRes] = await Promise.all([
         fetch('/api/goals/dream'),
         fetch(`/api/daily?date=${dateStr}`),
         fetch('/api/progress'),
         fetch('/api/profile'),
+        fetch(`/api/goals/period?type=week&date=${weekStart.toISOString()}`),
       ])
 
       if (dreamRes.ok) {
@@ -55,6 +76,11 @@ export default function HomePage() {
         const profile = await profileRes.json()
         setUserProfile(profile)
       }
+
+      if (weekGoalsRes.ok) {
+        const weekGoalsData: WeekGoalsResponse = await weekGoalsRes.json()
+        setWeekGoals(weekGoalsData.goals || [])
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -72,10 +98,12 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Header - Персонализированное приветствие */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Добро пожаловать!</h1>
-        <p className="text-lg text-gray-600">{format(today, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+          {getGreeting()}{userProfile?.name ? `, ${userProfile.name}!` : '!'}
+        </h1>
+        <p className="text-xl text-gray-600 dark:text-gray-400">{format(today, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
       </div>
 
       {/* Dream Progress - ГЛАВНЫЙ ВИДЖЕТ */}
@@ -96,7 +124,7 @@ export default function HomePage() {
       {/* Today's Card */}
       <div className="card">
         <h2 className="text-2xl font-bold mb-4">Сегодняшний день</h2>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {!dailyEntry?.planText && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
               <p className="text-yellow-800 dark:text-yellow-200">План на сегодня еще не создан</p>
@@ -137,37 +165,86 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Цели недели */}
+      {weekGoals.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Цели недели</h2>
+            <Link href="/goals" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+              Все цели →
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {weekGoals.slice(0, 5).map((goal, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-sm ${
+                  goal.completed 
+                    ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+                    : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+                }`}>
+                  {goal.completed ? '✓' : '○'}
+                </span>
+                <span className={`text-sm ${
+                  goal.completed 
+                    ? 'text-gray-500 dark:text-gray-400 line-through' 
+                    : 'text-gray-800 dark:text-gray-200'
+                }`}>
+                  {goal.text}
+                </span>
+              </div>
+            ))}
+            {weekGoals.length > 5 && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                +{weekGoals.length - 5} целей
+              </p>
+            )}
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">
+                Выполнено: {weekGoals.filter(g => g.completed).length} из {weekGoals.length}
+              </span>
+              <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${(weekGoals.filter(g => g.completed).length / weekGoals.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link href="/daily" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-lg font-semibold mb-2">📝 Ежедневное планирование</h3>
-          <p className="text-gray-600 dark:text-gray-300">Создайте план на день и добавьте факт выполнения</p>
+          <h3 className="text-xl font-semibold mb-2">📝 Ежедневное планирование</h3>
+          <p className="text-base text-gray-600 dark:text-gray-300">Создайте план на день и добавьте факт выполнения</p>
         </Link>
 
         <Link href="/goals" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-lg font-semibold mb-2">🎯 Управление целями</h3>
-          <p className="text-gray-600 dark:text-gray-300">Установите цели на неделю, месяц, квартал и год</p>
+          <h3 className="text-xl font-semibold mb-2">🎯 Управление целями</h3>
+          <p className="text-base text-gray-600 dark:text-gray-300">Установите цели на неделю, месяц, квартал и год</p>
         </Link>
 
         <Link href="/periods" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30">
-          <h3 className="text-lg font-semibold mb-2">📊 Периодические оценки</h3>
-          <p className="text-gray-600 dark:text-gray-300">Получите оценку недели, месяца, квартала или года от ИИ</p>
+          <h3 className="text-xl font-semibold mb-2">📊 Периодические оценки</h3>
+          <p className="text-base text-gray-600 dark:text-gray-300">Получите оценку недели, месяца, квартала или года от ИИ</p>
         </Link>
 
         <Link href="/forecast" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30">
-          <h3 className="text-lg font-semibold mb-2">🔮 Прогнозы</h3>
-          <p className="text-gray-600 dark:text-gray-300">Узнайте прогноз достижения мечты и выполнения целей</p>
+          <h3 className="text-xl font-semibold mb-2">🔮 Прогнозы</h3>
+          <p className="text-base text-gray-600 dark:text-gray-300">Узнайте прогноз достижения мечты и выполнения целей</p>
         </Link>
 
         <Link href="/analytics" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-lg font-semibold mb-2">📈 Аналитика</h3>
-          <p className="text-gray-600 dark:text-gray-300">Просмотрите статистику и тренды вашей эффективности</p>
+          <h3 className="text-xl font-semibold mb-2">📈 Аналитика</h3>
+          <p className="text-base text-gray-600 dark:text-gray-300">Просмотрите статистику и тренды вашей эффективности</p>
         </Link>
 
         <Link href="/tasks" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-lg font-semibold mb-2">✅ Задачи</h3>
-          <p className="text-gray-600 dark:text-gray-300">Управляйте незакрытыми задачами и приоритетами</p>
+          <h3 className="text-xl font-semibold mb-2">✅ Задачи</h3>
+          <p className="text-base text-gray-600 dark:text-gray-300">Управляйте незакрытыми задачами и приоритетами</p>
         </Link>
       </div>
     </div>

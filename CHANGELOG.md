@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-02-18 — docs: обновлена документация — Cloudflare Worker прокси для Anthropic API
+- 🔌 API: 4 файлов (route, route, route...)
+- 🧩 Компоненты: 3 файлов (DreamProgress, Navigation, ProgressIndicator)
+- 📄 Страницы: 3 файлов
+
+
 ### 2026-02-17 — fix: chat и check-plan используют общий Anthropic клиент с прокси
 - 📝 Документация: 3 файлов
 

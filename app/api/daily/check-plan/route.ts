@@ -15,8 +15,6 @@ import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { getAnthropicClient } from '@/lib/anthropic'
 
-const anthropic = getAnthropicClient()
-
 const CheckPlanSchema = z.object({
   date: z.string(),
   planTasks: z.array(z.string()),
@@ -154,7 +152,7 @@ export async function POST(request: NextRequest) {
 
     // Вызов Claude API
     const startTime = Date.now()
-    const message = await anthropic.messages.create({
+    const message = await getAnthropicClient().messages.create({
       model: 'claude-3-5-haiku-20241022',  // Haiku для проверки плана - дешевле
       max_tokens: 1024,
       system: [

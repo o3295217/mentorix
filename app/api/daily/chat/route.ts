@@ -16,8 +16,6 @@ import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { getAnthropicClient } from '@/lib/anthropic'
 
-const anthropic = getAnthropicClient()
-
 const ChatSchema = z.object({
   date: z.string(),
   currentTime: z.string().optional(), // HH:MM время пользователя
@@ -293,7 +291,7 @@ export async function POST(request: NextRequest) {
 
     // Вызов Claude API
     const startTime = Date.now()
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-3-5-haiku-20241022',  // Haiku для чата - дешевле
       max_tokens: 1024,
       system: [

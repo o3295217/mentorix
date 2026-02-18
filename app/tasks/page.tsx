@@ -17,6 +17,9 @@ export default function TasksPage() {
   // Отслеживание задач в плане: { taskId: date }
   const [tasksInPlan, setTasksInPlan] = useState<Record<number, string>>({})
   
+  // Скрывать задачи которые уже в плане на сегодня
+  const [hideInPlan, setHideInPlan] = useState(true)
+  
   // Модальное окно выбора даты
   const [showDateModal, setShowDateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<OpenTask | null>(null)
@@ -34,19 +37,53 @@ export default function TasksPage() {
 
   const loadTasks = async () => {
     try {
-      const [openRes, closedRes] = await Promise.all([
+      const today = format(new Date(), 'yyyy-MM-dd')
+      
+      const [openRes, closedRes, dailyRes] = await Promise.all([
         fetch('/api/tasks/open'),
         fetch('/api/tasks/closed'),
+        fetch(`/api/daily?date=${today}`),
       ])
 
+      let openData: OpenTask[] = []
       if (openRes.ok) {
-        const openData = await openRes.json()
+        openData = await openRes.json()
         setOpenTasks(openData)
       }
 
       if (closedRes.ok) {
         const closedData = await closedRes.json()
         setClosedTasks(closedData)
+      }
+
+      // Проверяем какие задачи уже в плане на сегодня
+      if (dailyRes.ok && openData.length > 0) {
+        const daily = await dailyRes.json()
+        const planText = daily?.planText || ''
+        const planTasks = planText.split('\n').filter((t: string) => t.trim())
+        
+        let extraTasks: string[] = []
+        if (daily?.extraTasksJson) {
+          try {
+            extraTasks = JSON.parse(daily.extraTasksJson)
+          } catch {
+            extraTasks = []
+          }
+        }
+        
+        const allPlanTasks = [...planTasks, ...extraTasks]
+        
+        // Находим задачи которые уже в плане
+        const inPlanMap: Record<number, string> = {}
+        for (const task of openData) {
+          const isInPlan = allPlanTasks.some((planTask: string) => 
+            areTasksSimilar(task.taskText, planTask)
+          )
+          if (isInPlan) {
+            inPlanMap[task.id] = today
+          }
+        }
+        setTasksInPlan(inPlanMap)
       }
     } catch (error) {
       console.error('Error loading tasks:', error)
@@ -192,8 +229,16 @@ export default function TasksPage() {
     }
   }
 
-  const strategicOpen = openTasks.filter((t) => t.taskType === 'strategic')
-  const operationalOpen = openTasks.filter((t) => t.taskType === 'operational')
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const inPlanTodayCount = Object.values(tasksInPlan).filter(d => d === today).length
+  
+  // Фильтруем задачи которые в плане на сегодня (если включено скрытие)
+  const filteredOpen = hideInPlan 
+    ? openTasks.filter(t => tasksInPlan[t.id] !== today)
+    : openTasks
+  
+  const strategicOpen = filteredOpen.filter((t) => t.taskType === 'strategic')
+  const operationalOpen = filteredOpen.filter((t) => t.taskType === 'operational')
   const strategicClosed = closedTasks.filter((t) => t.taskType === 'strategic')
   const operationalClosed = closedTasks.filter((t) => t.taskType === 'operational')
 
@@ -207,11 +252,35 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Незакрытые задачи</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Незакрытые задачи</h1>
+        {inPlanTodayCount > 0 && (
+          <button
+            onClick={() => setHideInPlan(!hideInPlan)}
+            className="text-sm px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
+          >
+            {hideInPlan 
+              ? `👁️ Показать в плане (${inPlanTodayCount})` 
+              : `🙈 Скрыть в плане (${inPlanTodayCount})`}
+          </button>
+        )}
+      </div>
 
       {openTasks.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-gray-600 dark:text-gray-400">Все задачи закрыты! 🎉</p>
+        </div>
+      ) : filteredOpen.length === 0 && hideInPlan ? (
+        <div className="card text-center py-12">
+          <p className="text-gray-600 dark:text-gray-400">
+            Все задачи добавлены в план на сегодня 📋
+          </p>
+          <button
+            onClick={() => setHideInPlan(false)}
+            className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Показать {inPlanTodayCount} задач в плане
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

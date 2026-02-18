@@ -43,7 +43,7 @@ export default function ProgressIndicator({
           <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">🌟 Прогресс к мечте</h2>
           <Link
             href="/progress"
-            className="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+            className="text-base text-blue-600 hover:text-blue-700 hover:underline font-medium"
           >
             Подробнее →
           </Link>
@@ -53,8 +53,10 @@ export default function ProgressIndicator({
         <div className="flex items-baseline flex-wrap gap-x-2">
           <span className="text-lg text-gray-600 dark:text-gray-300">При текущей скорости {displayName} достигнет цель через</span>
           <span className="text-4xl font-bold" style={{ color }}>{formatYears(yearsToGoal)}</span>
+          <span className="text-lg text-gray-500 dark:text-gray-400">лет.</span>
+          <span className="text-lg text-gray-600 dark:text-gray-300">План:</span>
+          <span className="text-4xl font-bold text-gray-700 dark:text-gray-200">{targetYears}</span>
           <span className="text-lg text-gray-500 dark:text-gray-400">лет</span>
-          <span className="text-lg text-gray-400 dark:text-gray-500">(план: {targetYears} лет)</span>
         </div>
 
         {/* Прогресс-бар */}
@@ -67,7 +69,7 @@ export default function ProgressIndicator({
           </div>
         </div>
 
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex justify-between text-base text-gray-500 dark:text-gray-400">
           <span>{productiveDays} / {targetDays} дней</span>
           <span>{progressPercent.toFixed(1)}%</span>
         </div>

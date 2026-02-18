@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseDateParam } from '@/lib/dates'
 import { requireUserId } from '@/lib/get-user-id'
+import { areTasksSimilar } from '@/lib/task-match'
 
 interface TransferAction {
   type: 'transfer'
@@ -89,16 +90,18 @@ export async function POST(request: NextRequest) {
 
           case 'backlog': {
             // Добавить в OpenTasks
-            // Проверить, нет ли уже такой задачи
-            const existingTask = await prisma.openTask.findFirst({
+            // Проверить, нет ли уже похожей задачи
+            const existingTasks = await prisma.openTask.findMany({
               where: {
                 userId,
-                taskText: taskText,
                 isClosed: false
-              }
+              },
+              select: { taskText: true }
             })
 
-            if (!existingTask) {
+            const hasSimilar = existingTasks.some(t => areTasksSimilar(t.taskText, taskText))
+
+            if (!hasSimilar) {
               await prisma.openTask.create({
                 data: {
                   userId,

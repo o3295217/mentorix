@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { parseDateParam } from '@/lib/dates'
 import { requireUserId } from '@/lib/get-user-id'
+import { areTasksSimilar } from '@/lib/task-match'
 
 const OpenTaskSchema = z.object({
   taskText: z.string().min(1, "Task text is required"),
@@ -10,6 +11,7 @@ const OpenTaskSchema = z.object({
   originDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Invalid date format",
   }),
+  forceCreate: z.boolean().optional(), // Пропустить проверку на похожие
 })
 
 export async function GET(request: NextRequest) {
@@ -47,7 +49,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { taskText, taskType, originDate } = validation.data
+    const { taskText, taskType, originDate, forceCreate } = validation.data
+
+    // Проверяем на похожие открытые задачи (если не forceCreate)
+    if (!forceCreate) {
+      const existingTasks = await prisma.openTask.findMany({
+        where: { userId, isClosed: false },
+        select: { id: true, taskText: true, originDate: true },
+      })
+      
+      const similarTasks = existingTasks.filter(t => areTasksSimilar(t.taskText, taskText))
+      
+      if (similarTasks.length > 0) {
+        return NextResponse.json({
+          warning: 'similar_tasks_found',
+          similarTasks: similarTasks.map(t => ({
+            id: t.id,
+            taskText: t.taskText,
+            originDate: t.originDate,
+          })),
+          message: `Найдено ${similarTasks.length} похожих задач. Создать новую или закрыть старые?`,
+        }, { status: 409 }) // Conflict
+      }
+    }
 
     const task = await prisma.openTask.create({
       data: {
