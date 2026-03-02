@@ -47,6 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Ставим loading при начале проверки — убирает мерцание при смене маршрута
+    setLoading(true)
+
     const optional = isOptionalAuthPage(pathname)
 
     try {
