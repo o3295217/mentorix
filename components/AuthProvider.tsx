@@ -24,10 +24,14 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email']
 
-function isPublicPath(pathname: string | null): boolean {
-  // Главная страница публична (показывает Landing или Dashboard)
-  if (pathname === '/') return true
+/** Страницы авторизации — не проверяем auth вообще */
+function isAuthPage(pathname: string | null): boolean {
   return PUBLIC_PATHS.some(p => pathname?.startsWith(p))
+}
+
+/** Страницы, где проверяем auth, но не редиректим на логин если не авторизован */
+function isOptionalAuthPage(pathname: string | null): boolean {
+  return pathname === '/'
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -37,18 +41,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const checkAuth = useCallback(async () => {
-    // На публичных страницах не проверяем
-    if (isPublicPath(pathname)) {
+    // На страницах авторизации (login, register и т.д.) — не проверяем
+    if (isAuthPage(pathname)) {
       setLoading(false)
       return
     }
+
+    const optional = isOptionalAuthPage(pathname)
 
     try {
       const res = await fetch('/api/auth/me')
 
       if (res.status === 401) {
         setUser(null)
-        router.push(`/login?redirect=${encodeURIComponent(pathname || '/')}`)
+        // На главной не редиректим — покажем Landing
+        if (!optional) {
+          router.push(`/login?redirect=${encodeURIComponent(pathname || '/')}`)
+        }
         return
       }
 
