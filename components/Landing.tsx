@@ -5,7 +5,7 @@ import Link from 'next/link'
 const features = [
   {
     icon: '🎯',
-    title: 'Мечта на 5 лет',
+    title: 'Большая мечта',
     description: 'Формулируй глобальную цель и декомпозируй её на годовые, квартальные и недельные задачи',
   },
   {
@@ -41,7 +41,7 @@ export default function Landing() {
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 -mx-4 sm:-mx-6 lg:-mx-8 -my-8 px-4 sm:px-6 lg:px-8 py-8">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
           <div className="text-center">
             {/* Logo */}
             <div className="flex justify-center mb-8">
@@ -59,7 +59,7 @@ export default function Landing() {
             {/* Subheadline */}
             <p className="mt-6 max-w-2xl mx-auto text-xl text-gray-300">
               Планируй день, отслеживай прогресс и получай умные рекомендации от ИИ. 
-              Достигни цели за 5 лет с ежедневной поддержкой.
+              Достигай свою мечту с ежедневной поддержкой.
             </p>
             
             {/* CTA Buttons */}
