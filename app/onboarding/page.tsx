@@ -1,285 +1,286 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-const slides = [
+/* ─── Slide data ─── */
+
+interface Slide {
+  id: string
+  badge: string
+  badgeColor: string
+  title: React.ReactNode
+  subtitle: string
+}
+
+const slides: Slide[] = [
   {
     id: 'welcome',
-    title: 'Добро пожаловать в ION Assistant',
-    subtitle: 'Ваш персональный помощник в достижении целей',
-    content: (
-      <div className="text-center space-y-6">
-        <div className="text-8xl">🎯</div>
-        <p className="text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-          ION поможет вам превратить большие цели в конкретные ежедневные действия
-        </p>
-      </div>
+    badge: 'Добро пожаловать',
+    badgeColor: 'text-blue-400',
+    title: (
+      <>
+        Ваш путь к цели
+        <br />
+        <span className="onb-gradient-text">начинается здесь</span>
+      </>
     ),
+    subtitle:
+      'ION превращает амбициозные цели в понятные ежедневные действия. Никакой магии — только структура, дисциплина и честная обратная связь от ИИ.',
   },
   {
     id: 'pyramid',
-    title: 'От цели к действию',
-    subtitle: 'Принцип декомпозиции целей',
-    content: (
-      <div className="flex flex-col items-center space-y-2">
-        {/* Пирамида целей */}
-        <div className="relative w-full max-w-lg">
-          {/* Уровень 1 - Цель */}
-          <div className="flex justify-center mb-2">
-            <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-8 py-3 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span className="text-xl">🎯</span>
-              <span className="ml-2 font-semibold">Цель</span>
-              <span className="ml-2 text-sm opacity-80">(долгосрочная)</span>
-            </div>
-          </div>
-          
-          {/* Стрелка */}
-          <div className="flex justify-center text-gray-400 dark:text-gray-500 text-2xl">↓</div>
-          
-          {/* Уровень 2 - Год */}
-          <div className="flex justify-center mb-2">
-            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-10 py-3 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span className="text-xl">📅</span>
-              <span className="ml-2 font-semibold">Год</span>
-            </div>
-          </div>
-          
-          {/* Стрелка */}
-          <div className="flex justify-center text-gray-400 dark:text-gray-500 text-2xl">↓</div>
-          
-          {/* Уровень 3 - Полугодие/Квартал */}
-          <div className="flex justify-center gap-4 mb-2">
-            <div className="bg-gradient-to-r from-teal-500 to-green-500 text-white px-6 py-2 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span>📆</span>
-              <span className="ml-2 font-medium">Полугодие</span>
-            </div>
-            <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-2 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span>📆</span>
-              <span className="ml-2 font-medium">Квартал</span>
-            </div>
-          </div>
-          
-          {/* Стрелка */}
-          <div className="flex justify-center text-gray-400 dark:text-gray-500 text-2xl">↓</div>
-          
-          {/* Уровень 4 - Месяц */}
-          <div className="flex justify-center mb-2">
-            <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-12 py-2 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span>🗓️</span>
-              <span className="ml-2 font-medium">Месяц</span>
-            </div>
-          </div>
-          
-          {/* Стрелка */}
-          <div className="flex justify-center text-gray-400 dark:text-gray-500 text-2xl">↓</div>
-          
-          {/* Уровень 5 - Неделя */}
-          <div className="flex justify-center mb-2">
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-14 py-2 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span>📋</span>
-              <span className="ml-2 font-medium">Неделя</span>
-            </div>
-          </div>
-          
-          {/* Стрелка */}
-          <div className="flex justify-center text-gray-400 dark:text-gray-500 text-2xl">↓</div>
-          
-          {/* Уровень 6 - День */}
-          <div className="flex justify-center">
-            <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-16 py-3 rounded-lg shadow-lg transform hover:scale-105 transition-transform">
-              <span className="text-xl">✅</span>
-              <span className="ml-2 font-semibold">День</span>
-              <span className="ml-2 text-sm opacity-80">— задачи</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    badge: 'Структура',
+    badgeColor: 'text-purple-400',
+    title: (
+      <>
+        От мечты —
+        <br />
+        <span className="onb-gradient-text">до задач на сегодня</span>
+      </>
     ),
+    subtitle:
+      'Каждый уровень логически вытекает из предыдущего. Вы всегда видите, зачем делаете то, что делаете.',
   },
   {
-    id: 'howItWorks',
-    title: 'Как это работает',
-    subtitle: 'Каждая мелкая задача связана с большой целью',
-    content: (
-      <div className="space-y-6 max-w-lg mx-auto">
-        <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-          <div className="text-3xl">1️⃣</div>
-          <div>
-            <h4 className="font-semibold text-gray-900 dark:text-white">Определите цель</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Запишите долгосрочную цель, которую хотите достичь
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-          <div className="text-3xl">2️⃣</div>
-          <div>
-            <h4 className="font-semibold text-gray-900 dark:text-white">Декомпозируйте</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Разбейте цель на периоды: год → полугодие → квартал → месяц → неделя
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-          <div className="text-3xl">3️⃣</div>
-          <div>
-            <h4 className="font-semibold text-gray-900 dark:text-white">Планируйте день</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Каждый день добавляйте задачи, приближающие к целям периода
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-          <div className="text-3xl">4️⃣</div>
-          <div>
-            <h4 className="font-semibold text-gray-900 dark:text-white">Отслеживайте прогресс</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Видьте связь каждого действия с большой целью
-            </p>
-          </div>
-        </div>
-      </div>
+    id: 'rhythm',
+    badge: 'Ежедневный ритм',
+    badgeColor: 'text-blue-400',
+    title: (
+      <>
+        Утром — план.
+        <br />
+        <span className="onb-gradient-text">Вечером — разбор.</span>
+      </>
     ),
+    subtitle:
+      'Каждый день вы формируете план, действуете, фиксируете результат. ИИ анализирует день по пяти критериям и даёт рекомендации.',
   },
   {
-    id: 'assistant',
-    title: 'ION — ваш AI помощник',
-    subtitle: 'Обсуждайте планы и получайте советы',
-    content: (
-      <div className="space-y-6 max-w-md mx-auto">
-        <div className="text-center text-6xl mb-4">🤖</div>
-        
-        <div className="space-y-4">
-          <div className="flex gap-3">
-            <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-2xl rounded-tl-none max-w-xs">
-              Какие задачи запланировать на сегодня?
-            </div>
-          </div>
-          
-          <div className="flex gap-3 justify-end">
-            <div className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-2xl rounded-tr-none max-w-xs">
-              Исходя из ваших целей на неделю, рекомендую сфокусироваться на...
-            </div>
-          </div>
-        </div>
-        
-        <p className="text-center text-gray-600 dark:text-gray-400 text-sm">
-          ION анализирует ваши цели и помогает <br/>планировать эффективнее
-        </p>
-      </div>
+    id: 'ai',
+    badge: 'ИИ-ассистент',
+    badgeColor: 'text-purple-400',
+    title: (
+      <>
+        Не мотиватор,
+        <br />
+        <span className="onb-gradient-text">а навигатор</span>
+      </>
     ),
+    subtitle:
+      'ION не говорит «молодец». Он показывает, где вы ускоряетесь, где буксуете, и что конкретно делать завтра.',
   },
   {
     id: 'start',
-    title: 'Готовы начать?',
-    subtitle: 'Определите свою первую цель',
-    content: (
-      <div className="text-center space-y-6">
-        <div className="text-8xl">🚀</div>
-        <p className="text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-          Начните с определения одной важной цели. <br/>
-          Затем разбейте её на шаги к достижению.
-        </p>
-      </div>
+    badge: 'Старт',
+    badgeColor: 'text-green-400',
+    title: (
+      <>
+        Определите цель.
+        <br />
+        <span className="onb-gradient-text">Остальное — наше дело.</span>
+      </>
     ),
+    subtitle:
+      'Начните с одной главной цели. Разбейте её на шаги. Первый день — уже через минуту.',
   },
-];
+]
+
+/* ─── Slide-specific visuals ─── */
+
+function PyramidVisual() {
+  const levels = [
+    { label: 'Мечта', w: '38%', opacity: 'opacity-100' },
+    { label: 'Год', w: '50%', opacity: 'opacity-80' },
+    { label: 'Квартал', w: '62%', opacity: 'opacity-60' },
+    { label: 'Месяц', w: '74%', opacity: 'opacity-45' },
+    { label: 'Неделя', w: '86%', opacity: 'opacity-30' },
+    { label: 'День', w: '100%', opacity: 'opacity-20' },
+  ]
+  return (
+    <div className="w-full max-w-md mx-auto space-y-2">
+      {levels.map((l) => (
+        <div key={l.label} className="flex justify-center">
+          <div
+            className={`h-10 rounded-lg bg-gradient-to-r from-blue-500 to-blue-400 ${l.opacity} flex items-center justify-center transition-all duration-500`}
+            style={{ width: l.w }}
+          >
+            <span className="text-white text-sm font-semibold">{l.label}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RhythmVisual() {
+  const steps = [
+    { time: 'Утро', text: 'Создайте план дня', color: 'border-purple-400/40' },
+    { time: 'День', text: 'Действуйте и отмечайте', color: 'border-blue-400/40' },
+    { time: 'Вечер', text: 'Зафиксируйте результат', color: 'border-blue-400/40' },
+    { time: 'Оценка', text: 'Получите разбор от ИИ', color: 'border-green-400/40' },
+  ]
+  return (
+    <div className="w-full max-w-sm mx-auto space-y-3">
+      {steps.map((s) => (
+        <div
+          key={s.time}
+          className={`flex items-center gap-4 bg-gray-900/60 border ${s.color} rounded-xl px-5 py-3`}
+        >
+          <span className="text-xs font-bold tracking-widest uppercase text-gray-500 w-16 flex-shrink-0">
+            {s.time}
+          </span>
+          <span className="text-gray-300 text-sm">{s.text}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AiVisual() {
+  return (
+    <div className="w-full max-w-sm mx-auto space-y-4">
+      <div className="flex gap-3">
+        <div className="bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm max-w-[80%]">
+          Какие задачи приблизят меня к цели на этой неделе?
+        </div>
+      </div>
+      <div className="flex gap-3 justify-end">
+        <div className="bg-blue-600/20 border border-blue-500/30 text-blue-200 px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm max-w-[80%]">
+          Исходя из ваших целей на неделю, стоит сфокусироваться на трёх ключевых задачах...
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StartVisual() {
+  return (
+    <div className="w-full max-w-xs mx-auto flex items-center justify-between">
+      {['Цель', 'Структура', 'Действие'].map((label, i) => (
+        <div key={label} className="flex flex-col items-center gap-2">
+          <div
+            className={`w-3 h-3 rounded-full ${
+              i === 2
+                ? 'bg-green-400 ring-4 ring-green-400/20'
+                : 'bg-blue-400 ring-4 ring-blue-400/20'
+            }`}
+          />
+          <span className="text-xs text-gray-500">{label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const slideVisuals: Record<string, React.ReactNode> = {
+  pyramid: <PyramidVisual />,
+  rhythm: <RhythmVisual />,
+  ai: <AiVisual />,
+  start: <StartVisual />,
+}
+
+/* ─── Page component ─── */
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [completing, setCompleting] = useState(false);
+  const router = useRouter()
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [completing, setCompleting] = useState(false)
 
-  const isLastSlide = currentSlide === slides.length - 1;
-  const slide = slides[currentSlide];
+  const isLastSlide = currentSlide === slides.length - 1
+  const slide = slides[currentSlide]
 
   const handleNext = () => {
     if (isLastSlide) {
-      completeOnboarding();
+      completeOnboarding()
     } else {
-      setCurrentSlide((prev) => prev + 1);
+      setCurrentSlide((prev) => prev + 1)
     }
-  };
+  }
 
   const handlePrev = () => {
     if (currentSlide > 0) {
-      setCurrentSlide((prev) => prev - 1);
+      setCurrentSlide((prev) => prev - 1)
     }
-  };
-
-  const handleSkip = () => {
-    completeOnboarding();
-  };
+  }
 
   const completeOnboarding = async () => {
-    setCompleting(true);
+    setCompleting(true)
     try {
       const res = await fetch('/api/auth/onboarding', {
         method: 'POST',
         credentials: 'include',
-      });
+      })
       if (res.ok) {
-        // Используем window.location для полной перезагрузки и обновления данных пользователя
-        window.location.href = '/goals';
+        window.location.href = '/goals'
       } else {
-        console.error('Failed to complete onboarding:', await res.text());
-        router.push('/goals');
+        router.push('/goals')
       }
-    } catch (error) {
-      console.error('Failed to complete onboarding:', error);
-      router.push('/goals');
+    } catch {
+      router.push('/goals')
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div
+      className="min-h-screen bg-gray-950 -my-8 w-screen overflow-hidden flex flex-col"
+      style={{ marginLeft: 'calc(-50vw + 50%)' }}
+    >
       {/* Progress bar */}
-      <div className="w-full h-1 bg-gray-200 dark:bg-gray-700">
+      <div className="w-full h-0.5 bg-gray-800">
         <div
-          className="h-full bg-blue-500 transition-all duration-300"
+          className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500"
           style={{ width: `${((currentSlide + 1) / slides.length) * 100}%` }}
         />
       </div>
 
-      {/* Skip button */}
-      <div className="flex justify-end p-4">
+      {/* Skip */}
+      <div className="flex justify-end px-6 pt-4">
         <button
-          onClick={handleSkip}
-          className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          onClick={completeOnboarding}
+          disabled={completing}
+          className="text-sm text-gray-600 hover:text-gray-400 transition-colors"
         >
           Пропустить
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 pb-20">
-        <div className="w-full max-w-2xl">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              {slide.title}
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">{slide.subtitle}</p>
-          </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+        <div className="w-full max-w-2xl text-center">
+          {/* Badge */}
+          <span
+            className={`text-sm font-semibold tracking-widest uppercase mb-4 block ${slide.badgeColor}`}
+          >
+            {slide.badge}
+          </span>
 
-          <div className="min-h-[400px] flex items-center justify-center">
-            {slide.content}
-          </div>
+          {/* Title */}
+          <h1 className="text-3xl sm:text-5xl font-bold text-white leading-tight tracking-tight">
+            {slide.title}
+          </h1>
+
+          {/* Subtitle */}
+          <p className="mt-6 max-w-lg mx-auto text-lg text-gray-400 leading-relaxed">
+            {slide.subtitle}
+          </p>
+
+          {/* Visual */}
+          {slideVisuals[slide.id] && (
+            <div className="mt-10">{slideVisuals[slide.id]}</div>
+          )}
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+      {/* Bottom navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-950/80 backdrop-blur-lg border-t border-gray-800/50 py-4 px-6">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <button
             onClick={handlePrev}
             disabled={currentSlide === 0}
-            className="px-6 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-5 py-2 text-gray-500 hover:text-white transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            ← Назад
+            Назад
           </button>
 
           {/* Dots */}
@@ -288,10 +289,10 @@ export default function OnboardingPage() {
               <button
                 key={index}
                 onClick={() => setCurrentSlide(index)}
-                className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
                   index === currentSlide
-                    ? 'bg-blue-500'
-                    : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400'
+                    ? 'bg-blue-400 w-6'
+                    : 'bg-gray-700 hover:bg-gray-600'
                 }`}
               />
             ))}
@@ -300,12 +301,15 @@ export default function OnboardingPage() {
           <button
             onClick={handleNext}
             disabled={completing}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+            className="group relative px-6 py-2 text-sm font-semibold text-white rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50"
           >
-            {completing ? 'Загрузка...' : isLastSlide ? 'Начать →' : 'Далее →'}
+            <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500 group-hover:from-blue-500 group-hover:to-blue-400 transition-all" />
+            <span className="relative">
+              {completing ? 'Загрузка...' : isLastSlide ? 'Начать' : 'Далее'}
+            </span>
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 }

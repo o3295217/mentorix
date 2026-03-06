@@ -95,4 +95,138 @@
   .dark .chat-scrollbar:hover::-webkit-scrollbar-thumb {
     background-color: rgba(150, 150, 150, 0.4);
   }
+
+  /* ====== LANDING ANIMATIONS ====== */
+
+  /* Gradient animated text (shared with onboarding) */
+  .landing-gradient-text,
+  .onb-gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #60a5fa, #a78bfa, #60a5fa);
+    background-size: 200% auto;
+    animation: landing-gradient-shift 4s ease-in-out infinite;
+  }
+
+  /* Subtle shimmer for subtext */
+  .landing-gradient-text-subtle {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(90deg, #6b7280, #93c5fd, #c4b5fd, #93c5fd, #6b7280);
+    background-size: 300% auto;
+    animation: landing-shimmer 6s linear infinite;
+  }
+
+  /* Hero fade-in */
+  .landing-fade-in {
+    animation: landing-fade-up 0.8s ease-out both;
+  }
+  .landing-delay-1 { animation-delay: 0.15s; }
+  .landing-delay-2 { animation-delay: 0.3s; }
+  .landing-delay-3 { animation-delay: 0.5s; }
+
+  /* Scroll reveal */
+  .landing-reveal {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  }
+  .landing-reveal-delay-1 { transition-delay: 0.1s; }
+  .landing-reveal-delay-2 { transition-delay: 0.2s; }
+  .landing-reveal-delay-3 { transition-delay: 0.3s; }
+
+  .landing-visible .landing-reveal,
+  .landing-visible.landing-reveal {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Background orbs */
+  .landing-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+  .landing-orb-1 {
+    width: 500px;
+    height: 500px;
+    background: rgba(59, 130, 246, 0.12);
+    top: -100px;
+    left: 10%;
+    animation: landing-float 12s ease-in-out infinite;
+  }
+  .landing-orb-2 {
+    width: 400px;
+    height: 400px;
+    background: rgba(139, 92, 246, 0.10);
+    top: 50px;
+    right: 5%;
+    animation: landing-float 15s ease-in-out infinite reverse;
+  }
+  .landing-orb-3 {
+    width: 350px;
+    height: 350px;
+    background: rgba(59, 130, 246, 0.06);
+    bottom: 10%;
+    left: 30%;
+    animation: landing-float 10s ease-in-out infinite 2s;
+  }
+
+  /* Grid background */
+  .landing-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Scroll indicator */
+  .landing-scroll-indicator {
+    width: 24px;
+    height: 40px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    padding-top: 6px;
+  }
+  .landing-scroll-dot {
+    width: 4px;
+    height: 8px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 2px;
+    animation: landing-scroll-bounce 2s ease-in-out infinite;
+  }
+}
+
+/* Landing keyframes — outside @layer to work correctly */
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-gradient-shift {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 200% center; }
+}
+
+@keyframes landing-shimmer {
+  0% { background-position: 300% center; }
+  100% { background-position: 0% center; }
+}
+
+@keyframes landing-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.95); }
+}
+
+@keyframes landing-scroll-bounce {
+  0%, 100% { opacity: 0.4; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(10px); }
 }

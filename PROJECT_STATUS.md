@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-03-02**
+> Последнее обновление: **2026-03-06**
 
 ## Общая информация
 
@@ -84,7 +84,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (18)
+## Компоненты (19)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -92,6 +92,7 @@
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `Landing`
+- `LayoutFooter`
 - `Navigation`
 - `ProgressIndicator`
 - `Providers`

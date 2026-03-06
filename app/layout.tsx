@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Navigation from '@/components/Navigation'
+import LayoutFooter from '@/components/LayoutFooter'
 import AuthGuard from '@/components/AuthGuard'
 import { Providers } from '@/components/Providers'
 import { cookies } from 'next/headers'
@@ -47,10 +48,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body suppressHydrationWarning>
         <Providers>
-          <div className="min-h-screen flex flex-col">
-            <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-              <Navigation />
-            </header>
+          <div className="min-h-screen flex flex-col overflow-x-hidden">
+            <Navigation />
 
             <main className="flex-1">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -58,13 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </main>
 
-            <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                  © {new Date().getFullYear()} AI Lab ION-1
-                </p>
-              </div>
-            </footer>
+            <LayoutFooter />
           </div>
         </Providers>
       </body>
