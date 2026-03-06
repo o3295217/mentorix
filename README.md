@@ -117,12 +117,15 @@ ai-assistant-spec/
 │   ├── periods/               # Периодические оценки
 │   ├── profile/               # Профиль пользователя
 │   ├── progress/              # Прогресс к мечте
-│   └── tasks/                 # Управление задачами
+│   ├── tasks/                 # Управление задачами
+│   └── onboarding/            # Онбординг (5 слайдов, тёмная тема)
 ├── components/                # React компоненты
 │   ├── BalanceFlags.tsx       # Флаги баланса (здоровье/семья/энергия)
 │   ├── DatePickerWithIndicators.tsx  # Календарь с индикаторами
 │   ├── DreamProgress.tsx      # Виджет прогресса к мечте
-│   ├── Navigation.tsx         # Навигация с активной вкладкой
+│   ├── Landing.tsx            # Публичный лендинг для неавторизованных
+│   ├── LayoutFooter.tsx       # Футер (скрывается на лендинге/auth/онбординге)
+│   ├── Navigation.tsx         # Навигация с <header>, активной вкладкой
 │   ├── ProgressIndicator.tsx  # Индикатор прогноза на главной
 │   └── Speedometer.tsx        # Визуализация скорости
 ├── lib/                       # Утилиты
@@ -144,6 +147,11 @@ ai-assistant-spec/
 ├── prisma/
 │   └── schema.prisma          # Схема базы данных
 ├── docs/
+│   ├── ARCHITECTURE.md        # Архитектура проекта
+│   ├── DEPLOY.md              # Деплой на VK Cloud
+│   ├── DEVELOPMENT.md         # Рабочий процесс разработки
+│   ├── INFRASTRUCTURE.md      # Инфраструктура и сервер
+│   ├── ROADMAP.md             # Дорожная карта
 │   ├── SPECIFICATION.md       # Техническая спецификация
 │   └── USER_GUIDE.md          # Руководство пользователя
 ├── Dockerfile
@@ -155,6 +163,10 @@ ai-assistant-spec/
 
 - 📘 [Руководство пользователя](docs/USER_GUIDE.md) — как пользоваться приложением
 - 📋 [Техническая спецификация](docs/SPECIFICATION.md) — детальное описание архитектуры
+- 🏗️ [Архитектура](docs/ARCHITECTURE.md) — структура проекта, БД, AI, алгоритмы
+- 🚀 [Деплой](docs/DEPLOY.md) — развёртывание на VK Cloud
+- 🛠️ [Разработка](docs/DEVELOPMENT.md) — рабочий процесс
+- 🗺️ [Дорожная карта](docs/ROADMAP.md) — план развития
 
 ## Получение API ключа Anthropic
 

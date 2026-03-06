@@ -1,6 +1,6 @@
 # АРХИТЕКТУРА ПРОЕКТА: AI Effectiveness Assistant
 
-> Техническая документация для разработчиков. Актуальность: февраль 2026.
+> Техническая документация для разработчиков. Актуальность: март 2026.
 
 ---
 
@@ -66,8 +66,9 @@ ai-assistant-spec/
 │   ├── profile/              # Профиль пользователя
 │   ├── progress/             # Прогресс
 │   ├── tasks/                # Открытые задачи
+│   ├── onboarding/           # Онбординг (5 слайдов, тёмная тема)
 │   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Dashboard
+│   └── page.tsx              # Dashboard / Landing
 ├── components/               # React компоненты
 │   ├── goals/                # Компоненты целей
 │   │   ├── DreamSection.tsx
@@ -79,8 +80,10 @@ ai-assistant-spec/
 │   ├── Speedometer.tsx       # Прогресс к мечте
 │   ├── BalanceFlags.tsx      # Флаги баланса
 │   ├── DreamProgress.tsx
+│   ├── Landing.tsx           # Публичный лендинг (тёмная тема, scroll-reveal)
+│   ├── LayoutFooter.tsx      # Футер (скрывается на landing/auth/onboarding)
 │   ├── ProgressIndicator.tsx # Индикатор прогресса на Dashboard
-│   ├── Navigation.tsx
+│   ├── Navigation.tsx        # Навигация, содержит <header>
 │   ├── ThemeProvider.tsx
 │   ├── ThemeToggle.tsx       # Переключатель темы
 │   └── Providers.tsx
@@ -872,11 +875,57 @@ app/daily/page.tsx
 
 ```
 app/page.tsx
+├── [если !user] Landing.tsx  # Полноэкранный лендинг для неавторизованных
 ├── Speedometer              # Прогресс к мечте
 ├── DreamProgress            # Детали прогресса
 ├── BalanceFlags             # Здоровье, семья, энергия
 └── [график оценок]          # Recharts LineChart
 ```
+
+### Layout (app/layout.tsx)
+
+```
+<body>
+  <Providers>
+    <AuthGuard>
+      <Navigation />         # <header> внутри, скрывается на landing/auth/onboarding
+      <main>{children}</main>
+      <LayoutFooter />       # Скрывается на landing/auth/onboarding
+    </AuthGuard>
+  </Providers>
+</body>
+```
+
+### Онбординг (app/onboarding/page.tsx)
+
+```
+OnboardingPage
+├── Slide 1: Welcome        # Приветствие
+├── Slide 2: Pyramid        # PyramidVisual — пирамида целей
+├── Slide 3: Rhythm         # RhythmVisual — ежедневный цикл
+├── Slide 4: AI             # AiVisual — чат-баблы
+├── Slide 5: Start          # StartVisual — CTA с анимированными орбами
+└── [навигация: dots + кнопки Назад/Далее]
+```
+
+### Landing (components/Landing.tsx)
+
+```
+Landing
+├── Hero                     # Градиентный заголовок, CTA
+├── Шаг первый               # Иерархия целей (пирамида)
+├── Шаг второй               # Ежедневный ритм (timeline)
+├── Шаг третий               # AI-анализ (mock оценка)
+├── Features grid            # 6 карточек возможностей
+├── Journey line             # 5 этапов пути
+├── Final CTA                # Призыв к регистрации
+└── Footer                   # Свой footer (не LayoutFooter)
+```
+
+CSS-анимации лендинга:
+- `IntersectionObserver` с `rootMargin: '-80px'` запускает `.landing-visible.landing-reveal`
+- `prefers-reduced-motion` отключает анимации
+- Определены в `app/globals.css`
 
 ---
 
@@ -1213,6 +1262,14 @@ if (!validation.success) {
 - Убраны функции `saveFact()` и `transferCompletedTasks()`
 - Обновлён UI кнопки "Сохранить план" с индикатором ⚠️
 
+### Март 2026
+- **Добавлен `Landing.tsx`** — публичный лендинг для неавторизованных пользователей (тёмная тема, scroll-reveal анимации через IntersectionObserver, 3 шага, features grid, journey line)
+- **Добавлен `LayoutFooter.tsx`** — футер приложения с условным рендерингом (скрывается на landing, auth, onboarding)
+- **`Navigation.tsx`** — `<header>` перенесён внутрь компонента, скрывается на landing/auth/onboarding
+- **`app/layout.tsx`** — реструктуризация: OG meta-теги, `overflow-x-hidden`, убраны обёртки header/footer
+- **`app/onboarding/page.tsx`** — полный рерайт: 5 слайдов с тёмной темой, PyramidVisual, RhythmVisual, AiVisual, StartVisual
+- **`app/globals.css`** — compound selector `.landing-visible.landing-reveal`, `prefers-reduced-motion`, shared `.onb-gradient-text`
+
 ### Январь 2026
 - Добавлен `lib/rate-limit.ts` — Rate limiting для AI endpoints
 - Добавлен `lib/user-stats.ts` — накопительная статистика пользователя
@@ -1233,4 +1290,4 @@ if (!validation.success) {
 
 ---
 
-*Последнее обновление: 7 февраля 2026*
+*Последнее обновление: 6 марта 2026*

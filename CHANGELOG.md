@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-03-06 — misc: auth pages, evaluation fixes, tasks, prompts, user guide update
+- 📝 Документация: 5 файлов
+
+
 ### 2026-03-06 — fix: remaining landing polish
 - 🔌 API: 3 файлов (route, route, route)
 - 🧩 Компоненты: 1 файлов (DreamProgress)

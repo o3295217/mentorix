@@ -98,6 +98,23 @@ docker exec ai-assistant-db psql -U ai_assistant -d ai_assistant -c "SELECT * FR
 1. Создать `app/mypage/page.tsx`
 2. Создать `app/mypage/layout.tsx` если нужен свой layout
 3. Добавить в навигацию `components/Navigation.tsx`
+4. Если страница должна отображаться без Navigation/LayoutFooter (как auth или onboarding) — добавить путь в `HIDDEN_PATHS` в обоих компонентах
+
+### Layout-структура (app/layout.tsx)
+
+```
+<body>
+  <Providers>
+    <AuthGuard>
+      <Navigation />       ← <header> внутри, скрывается на landing/auth/onboarding
+      <main>{children}</main>
+      <LayoutFooter />     ← скрывается на landing/auth/onboarding
+    </AuthGuard>
+  </Providers>
+</body>
+```
+
+Для публичных страниц (неавторизованные пользователи) — `app/page.tsx` рендерит `Landing.tsx` вместо Dashboard.
 
 ### Добавить новый API endpoint
 1. Создать `app/api/myendpoint/route.ts`
