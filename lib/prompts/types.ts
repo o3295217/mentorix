@@ -19,6 +19,7 @@ export interface UserProfile {
 
 export interface GoalsHierarchy {
   dreamGoal: string
+  dreamYears?: number
   yearGoals: string[]
   halfYearGoals: string[]
   quarterGoals: string[]

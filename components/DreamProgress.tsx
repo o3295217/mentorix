@@ -4,9 +4,10 @@ import { useState } from 'react'
 
 interface DreamProgressProps {
   dreamGoal: string
+  years?: number
 }
 
-export default function DreamProgress({ dreamGoal }: DreamProgressProps) {
+export default function DreamProgress({ dreamGoal, years }: DreamProgressProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   // Если нет мечты
@@ -34,7 +35,7 @@ export default function DreamProgress({ dreamGoal }: DreamProgressProps) {
       <div className="flex items-start gap-3">
         <div className="text-3xl flex-shrink-0">🌟</div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-semibold text-gray-600 dark:text-gray-400 mb-1">Твоя мечта (5 лет)</h2>
+          <h2 className="text-base font-semibold text-gray-600 dark:text-gray-400 mb-1">Твоя мечта{years ? ` (${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'})` : ''}</h2>
           <p className={`text-lg text-gray-900 dark:text-gray-100 font-medium leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}>
             "{dreamGoal}"
           </p>

@@ -107,9 +107,9 @@ function ResetPasswordForm() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
-              ION Assistant
-            </h1>
+            <Link href="/" className="block text-center text-3xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              ← ION Assistant
+            </Link>
             <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
               Ошибка
             </h2>
@@ -146,9 +146,9 @@ function ResetPasswordForm() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
-              ION Assistant
-            </h1>
+            <Link href="/" className="block text-center text-3xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              ← ION Assistant
+            </Link>
             <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
               Пароль изменён
             </h2>
@@ -172,9 +172,9 @@ function ResetPasswordForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
-            ION Assistant
-          </h1>
+          <Link href="/" className="block text-center text-3xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            ← ION Assistant
+          </Link>
           <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
             Новый пароль
           </h2>

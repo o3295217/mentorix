@@ -121,7 +121,7 @@ export default function HomePage() {
       </div>
 
       {/* Dream Progress - ГЛАВНЫЙ ВИДЖЕТ */}
-      <DreamProgress dreamGoal={dreamGoal?.goalText || ''} />
+      <DreamProgress dreamGoal={dreamGoal?.goalText || ''} years={dreamGoal?.years} />
 
       {/* Progress Indicator */}
       {progressStats && (

@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
       days: daysData,
       goals: {
         dreamGoal: dream?.goalText || 'Не указана',
+        dreamYears: dream?.years,
         yearGoals: safeParseJson(currentYearGoal?.goalsJson, []),
         halfYearGoals: safeParseJson(halfYearGoals?.goalsJson, []),
         quarterGoals: safeParseJson(quarterGoals?.goalsJson, []),

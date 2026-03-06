@@ -33,8 +33,9 @@ ${details.join('\n')}
 
 // Форматирование иерархии целей
 export function formatGoalsHierarchy(goals: GoalsHierarchy): string {
+  const yearsLabel = goals.dreamYears ? `${goals.dreamYears} ${goals.dreamYears === 1 ? 'год' : goals.dreamYears < 5 ? 'года' : 'лет'}` : 'срок не указан'
   return `
-🎯 МЕЧТА (5 лет):
+🎯 МЕЧТА (${yearsLabel}):
 ${goals.dreamGoal}
 
 📅 ЦЕЛИ НА ТЕКУЩИЙ ГОД:

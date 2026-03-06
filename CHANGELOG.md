@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-03-06 — fix: remaining landing polish
+- 🔌 API: 3 файлов (route, route, route)
+- 🧩 Компоненты: 1 файлов (DreamProgress)
+- 📄 Страницы: 5 файлов
+- 📚 Библиотеки: 2 файлов (core, types)
+- 📝 Документация: 3 файлов
+
+
 ### 2026-03-06 — fix: landing & onboarding overhaul
 - 🧩 Компоненты: 1 файлов (Landing)
 - 📦 Другое: 2 файлов

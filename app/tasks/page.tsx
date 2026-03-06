@@ -145,7 +145,7 @@ export default function TasksPage() {
         delete updated[taskId]
         return updated
       })
-      setMessage('🗑️ Задача удалена')
+      setMessage('Задача удалена')
       setTimeout(() => setMessage(''), 3000)
     } catch (error) {
       console.error('Error deleting task:', error)
@@ -189,7 +189,7 @@ export default function TasksPage() {
       const existsInExtra = currentExtraTasks.some(t => areTasksSimilar(t, selectedTask.taskText))
       
       if (existsInPlan || existsInExtra) {
-        setMessage('ℹ️ Похожая задача уже есть в плане на этот день')
+        setMessage('Похожая задача уже есть в плане на этот день')
         setTimeout(() => setMessage(''), 3000)
         setShowDateModal(false)
         return
@@ -218,13 +218,13 @@ export default function TasksPage() {
           ? 'сегодня' 
           : format(parseDateParam(selectedDate), 'd MMM', { locale: ru })
         
-        setMessage(`✅ Добавлено в план на ${dateLabel}`)
+        setMessage(`Добавлено в план на ${dateLabel}`)
         setTimeout(() => setMessage(''), 3000)
         setShowDateModal(false)
       }
     } catch (error) {
       console.error('Error adding task to plan:', error)
-      setMessage('❌ Ошибка при добавлении в план')
+      setMessage('Ошибка при добавлении в план')
       setTimeout(() => setMessage(''), 3000)
     }
   }
@@ -260,20 +260,20 @@ export default function TasksPage() {
             className="text-sm px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
           >
             {hideInPlan 
-              ? `👁️ Показать в плане (${inPlanTodayCount})` 
-              : `🙈 Скрыть в плане (${inPlanTodayCount})`}
+              ? `Показать в плане (${inPlanTodayCount})` 
+              : `Скрыть в плане (${inPlanTodayCount})`}
           </button>
         )}
       </div>
 
       {openTasks.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">Все задачи закрыты! 🎉</p>
+          <p className="text-gray-600 dark:text-gray-400">Все задачи закрыты!</p>
         </div>
       ) : filteredOpen.length === 0 && hideInPlan ? (
         <div className="card text-center py-12">
           <p className="text-gray-600 dark:text-gray-400">
-            Все задачи добавлены в план на сегодня 📋
+            Все задачи добавлены в план на сегодня
           </p>
           <button
             onClick={() => setHideInPlan(false)}
@@ -286,7 +286,7 @@ export default function TasksPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Strategic Tasks */}
           <div className="card">
-            <h2 className="text-xl font-bold mb-4 text-purple-700 dark:text-purple-400">🎯 Стратегические задачи</h2>
+            <h2 className="text-xl font-bold mb-4 text-purple-700 dark:text-purple-400">Стратегические задачи</h2>
             {strategicOpen.length === 0 ? (
               <p className="text-gray-600 dark:text-gray-400 text-sm">Нет стратегических задач</p>
             ) : (
@@ -377,7 +377,7 @@ export default function TasksPage() {
 
           {/* Operational Tasks */}
           <div className="card">
-            <h2 className="text-xl font-bold mb-4 text-blue-700 dark:text-blue-400">⚙️ Операционные задачи</h2>
+            <h2 className="text-xl font-bold mb-4 text-blue-700 dark:text-blue-400">Операционные задачи</h2>
             {operationalOpen.length === 0 ? (
               <p className="text-gray-600 dark:text-gray-400 text-sm">Нет операционных задач</p>
             ) : (
@@ -483,7 +483,7 @@ export default function TasksPage() {
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Closed Strategic */}
               <div className="card bg-gray-50 dark:bg-gray-800">
-                <h2 className="text-xl font-bold mb-4 text-gray-500 dark:text-gray-400">🎯 Стратегические (закрытые)</h2>
+                <h2 className="text-xl font-bold mb-4 text-gray-500 dark:text-gray-400">Стратегические (закрытые)</h2>
                 {strategicClosed.length === 0 ? (
                   <p className="text-gray-500 dark:text-gray-400 text-sm">Нет закрытых стратегических задач</p>
                 ) : (
@@ -510,7 +510,7 @@ export default function TasksPage() {
 
               {/* Closed Operational */}
               <div className="card bg-gray-50 dark:bg-gray-800">
-                <h2 className="text-xl font-bold mb-4 text-gray-500 dark:text-gray-400">⚙️ Операционные (закрытые)</h2>
+                <h2 className="text-xl font-bold mb-4 text-gray-500 dark:text-gray-400">Операционные (закрытые)</h2>
                 {operationalClosed.length === 0 ? (
                   <p className="text-gray-500 dark:text-gray-400 text-sm">Нет закрытых операционных задач</p>
                 ) : (
