@@ -20,7 +20,7 @@ function useScrollReveal() {
           }
         })
       },
-      { threshold: 0, rootMargin: '0px 0px 200px 0px' }
+      { threshold: 0.1, rootMargin: '0px 0px -80px 0px' }
     )
 
     // Наблюдаем за всеми дочерними элементами с data-reveal
@@ -137,7 +137,7 @@ export default function Landing() {
                       { level: 'Месяц', text: 'Ближайшие шаги', color: 'from-blue-500/40 to-blue-400/40', width: '55%' },
                       { level: 'Неделя', text: 'Фокус прямо сейчас', color: 'from-blue-500/25 to-blue-400/25', width: '40%' },
                     ].map((item, i) => (
-                      <div key={item.level} className="flex items-center gap-4" style={{ animationDelay: `${i * 100}ms` }}>
+                      <div key={item.level} className="flex items-center gap-4">
                         <div
                           className={`h-10 rounded-lg bg-gradient-to-r ${item.color} flex items-center px-4 transition-all duration-500`}
                           style={{ width: item.width }}
@@ -254,21 +254,21 @@ export default function Landing() {
                   {/* Criteria bars */}
                   <div className="space-y-3">
                     {[
-                      { name: 'Прогресс к мечте', value: 80 },
-                      { name: 'Стратегия', value: 70 },
-                      { name: 'Операционное', value: 90 },
-                      { name: 'Командное', value: 75 },
-                      { name: 'Эффективность', value: 65 },
+                      { name: 'Прогресс к мечте', value: 8 },
+                      { name: 'Стратегия', value: 7 },
+                      { name: 'Операционное', value: 9 },
+                      { name: 'Командное', value: 7.5 },
+                      { name: 'Эффективность', value: 6.5 },
                     ].map((c) => (
                       <div key={c.name}>
                         <div className="flex justify-between text-sm mb-1">
                           <span className="text-gray-400">{c.name}</span>
-                          <span className="text-gray-500">{c.value}%</span>
+                          <span className="text-gray-500">{c.value}/10</span>
                         </div>
                         <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-1000"
-                            style={{ width: `${c.value}%` }}
+                            style={{ width: `${c.value * 10}%` }}
                           />
                         </div>
                       </div>
@@ -423,21 +423,21 @@ export default function Landing() {
           </p>
 
           {/* Visual journey line */}
-          <div className="landing-reveal landing-reveal-delay-2 mt-10 flex items-center justify-between max-w-2xl mx-auto">
-            {['Мечта', 'Цели', 'План дня', 'Действие', 'Оценка', 'Рост'].map((label, i) => (
-              <div key={label} className="flex flex-col items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${
-                  i === 0 ? 'bg-blue-400 ring-4 ring-blue-400/20' :
-                  i === 5 ? 'bg-green-400 ring-4 ring-green-400/20' :
-                  'bg-gray-600'
-                }`} />
-                <span className="text-xs text-gray-500">{label}</span>
-              </div>
-            ))}
-          </div>
-          {/* Connecting line */}
-          <div className="landing-reveal landing-reveal-delay-2 max-w-2xl mx-auto -mt-[38px] mb-8 px-4">
-            <div className="h-px bg-gradient-to-r from-blue-400 via-gray-700 to-green-400" />
+          <div className="landing-reveal landing-reveal-delay-2 mt-10 max-w-2xl mx-auto relative">
+            {/* Connecting line behind dots */}
+            <div className="absolute top-1.5 left-4 right-4 h-px bg-gradient-to-r from-blue-400 via-gray-700 to-green-400" />
+            <div className="relative flex items-start justify-between">
+              {['Мечта', 'Цели', 'План дня', 'Действие', 'Оценка', 'Рост'].map((label, i) => (
+                <div key={label} className="flex flex-col items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${
+                    i === 0 ? 'bg-blue-400 ring-4 ring-blue-400/20' :
+                    i === 5 ? 'bg-green-400 ring-4 ring-green-400/20' :
+                    'bg-gray-600'
+                  }`} />
+                  <span className="text-xs text-gray-500">{label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -473,7 +473,7 @@ export default function Landing() {
       {/* ====== FOOTER ====== */}
       <footer className="border-t border-gray-800/50 py-8 px-4">
         <div className="max-w-7xl mx-auto text-center text-gray-600 text-sm">
-          © 2026 ION. Персональный ИИ-ассистент для достижения целей.
+          © {new Date().getFullYear()} ION. Персональный ИИ-ассистент для достижения целей.
         </div>
       </footer>
     </div>

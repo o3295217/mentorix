@@ -179,22 +179,24 @@
     background-size: 60px 60px;
   }
 
-  /* Scroll indicator */
-  .landing-scroll-indicator {
-    width: 24px;
-    height: 40px;
-    border: 2px solid rgba(255,255,255,0.15);
-    border-radius: 12px;
-    display: flex;
-    justify-content: center;
-    padding-top: 6px;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .landing-fade-in,
+  .landing-reveal {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
-  .landing-scroll-dot {
-    width: 4px;
-    height: 8px;
-    background: rgba(255,255,255,0.4);
-    border-radius: 2px;
-    animation: landing-scroll-bounce 2s ease-in-out infinite;
+  .landing-gradient-text,
+  .onb-gradient-text,
+  .landing-gradient-text-subtle {
+    animation: none !important;
+  }
+  .landing-orb {
+    animation: none !important;
   }
 }
 
@@ -226,7 +228,4 @@
   66% { transform: translate(-20px, 15px) scale(0.95); }
 }
 
-@keyframes landing-scroll-bounce {
-  0%, 100% { opacity: 0.4; transform: translateY(0); }
-  50% { opacity: 1; transform: translateY(10px); }
-}
+

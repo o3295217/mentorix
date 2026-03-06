@@ -9,7 +9,19 @@ import { DEFAULT_THEME_PREFERENCE, isThemePreference, THEME_COOKIE_KEY, type The
 
 export const metadata: Metadata = {
   title: 'ION Assistant',
-  description: 'Личный ИИ-ассистент для управления эффективностью',
+  description: 'Личный ИИ-ассистент для управления эффективностью. Превращаем мечту в ежедневное действие.',
+  openGraph: {
+    title: 'ION — ИИ-ассистент для достижения целей',
+    description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
+    siteName: 'ION Assistant',
+    locale: 'ru_RU',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ION — ИИ-ассистент для достижения целей',
+    description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

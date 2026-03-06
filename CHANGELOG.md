@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-03-06 — fix: landing & onboarding overhaul
+- 🧩 Компоненты: 1 файлов (Landing)
+- 📦 Другое: 2 файлов
+
+
 ### 2026-03-06 — fix: убрано мерцание Landing при переходе с регистрации/логина на главную
 - 🧩 Компоненты: 3 файлов (Landing, LayoutFooter, Navigation)
 - 📄 Страницы: 1 файлов
