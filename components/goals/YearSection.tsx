@@ -2,13 +2,13 @@
 
 import { useState, useMemo } from 'react'
 import { monthNames } from '@/lib/goals-utils'
-import { getDetailLevel } from '@/lib/dates'
 import { useInlineEdit } from '@/hooks/useInlineEdit'
 import { useCopyDropdown } from '@/hooks/useCopyDropdown'
 
 interface YearSectionProps {
   year: number
   currentYear: number
+  detailLevel: 'month' | 'quarter' | 'half' | 'year'
   goals: string[]
   onAddGoal: (text: string) => void
   onRemoveGoal: (index: number) => void
@@ -21,6 +21,7 @@ interface YearSectionProps {
 export default function YearSection({
   year,
   currentYear,
+  detailLevel,
   goals,
   onAddGoal,
   onRemoveGoal,
@@ -39,8 +40,6 @@ export default function YearSection({
       setNewGoal('')
     }
   }
-
-  const detailLevel = getDetailLevel(year, currentYear)
 
   const filteredGoals = useMemo(() => {
     if (!searchQuery) return goals

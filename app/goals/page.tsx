@@ -329,6 +329,7 @@ export default function GoalsPage() {
             <YearSection
               year={selectedYear}
               currentYear={currentYear}
+              detailLevel={detailLevel}
               goals={yearGoals.get(selectedYear) || []}
               onAddGoal={(text) => addYearGoal(selectedYear, text)}
               onRemoveGoal={(index) => removeYearGoal(selectedYear, index)}
@@ -339,29 +340,21 @@ export default function GoalsPage() {
             />
 
             {/* Квартал — для month и quarter detail levels */}
-            {(detailLevel === 'month' || detailLevel === 'quarter') && (() => {
-              const quarterKey = `${selectedYear}-Q${selectedQuarter}`
-              const quarterGoals = periodGoals.get(quarterKey) || []
-              const isCurrentQuarter = selectedYear === currentYear && selectedQuarter === currentQuarter
-              const progress = calculatePeriodProgress(quarterKey)
-              const quarterDate = new Date(selectedYear, (selectedQuarter - 1) * 3, 1)
-
-              return (
-                <QuarterSection
-                  quarter={selectedQuarter}
-                  year={selectedYear}
-                  goals={quarterGoals}
-                  isCurrent={isCurrentQuarter}
-                  progress={progress}
-                  onAddGoal={(text) => addPeriodGoal(quarterKey, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`, text)}
-                  onRemoveGoal={(index) => removePeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`)}
-                  onEditGoal={(index, text) => editPeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`, text)}
-                  onCopyGoal={handleCopyGoal}
-                  periodGoals={periodGoals}
-                  searchQuery={searchQuery}
-                />
-              )
-            })()}
+            {(detailLevel === 'month' || detailLevel === 'quarter') && (
+              <QuarterSection
+                quarter={selectedQuarter}
+                year={selectedYear}
+                goals={periodGoals.get(`${selectedYear}-Q${selectedQuarter}`) || []}
+                isCurrent={selectedYear === currentYear && selectedQuarter === currentQuarter}
+                progress={calculatePeriodProgress(`${selectedYear}-Q${selectedQuarter}`)}
+                onAddGoal={(text) => addPeriodGoal(`${selectedYear}-Q${selectedQuarter}`, 'quarter', new Date(selectedYear, (selectedQuarter - 1) * 3, 1), `Q${selectedQuarter} ${selectedYear}`, text)}
+                onRemoveGoal={(index) => removePeriodGoal(`${selectedYear}-Q${selectedQuarter}`, index, 'quarter', new Date(selectedYear, (selectedQuarter - 1) * 3, 1), `Q${selectedQuarter} ${selectedYear}`)}
+                onEditGoal={(index, text) => editPeriodGoal(`${selectedYear}-Q${selectedQuarter}`, index, 'quarter', new Date(selectedYear, (selectedQuarter - 1) * 3, 1), `Q${selectedQuarter} ${selectedYear}`, text)}
+                onCopyGoal={handleCopyGoal}
+                periodGoals={periodGoals}
+                searchQuery={searchQuery}
+              />
+            )}
 
             {/* Месяцы — только для month detail level */}
             {detailLevel === 'month' && (
@@ -391,7 +384,6 @@ export default function GoalsPage() {
                         const parsed = parseWeekKey(targetKey)
                         addPeriodGoal(targetKey, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, goal)
                       }}
-                      showAllPeriods={true}
                       draggedGoal={draggedGoal}
                       setDraggedGoal={setDraggedGoal}
                       dragOverWeek={dragOverWeek}

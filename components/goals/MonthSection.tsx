@@ -22,7 +22,6 @@ interface MonthSectionProps {
   onCopyGoal: (goal: string, targetType: 'week', targetKey: string) => void
   
   // Week props
-  showAllPeriods: boolean
   draggedGoal: { weekKey: string; index: number; goal: string } | null
   setDraggedGoal: (goal: { weekKey: string; index: number; goal: string } | null) => void
   dragOverWeek: string | null
@@ -57,7 +56,6 @@ export default function MonthSection({
   periodGoals,
   trackedGoals,
   onCopyGoal,
-  showAllPeriods,
   draggedGoal,
   setDraggedGoal,
   dragOverWeek,
@@ -81,23 +79,6 @@ export default function MonthSection({
   const { copyDropdownIndex, dropdownRef, toggleDropdown, closeDropdown } = useCopyDropdown()
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null)
 
-  // Auto-expand current week
-  useEffect(() => {
-    if (isCurrent && !expandedWeek) {
-      const today = new Date()
-      const currentWeek = weeksInMonth.find(w => today >= w.start && today <= w.end)
-      if (currentWeek) setExpandedWeek(currentWeek.key)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCurrent])
-
-  const handleAdd = () => {
-    if (newGoal.trim()) {
-      onAddGoal(newGoal)
-      setNewGoal('')
-    }
-  }
-
   const weeksInMonth = useMemo(() => {
     const weeks: { num: number; key: string; start: Date; end: Date }[] = []
     const firstD = new Date(year, month, 1)
@@ -115,6 +96,22 @@ export default function MonthSection({
     }
     return weeks
   }, [year, month])
+
+  // Auto-expand current week
+  useEffect(() => {
+    if (isCurrent && !expandedWeek) {
+      const today = new Date()
+      const currentWeek = weeksInMonth.find(w => today >= w.start && today <= w.end)
+      if (currentWeek) setExpandedWeek(currentWeek.key)
+    }
+  }, [isCurrent, expandedWeek, weeksInMonth])
+
+  const handleAdd = () => {
+    if (newGoal.trim()) {
+      onAddGoal(newGoal)
+      setNewGoal('')
+    }
+  }
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
 

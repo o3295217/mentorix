@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-03-10 — refactor: goals page optimization — filters, progress, split MonthSection, hooks, weeks for all months
+- 🧩 Компоненты: 2 файлов (MonthSection, YearSection)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-03-10 — refactor: Goals page UX redesign — tab-навигация вместо аккордеонов
 - 🧩 Компоненты: 5 файлов (MonthSection, QuarterSection, WeekCard...)
 - 📄 Страницы: 1 файлов

@@ -520,7 +520,8 @@ Claude API оценивает день по следующим критерия�
 - Трекинг: completion, priority, deadline для целей недели
 - Горячие клавиши: Ctrl+F поиск, Esc отмена, Enter сохранить
 
-**Компоненты:** `TimelineNav`, `DreamSection`, `YearSection`, `QuarterSection`, `MonthSection` (с WeekStrip), `HalfYearSection`
+**Компоненты:** `TimelineNav`, `DreamSection`, `YearSection`, `QuarterSection`, `MonthSection`, `WeekStrip`, `WeekCard`, `HalfYearSection`
+**Хуки:** `useInlineEdit`, `useCopyDropdown` (дедупликация редактирования и копирования целей)
 
 ### 7.6. Прогноз
 
