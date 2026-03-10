@@ -142,354 +142,462 @@ Claude API оценивает день по следующим критерия�
 
 ## 4. СТРУКТУРА БАЗЫ ДАННЫХ
 
-### 4.1. Таблица: `dream_goal`
-```
-id: INTEGER PRIMARY KEY
-goal_text: TEXT (цель на 5 лет)
-created_at: DATETIME
-updated_at: DATETIME
-```
-**Примечание:** Одна запись - текущая мечта
+> **СУБД:** PostgreSQL, ORM: Prisma. Полная схема — `prisma/schema.prisma`.
 
-### 4.2. Таблица: `period_goals`
-```
-id: INTEGER PRIMARY KEY
-period_type: TEXT ('year', 'half_year', 'quarter', 'month', 'week')
-period_start: DATE
-period_end: DATE
-goals_json: TEXT (JSON массив строк)
-created_at: DATETIME
-updated_at: DATETIME
-```
+Система является **многопользовательской** — все таблицы содержат `userId` и связаны с моделью `User`.
 
-**Пример goals_json:**
-```json
-[
-  "Завершить систему оплаты труда РОП",
-  "Согласовать KPI на декабрь",
-  "Провести 3 встречи по проекту ЕНКО"
-]
-```
+### 4.1. Аутентификация и пользователи
 
-### 4.3. Таблица: `daily_entries`
-```
-id: INTEGER PRIMARY KEY
-date: DATE UNIQUE
-plan_text: TEXT (план на день)
-fact_text: TEXT (факт выполнения)
-created_at: DATETIME
-updated_at: DATETIME
-```
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `User` | `users` | Пользователь: email, passwordHash (bcrypt), role, themePreference (light/dark/system), onboardingCompleted |
+| `Session` | `sessions` | Сессия: token, expiresAt, userAgent, ipAddress |
+| `PasswordResetToken` | `password_reset_tokens` | Токен сброса пароля |
+| `EmailVerificationToken` | `email_verification_tokens` | Токен верификации email |
 
-### 4.4. Таблица: `evaluations`
-```
-id: INTEGER PRIMARY KEY
-daily_entry_id: INTEGER (FK)
-strategy_score: INTEGER (1-10)
-operations_score: INTEGER (1-10)
-team_score: INTEGER (1-10)
-efficiency_score: INTEGER (1-10)
-overall_score: REAL (1-10)
-feedback_text: TEXT (текст обратной связи)
-plan_vs_fact_text: TEXT (анализ план vs факт)
-alignment_day_week: TEXT
-alignment_week_month: TEXT
-alignment_month_quarter: TEXT
-alignment_quarter_half: TEXT
-alignment_half_year: TEXT
-alignment_year_dream: TEXT
-recommendations_text: TEXT
-created_at: DATETIME
-```
+### 4.2. Цели
 
-### 4.5. Таблица: `open_tasks`
-```
-id: INTEGER PRIMARY KEY
-task_text: TEXT
-task_type: TEXT ('strategic', 'operational')
-origin_date: DATE
-is_closed: BOOLEAN
-closed_at: DATETIME
-created_at: DATETIME
-```
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `DreamGoal` | `dream_goal` | Мечта: goalText, years (горизонт в годах, по умолч. 5) |
+| `YearGoal` | `year_goals` | Цели на год: year, goalsJson (JSON массив строк). Unique: userId+year |
+| `PeriodGoal` | `period_goals` | Цели периодов (quarter, month, week, half_year): periodType, periodStart, periodEnd, goalsJson |
+| `Goal` | `goals` | Трекинг отдельных целей: text, periodType, periodKey, completed, deadline, priority, tagsJson, sortOrder |
+| `GoalTag` | `goal_tags` | Теги целей: name, color. Unique: userId+name |
+
+### 4.3. Ежедневные записи и оценки
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `DailyEntry` | `daily_entries` | Запись дня: date (unique per user), planText, factText, planSnapshotJson, extraTasksJson, контекст дня (emotionalState, energyLevel, sleepQuality, familyTime, exerciseTime и др.), selectedTasksJson |
+| `Evaluation` | `evaluations` | Оценка от ИИ (1:1 с DailyEntry): **dreamProgressScore** (главная метрика), strategyScore, operationsScore, teamScore, efficiencyScore, overallScore, feedbackText, planVsFactText, 6 полей alignment (вертикальный), 3 флага баланса (health/family/energy), 3 поля горизонтального alignment (work↔health/family/values), recommendationsText, suggestedTasksJson |
+| `PeriodEvaluation` | `period_evaluations` | Оценка периода (неделя/месяц/квартал/год): dreamProgressScore, overallScore, блоки (professional/personal/social/balance), patterns, trends, goalsCompletion, alignment, feedbackText, recommendationsText, insights |
+
+### 4.4. Задачи
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `OpenTask` | `open_tasks` | Незакрытые задачи: taskText, taskType (strategic/operational), originDate, isClosed, closedAt |
+
+### 4.5. Профиль пользователя
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `UserProfile` | `user_profile` | Профиль: name, occupation, industry, maritalStatus, hobbies, sports, location, age, education, teamSize, values, challenges и др. |
+| `ProfileBlock` | `profile_blocks` | Блоки профиля (динамическая структура): title, order |
+| `ProfileCategory` | `profile_categories` | Категории внутри блоков: title, order |
+| `ProfileItem` | `profile_items` | Элементы профиля: fieldName, fieldValue, content, order |
+
+### 4.6. Привычки
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `Habit` | `habits` | Привычки: taskText, frequency (daily/weekly/custom), daysOfWeek, isActive, streak, bestStreak, totalDone, sortOrder |
+
+### 4.7. Аналитика и ИИ-инсайты
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `UserInsights` | `user_insights` | ИИ-инсайты: patterns, strengths, challenges, preferences, recommendations, motivators, weeklySummary, evaluationCount |
+| `UserStats` | `user_stats` | Статистика: totalDays, avgDailyScore, completionByDayJson, trendDirection, bestDayOfWeek, currentStreak, bestStreak, optimalTaskCount и др. |
+| `WorldContext` | `world_context` | Контекст дня: marketEvents, personalEvents, constraints, notes |
+
+### 4.8. Чат
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `ChatMessage` | `chat_messages` | Сообщения чата с ИИ: date, role (user/assistant), content |
 
 ---
 
 ## 5. API ENDPOINTS
 
-### 5.1. Goals API
+> Все API требуют аутентификации (cookie `session_token`), кроме `/api/auth/*` и `/api/health`.
 
-**GET /api/goals/dream**
-- Получить текущую мечту
+### 5.1. Аутентификация (`/api/auth/`)
 
-**POST /api/goals/dream**
-- Создать/обновить мечту
-- Body: `{ goal_text: string }`
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/api/auth/register` | Регистрация нового пользователя |
+| POST | `/api/auth/login` | Вход: email + password → session cookie |
+| POST | `/api/auth/logout` | Выход: удаление сессии |
+| GET/PUT | `/api/auth/me` | GET: текущий пользователь; PUT: обновление профиля |
+| GET/POST | `/api/auth/onboarding` | Онбординг нового пользователя |
+| POST | `/api/auth/forgot-password` | Запрос сброса пароля (email) |
+| GET/POST | `/api/auth/reset-password` | Сброс пароля по токену |
+| GET/POST | `/api/auth/verify-email` | Подтверждение email |
+| POST | `/api/auth/resend-verification` | Повтор письма верификации |
 
-**GET /api/goals/period?type=week&date=2025-11-10**
-- Получить цели для периода
-- Параметры: type (week/month/quarter/half_year/year), date
+### 5.2. Цели (`/api/goals/`)
 
-**POST /api/goals/period**
-- Создать/обновить цели для периода
-- Body: `{ period_type: string, period_start: date, period_end: date, goals: string[] }`
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET/POST | `/api/goals/dream` | Мечта пользователя (goalText, years) |
+| GET/POST | `/api/goals/year` | Цели на год (goalsJson) |
+| GET/POST | `/api/goals/period` | Цели периодов (quarter/month/week/half_year) |
+| GET/POST/PUT/DELETE | `/api/goals/items` | CRUD трекинга целей (completed, priority, tags) |
+| POST | `/api/goals/move` | Перемещение целей между периодами |
+| GET/POST/DELETE | `/api/goals/tags` | Теги для целей (name, color) |
 
-### 5.2. Daily Entries API
+### 5.3. Ежедневные записи (`/api/daily/`)
 
-**GET /api/daily/:date**
-- Получить запись за конкретный день
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET/POST | `/api/daily` | GET: запись за дату; POST: сохранение плана/факта |
+| GET | `/api/daily/indicators` | Индикаторы для DatePicker (оценки по дням) |
+| POST | `/api/daily/check-plan` | ИИ-проверка плана дня перед стартом |
+| POST | `/api/daily/chat` | Чат с ИИ о плане на день |
+| GET/POST/DELETE | `/api/daily/chat/messages` | CRUD сообщений чата |
 
-**POST /api/daily**
-- Создать/обновить план или факт
-- Body: `{ date: date, plan_text?: string, fact_text?: string }`
+### 5.4. Оценки ИИ (`/api/evaluate/`)
 
-**GET /api/daily/list?from=2025-10-01&to=2025-11-10**
-- Получить список дней за период
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/api/evaluate` | Оценка дня через Claude API |
+| GET/POST | `/api/evaluate/batch` | Массовая оценка пропущенных дней |
+| POST | `/api/evaluate-period` | Оценка периода (неделя/месяц/квартал/год) |
 
-### 5.3. Evaluation API
+### 5.5. Прогнозы (`/api/forecast/`)
 
-**POST /api/evaluate**
-- Отправить запрос к Claude API для оценки дня
-- Body: `{ daily_entry_id: number }`
-- Система собирает все данные (мечта, периоды, план, факт)
-- Отправляет промпт в Claude API
-- Сохраняет результат в таблицу evaluations
-- Возвращает оценку клиенту
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/api/forecast` | ИИ-прогноз достижения целей (на базе исторических данных) |
 
-**GET /api/evaluate/:daily_entry_id**
-- Получить сохраненную оценку
+### 5.6. Задачи (`/api/tasks/`)
 
-### 5.4. Open Tasks API
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET/POST | `/api/tasks/open` | Список незакрытых задач; POST: добавление |
+| GET | `/api/tasks/closed` | Список закрытых задач |
+| POST | `/api/tasks/[id]/close` | Закрыть задачу |
+| POST | `/api/tasks/[id]/reopen` | Переоткрыть задачу |
+| DELETE | `/api/tasks/[id]/delete` | Удалить задачу |
+| POST | `/api/tasks/add-suggested` | Добавить задачу, предложенную ИИ |
+| POST | `/api/tasks/process-uncompleted` | Обработка невыполненных задач дня |
 
-**GET /api/tasks/open**
-- Получить список незакрытых задач
+### 5.7. Привычки (`/api/habits/`)
 
-**POST /api/tasks/close/:id**
-- Пометить задачу как закрытую
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET/POST/PUT/DELETE | `/api/habits` | CRUD привычек (frequency, streak, bestStreak) |
+| GET | `/api/habits/suggestions` | ИИ-рекомендации по привычкам |
 
-### 5.5. Analytics API
+### 5.8. Профиль (`/api/profile/`)
 
-**GET /api/analytics/trend?days=30**
-- Получить данные для графика (последние N дней)
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET/POST | `/api/profile` | Основной профиль (occupation, industry, values и пр.) |
+| GET/POST/DELETE/PATCH | `/api/profile/blocks` | Динамические блоки профиля |
+| GET/POST/DELETE/PATCH | `/api/profile/categories` | Категории внутри блоков |
+| POST/DELETE/PATCH | `/api/profile/items` | Элементы профиля |
+| GET/PUT | `/api/profile/insights` | ИИ-инсайты о пользователе |
+| GET/POST | `/api/profile/theme` | Тема оформления (light/dark/system) |
 
-**GET /api/analytics/week-report?week_start=2025-11-04**
-- Получить отчет за неделю
+### 5.9. Аналитика (`/api/analytics/`)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/analytics/trend` | Тренды оценок (по дням, 30/60/90 дней) |
+| GET | `/api/analytics/ai-usage` | Статистика использования ИИ |
+
+### 5.10. Периоды (`/api/periods/`)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/periods` | Список периодических оценок |
+| GET | `/api/periods/[id]` | Детали периодической оценки |
+
+### 5.11. Прогресс и чат
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/progress` | Прогресс движения к мечте (спидометр) |
+| GET/POST/DELETE | `/api/chat` | Общий чат с ИИ |
+
+### 5.12. Служебные
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/health` | Health check (без авторизации) |
 
 ---
 
-## 6. ПРОМПТ ДЛЯ CLAUDE API
+## 6. СИСТЕМА ПРОМПТОВ ДЛЯ CLAUDE API
 
-### 6.1. Структура промпта
+> **Модель:** claude-sonnet-4.5 (через Anthropic SDK, с опциональным Cloudflare Worker прокси).
+> **Промпты хранятся в:** `lib/prompts/` (daily.ts, period.ts, forecast.ts, check-plan.ts, plan-chat.ts, core.ts, types.ts).
 
+### 6.1. Дневная оценка (`lib/prompts/daily.ts`)
+
+**Архитектура:** System prompt (статический, кэшируется) + User prompt (динамический, данные пользователя).
+
+**System prompt** — роль строгого ИИ-коуча с единственной целью: привести пользователя к его мечте.
+
+**Критерии оценки (6 метрик):**
+
+1. **dream_progress_score** (1-10) — **ГЛАВНАЯ МЕТРИКА**: приблизил ли день к мечте
+2. **strategy_score** (1-10) — стратегическое развитие
+3. **operations_score** (1-10) — операционное управление
+4. **team_score** (1-10) — работа с командой
+5. **efficiency_score** (1-10) — эффективность времени
+6. **overall_score** — среднее арифметическое 4 классических показателей
+
+**Вертикальный alignment (6 уровней):**
 ```
-Ты строгий ИИ-ассистент для управления эффективностью руководителя компании.
+День → Неделя → Месяц → Квартал → Полугодие → Год → Мечта
+```
+Для каждой связи: `работает / частично / нет` + объяснение.
+Гибкий подход: если промежуточные цели не заполнены — фокус на прямую связь День → Мечта.
 
-ИЕРАРХИЯ ЦЕЛЕЙ:
+**Флаги баланса (обязательно):**
+- Здоровье: `ok / warning / critical`
+- Семья: `ok / warning / critical`
+- Энергия: `ok / warning / critical`
 
-🎯 МЕЧТА (5 лет):
-{dream_goal_text}
+**Горизонтальный alignment (опционально, при проблемах):**
+- Работа ↔ Здоровье: `баланс / частично / конфликт / критично`
+- Работа ↔ Семья
+- Работа ↔ Ценности
 
-📅 ЦЕЛИ НА ТЕКУЩИЙ ГОД ({current_year}):
-{year_goals}
+**Дополнительно:**
+- Анализ план vs факт (процент выполнения, невыполненные задачи)
+- Жёсткая конструктивная обратная связь (2-3 абзаца)
+- 1-2 конкретные рекомендации на завтра
+- Предложенные задачи (`suggested_tasks`) — до 3 важных невыполненных задач для трекинга
 
-📆 ЦЕЛИ НА ТЕКУЩЕЕ ПОЛУГОДИЕ ({current_half}):
-{half_year_goals}
-
-📊 ЦЕЛИ НА ТЕКУЩИЙ КВАРТАЛ ({current_quarter}):
-{quarter_goals}
-
-📋 ЦЕЛИ НА ТЕКУЩИЙ МЕСЯЦ ({current_month}):
-{month_goals}
-
-📌 ЦЕЛИ НА ТЕКУЩУЮ НЕДЕЛЮ ({week_dates}):
-{week_goals}
-
----
-
-📝 ПЛАН НА СЕГОДНЯ ({date}):
-{plan_text}
-
-✅ ФАКТ ВЫПОЛНЕНИЯ:
-{fact_text}
-
-❌ НЕЗАКРЫТЫЕ ЗАДАЧИ ИЗ ПРОШЛОГО:
-{open_tasks}
-
----
-
-ТВОЯ ЗАДАЧА:
-
-1. Оцени день по 4 критериям (1-10):
-   - Стратегическое развитие
-   - Операционное управление
-   - Работа с командой
-   - Эффективность времени
-
-2. Рассчитай общую оценку (среднее)
-
-3. Проанализируй план vs факт:
-   - Какие задачи выполнены
-   - Какие не выполнены
-   - Почему
-
-4. ГЛАВНОЕ - проверь alignment (выравнивание):
-   - Работают ли задачи сегодня на недельные цели?
-   - Работают ли недельные на месячные?
-   - Работают ли месячные на квартальные?
-   - Работают ли квартальные на полугодовые?
-   - Работают ли полугодовые на годовые?
-   - Работают ли годовые на мечту?
-
-5. Дай жесткую конструктивную критику (без сахара)
-
-6. Дай конкретные рекомендации на завтра
-
-ФОРМАТ ОТВЕТА - СТРОГО JSON:
+**Формат ответа — строго JSON:**
+```json
 {
-  "strategy_score": число 1-10,
-  "operations_score": число 1-10,
-  "team_score": число 1-10,
-  "efficiency_score": число 1-10,
-  "overall_score": число 1-10 (среднее с точностью до 0.5),
-  "plan_vs_fact": "текст анализа",
-  "feedback": "жесткая обратная связь",
+  "dream_progress_score": 7,
+  "strategy_score": 6,
+  "operations_score": 8,
+  "team_score": 5,
+  "efficiency_score": 7,
+  "overall_score": 6.5,
+  "plan_vs_fact": "анализ выполнения",
   "alignment": {
-    "day_to_week": "анализ + статус (works/partial/no)",
-    "week_to_month": "анализ + статус",
-    "month_to_quarter": "анализ + статус",
-    "quarter_to_half": "анализ + статус",
-    "half_to_year": "анализ + статус",
-    "year_to_dream": "анализ + статус"
+    "day_to_week": "работает — ...",
+    "week_to_month": "частично — ...",
+    "month_to_quarter": "работает — ...",
+    "quarter_to_half": "частично — ...",
+    "half_to_year": "работает — ...",
+    "year_to_dream": "работает — ..."
   },
-  "recommendations": "конкретные рекомендации"
+  "balance_flags": { "health": "ok", "family": "warning", "energy": "ok" },
+  "horizontal_alignment": { "work_health": "баланс", "work_family": "частично", "work_values": "баланс" },
+  "feedback": "обратная связь...",
+  "recommendations": "рекомендации...",
+  "suggested_tasks": [
+    { "taskText": "...", "taskType": "strategic", "priority": "high", "reason": "..." }
+  ]
 }
 ```
 
-### 6.2. Обработка ответа
+### 6.2. Периодическая оценка (`lib/prompts/period.ts`)
 
-- Парсить JSON ответ от Claude
-- Сохранить все поля в таблицу evaluations
-- Обработать ошибки (если JSON невалидный)
+Анализ периода (неделя/месяц/квартал/год) на основе дневных оценок.
+
+**Блоки оценки:**
+- Профессиональный (strategy/operations/team усреднённо)
+- Личный (health/family/energy по 10-балльной шкале)
+- Социальный (teamwork)
+- Баланс (work-life balance, риск выгорания)
+
+**Дополнительно:** паттерны поведения, тренды, выполнение целей, alignment, блокеры, инсайты (для длительных периодов).
+
+### 6.3. Прогноз (`lib/prompts/forecast.ts`)
+
+ИИ-прогноз достижения целей на основе:
+- Базовый период (анализ прошлого: план/факт, completion rate, стратегические задачи)
+- Горизонт прогноза (неделя/месяц/квартал/год/мечта)
+
+**Выдаёт:** вероятность выполнения каждой цели, прогноз мечты (estimatedYears, onTrack, gap), сценарии «что если», поведенческие паттерны.
+
+### 6.4. Проверка плана (`lib/prompts/check-plan.ts`)
+
+ИИ анализирует план дня ДО начала работы: соответствие целям, реалистичность, предложения по улучшению.
+
+### 6.5. Чат о плане (`lib/prompts/plan-chat.ts`)
+
+Интерактивный чат с ИИ для обсуждения и доработки плана на день.
+
+### 6.6. Обработка ответа
+
+- Извлечение JSON из ответа Claude (`extractJsonFromAIResponse`)
+- Валидация и нормализация оценок (`isValidScore`, `clampScore`)
+- Санитизация пользовательского ввода (`sanitizeUserInput`)
+- Обработка ошибок при невалидном JSON
 
 ---
 
 ## 7. ПОЛЬЗОВАТЕЛЬСКИЙ ИНТЕРФЕЙС
 
-### 7.1. Главная страница (Dashboard)
+### 7.1. Главная страница (Landing / Dashboard)
+
+**URL:** `/`
+
+**Для неавторизованных:** Landing-страница с описанием и кнопками входа/регистрации.
+
+**Для авторизованных** (после входа перенаправление на `/daily`):
+- Навигация (боковая панель): Daily, Goals, Forecast, Tasks, History, Analytics, Progress, Profile, Periods
+- Переключатель темы (Light/Dark/System)
+
+### 7.2. Аутентификация
+
+| URL | Описание |
+|-----|----------|
+| `/login` | Вход: email + пароль |
+| `/register` | Регистрация: email, имя, пароль |
+| `/forgot-password` | Запрос сброса пароля |
+| `/reset-password` | Сброс пароля по токену из email |
+| `/verify-email` | Подтверждение email |
+| `/onboarding` | Онбординг: заполнение профиля и мечты |
+
+### 7.3. Ежедневное планирование
+
+**URL:** `/daily`
 
 **Компоненты:**
-- Header с навигацией
-- Карточка "Сегодняшний день" с кнопками:
-  - "Создать план на день"
-  - "Добавить факт"
-- График оценок (последние 30 дней)
-- Виджет "Иерархия целей" (collapse/expand):
-  - Мечта (с кнопкой редактирования)
-  - Год (с кнопкой редактирования)
-  - Полугодие
-  - Квартал
-  - Месяц
-  - Неделя
-
-### 7.2. Страница планирования периодов
-
-**URL:** `/goals`
-
-**Вкладки:**
-- Мечта (5 лет)
-- Год
-- Полугодие
-- Квартал
-- Месяц
-- Неделя
-
-**Каждая вкладка содержит:**
-- Даты периода (авто-определение)
-- Текстовое поле для ввода целей (multiline textarea)
-- Кнопка "Сохранить"
-- Список текущих целей периода (с возможностью редактирования/удаления)
-
-### 7.3. Страница ежедневного планирования
-
-**URL:** `/daily/:date`
-
-**Компоненты:**
-- Выбор даты (датапикер)
-- Раздел "План на день":
-  - Textarea для ввода плана
-  - Кнопка "Сохранить план"
-- Раздел "Контекст из периодов":
-  - Показ целей на неделю
-  - Показ целей на месяц
-  - (для удобства планирования)
-- Раздел "Факт выполнения":
-  - Textarea для ввода факта
-  - Кнопка "Получить оценку"
+- **DatePicker** с цветными индикаторами оценок (зелёный >7, жёлтый 5-7, красный <5)
+- **Секция «План на день»:**
+  - Textarea для свободного ввода
+  - Контекст дня: эмоциональное/физическое состояние, уровень энергии, качество сна, время с семьёй, физические упражнения
+  - Выбор задач из целей недели, привычек и незакрытых задач (чекбоксами)
+  - ИИ-проверка плана (кнопка «Проверить план»)
+  - Чат с ИИ для доработки плана
+- **Секция «Факт выполнения»:**
+  - Textarea
+  - Разбор выполненных/невыполненных задач (на основе плана)
+  - Кнопка «Получить оценку» → запрос к Claude API
 
 ### 7.4. Страница оценки дня
 
-**URL:** `/evaluation/:date`
+**URL:** `/evaluation/[date]`
 
 **Компоненты:**
-- План на день
-- Факт выполнения
-- Карточки с оценками (strategy, operations, team, efficiency)
-- Общая оценка (большая, цветная: зеленый >7, желтый 5-7, красный <5)
-- Анализ план vs факт
-- Обратная связь от ИИ
-- Визуализация alignment:
+- План и факт дня
+- **6 карточек с оценками:** dream_progress, strategy, operations, team, efficiency, overall
+- Цветовая индикация: зелёный >7, жёлтый 5-7, красный <5
+- **Флаги баланса:** здоровье / семья / энергия (с иконками и цветами)
+- **Визуализация alignment:**
   ```
   День → [✅] Неделя → [⚠️] Месяц → [✅] Квартал → [✅] Полугодие → [❌] Год → [✅] Мечта
   ```
-  Клик на каждую связь показывает детальный текст
-- Рекомендации
+- **Горизонтальный alignment** (работа ↔ здоровье/семья/ценности)
+- Обратная связь от ИИ
+- Рекомендации на завтра
+- Предложенные задачи (с кнопкой добавления в трекер)
+- Модальное окно незакрытых задач (при наличии невыполненных из плана)
 
-### 7.5. Страница истории
+### 7.5. Управление целями
 
-**URL:** `/history`
+**URL:** `/goals`
+
+**Навигация (tab-based):**
+- **TimelineNav** — горизонтальные чипы годов + табы кварталов/полугодий
+  - Года отображаются как чипы, выбранный год подсвечен
+  - Для текущего и ближнего года — табы Q1-Q4
+  - Для дальних лет (+2-3) — табы H1-H2
+  - Для совсем дальних (4+) — только год без табов
+  - Уровень детализации определяется автоматически через `getDetailLevel()`
+
+**Иерархия (плоская, без аккордеонов):**
+- **Мечта** — компактный блок (line-clamp-2 с кнопкой "Показать полностью"), прогресс-бар
+- **Год** — цели выбранного года (плоский список, inline-edit, copy-to-period)
+- **Квартал** — цели выбранного квартала с прогресс-баром
+- **Месяцы** — 3 месяца квартала, каждый с компактной WeekStrip (бейджи W1-W5 с мини-прогрессом)
+  - Клик по бейджу недели — раскрытие детальной карточки (одна неделя за раз)
+  - Текущая неделя авто-раскрывается
+- **Полугодие** — для дальних лет (упрощённый вид)
+
+**Функции:**
+- Добавление/редактирование/удаление целей на всех уровнях
+- Копирование целей вниз по иерархии (квартал → месяц, месяц → неделя)
+- Drag-and-drop перемещение задач между неделями (как на strip, так и в карточке)
+- Теги (создание, цвет, привязка к целям)
+- Фильтры (скрыты за кнопкой): поиск, статус, приоритет, тег
+- Прогресс-бары для кварталов и месяцев
+- Трекинг: completion, priority, deadline для целей недели
+- Горячие клавиши: Ctrl+F поиск, Esc отмена, Enter сохранить
+
+**Компоненты:** `TimelineNav`, `DreamSection`, `YearSection`, `QuarterSection`, `MonthSection` (с WeekStrip), `HalfYearSection`
+
+### 7.6. Прогноз
+
+**URL:** `/forecast`
 
 **Компоненты:**
-- Календарный вид (как calendar heatmap)
-- Каждый день отмечен цветом в зависимости от оценки
-- Клик на день → переход на `/evaluation/:date`
-- Фильтры по датам
+- Выбор базового периода для анализа и горизонта прогноза
+- ИИ-прогноз: вероятность выполнения каждой цели, риски, угрозы
+- Прогноз мечты: estimatedYears, onTrack, gap с требуемым прогрессом
+- Сценарии «что если»
+- Выявленные паттерны поведения
 
-### 7.6. Страница аналитики
-
-**URL:** `/analytics`
-
-**Компоненты:**
-- График оценок за период (линейный)
-- Выбор периода (30/60/90 дней)
-- Средняя оценка за период
-- Тренд (↗️ растет / ↘️ падает)
-- Топ-3 лучших дня
-- Топ-3 худших дня
-
-### 7.7. Страница незакрытых задач
+### 7.7. Задачи
 
 **URL:** `/tasks`
 
 **Компоненты:**
-- Список задач с группировкой:
-  - Стратегические
-  - Операционные
-- Каждая задача показывает:
-  - Текст задачи
-  - Дата возникновения
-  - Кнопка "Отметить закрытой"
+- Два таба: Открытые / Закрытые
+- Группировка: стратегические / операционные
+- Каждая задача: текст, дата возникновения, приоритет
+- Кнопки: закрыть, переоткрыть, удалить
+- Автоматическое добавление невыполненных задач из оценки ИИ
 
-### 7.8. Страница недельного отчета
+### 7.8. История
 
-**URL:** `/reports/week?start=2025-11-04`
+**URL:** `/history`
 
 **Компоненты:**
-- Выбор недели
-- Цели недели (какие были поставлены)
-- Что выполнено за неделю (агрегация из дней)
-- Средняя оценка недели
-- График оценок по дням недели
-- Выводы ИИ (опционально: дополнительный запрос к API)
+- Календарная тепловая карта (calendar heatmap) с цветами по оценкам
+- Клик на день → переход на `/evaluation/[date]`
+
+### 7.9. Аналитика
+
+**URL:** `/analytics`
+
+**Компоненты:**
+- Графики оценок (Recharts): dream_progress, overall, strategy, operations, team, efficiency
+- Выбор периода (30/60/90 дней)
+- Средняя оценка, тренд (растёт/падает)
+- Статистика использования ИИ
+
+### 7.10. Прогресс к мечте
+
+**URL:** `/progress`
+
+**Компоненты:**
+- **Спидометр (Speedometer)** — визуализация общего прогресса к мечте
+- **DreamProgress** — компонент отображения пути к мечте
+- Трекинг стриков (текущий, лучший)
+- Статистика: всего дней, среднее выполнение, оптимальное количество задач
+
+### 7.11. Периодические оценки
+
+**URL:** `/periods`, `/periods/[id]`
+
+**Компоненты:**
+- Список периодов с оценками (неделя/месяц/квартал/год)
+- Детальная страница: блоки оценки (профессиональный, личный, социальный, баланс)
+- Паттерны, тренды, выполнение целей, блокеры
+- Кнопка «Получить оценку периода»
+
+### 7.12. Профиль
+
+**URL:** `/profile`
+
+**Компоненты:**
+- Основная информация (имя, профессия, отрасль, образование и пр.)
+- Динамические блоки и категории (пользователь настраивает структуру)
+- ИИ-инсайты: паттерны, сильные стороны, вызовы, рекомендации
+- Привычки: CRUD, частота, стрики (текущий и лучший)
+- Настройка темы
+
+### 7.13. Навигация
+
+**Основные пункты:** Daily, Goals, Forecast, Tasks, History, Analytics, Progress, Periods, Profile  
+**Адаптивный дизайн:** боковая панель (desktop), нижняя навигация (mobile)  
+**Компонент:** `Navigation.tsx` + `LayoutFooter.tsx`
 
 ---
 
@@ -501,9 +609,14 @@ created_at: DATETIME
 - БД запросы: < 100мс
 
 ### 8.2. Безопасность
-- API ключ Anthropic хранится в `.env.local`
-- НЕ коммитить API ключ в git
-- Все данные локальные (не передаются на внешние серверы кроме Anthropic API)
+- **Многопользовательская авторизация:** email + bcrypt-хеш пароля, cookie-сессии
+- **Верификация email** и **сброс пароля** через токены
+- API ключ Anthropic хранится в `.env.local` / `.env.production`
+- `AUTH_SECRET` — ключ для HMAC подписи сессий
+- НЕ коммитить секреты в git
+- Rate limiting на API endpoints
+- Санитизация пользовательского ввода перед отправкой в Claude
+- Опциональный Cloudflare Worker прокси для обхода гео-блокировки Anthropic API
 
 ### 8.3. Надежность
 - Обработка ошибок API (если Claude не отвечает)
@@ -634,19 +747,46 @@ created_at: DATETIME
 ```
 DATABASE_URL="postgresql://ai_assistant:ai_assistant_dev@localhost:5432/ai_assistant"
 ANTHROPIC_API_KEY="sk-ant-..."
+AUTH_SECRET="<random-hex-32>"
+
+# Опционально: Cloudflare Worker прокси для обхода гео-блокировки Anthropic
+ANTHROPIC_PROXY_URL="https://..."
+ANTHROPIC_PROXY_SECRET="..."
+
+# Email (для сброса пароля и верификации)
+SMTP_HOST="..."
+SMTP_PORT=587
+SMTP_USER="..."
+SMTP_PASS="..."
+EMAIL_FROM="noreply@..."
+BASE_URL="http://localhost:3003"
+
+# Режим регистрации (open / closed / invite)
+REGISTRATION_MODE=open
 ```
+
+### Локальная разработка
+- **Порт:** 3003 (настроено в `scripts/start-local.sh` и `Start AI Assistant.command`)
+- **БД:** PostgreSQL через Docker Compose
+- **Запуск:** `npm run dev` или `./Start AI\ Assistant.command`
+
+### Production
+- **Порт внутренний:** 3000 (Docker-контейнер)
+- **Nginx** проксирует 80/443 → localhost:3000
+- Подробности: `docs/DEPLOY.md`, `docs/INFRASTRUCTURE.md`
 
 ### package.json dependencies (основные)
 ```
-next
-react
-typescript
-prisma
-@prisma/client
+next 16.x
+react 19.x
+typescript 5.x
+prisma / @prisma/client 5.x
 @anthropic-ai/sdk
 tailwindcss
 recharts
 date-fns
+bcryptjs
+nodemailer
 ```
 
 ---

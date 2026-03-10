@@ -71,11 +71,12 @@ ai-assistant-spec/
 │   └── page.tsx              # Dashboard / Landing
 ├── components/               # React компоненты
 │   ├── goals/                # Компоненты целей
-│   │   ├── DreamSection.tsx
-│   │   ├── YearSection.tsx
+│   │   ├── TimelineNav.tsx    # Навигация: чипы годов + табы кварталов/полугодий
+│   │   ├── DreamSection.tsx   # Мечта: line-clamp, прогресс-бар
+│   │   ├── YearSection.tsx    # Цели года (плоский, без аккордеона)
 │   │   ├── HalfYearSection.tsx
-│   │   ├── QuarterSection.tsx
-│   │   └── MonthSection.tsx
+│   │   ├── QuarterSection.tsx # Цели квартала (плоский, без аккордеона)
+│   │   └── MonthSection.tsx   # Месяц + WeekStrip (компактные бейджи недель)
 │   ├── DatePickerWithIndicators.tsx
 │   ├── Speedometer.tsx       # Прогресс к мечте
 │   ├── BalanceFlags.tsx      # Флаги баланса
@@ -822,7 +823,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (14 основных + 5 для целей)
+### Список компонентов (14 основных + 6 для целей)
 
 **Основные:**
 - `AuthGuard`
@@ -845,6 +846,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `goals/HalfYearSection`
 - `goals/MonthSection`
 - `goals/QuarterSection`
+- `goals/TimelineNav`
 - `goals/YearSection`
 
 ### Иерархия компонентов целей

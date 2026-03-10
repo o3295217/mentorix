@@ -72,8 +72,8 @@ rsync -avz --delete \
 # На сервере
 cd ~/ai-assistant
 
-# Копируем пример конфигурации
-cp .env.production.example .env.production
+# Создаём файл конфигурации
+touch .env.production
 
 # Генерируем секретный ключ
 AUTH_SECRET=$(openssl rand -hex 32)

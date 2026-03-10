@@ -6,6 +6,21 @@
 
 ## [Unreleased]
 
+### 2026-03-10 — fix: восстановлен MonthSection.tsx и прочие изменения
+- 🧩 Компоненты: 5 файлов (DreamSection, MonthSection, QuarterSection...)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 6 файлов
+
+
+### 2026-03-10 — refactor: Goals page UX redesign (tab-навигация вместо аккордеонов)
+- 🆕 `TimelineNav.tsx` — горизонтальные чипы годов + табы кварталов/полугодий
+- ♻️ `DreamSection.tsx` — line-clamp-2, прогресс-бар
+- ♻️ `YearSection.tsx` — упрощён (плоский, без accordion)
+- ♻️ `QuarterSection.tsx` — упрощён (плоский, без accordion)
+- ♻️ `MonthSection.tsx` — WeekStrip (компактные бейджи недель) вместо сетки карточек
+- ♻️ `app/goals/page.tsx` — полная пересборка (tab-навигация, плоская структура)
+- 📝 docs: обновлены SPECIFICATION.md, ARCHITECTURE.md, ROADMAP.md
+
 ### 2026-03-10 — docs: обновление документации — Landing, LayoutFooter, онбординг, layout-структура
 - 🧩 Компоненты: 16 файлов (AuthGuard, BalanceFlags, DatePickerWithIndicators...)
 - 📄 Страницы: 17 файлов

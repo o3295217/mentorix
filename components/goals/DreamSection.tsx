@@ -11,10 +11,12 @@ interface DreamGoal {
 interface DreamSectionProps {
   dreamGoal: DreamGoal | null
   onSave: (text: string, years: number) => Promise<void>
+  progress?: { total: number; completed: number; percent: number }
 }
 
-export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
+export default function DreamSection({ dreamGoal, onSave, progress }: DreamSectionProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [text, setText] = useState('')
   const [years, setYears] = useState(5)
   const [saving, setSaving] = useState(false)
@@ -135,9 +137,35 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
           </div>
         </div>
       ) : (
-        <p className="text-gray-200 leading-relaxed italic">
-          &ldquo;{dreamGoal?.goalText}&rdquo;
-        </p>
+        <div>
+          <p
+            className={`text-gray-200 leading-relaxed italic cursor-pointer ${!isExpanded ? 'line-clamp-2' : ''}`}
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            &ldquo;{dreamGoal?.goalText}&rdquo;
+          </p>
+          {dreamGoal && dreamGoal.goalText.length > 120 && !isExpanded && (
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+            >
+              Показать полностью
+            </button>
+          )}
+          {progress && progress.total > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                  style={{ width: `${progress.percent}%` }}
+                />
+              </div>
+              <span className="text-xs text-gray-500 tabular-nums">
+                {progress.completed}/{progress.total}
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

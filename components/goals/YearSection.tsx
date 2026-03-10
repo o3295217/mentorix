@@ -8,28 +8,22 @@ interface YearSectionProps {
   year: number
   currentYear: number
   goals: string[]
-  isExpanded: boolean
-  onToggle: () => void
   onAddGoal: (text: string) => void
   onRemoveGoal: (index: number) => void
   onEditGoal: (index: number, text: string) => void
   periodGoals: Map<string, string[]>
   onCopyGoal: (goal: string, targetType: 'quarter' | 'month' | 'week', targetKey: string) => void
-  children?: React.ReactNode
 }
 
 export default function YearSection({
   year,
   currentYear,
   goals,
-  isExpanded,
-  onToggle,
   onAddGoal,
   onRemoveGoal,
   onEditGoal,
   periodGoals,
   onCopyGoal,
-  children
 }: YearSectionProps) {
   const [newGoal, setNewGoal] = useState('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
@@ -47,9 +41,6 @@ export default function YearSection({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const distance = year - currentYear
-  const isCurrent = distance === 0
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -105,241 +96,179 @@ export default function YearSection({
     })
   }, [goals, periodGoals, year, currentYear])
 
-  const scrollToElement = (elementId: string) => {
-    const element = document.getElementById(elementId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      element.classList.add('ring-2', 'ring-blue-500/50')
-      setTimeout(() => {
-        element.classList.remove('ring-2', 'ring-blue-500/50')
-      }, 2000)
-    }
-  }
-
   return (
-    <div className="group">
-      {/* Заголовок года — чистый аккордеон */}
-      <button
-        onClick={onToggle}
-        className={`w-full flex items-center gap-3 py-3 px-1 border-b transition-colors ${
-          isCurrent ? 'border-blue-500/30' : 'border-gray-800'
-        } hover:bg-gray-900/40 rounded-t-lg`}
-      >
-        <span className="text-gray-500 text-sm w-4 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-          ▸
-        </span>
-        <span className="font-bold text-lg">
-          {year}
-        </span>
-        {isCurrent && (
-          <span className="text-xs text-blue-400 font-normal">(текущий)</span>
-        )}
-        <span className="text-sm text-gray-500">
-          {goals.length > 0
-            ? `${goals.length} ${goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'}`
-            : 'Добавьте цели \u2192'}
-        </span>
-        <span className="ml-auto text-xs text-gray-600 font-medium">
-          {distance === 0 ? 'Сейчас' : `+${distance} ${distance === 1 ? 'год' : distance < 5 ? 'года' : 'лет'}`}
-        </span>
-      </button>
+    <div className="space-y-3">
+      {/* Заголовок */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-400">
+          Цели на {year} год
+          {goals.length > 0 && (
+            <span className="ml-2 text-gray-600">({goals.length})</span>
+          )}
+        </h3>
+      </div>
 
-      {/* Содержимое года */}
-      {isExpanded && (
-        <div className="pl-5 pb-6 space-y-4 border-l border-gray-800 ml-2 mt-2">
-          {/* Заголовок целей */}
-          <h4 className="text-sm font-medium text-gray-400">
-            Цели на {year} год:
-          </h4>
+      {/* Добавление */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newGoal}
+          onChange={(e) => setNewGoal(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+          placeholder="Цель на год..."
+          className="input text-sm"
+        />
+        <button onClick={handleAdd} className="btn-primary text-sm whitespace-nowrap px-3">
+          +
+        </button>
+      </div>
 
-          {/* Добавление */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newGoal}
-              onChange={(e) => setNewGoal(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              placeholder="Введите цель и нажмите Enter..."
-              className="input text-sm"
-            />
-            <button onClick={handleAdd} className="btn-primary text-sm whitespace-nowrap">
-              + Добавить
-            </button>
-          </div>
-
-          {/* Список целей */}
-          <div className="space-y-1.5">
-            {goals.length === 0 ? (
-              <p className="text-gray-600 text-sm py-4 text-center">Добавьте цели на {year} год...</p>
-            ) : (
-              goalsWithCopiedTo.map(({ goal, copiedTo }, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2.5 py-2 px-3 rounded-lg hover:bg-gray-900/50 transition-colors group/item"
-                >
-                  <span className="w-5 h-5 rounded bg-gray-800 text-gray-400 flex items-center justify-center text-xs font-medium flex-shrink-0">
-                    {index + 1}
-                  </span>
-                  
-                  {editingIndex === index ? (
-                    <input
-                      type="text"
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      onBlur={() => handleSaveEdit(index)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveEdit(index)
-                        if (e.key === 'Escape') { setEditingIndex(null); setEditingText('') }
-                      }}
-                      className="flex-1 px-2 py-1 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                      autoFocus
-                    />
-                  ) : (
-                    <div className="flex-1 flex items-center gap-2 flex-wrap min-w-0">
-                      {copiedTo.length > 0 ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const first = copiedTo[0]
-                            const id = first.type === 'quarter' ? `quarter-${first.key}` : first.type === 'month' ? `month-${first.key}` : `week-${first.key}`
-                            scrollToElement(id)
-                          }}
-                          className="text-sm text-left text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+      {/* Список целей */}
+      {goals.length > 0 && (
+        <div className="space-y-1">
+          {goalsWithCopiedTo.map(({ goal, copiedTo }, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2.5 py-1.5 px-3 rounded-lg hover:bg-gray-900/50 transition-colors group/item"
+            >
+              <span className="w-5 h-5 rounded bg-gray-800 text-gray-400 flex items-center justify-center text-xs font-medium flex-shrink-0">
+                {index + 1}
+              </span>
+              
+              {editingIndex === index ? (
+                <input
+                  type="text"
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  onBlur={() => handleSaveEdit(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveEdit(index)
+                    if (e.key === 'Escape') { setEditingIndex(null); setEditingText('') }
+                  }}
+                  className="flex-1 px-2 py-1 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  autoFocus
+                />
+              ) : (
+                <div className="flex-1 flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-sm text-gray-200">{goal}</span>
+                  {copiedTo.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {copiedTo.map((c, i) => (
+                        <span
+                          key={i}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 border border-gray-700"
                         >
-                          {goal}
-                        </button>
-                      ) : (
-                        <span className="text-sm text-gray-200">{goal}</span>
-                      )}
-                      
-                      {copiedTo.length > 0 && (
-                        <div className="flex gap-1 flex-wrap">
-                          {copiedTo.map((c, i) => (
-                            <button 
-                              key={i}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const id = c.type === 'quarter' ? `quarter-${c.key}` : c.type === 'month' ? `month-${c.key}` : `week-${c.key}`
-                                scrollToElement(id)
-                              }}
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700 hover:text-gray-200 hover:border-gray-600 transition-colors cursor-pointer"
-                            >
-                              {c.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                          {c.label}
+                        </span>
+                      ))}
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* Действия — показываются при наведении */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                    {(detailLevel === 'month' || detailLevel === 'quarter') && (
-                      <div className="relative" ref={copyDropdownIndex === index ? dropdownRef : null}>
-                        <button
-                          onClick={() => setCopyDropdownIndex(copyDropdownIndex === index ? null : index)}
-                          className="text-gray-500 hover:text-blue-400 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
-                          title="Копировать в период"
-                        >
-                          ↓
-                        </button>
-                        {copyDropdownIndex === index && (
-                          <div className="absolute right-0 top-8 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-10 py-1 min-w-[160px] max-h-[400px] overflow-y-auto">
-                            <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider border-b border-gray-800">Кварталы</div>
-                            {[1, 2, 3, 4].map(q => (
-                              <button
-                                key={q}
-                                onClick={() => {
-                                  onCopyGoal(goal, 'quarter', `${year}-Q${q}`)
-                                  setCopyDropdownIndex(null)
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                              >
-                                Q{q}
-                              </button>
-                            ))}
-                            <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider border-b border-t border-gray-800 mt-1">Месяцы</div>
-                            {monthNames.map((mName, mIdx) => (
-                              <button
-                                key={mIdx}
-                                onClick={() => {
-                                  onCopyGoal(goal, 'month', `${year}-${String(mIdx + 1).padStart(2, '0')}`)
-                                  setCopyDropdownIndex(null)
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                              >
-                                {mName}
-                              </button>
-                            ))}
-                            
-                            {year === currentYear && (() => {
-                              const today = new Date()
-                              const currMonth = today.getMonth()
-                              const weeksData: { num: number; start: Date; end: Date }[] = []
-                              const firstD = new Date(year, currMonth, 1)
-                              const lastD = new Date(year, currMonth + 1, 0)
-                              const curr = new Date(firstD)
-                              while (curr.getDay() !== 1) curr.setDate(curr.getDate() + 1)
-                              let wNum = 1
-                              while (curr <= lastD) {
-                                const wStart = new Date(curr)
-                                const wEnd = new Date(curr)
-                                wEnd.setDate(wEnd.getDate() + 6)
-                                weeksData.push({ num: wNum, start: wStart, end: wEnd })
-                                curr.setDate(curr.getDate() + 7)
-                                wNum++
-                              }
-                              
-                              return (
-                                <>
-                                  <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider border-b border-t border-gray-800 mt-1">
-                                    Недели {monthNames[currMonth]}
-                                  </div>
-                                  {weeksData.map(w => (
-                                    <button
-                                      key={w.num}
-                                      onClick={() => {
-                                        onCopyGoal(goal, 'week', `${year}-${String(currMonth + 1).padStart(2, '0')}-W${w.num}`)
-                                        setCopyDropdownIndex(null)
-                                      }}
-                                      className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                                    >
-                                      W{w.num} ({w.start.getDate()}-{w.end.getDate()})
-                                    </button>
-                                  ))}
-                                </>
-                              )
-                            })()}
-                          </div>
-                        )}
+              {/* Действия — при наведении */}
+              <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                {(detailLevel === 'month' || detailLevel === 'quarter') && (
+                  <div className="relative" ref={copyDropdownIndex === index ? dropdownRef : null}>
+                    <button
+                      onClick={() => setCopyDropdownIndex(copyDropdownIndex === index ? null : index)}
+                      className="text-gray-500 hover:text-blue-400 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
+                      title="Копировать в период"
+                    >
+                      ↓
+                    </button>
+                    {copyDropdownIndex === index && (
+                      <div className="absolute right-0 top-8 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-10 py-1 min-w-[160px] max-h-[400px] overflow-y-auto">
+                        <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider border-b border-gray-800">Кварталы</div>
+                        {[1, 2, 3, 4].map(q => (
+                          <button
+                            key={q}
+                            onClick={() => {
+                              onCopyGoal(goal, 'quarter', `${year}-Q${q}`)
+                              setCopyDropdownIndex(null)
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                          >
+                            Q{q}
+                          </button>
+                        ))}
+                        <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider border-b border-t border-gray-800 mt-1">Месяцы</div>
+                        {monthNames.map((mName, mIdx) => (
+                          <button
+                            key={mIdx}
+                            onClick={() => {
+                              onCopyGoal(goal, 'month', `${year}-${String(mIdx + 1).padStart(2, '0')}`)
+                              setCopyDropdownIndex(null)
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                          >
+                            {mName}
+                          </button>
+                        ))}
+                        
+                        {year === currentYear && (() => {
+                          const today = new Date()
+                          const currMonth = today.getMonth()
+                          const weeksData: { num: number; start: Date; end: Date }[] = []
+                          const firstD = new Date(year, currMonth, 1)
+                          const lastD = new Date(year, currMonth + 1, 0)
+                          const curr = new Date(firstD)
+                          while (curr.getDay() !== 1) curr.setDate(curr.getDate() + 1)
+                          let wNum = 1
+                          while (curr <= lastD) {
+                            const wStart = new Date(curr)
+                            const wEnd = new Date(curr)
+                            wEnd.setDate(wEnd.getDate() + 6)
+                            weeksData.push({ num: wNum, start: wStart, end: wEnd })
+                            curr.setDate(curr.getDate() + 7)
+                            wNum++
+                          }
+                          
+                          return (
+                            <>
+                              <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase tracking-wider border-b border-t border-gray-800 mt-1">
+                                Недели {monthNames[currMonth]}
+                              </div>
+                              {weeksData.map(w => (
+                                <button
+                                  key={w.num}
+                                  onClick={() => {
+                                    onCopyGoal(goal, 'week', `${year}-${String(currMonth + 1).padStart(2, '0')}-W${w.num}`)
+                                    setCopyDropdownIndex(null)
+                                  }}
+                                  className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                                >
+                                  W{w.num} ({w.start.getDate()}-{w.end.getDate()})
+                                </button>
+                              ))}
+                            </>
+                          )
+                        })()}
                       </div>
                     )}
-
-                    <button
-                      onClick={() => {
-                        setEditingIndex(index)
-                        setEditingText(goal)
-                      }}
-                      className="text-gray-500 hover:text-gray-300 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
-                      title="Редактировать"
-                    >
-                      &#9998;
-                    </button>
-                    <button
-                      onClick={() => onRemoveGoal(index)}
-                      className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
-                      title="Удалить"
-                    >
-                      &#10005;
-                    </button>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                )}
 
-          {/* Детализация (Children) */}
-          {children}
+                <button
+                  onClick={() => {
+                    setEditingIndex(index)
+                    setEditingText(goal)
+                  }}
+                  className="text-gray-500 hover:text-gray-300 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
+                  title="Редактировать"
+                >
+                  &#9998;
+                </button>
+                <button
+                  onClick={() => onRemoveGoal(index)}
+                  className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
+                  title="Удалить"
+                >
+                  &#10005;
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

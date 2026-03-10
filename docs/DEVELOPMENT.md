@@ -31,7 +31,7 @@ npx prisma db push
 npm run dev
 ```
 
-Приложение: http://localhost:3000
+Приложение: http://localhost:3003
 
 ---
 
@@ -180,9 +180,9 @@ npx prisma generate
 # Перезапустить dev сервер
 ```
 
-### Порт 3000 занят
+### Порт 3003 занят
 ```bash
-lsof -i :3000
+lsof -i :3003
 kill -9 <PID>
 ```
 

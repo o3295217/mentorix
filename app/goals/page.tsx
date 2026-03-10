@@ -9,9 +9,9 @@ import YearSection from '@/components/goals/YearSection'
 import QuarterSection from '@/components/goals/QuarterSection'
 import MonthSection from '@/components/goals/MonthSection'
 import HalfYearSection from '@/components/goals/HalfYearSection'
+import TimelineNav from '@/components/goals/TimelineNav'
 
 export default function GoalsPage() {
-  // Используем хуки для управления целями
   const {
     dreamGoal,
     saveDream,
@@ -39,7 +39,6 @@ export default function GoalsPage() {
     currentYear,
   } = useGoals()
 
-  // Обёртка для создания тега с использованием локального состояния
   const handleCreateTag = () => {
     if (newTagName.trim()) {
       createTagApi(newTagName.trim(), newTagColor)
@@ -52,11 +51,12 @@ export default function GoalsPage() {
     setCopyDropdown,
   } = useGoalsCopy()
 
-  // Локальные UI-состояния
-  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set([new Date().getFullYear()]))
-  const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(new Set())
-  const [showAllPeriods, setShowAllPeriods] = useState(false)
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  // Навигация по времени
+  const currentQuarter = Math.floor(new Date().getMonth() / 3) + 1
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedQuarter, setSelectedQuarter] = useState(currentQuarter)
+
+  // UI-состояния для недель
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set())
   const [draggedGoal, setDraggedGoal] = useState<{ weekKey: string; index: number; goal: string } | null>(null)
   const [dragOverWeek, setDragOverWeek] = useState<string | null>(null)
@@ -66,6 +66,7 @@ export default function GoalsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all')
   const [filterPriority, setFilterPriority] = useState<number | null>(null)
   const [filterTag, setFilterTag] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
   // Управление тегами
   const [newTagName, setNewTagName] = useState('')
@@ -103,39 +104,46 @@ export default function GoalsPage() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [copyDropdown, setCopyDropdown])
 
-  // Загрузка данных при появлении dreamGoal
+  // Вычисляемые значения
+  const years = dreamGoal ? Array.from({ length: dreamGoal.years }, (_, i) => currentYear + i) : []
+  const detailLevel = getDetailLevel(selectedYear, currentYear)
+
+  // Загрузка годовых целей при появлении dreamGoal
   useEffect(() => {
     if (dreamGoal) {
-      const years = Array.from({ length: dreamGoal.years }, (_, i) => currentYear + i)
-      years.forEach(year => loadYearGoals(year))
-
-      const today = new Date()
-      const currentMonth = today.getMonth()
-      const currentQuarter = Math.floor(currentMonth / 3) + 1
-      const quarterKey = `${currentYear}-Q${currentQuarter}`
-
-      setExpandedPeriods(prev => new Set(prev).add(quarterKey))
-
-      for (let q = 1; q <= 4; q++) {
-        loadPeriodGoalsWithKey('quarter', new Date(currentYear, (q - 1) * 3, 1))
-      }
-      for (let m = 0; m < 12; m++) {
-        loadPeriodGoalsWithKey('month', new Date(currentYear, m, 1))
-      }
-      loadAllWeeksForMonth(currentYear, currentMonth)
+      const allYears = Array.from({ length: dreamGoal.years }, (_, i) => currentYear + i)
+      allYears.forEach(year => loadYearGoals(year))
     }
-  }, [dreamGoal, currentYear, loadYearGoals, loadPeriodGoalsWithKey, loadAllWeeksForMonth])
+  }, [dreamGoal, currentYear, loadYearGoals])
 
-  const toggleYear = (year: number) => {
-    setExpandedYears(prev => {
-      const next = new Set(prev)
-      if (next.has(year)) next.delete(year)
-      else next.add(year)
-      return next
-    })
-  }
+  // Загрузка данных при смене выбранного года
+  useEffect(() => {
+    if (!dreamGoal) return
+    const dl = getDetailLevel(selectedYear, currentYear)
+    if (dl === 'month' || dl === 'quarter') {
+      for (let q = 1; q <= 4; q++) {
+        loadPeriodGoalsWithKey('quarter', new Date(selectedYear, (q - 1) * 3, 1))
+      }
+    }
+    if (dl === 'month') {
+      for (let m = 0; m < 12; m++) {
+        loadPeriodGoalsWithKey('month', new Date(selectedYear, m, 1))
+      }
+    }
+    if (dl === 'half') {
+      loadPeriodGoalsWithKey('half_year', new Date(selectedYear, 0, 1))
+      loadPeriodGoalsWithKey('half_year', new Date(selectedYear, 6, 1))
+    }
+  }, [selectedYear, dreamGoal, currentYear, loadPeriodGoalsWithKey])
 
-
+  // Загрузка недель при смене квартала (только для month detailLevel)
+  useEffect(() => {
+    if (!dreamGoal || detailLevel !== 'month') return
+    const startMonth = (selectedQuarter - 1) * 3
+    for (let i = 0; i < 3; i++) {
+      loadAllWeeksForMonth(selectedYear, startMonth + i)
+    }
+  }, [selectedYear, selectedQuarter, dreamGoal, detailLevel, loadAllWeeksForMonth])
 
   // Перемещение задачи между неделями (drag-and-drop)
   const moveGoalBetweenWeeks = (fromWeekKey: string, toWeekKey: string, goalIndex: number, goalText: string) => {
@@ -147,15 +155,12 @@ export default function GoalsPage() {
     showMessage(`Задача перемещена в W${toParsed.weekNum}`)
   }
 
-  // Обёртка для сохранения редактирования periodGoal
   const saveEditPeriodGoal = (periodKey: string, index: number, periodType: 'quarter' | 'month' | 'week' | 'half_year', date: Date, label: string, text: string) => {
     editPeriodGoal(periodKey, index, periodType, date, label, text)
   }
 
-  // Обёртка для копирования целей (через addPeriodGoal)
   const handleCopyGoal = (goal: string, targetType: 'quarter' | 'month' | 'week', targetKey: string) => {
     const year = parseInt(targetKey.split('-')[0])
-    
     if (targetType === 'quarter') {
       const quarter = parseInt(targetKey.split('-Q')[1])
       const quarterDate = new Date(year, (quarter - 1) * 3, 1)
@@ -170,105 +175,127 @@ export default function GoalsPage() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Управление целями</h1>
+  const hasActiveFilters = searchQuery || filterStatus !== 'all' || filterPriority !== null || filterTag !== null
 
-      {/* Панель поиска и фильтров */}
-      <div className="card bg-gray-900/80 border border-gray-700">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Поиск */}
-          <div className="flex-1 min-w-[200px]">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск целей..."
-              className="w-full px-4 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50 focus:border-blue-400"
-            />
-          </div>
-          
-          {/* Фильтр по статусу */}
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'completed')}
-            className="px-3 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50"
+  return (
+    <div className="space-y-5">
+      {/* Заголовок + компактный тулбар */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Цели</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+              showFilters || hasActiveFilters
+                ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800 border border-transparent'
+            }`}
           >
-            <option value="all">Все</option>
-            <option value="active">Активные</option>
-            <option value="completed">Выполненные</option>
-          </select>
-          
-          {/* Фильтр по приоритету */}
-          <select
-            value={filterPriority ?? ''}
-            onChange={(e) => setFilterPriority(e.target.value ? parseInt(e.target.value) : null)}
-            className="px-3 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50"
-          >
-            <option value="">Все приоритеты</option>
-            <option value="3">Высокий</option>
-            <option value="2">Средний</option>
-            <option value="1">Низкий</option>
-            <option value="0">Без приоритета</option>
-          </select>
-          
-          {/* Фильтр по тегу */}
-          <select
-            value={filterTag ?? ''}
-            onChange={(e) => setFilterTag(e.target.value || null)}
-            className="px-3 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50"
-          >
-            <option value="">Все теги</option>
-            {(tags || []).map(tag => (
-              <option key={tag.id} value={tag.name}>{tag.name}</option>
-            ))}
-          </select>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Фильтры
+            {hasActiveFilters && (
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            )}
+          </button>
         </div>
-        
-        {/* Управление тегами */}
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm text-gray-400 font-medium">Теги:</span>
-            {(tags || []).map(tag => (
-              <span 
-                key={tag.id}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}` }}
-              >
-                {tag.name}
-                <button 
-                  onClick={() => deleteTag(tag.id)}
-                  className="ml-1 hover:opacity-70"
-                >
-                  
-                </button>
-              </span>
-            ))}
-            <div className="flex items-center gap-1 ml-2">
+      </div>
+
+      {/* Раскрывающаяся панель фильтров */}
+      {showFilters && (
+        <div className="card bg-gray-900/60 border border-gray-800 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex-1 min-w-[200px]">
               <input
                 type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
-                placeholder="Новый тег..."
-                className="px-2 py-1 text-xs border border-gray-700 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-blue-800/50"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск целей..."
+                className="w-full px-3 py-1.5 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
               />
-              <input
-                type="color"
-                value={newTagColor}
-                onChange={(e) => setNewTagColor(e.target.value)}
-                className="w-6 h-6 rounded cursor-pointer"
-              />
+            </div>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'completed')}
+              className="px-2.5 py-1.5 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            >
+              <option value="all">Все статусы</option>
+              <option value="active">Активные</option>
+              <option value="completed">Выполненные</option>
+            </select>
+            <select
+              value={filterPriority ?? ''}
+              onChange={(e) => setFilterPriority(e.target.value ? parseInt(e.target.value) : null)}
+              className="px-2.5 py-1.5 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            >
+              <option value="">Все приоритеты</option>
+              <option value="3">Высокий</option>
+              <option value="2">Средний</option>
+              <option value="1">Низкий</option>
+              <option value="0">Без приоритета</option>
+            </select>
+            <select
+              value={filterTag ?? ''}
+              onChange={(e) => setFilterTag(e.target.value || null)}
+              className="px-2.5 py-1.5 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            >
+              <option value="">Все теги</option>
+              {(tags || []).map(tag => (
+                <option key={tag.id} value={tag.name}>{tag.name}</option>
+              ))}
+            </select>
+            {hasActiveFilters && (
               <button
-                onClick={handleCreateTag}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterPriority(null); setFilterTag(null) }}
+                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
               >
-                +
+                Сбросить
               </button>
+            )}
+          </div>
+
+          {/* Теги — компактная строка */}
+          <div className="mt-3 pt-3 border-t border-gray-800">
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {(tags || []).map(tag => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                  style={{ backgroundColor: tag.color + '15', color: tag.color, border: `1px solid ${tag.color}40` }}
+                >
+                  {tag.name}
+                  <button onClick={() => deleteTag(tag.id)} className="hover:opacity-70 ml-0.5">×</button>
+                </span>
+              ))}
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
+                  placeholder="+ тег"
+                  className="px-2 py-0.5 text-xs border border-gray-700 rounded-lg w-20 bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600"
+                />
+                <input
+                  type="color"
+                  value={newTagColor}
+                  onChange={(e) => setNewTagColor(e.target.value)}
+                  className="w-5 h-5 rounded cursor-pointer border-0"
+                />
+                {newTagName.trim() && (
+                  <button
+                    onClick={handleCreateTag}
+                    className="px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  >
+                    +
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Секция Мечты */}
       <DreamSection
@@ -276,190 +303,143 @@ export default function GoalsPage() {
         onSave={saveDream}
       />
 
-      {/* Иерархическое дерево целей */}
+      {/* Навигация + контент */}
       {dreamGoal && (
-        <div className="card bg-gray-900/80">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-            
-            План достижения мечты
-          </h2>
+        <>
+          <TimelineNav
+            years={years}
+            selectedYear={selectedYear}
+            selectedQuarter={selectedQuarter}
+            currentYear={currentYear}
+            currentQuarter={currentQuarter}
+            onSelectYear={setSelectedYear}
+            onSelectQuarter={setSelectedQuarter}
+          />
 
-          <div className="space-y-3">
-            {Array.from({ length: dreamGoal.years }, (_, i) => {
-              const year = currentYear + i
-              const isExpanded = expandedYears.has(year)
-              const yearGoalsList = yearGoals.get(year) || []
-              const detailLevel = getDetailLevel(year)
+          <div className="space-y-4">
+            {/* Цели года */}
+            <YearSection
+              year={selectedYear}
+              currentYear={currentYear}
+              goals={yearGoals.get(selectedYear) || []}
+              onAddGoal={(text) => addYearGoal(selectedYear, text)}
+              onRemoveGoal={(index) => removeYearGoal(selectedYear, index)}
+              onEditGoal={(index, text) => editYearGoal(selectedYear, index, text)}
+              periodGoals={periodGoals}
+              onCopyGoal={handleCopyGoal}
+            />
+
+            {/* Квартал — для month и quarter detail levels */}
+            {(detailLevel === 'month' || detailLevel === 'quarter') && (() => {
+              const quarterKey = `${selectedYear}-Q${selectedQuarter}`
+              const quarterGoals = periodGoals.get(quarterKey) || []
+              const isCurrentQuarter = selectedYear === currentYear && selectedQuarter === currentQuarter
+              const progress = calculatePeriodProgress(quarterKey)
+              const quarterDate = new Date(selectedYear, (selectedQuarter - 1) * 3, 1)
 
               return (
-                <YearSection
-                  key={year}
-                  year={year}
-                  currentYear={currentYear}
-                  goals={yearGoalsList}
-                  isExpanded={isExpanded}
-                  onToggle={() => toggleYear(year)}
-                  onAddGoal={(text) => addYearGoal(year, text)}
-                  onRemoveGoal={(index) => removeYearGoal(year, index)}
-                  onEditGoal={(index, text) => editYearGoal(year, index, text)}
-                  periodGoals={periodGoals}
+                <QuarterSection
+                  quarter={selectedQuarter}
+                  year={selectedYear}
+                  goals={quarterGoals}
+                  isCurrent={isCurrentQuarter}
+                  progress={progress}
+                  onAddGoal={(text) => addPeriodGoal(quarterKey, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`, text)}
+                  onRemoveGoal={(index) => removePeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`)}
+                  onEditGoal={(index, text) => editPeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`, text)}
                   onCopyGoal={handleCopyGoal}
-                >
-                  {detailLevel !== 'year' && (
-                    <div className="border-t border-gray-700 pt-4 space-y-3">
-                      <h4 className="font-semibold text-gray-300 text-sm flex items-center gap-2">
-                        
-                        Детализация по периодам:
-                      </h4>
-
-                      {(detailLevel === 'month' || detailLevel === 'quarter') && (
-                        <div className="space-y-2">
-                          {[1, 2, 3, 4].map(quarter => {
-                            const quarterKey = `${year}-Q${quarter}`
-                            const quarterGoals = periodGoals.get(quarterKey) || []
-                            const isQuarterExpanded = expandedPeriods.has(quarterKey)
-                            const quarterDate = new Date(year, (quarter - 1) * 3, 1)
-                            const isCurrentQuarter = year === currentYear && quarter === Math.floor(new Date().getMonth() / 3) + 1
-                            const progress = calculatePeriodProgress(quarterKey)
-
-                            return (
-                              <QuarterSection
-                                key={quarterKey}
-                                quarter={quarter}
-                                year={year}
-                                goals={quarterGoals}
-                                isExpanded={isQuarterExpanded}
-                                isCurrent={isCurrentQuarter}
-                                progress={progress}
-                                onToggle={() => {
-                                  const newExpanded = new Set(expandedPeriods)
-                                  if (newExpanded.has(quarterKey)) {
-                                    newExpanded.delete(quarterKey)
-                                  } else {
-                                    newExpanded.add(quarterKey)
-                                    loadPeriodGoalsWithKey('quarter', quarterDate)
-                                  }
-                                  setExpandedPeriods(newExpanded)
-                                }}
-                                onAddGoal={(text) => addPeriodGoal(quarterKey, 'quarter', quarterDate, `Q${quarter} ${year}`, text)}
-                                onRemoveGoal={(index) => removePeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${quarter} ${year}`)}
-                                onEditGoal={(index, text) => editPeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${quarter} ${year}`, text)}
-                                onCopyGoal={handleCopyGoal}
-                                periodGoals={periodGoals}
-                              >
-                                {detailLevel === 'month' && (
-                                  <div className="border-t border-gray-700 pt-3 mt-3 space-y-2">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <p className="text-base text-gray-400 font-medium">Детализация по месяцам:</p>
-                                      <button
-                                        onClick={() => setShowAllPeriods(!showAllPeriods)}
-                                        className="text-base text-blue-500 hover:text-blue-400 transition-colors px-3 py-1.5 rounded hover:bg-blue-900/20"
-                                      >
-                                        {showAllPeriods ? 'Скрыть пустые' : 'Показать все'}
-                                      </button>
-                                    </div>
-                                    {[0, 1, 2].map(monthOffset => {
-                                      const month = (quarter - 1) * 3 + monthOffset
-                                      const monthDate = new Date(year, month, 1)
-                                      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
-                                      const monthGoals = periodGoals.get(monthKey) || []
-                                      const isCurrentMonth = year === currentYear && month === new Date().getMonth()
-
-                                      // Скрываем пустые месяцы, если не включён showAllPeriods (кроме текущего)
-                                      if (monthGoals.length === 0 && !showAllPeriods && !isCurrentMonth) {
-                                        return null
-                                      }
-
-                                      const isMonthCollapsed = collapsedMonths.has(monthKey)
-                                      const monthProgress = calculatePeriodProgress(monthKey)
-
-                                      return (
-                                        <MonthSection
-                                          key={monthKey}
-                                          month={month}
-                                          year={year}
-                                          goals={monthGoals}
-                                          isExpanded={!isMonthCollapsed}
-                                          isCurrent={isCurrentMonth}
-                                          progress={monthProgress}
-                                          onToggle={() => setCollapsedMonths(prev => {
-                                            const next = new Set(prev)
-                                            if (next.has(monthKey)) next.delete(monthKey)
-                                            else next.add(monthKey)
-                                            return next
-                                          })}
-                                          onAddGoal={(text) => addPeriodGoal(monthKey, 'month', monthDate, monthNames[month], text)}
-                                          onRemoveGoal={(index) => removePeriodGoal(monthKey, index, 'month', monthDate, monthNames[month])}
-                                          onEditGoal={(index, text) => saveEditPeriodGoal(monthKey, index, 'month', monthDate, monthNames[month], text)}
-                                          periodGoals={periodGoals}
-                                          trackedGoals={goals}
-                                          onCopyGoal={(goal, targetType, targetKey) => {
-                                            const parsed = parseWeekKey(targetKey)
-                                            // Просто добавляем цель в неделю
-                                            addPeriodGoal(targetKey, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, goal)
-                                          }}
-                                          showAllPeriods={showAllPeriods}
-                                          draggedGoal={draggedGoal}
-                                          setDraggedGoal={setDraggedGoal}
-                                          dragOverWeek={dragOverWeek}
-                                          setDragOverWeek={setDragOverWeek}
-                                          onMoveGoal={moveGoalBetweenWeeks}
-                                          onAddWeekGoal={(weekKey, text) => {
-                                            const parsed = parseWeekKey(weekKey)
-                                            addPeriodGoal(weekKey, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, text)
-                                          }}
-                                          onRemoveWeekGoal={(weekKey, index) => {
-                                            const parsed = parseWeekKey(weekKey)
-                                            removePeriodGoal(weekKey, index, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`)
-                                          }}
-                                          onEditWeekGoal={(weekKey, index, text) => {
-                                            const parsed = parseWeekKey(weekKey)
-                                            saveEditPeriodGoal(weekKey, index, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, text)
-                                          }}
-                                          processingGoals={processingGoals}
-                                          expandedGoals={expandedGoals}
-                                          setExpandedGoals={setExpandedGoals}
-                                          onToggleGoalCompletion={setGoalCompleted}
-                                          onSetGoalPriority={setGoalPriority}
-                                        />
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                              </QuarterSection>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* Полугодия для дальних лет */}
-                      {detailLevel === 'half' && (
-                        <div className="space-y-2">
-                          {[1, 2].map(half => {
-                            const halfKey = `${year}-H${half}`
-                            const halfGoals = periodGoals.get(halfKey) || []
-                            const halfDate = new Date(year, (half - 1) * 6, 1)
-
-                            return (
-                              <HalfYearSection
-                                key={halfKey}
-                                half={half}
-                                year={year}
-                                goals={halfGoals}
-                                onAddGoal={(text) => addPeriodGoal(halfKey, 'half_year', halfDate, `H${half} ${year}`, text)}
-                                onRemoveGoal={(index) => removePeriodGoal(halfKey, index, 'half_year', halfDate, `H${half} ${year}`)}
-                                onEditGoal={(index, text) => saveEditPeriodGoal(halfKey, index, 'half_year', halfDate, `H${half} ${year}`, text)}
-                              />
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </YearSection>
+                  periodGoals={periodGoals}
+                />
               )
-            })}
+            })()}
+
+            {/* Месяцы — только для month detail level */}
+            {detailLevel === 'month' && (
+              <div className="space-y-3">
+                {[0, 1, 2].map(offset => {
+                  const month = (selectedQuarter - 1) * 3 + offset
+                  const monthDate = new Date(selectedYear, month, 1)
+                  const monthKey = `${selectedYear}-${String(month + 1).padStart(2, '0')}`
+                  const monthGoals = periodGoals.get(monthKey) || []
+                  const isCurrentMonth = selectedYear === currentYear && month === new Date().getMonth()
+                  const monthProgress = calculatePeriodProgress(monthKey)
+
+                  return (
+                    <MonthSection
+                      key={monthKey}
+                      month={month}
+                      year={selectedYear}
+                      goals={monthGoals}
+                      isCurrent={isCurrentMonth}
+                      progress={monthProgress}
+                      onAddGoal={(text) => addPeriodGoal(monthKey, 'month', monthDate, monthNames[month], text)}
+                      onRemoveGoal={(index) => removePeriodGoal(monthKey, index, 'month', monthDate, monthNames[month])}
+                      onEditGoal={(index, text) => saveEditPeriodGoal(monthKey, index, 'month', monthDate, monthNames[month], text)}
+                      periodGoals={periodGoals}
+                      trackedGoals={goals}
+                      onCopyGoal={(goal, _targetType, targetKey) => {
+                        const parsed = parseWeekKey(targetKey)
+                        addPeriodGoal(targetKey, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, goal)
+                      }}
+                      showAllPeriods={true}
+                      draggedGoal={draggedGoal}
+                      setDraggedGoal={setDraggedGoal}
+                      dragOverWeek={dragOverWeek}
+                      setDragOverWeek={setDragOverWeek}
+                      onMoveGoal={moveGoalBetweenWeeks}
+                      onAddWeekGoal={(weekKey, text) => {
+                        const parsed = parseWeekKey(weekKey)
+                        addPeriodGoal(weekKey, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, text)
+                      }}
+                      onRemoveWeekGoal={(weekKey, index) => {
+                        const parsed = parseWeekKey(weekKey)
+                        removePeriodGoal(weekKey, index, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`)
+                      }}
+                      onEditWeekGoal={(weekKey, index, text) => {
+                        const parsed = parseWeekKey(weekKey)
+                        saveEditPeriodGoal(weekKey, index, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, text)
+                      }}
+                      processingGoals={processingGoals}
+                      expandedGoals={expandedGoals}
+                      setExpandedGoals={setExpandedGoals}
+                      onToggleGoalCompletion={setGoalCompleted}
+                      onSetGoalPriority={setGoalPriority}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Полугодия — для half detail level */}
+            {detailLevel === 'half' && (
+              <div className="space-y-3">
+                {[1, 2].map(half => {
+                  const halfKey = `${selectedYear}-H${half}`
+                  const halfGoals = periodGoals.get(halfKey) || []
+                  const halfDate = new Date(selectedYear, (half - 1) * 6, 1)
+
+                  return (
+                    <HalfYearSection
+                      key={halfKey}
+                      half={half}
+                      year={selectedYear}
+                      goals={halfGoals}
+                      onAddGoal={(text) => addPeriodGoal(halfKey, 'half_year', halfDate, `H${half} ${selectedYear}`, text)}
+                      onRemoveGoal={(index) => removePeriodGoal(halfKey, index, 'half_year', halfDate, `H${half} ${selectedYear}`)}
+                      onEditGoal={(index, text) => saveEditPeriodGoal(halfKey, index, 'half_year', halfDate, `H${half} ${selectedYear}`, text)}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
+        </>
+      )}
+
+      {/* Подсказка если нет мечты */}
+      {!dreamGoal && (
+        <div className="text-center py-8">
+          <p className="text-gray-500 text-sm">Создайте мечту, чтобы начать планирование</p>
         </div>
       )}
 
