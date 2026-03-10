@@ -84,7 +84,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (20)
+## Компоненты (22)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -105,6 +105,8 @@
 - `goals/MonthSection`
 - `goals/QuarterSection`
 - `goals/TimelineNav`
+- `goals/WeekCard`
+- `goals/WeekStrip`
 - `goals/YearSection`
 
 ## Модели БД (22)

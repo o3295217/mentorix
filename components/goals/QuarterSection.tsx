@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { monthNames } from '@/lib/goals-utils'
+import { useInlineEdit } from '@/hooks/useInlineEdit'
+import { useCopyDropdown } from '@/hooks/useCopyDropdown'
 
 interface QuarterSectionProps {
   quarter: number
@@ -14,6 +16,7 @@ interface QuarterSectionProps {
   onEditGoal: (index: number, text: string) => void
   onCopyGoal?: (goal: string, targetType: 'month' | 'week', targetKey: string) => void
   periodGoals: Map<string, string[]>
+  searchQuery?: string
 }
 
 export default function QuarterSection({
@@ -27,36 +30,17 @@ export default function QuarterSection({
   onEditGoal,
   onCopyGoal,
   periodGoals,
+  searchQuery = '',
 }: QuarterSectionProps) {
   const [newGoal, setNewGoal] = useState('')
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editingText, setEditingText] = useState('')
-  const [copyDropdownIndex, setCopyDropdownIndex] = useState<number | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setCopyDropdownIndex(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const { editingIndex, editingText, setEditingText, startEdit, cancelEdit, saveEdit } = useInlineEdit(onEditGoal)
+  const { copyDropdownIndex, dropdownRef, toggleDropdown, closeDropdown } = useCopyDropdown()
 
   const handleAdd = () => {
     if (newGoal.trim()) {
       onAddGoal(newGoal)
       setNewGoal('')
     }
-  }
-
-  const handleSaveEdit = (index: number) => {
-    if (editingText.trim()) {
-      onEditGoal(index, editingText)
-    }
-    setEditingIndex(null)
-    setEditingText('')
   }
 
   return (
@@ -96,9 +80,13 @@ export default function QuarterSection({
       </div>
 
       {/* Список целей */}
-      {goals.length > 0 && (
+      {goals.length > 0 && (() => {
+        const sq = searchQuery.toLowerCase()
+        const displayed = sq ? goals.filter(g => g.toLowerCase().includes(sq)) : goals
+        return displayed.length > 0 && (
         <div className="space-y-1">
-          {goals.map((goal, index) => {
+          {displayed.map((goal, index) => {
+            const originalIndex = goals.indexOf(goal)
             const copiedTo: { type: 'month' | 'week'; label: string; key: string }[] = []
             const goalLower = goal.trim().toLowerCase()
             
@@ -124,10 +112,10 @@ export default function QuarterSection({
                     type="text"
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
-                    onBlur={() => handleSaveEdit(index)}
+                    onBlur={() => saveEdit(index)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveEdit(index)
-                      if (e.key === 'Escape') { setEditingIndex(null); setEditingText('') }
+                      if (e.key === 'Enter') saveEdit(index)
+                      if (e.key === 'Escape') cancelEdit()
                     }}
                     className="flex-1 px-2 py-1 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                     autoFocus
@@ -154,7 +142,7 @@ export default function QuarterSection({
                   {onCopyGoal && (
                     <div className="relative" ref={copyDropdownIndex === index ? dropdownRef : null}>
                       <button
-                        onClick={() => setCopyDropdownIndex(copyDropdownIndex === index ? null : index)}
+                        onClick={() => toggleDropdown(index)}
                         className="text-gray-500 hover:text-blue-400 p-1 rounded hover:bg-gray-800 transition-colors text-xs"
                         title="Копировать в месяц"
                       >
@@ -170,7 +158,7 @@ export default function QuarterSection({
                                 key={m}
                                 onClick={() => {
                                   onCopyGoal(goal, 'month', `${year}-${String(m + 1).padStart(2, '0')}`)
-                                  setCopyDropdownIndex(null)
+                                  closeDropdown()
                                 }}
                                 className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                               >
@@ -183,13 +171,13 @@ export default function QuarterSection({
                     </div>
                   )}
                   <button
-                    onClick={() => { setEditingIndex(index); setEditingText(goal) }}
+                    onClick={() => startEdit(originalIndex, goal)}
                     className="text-gray-500 hover:text-gray-300 p-1 rounded hover:bg-gray-800 transition-colors text-xs"
                   >
                     &#9998;
                   </button>
                   <button
-                    onClick={() => onRemoveGoal(index)}
+                    onClick={() => onRemoveGoal(originalIndex)}
                     className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-gray-800 transition-colors text-xs"
                   >
                     &#10005;
@@ -199,7 +187,8 @@ export default function QuarterSection({
             )
           })}
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

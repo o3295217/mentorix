@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getDetailLevel } from '@/lib/dates'
 import { monthNames, parseWeekKey } from '@/lib/goals-utils'
 import { useGoals, useGoalsCopy } from '@/hooks'
@@ -107,6 +107,13 @@ export default function GoalsPage() {
   // Вычисляемые значения
   const years = dreamGoal ? Array.from({ length: dreamGoal.years }, (_, i) => currentYear + i) : []
   const detailLevel = getDetailLevel(selectedYear, currentYear)
+
+  // Прогресс мечты — по всем трекинговым целям
+  const dreamProgress = useMemo(() => {
+    const total = goals.length
+    const completed = goals.filter(g => g.completed).length
+    return { total, completed, percent: total > 0 ? Math.round((completed / total) * 100) : 0 }
+  }, [goals])
 
   // Загрузка годовых целей при появлении dreamGoal
   useEffect(() => {
@@ -301,6 +308,7 @@ export default function GoalsPage() {
       <DreamSection
         dreamGoal={dreamGoal}
         onSave={saveDream}
+        progress={dreamProgress}
       />
 
       {/* Навигация + контент */}
@@ -327,6 +335,7 @@ export default function GoalsPage() {
               onEditGoal={(index, text) => editYearGoal(selectedYear, index, text)}
               periodGoals={periodGoals}
               onCopyGoal={handleCopyGoal}
+              searchQuery={searchQuery}
             />
 
             {/* Квартал — для month и quarter detail levels */}
@@ -349,6 +358,7 @@ export default function GoalsPage() {
                   onEditGoal={(index, text) => editPeriodGoal(quarterKey, index, 'quarter', quarterDate, `Q${selectedQuarter} ${selectedYear}`, text)}
                   onCopyGoal={handleCopyGoal}
                   periodGoals={periodGoals}
+                  searchQuery={searchQuery}
                 />
               )
             })()}
@@ -404,6 +414,10 @@ export default function GoalsPage() {
                       setExpandedGoals={setExpandedGoals}
                       onToggleGoalCompletion={setGoalCompleted}
                       onSetGoalPriority={setGoalPriority}
+                      searchQuery={searchQuery}
+                      filterStatus={filterStatus}
+                      filterPriority={filterPriority}
+                      filterTag={filterTag}
                     />
                   )
                 })}

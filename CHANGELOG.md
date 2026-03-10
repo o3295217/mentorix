@@ -6,6 +6,20 @@
 
 ## [Unreleased]
 
+### 2026-03-10 — refactor: Goals page UX redesign — tab-навигация вместо аккордеонов
+- 🧩 Компоненты: 5 файлов (MonthSection, QuarterSection, WeekCard...)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 2 файлов
+- 📦 Другое: 3 файлов
+
+
+### 2026-03-10 — refactor: Goals page optimization (6-stage plan)
+- ✅ Фильтры подключены: searchQuery, filterStatus, filterPriority, filterTag
+- ✅ Прогресс мечты: DreamSection получает вычисленный progress
+- ✅ MonthSection (560→315 строк) разбит на WeekStrip.tsx + WeekCard.tsx
+- ✅ Дедупликация: useInlineEdit + useCopyDropdown хуки (3 компонента)
+- ✅ Недели показываются для всех месяцев (не только текущего)
+
 ### 2026-03-10 — fix: восстановлен MonthSection.tsx и прочие изменения
 - 🧩 Компоненты: 5 файлов (DreamSection, MonthSection, QuarterSection...)
 - 📄 Страницы: 1 файлов

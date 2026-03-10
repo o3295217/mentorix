@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { monthNames } from '@/lib/goals-utils'
 import { getDetailLevel } from '@/lib/dates'
+import { useInlineEdit } from '@/hooks/useInlineEdit'
+import { useCopyDropdown } from '@/hooks/useCopyDropdown'
 
 interface YearSectionProps {
   year: number
@@ -13,6 +15,7 @@ interface YearSectionProps {
   onEditGoal: (index: number, text: string) => void
   periodGoals: Map<string, string[]>
   onCopyGoal: (goal: string, targetType: 'quarter' | 'month' | 'week', targetKey: string) => void
+  searchQuery?: string
 }
 
 export default function YearSection({
@@ -24,23 +27,11 @@ export default function YearSection({
   onEditGoal,
   periodGoals,
   onCopyGoal,
+  searchQuery = '',
 }: YearSectionProps) {
   const [newGoal, setNewGoal] = useState('')
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editingText, setEditingText] = useState('')
-  const [copyDropdownIndex, setCopyDropdownIndex] = useState<number | null>(null)
-  
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setCopyDropdownIndex(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const { editingIndex, editingText, setEditingText, startEdit, cancelEdit, saveEdit } = useInlineEdit(onEditGoal)
+  const { copyDropdownIndex, dropdownRef, toggleDropdown, closeDropdown } = useCopyDropdown()
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -49,18 +40,16 @@ export default function YearSection({
     }
   }
 
-  const handleSaveEdit = (index: number) => {
-    if (editingText.trim()) {
-      onEditGoal(index, editingText)
-    }
-    setEditingIndex(null)
-    setEditingText('')
-  }
-
   const detailLevel = getDetailLevel(year, currentYear)
 
+  const filteredGoals = useMemo(() => {
+    if (!searchQuery) return goals
+    const q = searchQuery.toLowerCase()
+    return goals.filter(goal => goal.toLowerCase().includes(q))
+  }, [goals, searchQuery])
+
   const goalsWithCopiedTo = useMemo(() => {
-    return goals.map(goal => {
+    return filteredGoals.map(goal => {
       const copiedTo: { type: 'quarter' | 'month' | 'week'; label: string; key: string }[] = []
       const goalLower = goal.trim().toLowerCase()
       
@@ -94,7 +83,7 @@ export default function YearSection({
       
       return { goal, copiedTo }
     })
-  }, [goals, periodGoals, year, currentYear])
+  }, [filteredGoals, periodGoals, year, currentYear])
 
   return (
     <div className="space-y-3">
@@ -140,10 +129,10 @@ export default function YearSection({
                   type="text"
                   value={editingText}
                   onChange={(e) => setEditingText(e.target.value)}
-                  onBlur={() => handleSaveEdit(index)}
+                  onBlur={() => saveEdit(index)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveEdit(index)
-                    if (e.key === 'Escape') { setEditingIndex(null); setEditingText('') }
+                    if (e.key === 'Enter') saveEdit(index)
+                    if (e.key === 'Escape') cancelEdit()
                   }}
                   className="flex-1 px-2 py-1 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                   autoFocus
@@ -171,7 +160,7 @@ export default function YearSection({
                 {(detailLevel === 'month' || detailLevel === 'quarter') && (
                   <div className="relative" ref={copyDropdownIndex === index ? dropdownRef : null}>
                     <button
-                      onClick={() => setCopyDropdownIndex(copyDropdownIndex === index ? null : index)}
+                      onClick={() => toggleDropdown(index)}
                       className="text-gray-500 hover:text-blue-400 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
                       title="Копировать в период"
                     >
@@ -185,7 +174,7 @@ export default function YearSection({
                             key={q}
                             onClick={() => {
                               onCopyGoal(goal, 'quarter', `${year}-Q${q}`)
-                              setCopyDropdownIndex(null)
+                              closeDropdown()
                             }}
                             className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                           >
@@ -198,7 +187,7 @@ export default function YearSection({
                             key={mIdx}
                             onClick={() => {
                               onCopyGoal(goal, 'month', `${year}-${String(mIdx + 1).padStart(2, '0')}`)
-                              setCopyDropdownIndex(null)
+                              closeDropdown()
                             }}
                             className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                           >
@@ -234,7 +223,7 @@ export default function YearSection({
                                   key={w.num}
                                   onClick={() => {
                                     onCopyGoal(goal, 'week', `${year}-${String(currMonth + 1).padStart(2, '0')}-W${w.num}`)
-                                    setCopyDropdownIndex(null)
+                                    closeDropdown()
                                   }}
                                   className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
                                 >
@@ -250,10 +239,7 @@ export default function YearSection({
                 )}
 
                 <button
-                  onClick={() => {
-                    setEditingIndex(index)
-                    setEditingText(goal)
-                  }}
+                  onClick={() => startEdit(index, goal)}
                   className="text-gray-500 hover:text-gray-300 p-1 rounded hover:bg-gray-800 transition-colors text-sm"
                   title="Редактировать"
                 >

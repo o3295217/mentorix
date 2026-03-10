@@ -76,7 +76,9 @@ ai-assistant-spec/
 │   │   ├── YearSection.tsx    # Цели года (плоский, без аккордеона)
 │   │   ├── HalfYearSection.tsx
 │   │   ├── QuarterSection.tsx # Цели квартала (плоский, без аккордеона)
-│   │   └── MonthSection.tsx   # Месяц + WeekStrip (компактные бейджи недель)
+│   │   ├── MonthSection.tsx    # Месяц: цели + композиция WeekStrip + WeekCard
+│   │   ├── WeekStrip.tsx      # Компактные бейджи W1-W5 с мини-прогрессом
+│   │   └── WeekCard.tsx       # Раскрытая неделя: цели, checkbox, priority, drag
 │   ├── DatePickerWithIndicators.tsx
 │   ├── Speedometer.tsx       # Прогресс к мечте
 │   ├── BalanceFlags.tsx      # Флаги баланса
@@ -93,6 +95,8 @@ ai-assistant-spec/
 │   ├── useDaily.ts           # Логика дневного планирования (~1100 строк)
 │   ├── useGoals.ts           # Управление целями (~500 строк)
 │   ├── useGoalsCopy.ts       # Копирование целей между периодами
+│   ├── useInlineEdit.ts      # Хук inline-редактирования целей
+│   ├── useCopyDropdown.ts    # Хук dropdown копирования в период
 │   └── useForecast.ts        # Логика прогнозов (~224 строки)
 ├── lib/                      # Утилиты и конфигурация
 │   ├── prisma.ts             # Prisma Client singleton
@@ -823,7 +827,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (14 основных + 6 для целей)
+### Список компонентов (14 основных + 8 для целей)
 
 **Основные:**
 - `AuthGuard`
@@ -847,6 +851,8 @@ export async function getUserStatsForAI(): Promise<string>
 - `goals/MonthSection`
 - `goals/QuarterSection`
 - `goals/TimelineNav`
+- `goals/WeekCard`
+- `goals/WeekStrip`
 - `goals/YearSection`
 
 ### Иерархия компонентов целей
