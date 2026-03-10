@@ -62,9 +62,9 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
     if (!action) return '—'
     switch (action.type) {
       case 'transfer': return `→ ${format(new Date(action.date), 'd MMM', { locale: ru })}`
-      case 'backlog': return '📋 В задачи'
-      case 'completed': return '✅ Выполнено'
-      case 'skip': return '⏭️ Пропустить'
+      case 'backlog': return ' В задачи'
+      case 'completed': return ' Выполнено'
+      case 'skip': return '⏭ Пропустить'
     }
   }
 
@@ -72,24 +72,24 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-gray-900/80 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            📝 Невыполненные задачи
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-xl font-bold text-white">
+             Невыполненные задачи
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm text-gray-400 mt-1">
             Что делать с задачами, которые не были выполнены?
           </p>
         </div>
 
         {/* Quick actions */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+        <div className="p-4 border-b border-gray-700 bg-gray-700/50">
           <button
             onClick={handleTransferAll}
-            className="text-sm px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
+            className="px-3 py-1.5 rounded-lg transition bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
           >
-            📅 Все на завтра
+             Все на завтра
           </button>
         </div>
 
@@ -98,21 +98,21 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
           {tasks.map(task => (
             <div 
               key={task.id}
-              className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3"
+              className="bg-gray-700/50 rounded-lg p-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-gray-900 dark:text-white text-sm">
+                  <p className="text-white text-sm">
                     {task.taskText}
                   </p>
                   {task.transferCount && task.transferCount >= 3 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      ⚠️ Переносится {task.transferCount}-й раз. Может разбить на шаги?
+                    <p className="text-xs text-amber-400 mt-1">
+                       Переносится {task.transferCount}-й раз. Может разбить на шаги?
                     </p>
                   )}
                 </div>
                 <div className="flex-shrink-0">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-xs text-gray-400">
                     {getActionLabel(decisions[task.id])}
                   </span>
                 </div>
@@ -122,53 +122,37 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   onClick={() => setAction(task.id, { type: 'transfer', date: tomorrow })}
-                  className={`text-xs px-2 py-1 rounded transition ${
-                    decisions[task.id]?.type === 'transfer' 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                  }`}
+                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
-                  📅 Завтра
+                   Завтра
                 </button>
                 
                 <button
                   onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 transition"
+                  className="text-xs px-2 py-1 rounded text-gray-300 transition bg-gray-600 hover:bg-gray-500"
                 >
-                  📆 Другая дата
+                   Другая дата
                 </button>
 
                 <button
                   onClick={() => setAction(task.id, { type: 'backlog' })}
-                  className={`text-xs px-2 py-1 rounded transition ${
-                    decisions[task.id]?.type === 'backlog' 
-                      ? 'bg-purple-500 text-white' 
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                  }`}
+                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'backlog' ? 'bg-purple-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
-                  📋 В задачи
+                   В задачи
                 </button>
 
                 <button
                   onClick={() => setAction(task.id, { type: 'completed' })}
-                  className={`text-xs px-2 py-1 rounded transition ${
-                    decisions[task.id]?.type === 'completed' 
-                      ? 'bg-green-500 text-white' 
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                  }`}
+                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
-                  ✅ Выполнено
+                   Выполнено
                 </button>
 
                 <button
                   onClick={() => setAction(task.id, { type: 'skip' })}
-                  className={`text-xs px-2 py-1 rounded transition ${
-                    decisions[task.id]?.type === 'skip' 
-                      ? 'bg-gray-500 text-white' 
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                  }`}
+                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'skip' ? 'bg-gray-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
-                  ⏭️ Пропустить
+                  ⏭ Пропустить
                 </button>
               </div>
 
@@ -180,7 +164,7 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
                     value={customDate[task.id] || tomorrow}
                     onChange={(e) => setCustomDate(prev => ({ ...prev, [task.id]: e.target.value }))}
                     min={tomorrow}
-                    className="text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="text-sm px-2 py-1 border border-gray-700 rounded text-white bg-gray-700"
                   />
                   <button
                     onClick={() => {
@@ -197,15 +181,15 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+        <div className="p-4 border-t border-gray-700 flex justify-between items-center">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
+            className="px-4 py-2 text-gray-400 hover:text-gray-200 transition"
           >
             Отмена
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-gray-400">
               {Object.keys(decisions).length}/{tasks.length} задач
             </span>
             <button

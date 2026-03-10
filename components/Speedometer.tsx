@@ -41,11 +41,11 @@ export default function Speedometer({
 
   // Статус относительно плана (сравниваем прогноз с целью)
   const getStatus = (years: number) => {
-    if (years === Infinity) return { color: '#dc2626', bg: 'from-red-500 to-red-600', label: 'Критично', emoji: '🚨' }
-    if (years <= targetYears * 1.1) return { color: '#10b981', bg: 'from-emerald-400 to-emerald-500', label: 'В графике', emoji: '🚀' }
-    if (years <= targetYears * 1.5) return { color: '#f59e0b', bg: 'from-amber-400 to-amber-500', label: 'Отставание', emoji: '⚠️' }
-    if (years <= targetYears * 2) return { color: '#f97316', bg: 'from-orange-500 to-orange-600', label: 'Сильное отставание', emoji: '🔶' }
-    return { color: '#dc2626', bg: 'from-red-500 to-red-600', label: 'Критично', emoji: '🚨' }
+    if (years === Infinity) return { color: '#dc2626', bg: 'from-red-500 to-red-600', label: 'Критично', emoji: '' }
+    if (years <= targetYears * 1.1) return { color: '#10b981', bg: 'from-emerald-400 to-emerald-500', label: 'В графике', emoji: '' }
+    if (years <= targetYears * 1.5) return { color: '#f59e0b', bg: 'from-amber-400 to-amber-500', label: 'Отставание', emoji: '' }
+    if (years <= targetYears * 2) return { color: '#f97316', bg: 'from-orange-500 to-orange-600', label: 'Сильное отставание', emoji: '' }
+    return { color: '#dc2626', bg: 'from-red-500 to-red-600', label: 'Критично', emoji: '' }
   }
 
   const { color, bg, label, emoji } = getStatus(yearsToGoal)
@@ -78,18 +78,18 @@ export default function Speedometer({
     <div className="w-full max-w-md mx-auto">
       {/* Главный блок — ПРОГНОЗ */}
       <div className="text-center mb-6">
-        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 font-medium">
+        <div className="text-xs text-gray-400 uppercase tracking-wide mb-2 font-medium">
           Прогноз достижения мечты
         </div>
         <div className="text-7xl font-bold font-mono tracking-tight" style={{ color }}>
           {forecast.value}
         </div>
-        <div className="text-lg text-gray-500 dark:text-gray-400">{forecast.unit}</div>
+        <div className="text-lg text-gray-400">{forecast.unit}</div>
         
         {/* Сравнение с планом */}
         <div className="mt-3 flex items-center justify-center gap-3">
-          <div className="text-sm text-gray-400 dark:text-gray-400">
-            План: <span className="font-semibold text-gray-600 dark:text-gray-300">{targetYears} лет</span>
+          <div className="text-gray-400">
+            План: <span className="font-semibold text-gray-300">{targetYears} лет</span>
           </div>
           <div 
             className="text-sm font-bold px-2 py-0.5 rounded"
@@ -98,7 +98,7 @@ export default function Speedometer({
               color: color
             }}
           >
-            {diffYears > 0 ? diffText : '✓ Успеваем'}
+            {diffYears > 0 ? diffText : ' Успеваем'}
           </div>
         </div>
       </div>
@@ -113,15 +113,15 @@ export default function Speedometer({
       </div>
 
       {/* Текущая скорость */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 mb-4">
+      <div className="bg-gray-900/80 rounded-2xl border border-gray-700 shadow-sm p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Текущая скорость</span>
+          <span className="text-sm text-gray-400">Текущая скорость</span>
           <span className="text-2xl font-bold font-mono" style={{ color }}>{speed.toFixed(1)}</span>
         </div>
 
         {/* Прогресс-бар */}
         <div className="relative mb-2">
-          <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700">
+          <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-700">
             <div className="w-[40%] bg-red-200" />
             <div className="w-[30%] bg-amber-200" />
             <div className="w-[30%] bg-emerald-200" />
@@ -138,7 +138,7 @@ export default function Speedometer({
           {/* Маркер нужной скорости */}
           {neededSpeed > 0 && neededSpeed <= 10 && (
             <div 
-              className="absolute top-1/2 w-0.5 h-5 bg-gray-800 dark:bg-gray-200 rounded"
+              className="absolute top-1/2 w-0.5 h-5 rounded bg-gray-700"
               style={{ 
                 left: `${(neededSpeed / maxSpeed) * 100}%`,
                 transform: 'translate(-50%, -50%)'
@@ -148,7 +148,7 @@ export default function Speedometer({
           )}
         </div>
 
-        <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
+        <div className="flex justify-between text-xs text-gray-500">
           <span>0</span>
           <span>4</span>
           <span>7</span>
@@ -157,28 +157,28 @@ export default function Speedometer({
 
         {/* Подсказка о нужной скорости */}
         {diffYears > 0 && neededSpeed <= 10 && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-3 pt-3 border-t border-gray-700 text-center">
+            <span className="text-xs text-gray-400">
               Чтобы уложиться в {targetYears} лет, нужна скорость{' '}
-              <span className="font-bold text-gray-700 dark:text-gray-200">{neededSpeed.toFixed(1)}</span>
+              <span className="font-bold text-gray-200">{neededSpeed.toFixed(1)}</span>
             </span>
           </div>
         )}
       </div>
 
       {/* Прогресс к мечте */}
-      <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3">
+      <div className="bg-gray-900/80/60 rounded-xl p-3">
         <div className="flex justify-between text-xs mb-1.5">
-          <span className="text-gray-500 dark:text-gray-400">Прогресс к мечте</span>
-          <span className="font-medium text-gray-700 dark:text-gray-200">{productiveDays} / {targetDays} дней</span>
+          <span className="text-gray-400">Прогресс к мечте</span>
+          <span className="font-medium text-gray-200">{productiveDays} / {targetDays} дней</span>
         </div>
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+        <div className="w-full bg-gray-700 rounded-full h-1.5">
           <div 
             className="h-1.5 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <div className="text-right text-xs text-gray-400 dark:text-gray-500 mt-1">{progressPercent.toFixed(1)}%</div>
+        <div className="text-right text-xs text-gray-500 mt-1">{progressPercent.toFixed(1)}%</div>
       </div>
     </div>
   )

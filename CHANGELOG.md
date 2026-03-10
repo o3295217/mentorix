@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-03-10 — docs: обновление документации — Landing, LayoutFooter, онбординг, layout-структура
+- 🧩 Компоненты: 16 файлов (AuthGuard, BalanceFlags, DatePickerWithIndicators...)
+- 📄 Страницы: 17 файлов
+- ⚙️ Конфигурация: 1 файлов
+- 📦 Другое: 4 файлов
+
+
 ### 2026-03-06 — misc: auth pages, evaluation fixes, tasks, prompts, user guide update
 - 📝 Документация: 5 файлов
 

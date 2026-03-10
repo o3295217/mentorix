@@ -23,7 +23,7 @@ export default function HalfYearSection({
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingText, setEditingText] = useState('')
 
-  const bgClass = 'bg-gray-50 border-gray-200 dark:bg-gray-800/50 dark:border-gray-700'
+  const bgClass = 'bg-gray-800/50 border-gray-700'
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -49,7 +49,7 @@ export default function HalfYearSection({
         <span className="font-semibold">
           {half === 1 ? 'Первое полугодие' : 'Второе полугодие'}
         </span>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm text-gray-400">
           ({goals.length} {goals.length === 1 ? 'цель' : goals.length < 5 ? 'цели' : 'целей'})
         </span>
       </div>
@@ -62,7 +62,7 @@ export default function HalfYearSection({
           onChange={(e) => setNewGoal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder={`Цель на ${half === 1 ? 'первое' : 'второе'} полугодие...`}
-          className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-700 bg-white dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400"
+          className="flex-1 px-3 py-1.5 text-sm border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-700 bg-gray-900/80 text-gray-100"
         />
         <button
           onClick={handleAdd}
@@ -75,8 +75,8 @@ export default function HalfYearSection({
       {/* Список целей полугодия */}
       <div className="space-y-1">
         {goals.length === 0 ? (
-          <div className="text-center py-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-            <span className="text-2xl block mb-1">📋</span>
+          <div className="text-center py-4 bg-gray-800/50 rounded-lg border border-dashed border-gray-700">
+            
             <p className="text-gray-400 text-xs">
               Нет целей на {half === 1 ? 'первое' : 'второе'} полугодие
             </p>
@@ -85,7 +85,7 @@ export default function HalfYearSection({
           goals.map((goal, index) => (
             <div
               key={index}
-              className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm"
+              className="flex items-center gap-2 p-2 rounded-lg bg-gray-900/80 border border-gray-700 shadow-sm"
             >
               <span className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center text-white text-xs">
                 {index + 1}
@@ -100,12 +100,12 @@ export default function HalfYearSection({
                     if (e.key === 'Enter') handleSaveEdit(index)
                     if (e.key === 'Escape') { setEditingIndex(null); setEditingText('') }
                   }}
-                  className="flex-1 px-2 py-0.5 text-sm border-2 border-blue-300 dark:border-blue-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-800/50 dark:bg-gray-900 dark:text-gray-100"
+                  className="flex-1 px-2 py-0.5 text-sm border-2 border-blue-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-800/50"
                   autoFocus
                 />
               ) : (
                 <span 
-                  className="flex-1 text-sm cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  className="flex-1 text-sm cursor-pointer hover:text-blue-400 transition-colors"
                   onClick={() => {
                     setEditingIndex(index)
                     setEditingText(goal)
@@ -120,16 +120,16 @@ export default function HalfYearSection({
                   setEditingIndex(index)
                   setEditingText(goal)
                 }}
-                className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1 transition-colors text-xs"
+                className="text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded p-1 transition-colors text-xs"
                 title="Редактировать"
               >
-                ✏️
+                
               </button>
               <button
                 onClick={() => onRemoveGoal(index)}
-                className="text-red-400 hover:text-red-600 text-xs p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                className="text-red-400 hover:text-red-300 text-xs p-1 hover:bg-red-900/20 rounded transition-colors"
               >
-                ✕
+                
               </button>
             </div>
           ))

@@ -87,7 +87,7 @@ export default function GoalsPage() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === '/') {
         e.preventDefault()
-        showMessage('⌨️ Горячие клавиши: Esc=отмена, Ctrl+F=поиск, Enter=сохранить')
+        showMessage('Горячие клавиши: Esc=отмена, Ctrl+F=поиск, Enter=сохранить')
       }
     }
     document.addEventListener('keydown', handleKeyDown)
@@ -144,7 +144,7 @@ export default function GoalsPage() {
     const toParsed = parseWeekKey(toWeekKey)
     removePeriodGoal(fromWeekKey, goalIndex, 'week', fromParsed.weekStart, `Неделя ${fromParsed.weekNum}`)
     addPeriodGoal(toWeekKey, 'week', toParsed.weekStart, `Неделя ${toParsed.weekNum}`, goalText)
-    showMessage(`✅ Задача перемещена в W${toParsed.weekNum}`)
+    showMessage(`Задача перемещена в W${toParsed.weekNum}`)
   }
 
   // Обёртка для сохранения редактирования periodGoal
@@ -175,7 +175,7 @@ export default function GoalsPage() {
       <h1 className="text-3xl font-bold">Управление целями</h1>
 
       {/* Панель поиска и фильтров */}
-      <div className="card bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+      <div className="card bg-gray-900/80 border border-gray-700">
         <div className="flex flex-wrap gap-4 items-center">
           {/* Поиск */}
           <div className="flex-1 min-w-[200px]">
@@ -183,8 +183,8 @@ export default function GoalsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Поиск целей..."
-              className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50 focus:border-blue-400"
+              placeholder="Поиск целей..."
+              className="w-full px-4 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50 focus:border-blue-400"
             />
           </div>
           
@@ -192,33 +192,33 @@ export default function GoalsPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'completed')}
-            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50"
+            className="px-3 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50"
           >
-            <option value="all">📋 Все</option>
-            <option value="active">⏳ Активные</option>
-            <option value="completed">✅ Выполненные</option>
+            <option value="all">Все</option>
+            <option value="active">Активные</option>
+            <option value="completed">Выполненные</option>
           </select>
           
           {/* Фильтр по приоритету */}
           <select
             value={filterPriority ?? ''}
             onChange={(e) => setFilterPriority(e.target.value ? parseInt(e.target.value) : null)}
-            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50"
+            className="px-3 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50"
           >
-            <option value="">🎯 Все приоритеты</option>
-            <option value="3">🔴 Высокий</option>
-            <option value="2">🟡 Средний</option>
-            <option value="1">🟢 Низкий</option>
-            <option value="0">⚪ Без приоритета</option>
+            <option value="">Все приоритеты</option>
+            <option value="3">Высокий</option>
+            <option value="2">Средний</option>
+            <option value="1">Низкий</option>
+            <option value="0">Без приоритета</option>
           </select>
           
           {/* Фильтр по тегу */}
           <select
             value={filterTag ?? ''}
             onChange={(e) => setFilterTag(e.target.value || null)}
-            className="px-3 py-2 border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800/50"
+            className="px-3 py-2 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800/50"
           >
-            <option value="">🏷️ Все теги</option>
+            <option value="">Все теги</option>
             {(tags || []).map(tag => (
               <option key={tag.id} value={tag.name}>{tag.name}</option>
             ))}
@@ -226,9 +226,9 @@ export default function GoalsPage() {
         </div>
         
         {/* Управление тегами */}
-        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="mt-4 pt-4 border-t border-gray-700">
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Теги:</span>
+            <span className="text-sm text-gray-400 font-medium">Теги:</span>
             {(tags || []).map(tag => (
               <span 
                 key={tag.id}
@@ -240,7 +240,7 @@ export default function GoalsPage() {
                   onClick={() => deleteTag(tag.id)}
                   className="ml-1 hover:opacity-70"
                 >
-                  ✕
+                  
                 </button>
               </span>
             ))}
@@ -251,7 +251,7 @@ export default function GoalsPage() {
                 onChange={(e) => setNewTagName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
                 placeholder="Новый тег..."
-                className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-800/50"
+                className="px-2 py-1 text-xs border border-gray-700 rounded-lg w-24 focus:outline-none focus:ring-1 focus:ring-blue-800/50"
               />
               <input
                 type="color"
@@ -278,9 +278,9 @@ export default function GoalsPage() {
 
       {/* Иерархическое дерево целей */}
       {dreamGoal && (
-        <div className="card bg-white dark:bg-gray-800">
+        <div className="card bg-gray-900/80">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <span className="bg-primary-500 text-white p-2 rounded-lg">📊</span>
+            
             План достижения мечты
           </h2>
 
@@ -306,9 +306,9 @@ export default function GoalsPage() {
                   onCopyGoal={handleCopyGoal}
                 >
                   {detailLevel !== 'year' && (
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-3">
-                      <h4 className="font-semibold text-gray-600 dark:text-gray-300 text-sm flex items-center gap-2">
-                        <span>📋</span>
+                    <div className="border-t border-gray-700 pt-4 space-y-3">
+                      <h4 className="font-semibold text-gray-300 text-sm flex items-center gap-2">
+                        
                         Детализация по периодам:
                       </h4>
 
@@ -348,14 +348,14 @@ export default function GoalsPage() {
                                 periodGoals={periodGoals}
                               >
                                 {detailLevel === 'month' && (
-                                  <div className="border-t border-gray-100 pt-3 mt-3 space-y-2">
+                                  <div className="border-t border-gray-700 pt-3 mt-3 space-y-2">
                                     <div className="flex items-center justify-between mb-2">
-                                      <p className="text-base text-gray-500 font-medium">📅 Детализация по месяцам:</p>
+                                      <p className="text-base text-gray-400 font-medium">Детализация по месяцам:</p>
                                       <button
                                         onClick={() => setShowAllPeriods(!showAllPeriods)}
-                                        className="text-base text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 transition-colors px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                        className="text-base text-blue-500 hover:text-blue-400 transition-colors px-3 py-1.5 rounded hover:bg-blue-900/20"
                                       >
-                                        {showAllPeriods ? '🙈 Скрыть пустые' : '👁 Показать все'}
+                                        {showAllPeriods ? 'Скрыть пустые' : 'Показать все'}
                                       </button>
                                     </div>
                                     {[0, 1, 2].map(monthOffset => {
@@ -465,8 +465,8 @@ export default function GoalsPage() {
 
       {/* Message Toast */}
       {message && (
-        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
-          <p className="font-medium text-gray-900 dark:text-white">{message}</p>
+        <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
+          <p className="font-medium text-white">{message}</p>
         </div>
       )}
     </div>

@@ -101,10 +101,10 @@ export default function ProfilePage() {
         body: JSON.stringify(payload),
       })
 
-      showMessage('✅ Базовый профиль сохранён!')
+      showMessage(' Базовый профиль сохранён!')
     } catch (error) {
       console.error('Error saving profile:', error)
-      showMessage('❌ Ошибка при сохранении')
+      showMessage(' Ошибка при сохранении')
     } finally {
       setSaving(false)
     }
@@ -117,19 +117,19 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 p-6 flex items-center justify-center">
         <p>Загрузка...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-gray-950 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="card">
           <h1 className="text-3xl font-bold mb-2">Профиль пользователя</h1>
-          <p className="text-gray-600 dark:text-gray-300">
+          <p className="text-gray-300">
             Ваш профиль используется ИИ-коучем для персонализированных рекомендаций и оценок
           </p>
         </div>
@@ -140,10 +140,10 @@ export default function ProfilePage() {
 
           {/* Личное */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">Личное</h3>
+            <h3 className="text-lg font-semibold mb-4 text-gray-300">Личное</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Имя</span>
+                <span className="text-gray-300 font-medium mb-2 block">Имя</span>
                 <input
                   type="text"
                   value={profile.name}
@@ -154,7 +154,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Возраст</span>
+                <span className="text-gray-300 font-medium mb-2 block">Возраст</span>
                 <input
                   type="number"
                   value={profile.age}
@@ -165,7 +165,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Где живу</span>
+                <span className="text-gray-300 font-medium mb-2 block">Где живу</span>
                 <input
                   type="text"
                   value={profile.location}
@@ -176,7 +176,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Семейное положение</span>
+                <span className="text-gray-300 font-medium mb-2 block">Семейное положение</span>
                 <input
                   type="text"
                   value={profile.maritalStatus}
@@ -190,12 +190,12 @@ export default function ProfilePage() {
 
           {/* Профессиональная информация */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-semibold mb-4 text-gray-300 pt-4 border-t border-gray-700">
               Профессиональное
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Должность</span>
+                <span className="text-gray-300 font-medium mb-2 block">Должность</span>
                 <input
                   type="text"
                   value={profile.occupation}
@@ -206,7 +206,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Вид деятельности</span>
+                <span className="text-gray-300 font-medium mb-2 block">Вид деятельности</span>
                 <input
                   type="text"
                   value={profile.industry}
@@ -217,7 +217,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Размер команды</span>
+                <span className="text-gray-300 font-medium mb-2 block">Размер команды</span>
                 <input
                   type="number"
                   value={profile.teamSize}
@@ -228,7 +228,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Образование</span>
+                <span className="text-gray-300 font-medium mb-2 block">Образование</span>
                 <input
                   type="text"
                   value={profile.education}
@@ -240,7 +240,7 @@ export default function ProfilePage() {
             </div>
 
             <label className="block mt-4">
-              <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Опыт работы</span>
+              <span className="text-gray-300 font-medium mb-2 block">Опыт работы</span>
               <textarea
                 value={profile.workExperience}
                 onChange={(e) => handleChange('workExperience', e.target.value)}
@@ -253,12 +253,12 @@ export default function ProfilePage() {
 
           {/* Личные интересы */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-semibold mb-4 text-gray-300 pt-4 border-t border-gray-700">
               Интересы
             </h3>
             <div className="space-y-4">
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Хобби</span>
+                <span className="text-gray-300 font-medium mb-2 block">Хобби</span>
                 <input
                   type="text"
                   value={profile.hobbies}
@@ -269,7 +269,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Спорт</span>
+                <span className="text-gray-300 font-medium mb-2 block">Спорт</span>
                 <input
                   type="text"
                   value={profile.sports}
@@ -283,12 +283,12 @@ export default function ProfilePage() {
 
           {/* Ценности и вызовы */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-semibold mb-4 text-gray-300 pt-4 border-t border-gray-700">
               Ценности и приоритеты
             </h3>
             <div className="space-y-4">
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Мои ценности</span>
+                <span className="text-gray-300 font-medium mb-2 block">Мои ценности</span>
                 <textarea
                   value={profile.values}
                   onChange={(e) => handleChange('values', e.target.value)}
@@ -299,7 +299,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Текущие вызовы</span>
+                <span className="text-gray-300 font-medium mb-2 block">Текущие вызовы</span>
                 <textarea
                   value={profile.challenges}
                   onChange={(e) => handleChange('challenges', e.target.value)}
@@ -310,7 +310,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="block">
-                <span className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">Другое</span>
+                <span className="text-gray-300 font-medium mb-2 block">Другое</span>
                 <textarea
                   value={profile.other}
                   onChange={(e) => handleChange('other', e.target.value)}
@@ -330,7 +330,7 @@ export default function ProfilePage() {
 
         {/* Message Toast */}
         {message && (
-          <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
+          <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
             <p className="font-medium">{message}</p>
           </div>
         )}

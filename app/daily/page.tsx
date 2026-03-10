@@ -299,16 +299,16 @@ export default function DailyPage() {
         <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
       </div>
 
-      <p className="text-lg text-gray-600 dark:text-gray-400">
+      <p className="text-lg text-gray-400">
         {mounted ? format(new Date(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
       </p>
 
       {/* Context from periods */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
-          <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-100 mb-3">{weekLabel}:</h3>
+        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <h3 className="font-semibold text-lg text-blue-200 mb-3">{weekLabel}:</h3>
           {weekGoals.length > 0 ? (
-            <ul className="text-base text-blue-800 dark:text-blue-200 space-y-1.5">
+            <ul className="text-base text-blue-300 space-y-1.5">
               {weekGoals.map((goal, index) => {
                 // Используем статус из API (за весь период) или проверяем задачи текущего дня
                 const goalText = typeof goal === 'string' ? goal : goal.text
@@ -317,16 +317,16 @@ export default function DailyPage() {
                 const completed = completedInPeriod || completedToday
                 return (
                   <li key={index} className="flex items-center gap-2 leading-normal">
-                    <span className={completed ? 'text-green-600 dark:text-green-400' : ''}>
-                      {completed ? '✅' : '•'}
+                    <span className={completed ? 'text-green-400' : 'text-gray-500'}>
+                      {completed ? '✓' : '•'}
                     </span>
-                    <span className={`flex-1 ${completed ? 'text-green-700 dark:text-green-300' : ''}`}>
+                    <span className={`flex-1 ${completed ? 'text-green-400' : ''}`}>
                       {goalText}
                     </span>
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100 text-sm px-3 py-1.5 bg-blue-100 dark:bg-blue-800 hover:bg-blue-200 dark:hover:bg-blue-700 rounded-md whitespace-nowrap font-medium"
+                        className="text-blue-400 hover:text-blue-200 text-sm px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/20 rounded-md whitespace-nowrap font-medium"
                         title="Добавить в план дня"
                       >
                         → в план дня
@@ -337,14 +337,14 @@ export default function DailyPage() {
               })}
             </ul>
           ) : (
-            <p className="text-base text-blue-600 dark:text-blue-300">Не установлены</p>
+            <p className="text-base text-blue-400">Не установлены</p>
           )}
         </div>
 
-        <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700">
-          <h3 className="font-semibold text-lg text-purple-900 dark:text-purple-100 mb-3">{monthLabel}:</h3>
+        <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          <h3 className="font-semibold text-lg text-purple-200 mb-3">{monthLabel}:</h3>
           {monthGoals.length > 0 ? (
-            <ul className="text-base text-purple-800 dark:text-purple-200 space-y-1.5">
+            <ul className="text-base text-purple-300 space-y-1.5">
               {monthGoals.map((goal, index) => {
                 // Используем статус из API (за весь период) или проверяем задачи текущего дня
                 const goalText = typeof goal === 'string' ? goal : goal.text
@@ -353,16 +353,16 @@ export default function DailyPage() {
                 const completed = completedInPeriod || completedToday
                 return (
                   <li key={index} className="flex items-center gap-2 leading-normal">
-                    <span className={completed ? 'text-green-600 dark:text-green-400' : ''}>
-                      {completed ? '✅' : '•'}
+                    <span className={completed ? 'text-green-400' : 'text-gray-500'}>
+                      {completed ? '✓' : '•'}
                     </span>
-                    <span className={`flex-1 ${completed ? 'text-green-700 dark:text-green-300' : ''}`}>
+                    <span className={`flex-1 ${completed ? 'text-green-400' : ''}`}>
                       {goalText}
                     </span>
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-800 hover:bg-purple-200 dark:hover:bg-purple-700 rounded-md whitespace-nowrap font-medium"
+                        className="text-purple-400 hover:text-purple-200 text-sm px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/20 rounded-md whitespace-nowrap font-medium"
                         title="Добавить в план дня"
                       >
                         → в план дня
@@ -373,7 +373,7 @@ export default function DailyPage() {
               })}
             </ul>
           ) : (
-            <p className="text-base text-purple-600 dark:text-purple-300">Не установлены</p>
+            <p className="text-base text-purple-400">Не установлены</p>
           )}
         </div>
       </div>
@@ -383,14 +383,14 @@ export default function DailyPage() {
         {/* Plan - Left (60%) */}
         <div className="lg:col-span-3 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
-            <h2 className="text-xl font-bold">📝 План на день</h2>
+            <h2 className="text-xl font-bold">План на день</h2>
             {totalCount > 0 && (
               <span className={`text-sm px-3 py-1 rounded-full ${
-                completionPercent === 100 ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' :
-                completionPercent >= 50 ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300' :
-                'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                completionPercent === 100 ? 'bg-green-500/15 text-green-400' :
+                completionPercent >= 50 ? 'bg-yellow-500/15 text-yellow-400' :
+                'bg-gray-800 text-gray-400'
               }`}>
-                ✅ {completedCount}/{totalCount} ({completionPercent}%)
+                {completedCount}/{totalCount} ({completionPercent}%)
                 {extraDoneCount > 0 && ` +${extraDoneCount}`}
               </span>
             )}
@@ -409,7 +409,7 @@ export default function DailyPage() {
               }}
               placeholder="Добавить задачу..."
               rows={1}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
+              className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
               style={{ minHeight: '42px', height: 'auto' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
@@ -431,11 +431,11 @@ export default function DailyPage() {
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
 
             return (
-              <div className="group mb-4 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6 transition-all duration-200 hover:p-3">
+              <div className="group mb-4 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg mr-6 transition-all duration-200 hover:p-3">
                 {/* Компактный вид — одна строка */}
                 <div className="flex items-center gap-2">
-                  <span className="text-amber-600 dark:text-amber-400">🔄</span>
-                  <span className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                  
+                  <span className="text-sm text-amber-300 font-medium">
                     Привычки ({habits.length})
                   </span>
                   <div className="flex-1 flex gap-1 overflow-hidden group-hover:hidden">
@@ -446,11 +446,11 @@ export default function DailyPage() {
                           key={habit.id}
                           className={`text-xs px-2 py-0.5 rounded-full truncate max-w-[120px] ${
                             isInPlan
-                              ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400'
-                              : 'bg-amber-100 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300'
+                              ? 'bg-green-500/15 text-green-400'
+                              : 'bg-amber-500/15 text-amber-400'
                           }`}
                         >
-                          {isInPlan && '✓ '}{habit.taskText}
+                          {isInPlan && ' '}{habit.taskText}
                         </span>
                       )
                     })}
@@ -469,7 +469,7 @@ export default function DailyPage() {
                 </div>
                 
                 {/* Развёрнутый вид — при наведении */}
-                <div className="hidden group-hover:block mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
+                <div className="hidden group-hover:block mt-2 pt-2 border-t border-amber-500/20">
                   <div className="flex flex-wrap gap-1">
                     {habits.map((habit) => {
                       const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
@@ -478,8 +478,8 @@ export default function DailyPage() {
                           key={habit.id}
                           className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
                             isInPlan
-                              ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 line-through opacity-60'
-                              : 'bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200'
+                              ? 'bg-green-500/15 text-green-400 line-through opacity-60'
+                              : 'bg-amber-500/15 text-amber-300'
                           }`}
                         >
                           <button
@@ -488,9 +488,9 @@ export default function DailyPage() {
                             title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
                             disabled={isInPlan}
                           >
-                            {isInPlan && '✓ '}
+                            {isInPlan && ' '}
                             {habit.taskText}
-                            {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>🔥{habit.streak}</span>}
+                            {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>{habit.streak}</span>}
                           </button>
                           <button
                             onClick={(e) => {
@@ -502,7 +502,7 @@ export default function DailyPage() {
                             className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
                             title="Удалить привычку"
                           >
-                            ✕
+                            
                           </button>
                         </span>
                       )
@@ -515,28 +515,28 @@ export default function DailyPage() {
 
           {/* Предложения создать привычки */}
           {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).length > 0 && (
-            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg mr-6">
-              <h3 className="font-medium text-amber-900 dark:text-amber-100 text-sm mb-2">💡 Сделать привычкой?</h3>
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mr-6">
+              <h3 className="font-medium text-amber-200 text-sm mb-2">Сделать привычкой?</h3>
               <div className="space-y-2">
                 {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).slice(0, 3).map((suggestion, index) => (
                   <div key={index} className="flex items-center justify-between text-sm gap-2">
-                    <span className="text-amber-800 dark:text-amber-200 truncate flex-1">
+                    <span className="text-amber-300 truncate flex-1">
                       "{suggestion.text}" — {suggestion.totalCount} раз
                     </span>
                     <div className="flex gap-1 flex-shrink-0">
                       <button
                         onClick={() => createHabitFromTask(suggestion.text)}
-                        className="w-6 h-6 flex items-center justify-center bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white text-sm rounded transition-colors"
+                        className="w-6 h-6 flex items-center justify-center bg-green-600 hover:bg-green-500 text-white text-sm rounded transition-colors"
                         title="Создать привычку"
                       >
-                        ✓
+                        
                       </button>
                       <button
                         onClick={() => setDismissedSuggestions(prev => new Set([...prev, suggestion.text]))}
-                        className="w-6 h-6 flex items-center justify-center bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500 text-white text-sm rounded transition-colors"
+                        className="w-6 h-6 flex items-center justify-center bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
                         title="Скрыть"
                       >
-                        ✕
+                        
                       </button>
                     </div>
                   </div>
@@ -567,18 +567,18 @@ export default function DailyPage() {
                         editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
                       } ${
                     selectedTasks.has(task.id)
-                      ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700'
+                      ? 'bg-green-500/10 border-green-500/20'
                       : savedFlags[index]
-                        ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 opacity-60'
+                        ? 'bg-gray-900/80 border-gray-700 hover:border-gray-600'
+                        : 'bg-gray-900/80 border-gray-700 hover:border-gray-600 opacity-60'
                   } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                 >
-                  <span className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing">⋮⋮</span>
+                  <span className="text-gray-500 cursor-grab active:cursor-grabbing">⋮⋮</span>
                   <input
                     type="checkbox"
                     checked={selectedTasks.has(task.id)}
                     onChange={() => toggleTaskSelection(task.id)}
-                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                    className="w-5 h-5 text-green-400 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                   />
 
                   {editingTaskId === task.id ? (
@@ -596,48 +596,45 @@ export default function DailyPage() {
                       }}
                       onBlur={() => saveEditedTask(task.id)}
                       autoFocus
-                      className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white dark:border-primary-600"
+                      className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100"
                     />
                   ) : (
                     <span
-                      className={`flex-1 text-base text-gray-900 dark:text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-500 dark:text-gray-400' : ''}`}
+                      className={`flex-1 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
                       onDoubleClick={() => startEditingTask(task.id, task.taskText)}
                       title="Дважды кликните для редактирования"
                     >
                       {task.taskText}
-                      {getHabitForTask(task.taskText) && (
-                        <span className="ml-1 text-amber-500 text-xs" title="Это привычка">🔄</span>
-                      )}
                     </span>
                   )}
 
                   {/* Кнопка перенести на завтра */}
                   {confirmAction?.taskId === task.id && confirmAction.type === 'postpone' ? (
-                    <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/50 rounded px-1">
-                      <span className="text-xs text-blue-700 dark:text-blue-300">На завтра?</span>
+                    <div className="flex items-center gap-1 bg-blue-500/15 rounded px-1">
+                      <span className="text-xs text-blue-400">На завтра?</span>
                       <button
                         onClick={() => {
                           postponeTask(task.id, task.taskText)
                           setConfirmAction(null)
                         }}
-                        className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                        className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
                       >
-                        ✓
+                        
                       </button>
                       <button
                         onClick={() => setConfirmAction(null)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
                       >
-                        ✕
+                        
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmAction({ taskId: task.id, type: 'postpone' })}
-                      className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
+                      className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-400 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
                       title="Перенести на завтра"
                     >
-                      ➡️
+                      →
                     </button>
                   )}
 
@@ -653,10 +650,10 @@ export default function DailyPage() {
                               deleteHabit(habit.id)
                             }
                           }}
-                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-all"
+                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-red-500 hover:bg-gray-700 rounded transition-all"
                           title="Снять цикличность (удалить привычку)"
                         >
-                          ⏹️
+                          ×
                         </button>
                       )
                     } else {
@@ -664,40 +661,40 @@ export default function DailyPage() {
                       return (
                         <button
                           onClick={() => openHabitModal(task.taskText)}
-                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
+                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
                           title="Сделать привычкой"
                         >
-                          🔄
+                          ↻
                         </button>
                       )
                     }
                   })()}
                   {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
-                    <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/50 rounded px-1">
-                      <span className="text-xs text-red-700 dark:text-red-300">Удалить?</span>
+                    <div className="flex items-center gap-1 bg-red-900/50 rounded px-1">
+                      <span className="text-xs text-red-300">Удалить?</span>
                       <button
                         onClick={() => {
                           removeTask(task.id)
                           setConfirmAction(null)
                         }}
-                        className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                        className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
                       >
-                        ✓
+                        
                       </button>
                       <button
                         onClick={() => setConfirmAction(null)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
                       >
-                        ✕
+                        
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmAction({ taskId: task.id, type: 'delete' })}
-                      className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
                       title="Удалить задачу"
                     >
-                      ✕
+                      
                     </button>
                   )}
                 </div>
@@ -710,13 +707,13 @@ export default function DailyPage() {
                     {/* Карточка "Выполнено" в стиле задачи */}
                     <div
                       onClick={() => setShowCompleted(!showCompleted)}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg border cursor-pointer transition-colors bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 hover:border-green-400 dark:hover:border-green-600"
+                      className="flex items-center gap-2 py-1 px-2 rounded-lg border cursor-pointer transition-colors bg-green-900/20 border-green-500/20 hover:border-green-600"
                     >
-                      <span className="text-gray-400 dark:text-gray-500 text-xs w-4 text-center">
+                      <span className="text-gray-500 text-xs w-4 text-center">
                         {showCompleted ? '▼' : '▶'}
                       </span>
-                      <span className="text-green-600 dark:text-green-400">✅</span>
-                      <span className="flex-1 text-base text-green-700 dark:text-green-300 font-medium">
+                      
+                      <span className="flex-1 text-base text-green-400 font-medium">
                         Выполнено ({tasks.filter(t => selectedTasks.has(t.id)).length})
                       </span>
                     </div>
@@ -728,39 +725,39 @@ export default function DailyPage() {
                       {tasks.filter(t => selectedTasks.has(t.id)).map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 opacity-50 hover:opacity-70"
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-gray-900/80 border-gray-700 opacity-50 hover:opacity-70"
                         >
-                          <span className="text-gray-400 dark:text-gray-500 w-4"></span>
+                          
                           <input
                             type="checkbox"
                             checked={true}
                             onChange={() => toggleTaskSelection(task.id)}
-                            className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                            className="w-5 h-5 text-green-400 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                           />
-                          <span className="flex-1 text-base text-gray-500 dark:text-gray-400">
+                          <span className="flex-1 text-base text-gray-400">
                             {task.taskText}
                           </span>
                           {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
-                            <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/50 rounded px-1">
-                              <span className="text-xs text-red-700 dark:text-red-300">Удалить?</span>
+                            <div className="flex items-center gap-1 bg-red-900/50 rounded px-1">
+                              <span className="text-xs text-red-300">Удалить?</span>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   removeTask(task.id)
                                   setConfirmAction(null)
                                 }}
-                                className="w-5 h-5 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-800 rounded text-xs"
+                                className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
                               >
-                                ✓
+                                
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   setConfirmAction(null)
                                 }}
-                                className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-xs"
+                                className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
                               >
-                                ✕
+                                
                               </button>
                             </div>
                           ) : (
@@ -769,10 +766,10 @@ export default function DailyPage() {
                                 e.stopPropagation()
                                 setConfirmAction({ taskId: task.id, type: 'delete' })
                               }}
-                              className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                              className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
                               title="Удалить задачу"
                             >
-                              ✕
+                              
                             </button>
                           )}
                         </div>
@@ -785,8 +782,8 @@ export default function DailyPage() {
           </div>
 
           {/* Вне плана (перевыполнение) */}
-          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mr-6">
-            <h3 className="font-medium text-base text-gray-700 dark:text-gray-300 mb-2">➕ Вне плана (перевыполнение)</h3>
+          <div className="mt-4 p-3 bg-gray-900 border border-gray-700 rounded-lg mr-6">
+            <h3 className="font-medium text-base text-gray-300 mb-2">+ Вне плана (перевыполнение)</h3>
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
@@ -799,7 +796,7 @@ export default function DailyPage() {
                   }
                 }}
                 placeholder="Добавить сделанное вне плана..."
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100 placeholder-gray-400"
               />
               <button onClick={addExtraTask} className="btn-primary text-sm py-2">
                 Добавить
@@ -809,14 +806,14 @@ export default function DailyPage() {
             {extraTasks.length > 0 && (
               <div className="space-y-1">
                 {extraTasks.map((text, index) => (
-                  <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100">
+                  <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100">
                     <span className="flex-1">{text}</span>
                     <button
                       onClick={() => removeExtraTask(index)}
-                      className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
+                      className="text-red-500 hover:text-red-400 text-sm px-2 py-1"
                       title="Удалить"
                     >
-                      ✕
+                      
                     </button>
                   </div>
                 ))}
@@ -831,7 +828,7 @@ export default function DailyPage() {
               disabled={saving} 
               className={`btn-primary disabled:opacity-50 w-full ${hasUnsavedChanges ? 'ring-2 ring-orange-400 ring-offset-2' : ''}`}
             >
-              {saving ? 'Сохранение...' : hasUnsavedChanges ? '⚠️ Сохранить план' : '💾 Сохранить план'}
+              {saving ? 'Сохранение...' : hasUnsavedChanges ? 'Сохранить план' : 'Сохранить план'}
             </button>
           </div>
         </div>
@@ -839,14 +836,14 @@ export default function DailyPage() {
         {/* Chat - Right (40%) */}
         <div className="lg:col-span-2 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
-            <h2 className="text-xl font-bold">💬 Обсуждение плана с ION</h2>
+            <h2 className="text-xl font-bold">Обсуждение плана с ION</h2>
             {chatMessages.length > 0 && (
               <button 
                 onClick={clearChat}
-                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-sm text-gray-400 hover:text-gray-200"
                 title="Очистить чат"
               >
-                🗑️ Очистить
+                Очистить
               </button>
             )}
           </div>
@@ -854,37 +851,37 @@ export default function DailyPage() {
           {/* Сообщения чата - занимает всё свободное пространство */}
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 py-2 pl-2 pr-6 bg-gray-50 dark:bg-gray-800 rounded-l-lg chat-scrollbar"
+            className="flex-1 overflow-y-auto space-y-3 py-2 pl-2 pr-6 bg-gray-900 rounded-l-lg chat-scrollbar"
           >
             {chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
-                <p className="text-center text-gray-400 dark:text-gray-500 text-sm mb-4">Спросите ION:</p>
+                <p className="text-center text-gray-500 text-sm mb-4">Спросите ION:</p>
                 <button
                   onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации')}
                   disabled={sendingChat || tasks.length === 0}
-                  className="w-full p-3 text-left bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <span className="text-lg mr-2">🔍</span>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Проанализировать план</span>
+
+                  <span className="text-sm font-medium text-gray-200">Проанализировать план</span>
                 </button>
                 <button
                   onClick={() => sendChatMessage('Оцени временные затраты на каждую задачу и скажи, реалистичен ли план по времени')}
                   disabled={sendingChat || tasks.length === 0}
-                  className="w-full p-3 text-left bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <span className="text-lg mr-2">⏰</span>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Оценить время</span>
+
+                  <span className="text-sm font-medium text-gray-200">Оценить время</span>
                 </button>
                 <button
                   onClick={() => sendChatMessage('Как мой план связан с целями недели и месяца? Какие задачи стоит добавить?')}
                   disabled={sendingChat || tasks.length === 0}
-                  className="w-full p-3 text-left bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <span className="text-lg mr-2">🎯</span>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Связь с целями</span>
+
+                  <span className="text-sm font-medium text-gray-200">Связь с целями</span>
                 </button>
                 {tasks.length === 0 && (
-                  <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-2">
+                  <p className="text-center text-xs text-gray-500 mt-2">
                     Добавьте задачи в план
                   </p>
                 )}
@@ -895,13 +892,13 @@ export default function DailyPage() {
                   key={index}
                   className={`p-3 rounded-lg ${
                     msg.role === 'user'
-                      ? 'bg-primary-100 dark:bg-primary-900/30'
-                      : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
+                      ? 'bg-primary-900/30'
+                      : 'bg-gray-800 border border-gray-700'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium">
-                      {msg.role === 'user' ? `👤 ${userName}` : '🤖 ION'}
+                      {msg.role === 'user' ? userName : 'ION'}
                     </span>
                   </div>
                   <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
@@ -909,9 +906,9 @@ export default function DailyPage() {
               ))
             )}
             {sendingChat && (
-              <div className="p-3 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+              <div className="p-3 rounded-lg bg-gray-800 border border-gray-700">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">🤖 ION</span>
+                  <span className="text-sm font-medium">ION</span>
                   <span className="text-sm text-gray-400">печатает...</span>
                 </div>
               </div>
@@ -937,24 +934,24 @@ export default function DailyPage() {
               placeholder="Напишите сообщение..."
               disabled={sendingChat}
               rows={1}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-800 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
+              className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 bg-gray-800 text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
               style={{ minHeight: '42px' }}
             />
             <button
               onClick={() => sendChatMessage()}
               disabled={sendingChat || !chatInput.trim()}
-              className="self-end mb-0.5 w-10 h-10 flex items-center justify-center bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
+              className="self-end mb-0.5 w-10 h-10 flex items-center justify-center bg-primary-500 hover:bg-primary-600 disabled:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
             >
-              ➤
+              →
             </button>
           </div>
         </div>
       </div>
 
       {/* Evaluate */}
-      <div className="card bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-900/30 dark:to-purple-900/30 border border-primary-200 dark:border-primary-700">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Получить оценку дня от ION</h2>
-        <p className="text-base text-gray-700 dark:text-gray-300 mb-4">
+      <div className="card bg-gradient-to-r from-primary-900/30 to-purple-900/30 border border-primary-700">
+        <h2 className="text-xl font-bold mb-4 text-white">Получить оценку дня от ION</h2>
+        <p className="text-base text-gray-300 mb-4">
           После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
         </p>
         <button
@@ -965,45 +962,45 @@ export default function DailyPage() {
           {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
         </button>
         {dailyEntry?.evaluation && (
-          <p className="mt-4 text-base text-green-700 dark:text-green-400">
-            ✅ Оценка за этот день уже получена. Вы можете получить новую оценку.
+          <p className="mt-4 text-base text-green-400">
+            Оценка за этот день уже получена. Вы можете получить новую оценку.
           </p>
         )}
       </div>
 
       {message && (
-        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-200 dark:border-gray-700 z-50">
-          <p className="font-medium text-gray-900 dark:text-white">{message}</p>
+        <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
+          <p className="font-medium text-white">{message}</p>
         </div>
       )}
 
       {/* Модальное окно создания привычки */}
       {showHabitModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">🔄 Создать привычку</h3>
+          <div className="bg-gray-900/80 border border-gray-700 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-xl font-bold mb-4 text-white">Создать привычку</h3>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Задача:</label>
-              <p className="text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-2 rounded">{habitTaskText}</p>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Задача:</label>
+              <p className="text-gray-100 bg-gray-950 p-2 rounded">{habitTaskText}</p>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Повторять:</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Повторять:</label>
               <div className="space-y-2">
                 {[
-                  { value: 'daily', label: '📅 Ежедневно' },
-                  { value: 'weekdays', label: '💼 По будням (Пн-Пт)' },
-                  { value: 'weekends', label: '🌴 По выходным (Сб-Вс)' },
-                  { value: 'weekly', label: '📆 Раз в неделю' },
-                  { value: 'custom', label: '⚙️ Выбрать дни' },
+                  { value: 'daily', label: 'Ежедневно' },
+                  { value: 'weekdays', label: 'По будням (Пн-Пт)' },
+                  { value: 'weekends', label: 'По выходным (Сб-Вс)' },
+                  { value: 'weekly', label: 'Раз в неделю' },
+                  { value: 'custom', label: 'Выбрать дни' },
                 ].map(option => (
                   <label 
                     key={option.value} 
                     className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors ${
                       habitFrequency === option.value 
-                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' 
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                        ? 'border-amber-500 bg-amber-900/20' 
+                        : 'border-gray-700 hover:border-gray-600'
                     }`}
                   >
                     <input
@@ -1023,7 +1020,7 @@ export default function DailyPage() {
             {/* Выбор дней для weekly и custom */}
             {(habitFrequency === 'weekly' || habitFrequency === 'custom') && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дни недели:</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Дни недели:</label>
                 <div className="flex gap-1">
                   {[
                     { day: 1, label: 'Пн' },
@@ -1040,7 +1037,7 @@ export default function DailyPage() {
                       className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                         habitDays.includes(day)
                           ? 'bg-amber-500 text-white'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          : 'bg-gray-800 text-gray-200 hover:bg-gray-600'
                       }`}
                     >
                       {label}
@@ -1053,7 +1050,7 @@ export default function DailyPage() {
             <div className="flex gap-2 mt-6">
               <button
                 onClick={() => setShowHabitModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-700 text-gray-200 rounded-lg hover:bg-gray-800 transition-colors"
               >
                 Отмена
               </button>

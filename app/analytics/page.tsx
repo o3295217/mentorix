@@ -54,7 +54,7 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600">Загрузка...</div>
+        <div className="text-lg text-gray-400">Загрузка...</div>
       </div>
     )
   }
@@ -73,23 +73,23 @@ export default function AnalyticsPage() {
 
       {!stats ? (
         <div className="card text-center py-12">
-          <p className="text-gray-600">Недостаточно данных для анализа</p>
+          <p className="text-gray-400">Недостаточно данных для анализа</p>
         </div>
       ) : (
         <>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="card text-center">
-              <p className="text-sm text-gray-600 mb-1">Средняя оценка</p>
-              <p className="text-4xl font-bold text-primary-600">{stats.avg.toFixed(1)}</p>
+              <p className="text-sm text-gray-400 mb-1">Средняя оценка</p>
+              <p className="text-4xl font-bold text-blue-400">{stats.avg.toFixed(1)}</p>
             </div>
             <div className="card text-center">
-              <p className="text-sm text-gray-600 mb-1">Максимальная</p>
-              <p className="text-4xl font-bold text-green-600">{stats.max.toFixed(1)}</p>
+              <p className="text-sm text-gray-400 mb-1">Максимальная</p>
+              <p className="text-4xl font-bold text-green-400">{stats.max.toFixed(1)}</p>
             </div>
             <div className="card text-center">
-              <p className="text-sm text-gray-600 mb-1">Минимальная</p>
-              <p className="text-4xl font-bold text-red-600">{stats.min.toFixed(1)}</p>
+              <p className="text-sm text-gray-400 mb-1">Минимальная</p>
+              <p className="text-4xl font-bold text-red-400">{stats.min.toFixed(1)}</p>
             </div>
           </div>
 
@@ -115,24 +115,24 @@ export default function AnalyticsPage() {
           {/* Top and Worst Days */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="card">
-              <h2 className="text-xl font-bold mb-4 text-green-700">🏆 Лучшие дни</h2>
+              <h2 className="text-xl font-bold mb-4 text-green-400"> Лучшие дни</h2>
               <div className="space-y-2">
                 {stats.topDays.map((day) => (
-                  <div key={day.date} className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800/40">
+                  <div key={day.date} className="flex justify-between items-center p-3 bg-green-900/20 rounded-lg border border-green-800/40">
                     <span className="text-sm">{day.date}</span>
-                    <span className="font-bold text-green-700">{day.overallScore}</span>
+                    <span className="font-bold text-green-400">{day.overallScore}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="card">
-              <h2 className="text-xl font-bold mb-4 text-red-700">📉 Худшие дни</h2>
+              <h2 className="text-xl font-bold mb-4 text-red-400"> Худшие дни</h2>
               <div className="space-y-2">
                 {stats.worstDays.map((day) => (
-                  <div key={day.date} className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/40">
+                  <div key={day.date} className="flex justify-between items-center p-3 bg-red-900/20 rounded-lg border border-red-800/40">
                     <span className="text-sm">{day.date}</span>
-                    <span className="font-bold text-red-700">{day.overallScore}</span>
+                    <span className="font-bold text-red-400">{day.overallScore}</span>
                   </div>
                 ))}
               </div>

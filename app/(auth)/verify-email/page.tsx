@@ -88,10 +88,10 @@ function VerifyEmailForm() {
   // Показываем загрузку при верификации
   if (token && verifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 dark:text-gray-400">Подтверждение email...</p>
+          <p className="text-gray-400">Подтверждение email...</p>
         </div>
       </div>
     );
@@ -100,16 +100,16 @@ function VerifyEmailForm() {
   // Успешная верификация
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
+          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-6 text-center">
             <svg className="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <h2 className="text-xl font-semibold text-green-800 dark:text-green-200 mb-2">
+            <h2 className="text-xl font-semibold text-green-200 mb-2">
               Email подтверждён!
             </h2>
-            <p className="text-green-600 dark:text-green-400">
+            <p className="text-green-400">
               Перенаправление...
             </p>
           </div>
@@ -120,34 +120,34 @@ function VerifyEmailForm() {
 
   // Форма для повторной отправки (без токена или ошибка)
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
             Подтверждение email
           </h2>
           {!token && (
-            <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-center text-sm text-gray-400">
               Проверьте почту для активации аккаунта
             </p>
           )}
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded relative">
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl relative">
             {error}
           </div>
         )}
 
         {resendSuccess && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded">
+          <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-3 rounded">
             Письмо отправлено! Проверьте почту.
           </div>
         )}
 
         <form className="mt-8 space-y-6" onSubmit={handleResend}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300">
               Email
             </label>
             <input
@@ -156,7 +156,7 @@ function VerifyEmailForm() {
               type="email"
               autoComplete="email"
               required
-              className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-700 placeholder-gray-500 text-gray-100 bg-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm"
               placeholder="Введите email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -177,7 +177,7 @@ function VerifyEmailForm() {
         <div className="text-center">
           <Link
             href="/login"
-            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500"
+            className="text-sm text-blue-400 hover:text-blue-500"
           >
             Вернуться к входу
           </Link>
@@ -191,7 +191,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="min-h-screen flex items-center justify-center bg-gray-950">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       }

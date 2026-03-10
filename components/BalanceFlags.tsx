@@ -18,26 +18,26 @@ export default function BalanceFlags({
   const getIcon = (flag?: string) => {
     switch (flag) {
       case 'ok':
-        return '✅'
+        return ''
       case 'warning':
-        return '⚠️'
+        return ''
       case 'critical':
-        return '🔥'
+        return ''
       default:
-        return '❓'
+        return ''
     }
   }
 
   const getColor = (flag?: string) => {
     switch (flag) {
       case 'ok':
-        return 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-950/30 dark:border-green-900'
+        return 'text-green-300 bg-green-950/30 border-green-900'
       case 'warning':
-        return 'text-yellow-700 bg-yellow-50 border-yellow-200 dark:text-yellow-300 dark:bg-yellow-950/30 dark:border-yellow-900'
+        return 'text-yellow-300 bg-yellow-950/30 border-yellow-900'
       case 'critical':
-        return 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-950/30 dark:border-red-900'
+        return 'text-red-300 bg-red-950/30 border-red-900'
       default:
-        return 'text-gray-700 bg-gray-50 border-gray-200 dark:text-gray-300 dark:bg-gray-800/40 dark:border-gray-700'
+        return 'text-gray-300 bg-gray-800/40 border-gray-700'
     }
   }
 
@@ -59,23 +59,23 @@ export default function BalanceFlags({
 
   return (
     <div className="card">
-      <h2 className="text-xl font-bold mb-4">⚖️ Баланс жизни</h2>
+      <h2 className="text-xl font-bold mb-4"> Баланс жизни</h2>
 
       {hasCritical && (
-        <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-900 rounded-lg p-4 mb-4">
-          <p className="text-red-900 dark:text-red-200 font-bold">
-            🔥 ВНИМАНИЕ! Есть критические зоны - это угроза для достижения мечты!
+        <div className="rounded-lg p-4 mb-4 bg-red-950/30 border-red-900">
+          <p className="font-bold text-red-200">
+             ВНИМАНИЕ! Есть критические зоны - это угроза для достижения мечты!
           </p>
-          <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+          <p className="mt-1 text-red-300">
             Нельзя дойти к мечте выгоревшим, больным или с разрушенными отношениями.
           </p>
         </div>
       )}
 
       {!hasCritical && hasWarning && (
-        <div className="bg-yellow-50 dark:bg-yellow-950/30 border-2 border-yellow-300 dark:border-yellow-900 rounded-lg p-4 mb-4">
-          <p className="text-yellow-900 dark:text-yellow-200 font-semibold">
-            ⚠️ Некоторые сферы требуют внимания
+        <div className="rounded-lg p-4 mb-4 bg-yellow-950/30 border-yellow-900">
+          <p className="font-semibold text-yellow-200">
+             Некоторые сферы требуют внимания
           </p>
         </div>
       )}

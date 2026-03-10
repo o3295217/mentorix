@@ -100,7 +100,7 @@ export default function HomePage() {
   if (authLoading || (user && loading)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600 dark:text-gray-300">Загрузка...</div>
+        <div className="text-lg text-gray-400">Загрузка...</div>
       </div>
     )
   }
@@ -114,10 +114,10 @@ export default function HomePage() {
     <div className="space-y-8">
       {/* Header - Персонализированное приветствие */}
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+        <h1 className="text-4xl font-bold text-white mb-2">
           {getGreeting()}{userProfile?.name ? `, ${userProfile.name}!` : '!'}
         </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400">{format(today, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
+        <p className="text-xl text-gray-400">{format(today, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
       </div>
 
       {/* Dream Progress - ГЛАВНЫЙ ВИДЖЕТ */}
@@ -140,8 +140,8 @@ export default function HomePage() {
         <h2 className="text-2xl font-bold mb-4">Сегодняшний день</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {!dailyEntry?.planText && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-              <p className="text-yellow-800 dark:text-yellow-200">План на сегодня еще не создан</p>
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
+              <p className="text-yellow-200">План на сегодня еще не создан</p>
               <Link href="/daily" className="btn-primary mt-2 inline-block">
                 Создать план
               </Link>
@@ -149,8 +149,8 @@ export default function HomePage() {
           )}
 
           {dailyEntry?.planText && !dailyEntry?.factText && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-              <p className="text-blue-800 dark:text-blue-200 mb-2">План на сегодня создан</p>
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4">
+              <p className="text-blue-200 mb-2">План на сегодня создан</p>
               <Link href="/daily" className="btn-primary inline-block">
                 Добавить факт выполнения
               </Link>
@@ -158,8 +158,8 @@ export default function HomePage() {
           )}
 
           {dailyEntry?.factText && !dailyEntry?.evaluation && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
-              <p className="text-green-800 dark:text-green-200 mb-2">План и факт заполнены</p>
+            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4">
+              <p className="text-green-200 mb-2">План и факт заполнены</p>
               <Link href="/daily" className="btn-primary inline-block">
                 Получить оценку
               </Link>
@@ -167,8 +167,8 @@ export default function HomePage() {
           )}
 
           {dailyEntry?.evaluation && (
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-              <p className="text-purple-800 dark:text-purple-200 mb-2">
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4">
+              <p className="text-purple-200 mb-2">
                 Оценка за сегодня: <span className="font-bold text-2xl">{dailyEntry.evaluation.overallScore}</span>/10
               </p>
               <Link href={`/evaluation/${format(today, 'yyyy-MM-dd')}`} className="btn-primary inline-block">
@@ -184,7 +184,7 @@ export default function HomePage() {
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Цели недели</h2>
-            <Link href="/goals" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+            <Link href="/goals" className="text-sm text-blue-400 hover:underline">
               Все цели →
             </Link>
           </div>
@@ -193,32 +193,32 @@ export default function HomePage() {
               <div key={index} className="flex items-center gap-2">
                 <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-sm ${
                   goal.completed 
-                    ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
-                    : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+                    ? 'bg-green-500/15 text-green-400' 
+                    : 'bg-gray-800 text-gray-500'
                 }`}>
-                  {goal.completed ? '✓' : '○'}
+                  {goal.completed ? '✓' : '·'}
                 </span>
                 <span className={`text-sm ${
                   goal.completed 
-                    ? 'text-gray-500 dark:text-gray-400 line-through' 
-                    : 'text-gray-800 dark:text-gray-200'
+                    ? 'text-gray-500 line-through' 
+                    : 'text-gray-200'
                 }`}>
                   {goal.text}
                 </span>
               </div>
             ))}
             {weekGoals.length > 5 && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              <p className="text-sm text-gray-500 mt-2">
                 +{weekGoals.length - 5} целей
               </p>
             )}
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-3 pt-3 border-t border-gray-800">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">
+              <span className="text-gray-400">
                 Выполнено: {weekGoals.filter(g => g.completed).length} из {weekGoals.length}
               </span>
-              <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-green-500 rounded-full transition-all"
                   style={{ width: `${(weekGoals.filter(g => g.completed).length / weekGoals.length) * 100}%` }}
@@ -231,34 +231,40 @@ export default function HomePage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link href="/daily" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-semibold mb-2">📝 Ежедневное планирование</h3>
-          <p className="text-base text-gray-600 dark:text-gray-300">Создайте план на день и добавьте факт выполнения</p>
+        <Link href="/daily" className="card hover:border-blue-500/40 transition-all">
+          <div className="w-2 h-2 rounded-full bg-blue-400 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Ежедневное планирование</h3>
+          <p className="text-base text-gray-400">Создайте план на день и добавьте факт выполнения</p>
         </Link>
 
-        <Link href="/goals" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-semibold mb-2">🎯 Управление целями</h3>
-          <p className="text-base text-gray-600 dark:text-gray-300">Установите цели на неделю, месяц, квартал и год</p>
+        <Link href="/goals" className="card hover:border-purple-500/40 transition-all">
+          <div className="w-2 h-2 rounded-full bg-purple-400 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Управление целями</h3>
+          <p className="text-base text-gray-400">Установите цели на неделю, месяц, квартал и год</p>
         </Link>
 
-        <Link href="/periods" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30">
-          <h3 className="text-xl font-semibold mb-2">📊 Периодические оценки</h3>
-          <p className="text-base text-gray-600 dark:text-gray-300">Получите оценку недели, месяца, квартала или года от ИИ</p>
+        <Link href="/periods" className="card hover:border-pink-500/40 transition-all">
+          <div className="w-2 h-2 rounded-full bg-pink-400 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Периодические оценки</h3>
+          <p className="text-base text-gray-400">Получите оценку недели, месяца, квартала или года от ИИ</p>
         </Link>
 
-        <Link href="/forecast" className="card hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30">
-          <h3 className="text-xl font-semibold mb-2">🔮 Прогнозы</h3>
-          <p className="text-base text-gray-600 dark:text-gray-300">Узнайте прогноз достижения мечты и выполнения целей</p>
+        <Link href="/forecast" className="card hover:border-cyan-500/40 transition-all">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Прогнозы</h3>
+          <p className="text-base text-gray-400">Узнайте прогноз достижения мечты и выполнения целей</p>
         </Link>
 
-        <Link href="/analytics" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-semibold mb-2">📈 Аналитика</h3>
-          <p className="text-base text-gray-600 dark:text-gray-300">Просмотрите статистику и тренды вашей эффективности</p>
+        <Link href="/analytics" className="card hover:border-green-500/40 transition-all">
+          <div className="w-2 h-2 rounded-full bg-green-400 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Аналитика</h3>
+          <p className="text-base text-gray-400">Просмотрите статистику и тренды вашей эффективности</p>
         </Link>
 
-        <Link href="/tasks" className="card hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-semibold mb-2">✅ Задачи</h3>
-          <p className="text-base text-gray-600 dark:text-gray-300">Управляйте незакрытыми задачами и приоритетами</p>
+        <Link href="/tasks" className="card hover:border-orange-500/40 transition-all">
+          <div className="w-2 h-2 rounded-full bg-orange-400 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Задачи</h3>
+          <p className="text-base text-gray-400">Управляйте незакрытыми задачами и приоритетами</p>
         </Link>
       </div>
     </div>

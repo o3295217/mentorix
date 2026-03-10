@@ -290,7 +290,7 @@ export default function Landing() {
                             : 'bg-red-500/10 text-red-400 border border-red-500/20'
                         }`}
                       >
-                        {f.ok ? '✓' : '✗'} {f.label}
+                        {f.ok ? '✓' : '—'} {f.label}
                       </span>
                     ))}
                   </div>

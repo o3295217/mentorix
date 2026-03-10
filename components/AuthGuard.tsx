@@ -34,7 +34,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600 dark:text-gray-400">Проверка авторизации...</div>
+        <div className="text-lg text-gray-400">Проверка авторизации...</div>
       </div>
     )
   }

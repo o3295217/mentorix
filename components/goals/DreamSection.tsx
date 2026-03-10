@@ -34,7 +34,6 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
       setIsEditing(false)
     } catch (error) {
       console.error('Error saving dream:', error)
-      // Можно добавить toast уведомление об ошибке
     } finally {
       setSaving(false)
     }
@@ -42,15 +41,15 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
 
   if (!dreamGoal && !isEditing) {
     return (
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">🌟 У тебя пока нет Мечты</h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
-          "Человек без мечты, как птица без крыльев". Давай определим твою главную цель на ближайшие годы.
+      <div className="card ring-1 ring-blue-500/20 text-center">
+        <h2 className="text-2xl font-bold text-gray-100 mb-3">У тебя пока нет Мечты</h2>
+        <p className="text-gray-400 mb-6 max-w-2xl mx-auto text-sm leading-relaxed">
+          &ldquo;Человек без мечты, как птица без крыльев&rdquo;. Давай определим твою главную цель на ближайшие годы.
           Это станет фундаментом для всей системы планирования.
         </p>
         <button
           onClick={() => setIsEditing(true)}
-          className="bg-primary-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-600 transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
+          className="btn-primary px-6 py-3 font-semibold"
         >
           Создать Мечту
         </button>
@@ -59,36 +58,33 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="card ring-1 ring-blue-500/20">
       <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-4xl">🌟</span>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Твоя Мечта</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Горизонт планирования: {years} {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}</p>
-          </div>
+        <div>
+          <h2 className="text-lg font-bold text-white">Твоя Мечта</h2>
+          <p className="text-xs text-gray-500">Горизонт планирования: {years} {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}</p>
         </div>
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
+            className="text-gray-500 hover:text-gray-300 transition-colors p-1.5 hover:bg-gray-800 rounded-lg text-sm"
             title="Редактировать мечту"
           >
-            ✏️
+            &#9998;
           </button>
         )}
       </div>
 
       {isEditing ? (
-        <div className="space-y-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Опиши свою мечту (чего ты хочешь достичь?):
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">
+              Опиши свою мечту:
             </label>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-400 focus:ring-4 focus:ring-primary-100 dark:focus:ring-primary-900/30 transition-all resize-none text-lg"
+              className="input resize-none text-base"
               rows={3}
               placeholder="Например: Построить международную IT-компанию и жить у океана..."
               autoFocus
@@ -96,18 +92,18 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Горизонт планирования (лет):
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">
+              Горизонт (лет):
             </label>
             <div className="flex gap-2">
               {[1, 3, 5, 10].map((y) => (
                 <button
                   key={y}
                   onClick={() => setYears(y)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     years === y
-                      ? 'bg-primary-500 text-white shadow-md'
-                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-gray-200 dark:border-gray-700'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:text-gray-200 border border-gray-700'
                   }`}
                 >
                   {y} {y === 1 ? 'год' : y < 5 ? 'года' : 'лет'}
@@ -125,25 +121,23 @@ export default function DreamSection({ dreamGoal, onSave }: DreamSectionProps) {
                   setYears(dreamGoal.years)
                 }
               }}
-              className="px-4 py-2 text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="btn-secondary text-sm"
             >
               Отмена
             </button>
             <button
               onClick={handleSave}
               disabled={saving || !text.trim()}
-              className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Сохранение...' : 'Сохранить Мечту'}
+              {saving ? 'Сохранение...' : 'Сохранить'}
             </button>
           </div>
         </div>
       ) : (
-        <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-          <p className="text-xl text-gray-800 dark:text-gray-100 leading-relaxed font-medium italic">
-            "{dreamGoal?.goalText}"
-          </p>
-        </div>
+        <p className="text-gray-200 leading-relaxed italic">
+          &ldquo;{dreamGoal?.goalText}&rdquo;
+        </p>
       )}
     </div>
   )

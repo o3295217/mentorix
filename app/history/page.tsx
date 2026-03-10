@@ -95,7 +95,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600 dark:text-gray-400">Загрузка...</div>
+        <div className="text-lg text-gray-400">Загрузка...</div>
       </div>
     )
   }
@@ -105,7 +105,7 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold dark:text-white">История</h1>
+        <h1 className="font-bold text-white">История</h1>
         
         <div className="flex flex-wrap gap-2 items-center">
           <input
@@ -121,11 +121,7 @@ export default function HistoryPage() {
               <button
                 key={n}
                 onClick={() => setMonthsToShow(n)}
-                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                  monthsToShow === n 
-                    ? 'bg-purple-600 text-white' 
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${ monthsToShow === n ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
               >
                 {n} мес
               </button>
@@ -135,7 +131,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Легенда */}
-      <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex flex-wrap gap-4 text-sm text-gray-400">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-green-500"></div>
           <span>≥ 7 баллов</span>
@@ -161,14 +157,14 @@ export default function HistoryPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {months.map(({ month, days, startDayOfWeek }) => (
           <div key={month.toISOString()} className="card p-4">
-            <h2 className="text-lg font-semibold mb-3 text-center dark:text-white">
+            <h2 className="font-semibold mb-3 text-white">
               {format(month, 'LLLL yyyy', { locale: ru })}
             </h2>
             
             {/* Заголовки дней недели */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {weekDays.map(day => (
-                <div key={day} className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-1">
+                <div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
                   {day}
                 </div>
               ))}
@@ -198,17 +194,17 @@ export default function HistoryPage() {
                     className={`h-20 sm:h-24 rounded-lg border transition-all hover:scale-105 flex flex-col ${
                       isTodayDate 
                         ? 'ring-2 ring-purple-500 border-purple-300' 
-                        : 'border-gray-200 dark:border-gray-700'
+                        : 'border-gray-700'
                     } ${
                       isMatching ? 'ring-2 ring-yellow-400' : ''
                     } ${
                       entry 
-                        ? 'bg-white dark:bg-gray-800' 
-                        : 'bg-gray-50 dark:bg-gray-900'
+                        ? 'bg-gray-900/80' 
+                        : 'bg-gray-950'
                     }`}
                   >
                     {/* Номер дня */}
-                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 p-1">
+                    <div className="text-xs font-medium text-gray-400 p-1">
                       {format(day, 'd')}
                     </div>
                     
@@ -229,9 +225,9 @@ export default function HistoryPage() {
                     {/* Индикаторы П Ф О */}
                     {entry && (
                       <div className="flex justify-center gap-1 text-xs pb-1">
-                        <span className={hasPlan ? 'text-green-600 dark:text-green-400' : 'text-gray-300 dark:text-gray-600'}>П</span>
-                        <span className={hasFact ? 'text-green-600 dark:text-green-400' : 'text-gray-300 dark:text-gray-600'}>Ф</span>
-                        <span className={hasEvaluation ? 'text-green-600 dark:text-green-400' : 'text-gray-300 dark:text-gray-600'}>О</span>
+                        <span className={hasPlan ? 'text-green-400' : 'text-gray-400'}>П</span>
+                        <span className={hasFact ? 'text-green-400' : 'text-gray-400'}>Ф</span>
+                        <span className={hasEvaluation ? 'text-green-400' : 'text-gray-400'}>О</span>
                       </div>
                     )}
                   </Link>

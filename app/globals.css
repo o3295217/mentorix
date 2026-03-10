@@ -4,36 +4,36 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+    @apply bg-gray-950 text-gray-100;
   }
   
   /* Dark mode для нативных date picker */
-  .dark input[type="date"],
-  .dark input[type="datetime-local"],
-  .dark input[type="time"] {
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
     color-scheme: dark;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border dark:border-gray-700;
+    @apply bg-gray-900/80 rounded-2xl p-6 border border-gray-800 backdrop-blur-sm;
   }
 
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium py-2 px-4 rounded-xl transition-all;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 font-medium py-2 px-4 rounded-xl transition-colors;
   }
 
   .input {
-    @apply w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100;
+    @apply w-full px-4 py-2 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-900 text-gray-100 placeholder-gray-500;
   }
 
   .textarea {
-    @apply w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[120px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100;
+    @apply w-full px-4 py-2 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[120px] bg-gray-900 text-gray-100 placeholder-gray-500;
   }
 
   /* Анимация подмигивания для целей */
@@ -85,14 +85,6 @@
   }
   
   .chat-scrollbar:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(100, 100, 100, 0.4);
-  }
-  
-  .dark .chat-scrollbar:hover {
-    scrollbar-color: rgba(150, 150, 150, 0.4) transparent;
-  }
-  
-  .dark .chat-scrollbar:hover::-webkit-scrollbar-thumb {
     background-color: rgba(150, 150, 150, 0.4);
   }
 

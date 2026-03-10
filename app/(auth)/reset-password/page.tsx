@@ -93,10 +93,10 @@ function ResetPasswordForm() {
 
   if (validating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 dark:text-gray-400">Проверка токена...</p>
+          <p className="text-gray-400">Проверка токена...</p>
         </div>
       </div>
     );
@@ -104,20 +104,22 @@ function ResetPasswordForm() {
 
   if (!tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <Link href="/" className="block text-center text-3xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            <Link href="/" className="block text-center text-3xl font-bold text-white hover:text-blue-400 transition-colors">
               ← ION Assistant
             </Link>
-            <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="mt-6 text-center text-2xl font-semibold text-white">
               Ошибка
             </h2>
           </div>
           
-          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md p-6 text-center">
-            <div className="text-4xl mb-4">❌</div>
-            <p className="text-red-700 dark:text-red-300">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center">
+            <svg className="w-12 h-12 text-red-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <p className="text-red-300">
               {error || 'Ссылка недействительна или истекла'}
             </p>
           </div>
@@ -125,13 +127,13 @@ function ResetPasswordForm() {
           <div className="text-center space-y-3">
             <Link 
               href="/forgot-password" 
-              className="block text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="block text-sm text-blue-400 hover:text-blue-300"
             >
               Запросить новую ссылку
             </Link>
             <Link 
               href="/login" 
-              className="block text-sm text-gray-600 hover:text-gray-500 dark:text-gray-400"
+              className="block text-sm text-gray-400 hover:text-gray-300"
             >
               ← Вернуться к входу
             </Link>
@@ -143,23 +145,25 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <Link href="/" className="block text-center text-3xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            <Link href="/" className="block text-center text-3xl font-bold text-white hover:text-blue-400 transition-colors">
               ← ION Assistant
             </Link>
-            <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="mt-6 text-center text-2xl font-semibold text-white">
               Пароль изменён
             </h2>
           </div>
           
-          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-md p-6 text-center">
-            <div className="text-4xl mb-4">✅</div>
-            <p className="text-green-700 dark:text-green-300">
+          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-6 text-center">
+            <svg className="w-12 h-12 text-green-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="text-green-300">
               Ваш пароль успешно изменён!
             </p>
-            <p className="text-sm text-green-600 dark:text-green-400 mt-2">
+            <p className="text-sm text-green-400 mt-2">
               Перенаправление на страницу входа...
             </p>
           </div>
@@ -169,17 +173,17 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <Link href="/" className="block text-center text-3xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          <Link href="/" className="block text-center text-3xl font-bold text-white hover:text-blue-400 transition-colors">
             ← ION Assistant
           </Link>
-          <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
+          <h2 className="mt-6 text-center text-2xl font-semibold text-white">
             Новый пароль
           </h2>
           {userEmail && (
-            <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-center text-sm text-gray-400">
               для {userEmail}
             </p>
           )}
@@ -187,14 +191,14 @@ function ResetPasswordForm() {
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md p-4">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-md p-4">
+              <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
                 Новый пароль
               </label>
               <input
@@ -205,13 +209,13 @@ function ResetPasswordForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                className="mt-1 block w-full px-3 py-2 border border-gray-700 rounded-xl placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-900 text-gray-100"
                 placeholder="Минимум 6 символов"
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">
                 Подтвердите пароль
               </label>
               <input
@@ -222,7 +226,7 @@ function ResetPasswordForm() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                className="mt-1 block w-full px-3 py-2 border border-gray-700 rounded-xl placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-900 text-gray-100"
                 placeholder="Повторите пароль"
               />
             </div>
@@ -232,7 +236,7 @@ function ResetPasswordForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Сохранение...' : 'Сохранить новый пароль'}
             </button>
@@ -246,7 +250,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     }>

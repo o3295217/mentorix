@@ -875,57 +875,11 @@ app/daily/page.tsx
 
 ```
 app/page.tsx
-├── [если !user] Landing.tsx  # Полноэкранный лендинг для неавторизованных
 ├── Speedometer              # Прогресс к мечте
 ├── DreamProgress            # Детали прогресса
 ├── BalanceFlags             # Здоровье, семья, энергия
 └── [график оценок]          # Recharts LineChart
 ```
-
-### Layout (app/layout.tsx)
-
-```
-<body>
-  <Providers>
-    <AuthGuard>
-      <Navigation />         # <header> внутри, скрывается на landing/auth/onboarding
-      <main>{children}</main>
-      <LayoutFooter />       # Скрывается на landing/auth/onboarding
-    </AuthGuard>
-  </Providers>
-</body>
-```
-
-### Онбординг (app/onboarding/page.tsx)
-
-```
-OnboardingPage
-├── Slide 1: Welcome        # Приветствие
-├── Slide 2: Pyramid        # PyramidVisual — пирамида целей
-├── Slide 3: Rhythm         # RhythmVisual — ежедневный цикл
-├── Slide 4: AI             # AiVisual — чат-баблы
-├── Slide 5: Start          # StartVisual — CTA с анимированными орбами
-└── [навигация: dots + кнопки Назад/Далее]
-```
-
-### Landing (components/Landing.tsx)
-
-```
-Landing
-├── Hero                     # Градиентный заголовок, CTA
-├── Шаг первый               # Иерархия целей (пирамида)
-├── Шаг второй               # Ежедневный ритм (timeline)
-├── Шаг третий               # AI-анализ (mock оценка)
-├── Features grid            # 6 карточек возможностей
-├── Journey line             # 5 этапов пути
-├── Final CTA                # Призыв к регистрации
-└── Footer                   # Свой footer (не LayoutFooter)
-```
-
-CSS-анимации лендинга:
-- `IntersectionObserver` с `rootMargin: '-80px'` запускает `.landing-visible.landing-reveal`
-- `prefers-reduced-motion` отключает анимации
-- Определены в `app/globals.css`
 
 ---
 

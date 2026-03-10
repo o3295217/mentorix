@@ -8,9 +8,9 @@ import { DailyEntry, OpenTask, SuggestedTask } from '@/lib/types'
 import { areTasksSimilar } from '@/lib/task-match'
 
 function getScoreColor(score: number): string {
-  if (score >= 7) return 'text-green-600 dark:text-green-400'
-  if (score >= 5) return 'text-yellow-600 dark:text-yellow-400'
-  return 'text-red-600 dark:text-red-400'
+  if (score >= 7) return 'text-green-400'
+  if (score >= 5) return 'text-yellow-400'
+  return 'text-red-400'
 }
 
 // Структура для задач с статусом
@@ -153,7 +153,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg text-gray-600 dark:text-gray-400">Загрузка...</div>
+        <div className="text-lg text-gray-400">Загрузка...</div>
       </div>
     )
   }
@@ -161,8 +161,8 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   if (!dailyEntry || !dailyEntry.evaluation) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold mb-4 dark:text-white">Оценка не найдена</h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">Для этого дня еще нет оценки</p>
+        <h2 className="font-bold mb-4 text-white">Оценка не найдена</h2>
+        <p className="text-gray-400 mb-6">Для этого дня еще нет оценки</p>
         <Link href="/daily" className="btn-primary">
           Создать оценку
         </Link>
@@ -200,43 +200,43 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         </Link>
       </div>
 
-      <p className="text-lg text-gray-600 dark:text-gray-400">{format(date, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
+      <p className="text-lg text-gray-400">{format(date, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
 
       {/* ГЛАВНАЯ МЕТРИКА - Dream Progress Score */}
-      <div className="card text-center bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/40 dark:to-blue-900/40 border-2 border-purple-300 dark:border-purple-600">
-        <h2 className="text-2xl font-bold mb-2 text-purple-900 dark:text-purple-100">🌟 Движение к мечте</h2>
+      <div className="card text-center">
+        <h2 className="font-bold mb-2 text-purple-100"> Движение к мечте</h2>
         <p className={`text-7xl font-bold ${getScoreColor(evaluation.dreamProgressScore || evaluation.overallScore)}`}>
           {evaluation.dreamProgressScore || evaluation.overallScore}
         </p>
-        <p className="text-gray-600 dark:text-gray-400 mt-2 text-lg">из 10</p>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-3 max-w-md mx-auto">
+        <p className="text-gray-400 mt-2 text-lg">из 10</p>
+        <p className="text-sm text-gray-400 mt-3 max-w-md mx-auto">
           Главная метрика: насколько этот день приблизил тебя к мечте
         </p>
       </div>
 
       {/* Overall Score - вторичная метрика */}
-      <div className="card text-center bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-900/30 dark:to-purple-900/30">
-        <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Общая оценка (среднее по 4 показателям)</h2>
+      <div className="card text-center">
+        <h2 className="text-xl font-semibold mb-2 text-white">Общая оценка (среднее по 4 показателям)</h2>
         <p className={`text-5xl font-bold ${getScoreColor(evaluation.overallScore)}`}>{evaluation.overallScore}</p>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">из 10</p>
+        <p className="text-gray-400 mt-1">из 10</p>
       </div>
 
       {/* Scores breakdown */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Стратегия</p>
+          <p className="text-sm text-gray-400 mb-1">Стратегия</p>
           <p className={`text-3xl font-bold ${getScoreColor(evaluation.strategyScore)}`}>{evaluation.strategyScore}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Операции</p>
+          <p className="text-sm text-gray-400 mb-1">Операции</p>
           <p className={`text-3xl font-bold ${getScoreColor(evaluation.operationsScore)}`}>{evaluation.operationsScore}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Команда</p>
+          <p className="text-sm text-gray-400 mb-1">Команда</p>
           <p className={`text-3xl font-bold ${getScoreColor(evaluation.teamScore)}`}>{evaluation.teamScore}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Эффективность</p>
+          <p className="text-sm text-gray-400 mb-1">Эффективность</p>
           <p className={`text-3xl font-bold ${getScoreColor(evaluation.efficiencyScore)}`}>{evaluation.efficiencyScore}</p>
         </div>
       </div>
@@ -255,17 +255,17 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
           
           return (
             <div className="flex flex-wrap gap-4 mb-4 text-sm">
-              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 rounded-full">
-                ✅ Выполнено: {completed}/{total} ({percent}%)
+              <span className="px-3 py-1 rounded-full bg-green-900/40 text-green-200">
+                 Выполнено: {completed}/{total} ({percent}%)
               </span>
               {notCompleted > 0 && (
-                <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-full">
-                  ❌ Не выполнено: {notCompleted}
+                <span className="px-3 py-1 rounded-full bg-red-900/40 text-red-200">
+                   Не выполнено: {notCompleted}
                 </span>
               )}
               {extra > 0 && (
-                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded-full">
-                  ➕ Сверх плана: {extra}
+                <span className="px-3 py-1 rounded-full bg-blue-900/40 text-blue-200">
+                   Сверх плана: {extra}
                 </span>
               )}
             </div>
@@ -279,25 +279,19 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
               key={index}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
                 task.status === 'completed'
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                  ? 'bg-green-900/20 border-green-800'
                   : task.status === 'not_completed'
-                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                  : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                  ? 'bg-red-900/20 border-red-800'
+                  : 'bg-blue-900/20 border-blue-800'
               }`}
             >
               <span className="text-sm flex-shrink-0">
-                {task.status === 'completed' ? '✅' : task.status === 'not_completed' ? '❌' : '➕'}
+                {task.status === 'completed' ? '✓' : task.status === 'not_completed' ? '✕' : '+'}
               </span>
-              <span className={`flex-1 ${
-                task.status === 'completed' 
-                  ? 'text-green-900 dark:text-green-100' 
-                  : task.status === 'not_completed'
-                  ? 'text-red-900 dark:text-red-100'
-                  : 'text-blue-900 dark:text-blue-100'
-              }`}>
+              <span className={`flex-1 ${ task.status === 'completed' ? 'text-green-300' : task.status === 'not_completed' ? 'text-red-300' : 'text-blue-100'}`}>
                 {task.text}
                 {task.status === 'extra' && (
-                  <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(сверх плана)</span>
+                  <span className="ml-2 text-xs text-blue-400">(сверх плана)</span>
                 )}
               </span>
             </div>
@@ -309,28 +303,28 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         </div>
 
         {/* Анализ */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">🔍 Анализ:</h3>
-          <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{evaluation.planVsFactText}</p>
+        <div className="border-t border-gray-700 pt-4">
+          <h3 className="font-semibold text-gray-300 mb-2"> Анализ:</h3>
+          <p className="text-gray-200 whitespace-pre-wrap">{evaluation.planVsFactText}</p>
         </div>
       </div>
 
       {/* Feedback */}
-      <div className="card bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700">
-        <h2 className="text-xl font-bold mb-4 text-red-900 dark:text-red-100">💬 Обратная связь</h2>
-        <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{evaluation.feedbackText}</p>
+      <div className="card">
+        <h2 className="font-bold mb-4 text-red-100"> Обратная связь</h2>
+        <p className="text-gray-200 whitespace-pre-wrap">{evaluation.feedbackText}</p>
       </div>
 
       {/* Suggested Tasks */}
       {(visibleSuggestedTasks.length > 0 || duplicateSuggestedTasks.length > 0) && (
-        <div className="card bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-200 dark:border-purple-700">
-          <h2 className="text-xl font-bold mb-4 text-purple-900 dark:text-purple-100">📋 Предложенные задачи</h2>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">ИИ выявил важные задачи, которые стоит добавить в список незакрытых</p>
+        <div className="card">
+          <h2 className="font-bold mb-4 text-purple-100"> Предложенные задачи</h2>
+          <p className="text-sm text-gray-300 mb-4">ИИ выявил важные задачи, которые стоит добавить в список незакрытых</p>
 
           {duplicateSuggestedTasks.length > 0 && (
-            <div className="mb-4 p-3 bg-purple-100 dark:bg-purple-800/50 rounded">
-              <p className="text-sm text-purple-900 dark:text-purple-100">
-                ⚠️ По этой теме уже есть незакрытые задачи (совпадение по названию/смыслу). Вместо создания дубля — сфокусируйся на закрытии
+            <div className="mb-4 p-3 rounded bg-purple-800/50">
+              <p className="text-purple-100">
+                 По этой теме уже есть незакрытые задачи (совпадение по названию/смыслу). Вместо создания дубля — сфокусируйся на закрытии
                 существующей во вкладке{' '}
                 <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>.
               </p>
@@ -342,58 +336,58 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
               const isAdding = addingTask === task.taskText
 
               return (
-                <div key={task.taskText} className="p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-purple-200 dark:border-purple-600">
+                <div key={task.taskText} className="p-4 bg-gray-900/80 rounded-lg border-purple-600">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           task.taskType === 'strategic'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
+                            ? 'bg-purple-900/40 text-purple-300'
+                            : 'bg-blue-900/40 text-blue-300'
                         }`}>
-                          {task.taskType === 'strategic' ? '🎯 Стратегическая' : '⚙️ Операционная'}
+                          {task.taskType === 'strategic' ? ' Стратегическая' : ' Операционная'}
                         </span>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           task.priority === 'high'
-                            ? 'bg-red-100 text-red-700'
+                            ? 'bg-red-900/40 text-red-300'
                             : task.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-gray-100 text-gray-700'
+                            ? 'bg-yellow-900/40 text-yellow-300'
+                            : 'bg-gray-800 text-gray-300'
                         }`}>
-                          {task.priority === 'high' ? '🔥 Высокий' : task.priority === 'medium' ? '⚡ Средний' : '📌 Низкий'}
+                          {task.priority === 'high' ? ' Высокий' : task.priority === 'medium' ? ' Средний' : ' Низкий'}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{task.taskText}</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{task.reason}</p>
+                      <h3 className="font-semibold text-white mb-2">{task.taskText}</h3>
+                      <p className="text-sm text-gray-400">{task.reason}</p>
                     </div>
                     <button
                       onClick={() => addTaskToOpen(task)}
                       disabled={isAdded || isAdding}
                       className={`px-4 py-2 rounded font-medium text-sm transition-colors ${
                         isAdded
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                           : 'bg-purple-600 text-white hover:bg-purple-700'
                       }`}
                     >
-                      {isAdding ? 'Добавление...' : isAdded ? '✓ Добавлено' : '+ Добавить'}
+                      {isAdding ? 'Добавление...' : isAdded ? ' Добавлено' : '+ Добавить'}
                     </button>
                   </div>
                 </div>
               )
             })}
           </div>
-          <div className="mt-4 p-3 bg-purple-100 dark:bg-purple-800/50 rounded">
-            <p className="text-sm text-purple-900 dark:text-purple-100">
-              💡 Добавленные задачи появятся на вкладке <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>
+          <div className="mt-4 p-3 rounded bg-purple-800/50">
+            <p className="text-purple-100">
+               Добавленные задачи появятся на вкладке <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>
             </p>
           </div>
         </div>
       )}
 
       {/* Recommendations */}
-      <div className="card bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700">
-        <h2 className="text-xl font-bold mb-4 text-green-900 dark:text-green-100">💡 Рекомендации</h2>
-        <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{evaluation.recommendationsText}</p>
+      <div className="card">
+        <h2 className="font-bold mb-4 text-green-100"> Рекомендации</h2>
+        <p className="text-gray-200 whitespace-pre-wrap">{evaluation.recommendationsText}</p>
       </div>
     </div>
   )
