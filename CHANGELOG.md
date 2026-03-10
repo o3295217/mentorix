@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-03-10 — refactor: stage 6 cleanup — remove showAllPeriods, pass detailLevel prop, remove IIFE, fix eslint-disable
+- 🧩 Компоненты: 1 файлов (Navigation)
+- 📦 Другое: 3 файлов
+
+
 ### 2026-03-10 — refactor: goals page optimization — filters, progress, split MonthSection, hooks, weeks for all months
 - 🧩 Компоненты: 2 файлов (MonthSection, YearSection)
 - 📄 Страницы: 1 файлов

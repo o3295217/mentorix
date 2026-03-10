@@ -6,18 +6,18 @@ import AuthGuard from '@/components/AuthGuard'
 import { Providers } from '@/components/Providers'
 
 export const metadata: Metadata = {
-  title: 'ION Assistant',
+  title: 'AION',
   description: 'Личный ИИ-ассистент для управления эффективностью. Превращаем мечту в ежедневное действие.',
   openGraph: {
-    title: 'ION — ИИ-ассистент для достижения целей',
+    title: 'AION — ИИ-ассистент для достижения целей',
     description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
-    siteName: 'ION Assistant',
+    siteName: 'AION',
     locale: 'ru_RU',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ION — ИИ-ассистент для достижения целей',
+    title: 'AION — ИИ-ассистент для достижения целей',
     description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
   },
 }

@@ -88,6 +88,66 @@
     background-color: rgba(150, 150, 150, 0.4);
   }
 
+  /* ====== NAV LOGO REBUS ====== */
+  .nav-logo {
+    display: inline-flex;
+    align-items: baseline;
+    line-height: 1;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .nav-logo:hover {
+    opacity: 0.85;
+    transition: opacity 0.2s;
+  }
+
+  .nav-logo-a {
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 0.78;
+    letter-spacing: -0.02em;
+    opacity: 0;
+    transform: scale(0);
+    animation: logo-a-intro 24s ease forwards;
+  }
+
+  .nav-logo-i {
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 0.78;
+    opacity: 0;
+    transform: scale(0);
+    animation: logo-i-intro 24s ease forwards, logo-i-shimmer 3s ease-in-out 24s infinite;
+  }
+
+  .nav-logo-on {
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 0.78;
+    letter-spacing: -0.02em;
+    opacity: 0;
+    transform: scale(0);
+    animation: logo-on-intro 24s ease forwards;
+  }
+
+  .nav-logo::after {
+    content: 'assistent';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    font-size: 1rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-50%) translateX(-100%);
+    animation: logo-text-first 5s ease-in-out 21s forwards, logo-text-loop 60s ease-in-out 26s infinite;
+  }
+
   /* ====== LANDING ANIMATIONS ====== */
 
   /* Gradient animated text (shared with onboarding) */
@@ -219,5 +279,73 @@
   33% { transform: translate(30px, -20px) scale(1.05); }
   66% { transform: translate(-20px, 15px) scale(0.95); }
 }
+
+/* ====== NAV LOGO KEYFRAMES ====== */
+
+/* A: dot→blue (0-1s), visible (1-5s), fade out (5-6s), hidden (6-13s), back blue (13-14s), stays */
+@keyframes logo-a-intro {
+  0%      { opacity: 0; transform: scale(0); color: #3b82f6; }
+  4.17%   { opacity: 1; transform: scale(1); color: #3b82f6; }
+  20.83%  { opacity: 1; transform: scale(1); color: #3b82f6; }
+  25%     { opacity: 0; transform: scale(1); color: #3b82f6; }
+  54.17%  { opacity: 0; transform: scale(1); }
+  58.33%  { opacity: 1; transform: scale(1); color: #3b82f6; }
+  100%    { opacity: 1; transform: scale(1); color: #3b82f6; }
+}
+
+/* I: dot→blue (0-1s), blue (1-6s), blink→gray (6-8s), gray (8-13s), blue (14s), blink 14-21s, end blue */
+@keyframes logo-i-intro {
+  0%      { opacity: 0; transform: scale(0); color: #3b82f6; }
+  4.17%   { opacity: 1; transform: scale(1); color: #3b82f6; }
+  25%     { opacity: 1; transform: scale(1); color: #3b82f6; }
+  27.08%  { color: rgba(255, 255, 255, 0.35); }
+  29.17%  { color: #3b82f6; }
+  31.25%  { color: rgba(255, 255, 255, 0.35); }
+  33.33%  { color: rgba(255, 255, 255, 0.35); }
+  54.17%  { color: rgba(255, 255, 255, 0.35); }
+  58.33%  { color: #3b82f6; }
+  62.5%   { color: rgba(255, 255, 255, 0.35); }
+  66.67%  { color: #3b82f6; }
+  70.83%  { color: rgba(255, 255, 255, 0.35); }
+  75%     { color: #3b82f6; }
+  79.17%  { color: rgba(255, 255, 255, 0.35); }
+  83.33%  { color: #3b82f6; }
+  87.5%   { color: rgba(255, 255, 255, 0.35); }
+  100%    { opacity: 1; transform: scale(1); color: #3b82f6; }
+}
+
+/* ON: hidden (0-5s), dot→gray (5-6s), stays gray */
+@keyframes logo-on-intro {
+  0%      { opacity: 0; transform: scale(0); color: rgba(255, 255, 255, 0.35); }
+  20.83%  { opacity: 0; transform: scale(0); color: rgba(255, 255, 255, 0.35); }
+  25%     { opacity: 1; transform: scale(1); color: rgba(255, 255, 255, 0.35); }
+  100%    { opacity: 1; transform: scale(1); color: rgba(255, 255, 255, 0.35); }
+}
+
+/* I shimmer: kicks in after intro ends at 24s, infinite */
+@keyframes logo-i-shimmer {
+  0%   { color: #3b82f6; }
+  50%  { color: rgba(255, 255, 255, 0.35); }
+  100% { color: #3b82f6; }
+}
+
+/* "assistent" first run at 21s */
+@keyframes logo-text-first {
+  0%   { opacity: 0; transform: translateY(-50%) translateX(-100%); }
+  15%  { opacity: 1; transform: translateY(-50%) translateX(-10%); }
+  85%  { opacity: 1; transform: translateY(-50%) translateX(110%); }
+  100% { opacity: 0; transform: translateY(-50%) translateX(140%); }
+}
+
+/* "assistent" loops every 60s — runs for 5s, idle 55s */
+@keyframes logo-text-loop {
+  0%      { opacity: 0; transform: translateY(-50%) translateX(-100%); }
+  1.25%   { opacity: 1; transform: translateY(-50%) translateX(-10%); }
+  7.08%   { opacity: 1; transform: translateY(-50%) translateX(110%); }
+  8.33%   { opacity: 0; transform: translateY(-50%) translateX(140%); }
+  100%    { opacity: 0; transform: translateY(-50%) translateX(140%); }
+}
+
+
 
 

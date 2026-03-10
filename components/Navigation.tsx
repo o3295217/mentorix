@@ -70,16 +70,10 @@ export default function Navigation() {
       <div className="flex justify-between h-16">
         <div className="flex space-x-8">
           <Link href="/" className="flex items-center">
-            {/* Буква A */}
-            <svg width="36" height="42" viewBox="0 0 24 28" className="flex-shrink-0">
-              <path d="M12 1 L1 27 M12 1 L12 27 M4 18 L12 18" 
-                    fill="none" stroke="#4a7c9b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="flex flex-col justify-center leading-tight -ml-1">
-              <span className="text-base font-semibold tracking-tight">
-                <span className="text-gray-500 font-light text-lg">[</span><span className="text-[#4a7c9b] font-bold text-xl">I</span><span className="text-gray-500 font-light text-lg">]</span><span className="text-white text-lg">On</span>
-              </span>
-              <span className="text-base text-white tracking-tight">ssistant</span>
+            <span className="nav-logo" aria-label="ION Assistant">
+              <span className="nav-logo-a">A</span>
+              <span className="nav-logo-i">I</span>
+              <span className="nav-logo-on">ON</span>
             </span>
           </Link>
           {/* Desktop menu */}
