@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# ===========================================
+# Commit-msg hook: автообновление CHANGELOG.md
+# ===========================================
+
+node scripts/update-docs.js --changelog-only --commit-msg-file="$1"

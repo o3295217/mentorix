@@ -13,10 +13,12 @@ NC='\033[0m' # No Color
 echo ""
 
 # ===========================================
-# 1. Автоматически обновляем PROJECT_STATUS.md
+# 1. Автоматически обновляем техдокументацию
+#    PROJECT_STATUS / ARCHITECTURE обновляются здесь,
+#    CHANGELOG обновляется в commit-msg с реальным сообщением коммита
 # ===========================================
 echo -e "${GREEN}📝 Обновляю PROJECT_STATUS.md...${NC}"
-node scripts/update-docs.js
+node scripts/update-docs.js --skip-changelog
 
 # Получаем список изменённых файлов
 STAGED_FILES=$(git diff --cached --name-only)
@@ -55,7 +57,7 @@ if echo "$STAGED_FILES" | grep -q "^package.json"; then
     echo -e "${YELLOW}⚠️  Изменён package.json → проверь README.md (секция Технологии)${NC}"
 fi
 
-# CHANGELOG обновляется автоматически в post-commit
+# CHANGELOG обновляется автоматически в commit-msg
 
 echo ""
 echo -e "${GREEN}✅ Pre-commit проверки пройдены${NC}"

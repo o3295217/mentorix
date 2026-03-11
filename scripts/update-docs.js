@@ -15,6 +15,26 @@ const { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
+function parseArgs(argv) {
+  const options = {
+    skipChangelog: false,
+    changelogOnly: false,
+    commitMsgFile: null,
+  };
+
+  for (const arg of argv) {
+    if (arg === '--skip-changelog') {
+      options.skipChangelog = true;
+    } else if (arg === '--changelog-only') {
+      options.changelogOnly = true;
+    } else if (arg.startsWith('--commit-msg-file=')) {
+      options.commitMsgFile = arg.slice('--commit-msg-file='.length);
+    }
+  }
+
+  return options;
+}
+
 // ============================================================
 // 1. Собираем информацию о проекте
 // ============================================================
@@ -150,10 +170,9 @@ function getStagedFiles() {
   }
 }
 
-function getCommitMessage() {
-  // Читаем сообщение из .git/COMMIT_EDITMSG если есть, иначе парсим из git log
-  const commitMsgPath = path.join(ROOT, '.git/COMMIT_EDITMSG');
-  if (fs.existsSync(commitMsgPath)) {
+function getCommitMessage(commitMsgFile) {
+  const commitMsgPath = commitMsgFile || path.join(ROOT, '.git/COMMIT_EDITMSG');
+  if (commitMsgPath && fs.existsSync(commitMsgPath)) {
     return fs.readFileSync(commitMsgPath, 'utf8').trim().split('\n')[0];
   }
   return 'обновление';
@@ -409,15 +428,20 @@ ${pkg.devDependencies.map(d => `- ${d}`).join('\n')}
 // ============================================================
 
 function main() {
+  const options = parseArgs(process.argv.slice(2));
   console.log('📝 Обновляю документацию...');
   
   // Получаем изменённые файлы
   const stagedFiles = getStagedFiles();
-  const commitMsg = getCommitMessage();
+  const commitMsg = getCommitMessage(options.commitMsgFile);
   
   // 1. Обновляем CHANGELOG.md
-  if (stagedFiles.length > 0) {
+  if (!options.skipChangelog && stagedFiles.length > 0) {
     updateChangelog(stagedFiles, commitMsg);
+  }
+
+  if (options.changelogOnly) {
+    return;
   }
   
   // 2. Обновляем ARCHITECTURE.md при изменении компонентов/API

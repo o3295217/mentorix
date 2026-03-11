@@ -221,7 +221,7 @@ docker compose -f docker-compose.production.yml up --build -d
 
 ## Последние изменения инструментария
 
-### 2026-01-28 — feat: автоматическое обновление документации после коммита
-- `.husky/post-commit`
+### 2026-01-28 — feat: автоматическое обновление документации во время коммита
 - `.husky/pre-commit`
-- `scripts/auto-changelog.js`
+- `.husky/commit-msg`
+- `scripts/update-docs.js`

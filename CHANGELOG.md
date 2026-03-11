@@ -6,7 +6,7 @@
 
 ## [Unreleased]
 
-### 2026-03-11 — Fix dream progress calculations and redesign progress view
+### 2026-03-11 — Fix daily task input autosize reset
 - 📄 Страницы: 1 файлов
 
 

@@ -55,7 +55,7 @@ npm run dev
 # Проверить типы
 npx tsc --noEmit
 
-# Обновить CHANGELOG.md
+# CHANGELOG.md обновится автоматически через git hook
 ```
 
 ---
