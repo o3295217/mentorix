@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-03-11 — Update progress metrics and refine task UI
+- 🔌 API: 2 файлов (route, route)
+- 🧩 Компоненты: 2 файлов (ProgressIndicator, Speedometer)
+- 📄 Страницы: 2 файлов
+
+
 ### 2026-03-11 — AION logo: new nav animation + icon + title
 - 🔌 API: 1 файлов (route)
 - 🧩 Компоненты: 3 файлов (ProgressIndicator, Speedometer, DreamSection)

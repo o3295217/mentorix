@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { differenceInCalendarDays, startOfDay, subDays } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
 
@@ -6,21 +7,28 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
     
-    // Получить мечту пользователя
-    const dreamGoal = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
+    // Получить актуальную мечту и дату старта работы над ней
+    const [dreamGoal, firstDreamGoal] = await prisma.$transaction([
+      prisma.dreamGoal.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.dreamGoal.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ])
     const dreamYears = dreamGoal?.years || 5
 
-    // Первый запланированный день — начало отсчёта
+    // Начало отсчёта: дата создания мечты, затем fallback на первую запись
     const firstEntry = await prisma.dailyEntry.findFirst({
       where: { userId },
       orderBy: { date: 'asc' },
       select: { date: true },
     })
-    const startDate = firstEntry?.date || new Date()
-    const elapsedDays = Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    const startDate = firstDreamGoal?.createdAt || firstEntry?.date || new Date()
+    const elapsedDays = Math.max(1, differenceInCalendarDays(new Date(), startDate) + 1)
 
     // Сколько дней было спланировано (всего DailyEntry)
     const plannedDays = await prisma.dailyEntry.count({ where: { userId } })
@@ -73,39 +81,68 @@ export async function GET(request: NextRequest) {
     const totalScore = evaluations.reduce((sum, e) => sum + (e.dreamProgressScore || 0), 0)
     const effectiveDays = totalScore / 10
 
-    // Средняя скорость за последние 7 дней
-    const last7Days = evaluations.slice(-7)
+    const today = new Date()
+    const last7DaysStart = startOfDay(subDays(today, 6))
+    const last30DaysStart = startOfDay(subDays(today, 29))
+
+    // Средняя скорость за последние 7 календарных дней
+    const last7Days = evaluations.filter((evaluation) => evaluation.dailyEntry.date >= last7DaysStart)
     const currentSpeed =
       last7Days.length > 0
         ? last7Days.reduce((sum, e) => sum + (e.dreamProgressScore || 0), 0) / last7Days.length
         : 0
 
-    // Средняя скорость за последние 30 дней
-    const last30Days = evaluations.slice(-30)
+    // Средняя скорость за последние 30 календарных дней
+    const last30Days = evaluations.filter((evaluation) => evaluation.dailyEntry.date >= last30DaysStart)
     const avgSpeed30d =
       last30Days.length > 0
         ? last30Days.reduce((sum, e) => sum + (e.dreamProgressScore || 0), 0) / last30Days.length
         : 0
 
-    // Текущий streak (дни подряд с score >= 7)
+    // Текущий streak: календарные дни подряд с score >= 7
     let currentStreak = 0
     for (let i = evaluations.length - 1; i >= 0; i--) {
-      if ((evaluations[i].dreamProgressScore || 0) >= 7) {
-        currentStreak++
-      } else {
+      const currentEvaluation = evaluations[i]
+      const currentDate = currentEvaluation.dailyEntry.date
+
+      if ((currentEvaluation.dreamProgressScore || 0) < 7) {
         break
       }
+
+      if (currentStreak > 0) {
+        const nextDate = evaluations[i + 1].dailyEntry.date
+        if (differenceInCalendarDays(nextDate, currentDate) !== 1) {
+          break
+        }
+      }
+
+      currentStreak++
     }
 
-    // Самый длинный streak
+    // Самый длинный streak: только соседние календарные даты с score >= 7
     let longestStreak = 0
     let tempStreak = 0
-    for (const e of evaluations) {
-      if ((e.dreamProgressScore || 0) >= 7) {
-        tempStreak++
+    let previousStreakDate: Date | null = null
+
+    for (const evaluation of evaluations) {
+      const score = evaluation.dreamProgressScore || 0
+      const currentDate = evaluation.dailyEntry.date
+
+      if (score >= 7) {
+        if (
+          previousStreakDate &&
+          differenceInCalendarDays(currentDate, previousStreakDate) === 1
+        ) {
+          tempStreak++
+        } else {
+          tempStreak = 1
+        }
+
+        previousStreakDate = currentDate
         longestStreak = Math.max(longestStreak, tempStreak)
       } else {
         tempStreak = 0
+        previousStreakDate = null
       }
     }
 

@@ -5,16 +5,30 @@ import { requireUserId } from '@/lib/get-user-id'
 
 const DreamGoalSchema = z.object({
   goalText: z.string().min(1, "Goal text is required"),
-  years: z.number().int().min(1).max(10).optional().default(5),
+  years: z.number().int().min(1).max(30).optional().default(5),
 })
 
 export async function GET(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const dream = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [latestDream, earliestDream] = await prisma.$transaction([
+      prisma.dreamGoal.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.dreamGoal.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ])
+
+    const dream = latestDream
+      ? {
+          ...latestDream,
+          createdAt: earliestDream?.createdAt || latestDream.createdAt,
+        }
+      : null
 
     return NextResponse.json(dream || null)
   } catch (error) {
@@ -45,13 +59,42 @@ export async function POST(request: NextRequest) {
 
     const { goalText, years } = validation.data
 
-    // Create or update dream goal (we only keep one per user)
-    const dream = await prisma.dreamGoal.create({
-      data: {
-        userId,
-        goalText,
-        years,
-      },
+    const dream = await prisma.$transaction(async (tx) => {
+      const existingDreams = await tx.dreamGoal.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'asc' },
+      })
+
+      if (existingDreams.length === 0) {
+        return tx.dreamGoal.create({
+          data: {
+            userId,
+            goalText,
+            years,
+          },
+        })
+      }
+
+      const canonicalDream = existingDreams[0]
+
+      const updatedDream = await tx.dreamGoal.update({
+        where: { id: canonicalDream.id },
+        data: {
+          goalText,
+          years,
+        },
+      })
+
+      if (existingDreams.length > 1) {
+        await tx.dreamGoal.deleteMany({
+          where: {
+            userId,
+            id: { not: canonicalDream.id },
+          },
+        })
+      }
+
+      return updatedDream
     })
 
     return NextResponse.json(dream)

@@ -134,20 +134,37 @@ export default function ProgressPage() {
         />
       </div>
 
-      {/* Компактные метрики */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* Сводка */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
           <div className="text-2xl font-bold text-blue-400">{stats.elapsedDays}</div>
           <div className="text-xs text-gray-500">дней прошло</div>
         </div>
         <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-          <div className="text-2xl font-bold text-green-400">{stats.fuelLevel}%</div>
-          <div className="text-xs text-gray-500">баланс</div>
+          <div className="text-2xl font-bold text-violet-400">{stats.plannedDays}</div>
+          <div className="text-xs text-gray-500">в плане</div>
         </div>
         <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-          <div className="text-2xl font-bold text-orange-400">{stats.avgSpeed30d}</div>
-          <div className="text-xs text-gray-500">скор. 30д</div>
+          <div className="text-2xl font-bold text-cyan-400">{stats.evaluatedDays}</div>
+          <div className="text-xs text-gray-500">оценено</div>
         </div>
+        <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
+          <div className="text-2xl font-bold text-emerald-400">{stats.effectiveDays}</div>
+          <div className="text-xs text-gray-500">эфф. дней</div>
+        </div>
+        <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
+          <div className="text-2xl font-bold text-amber-400">{stats.currentStreak}</div>
+          <div className="text-xs text-gray-500">серия сейчас</div>
+        </div>
+        <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
+          <div className="text-2xl font-bold text-orange-400">{stats.longestStreak}</div>
+          <div className="text-xs text-gray-500">лучшая серия</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500">
+        <span>Баланс: <span className="text-gray-300 font-medium">{stats.fuelLevel}%</span></span>
+        <span>Средняя скорость за 30 дней: <span className="text-gray-300 font-medium">{stats.avgSpeed30d}/10</span></span>
       </div>
 
       {/* Дорожная карта с вехами */}

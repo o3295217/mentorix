@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, isToday, differenceInCalendarDays, isSameMonth } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, isToday, differenceInCalendarDays, isAfter } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
-import { DailyEntry } from '@/lib/types'
+import { DailyEntry, DreamGoal } from '@/lib/types'
 
 interface MonthData {
   month: Date
@@ -14,6 +14,7 @@ interface MonthData {
 
 export default function HistoryPage() {
   const [entries, setEntries] = useState<DailyEntry[]>([])
+  const [dreamGoal, setDreamGoal] = useState<DreamGoal | null>(null)
   const [loading, setLoading] = useState(true)
   const [monthsToShow, setMonthsToShow] = useState(3)
   const [searchQuery, setSearchQuery] = useState('')
@@ -24,14 +25,23 @@ export default function HistoryPage() {
 
   const loadEntries = async () => {
     try {
-      // Получаем все записи (API возвращает все если нет from/to)
-      const res = await fetch('/api/daily')
-      if (!res.ok) {
-        console.error('Failed to load entries:', res.status)
+      const [entriesRes, dreamRes] = await Promise.all([
+        fetch('/api/daily'),
+        fetch('/api/goals/dream'),
+      ])
+
+      if (!entriesRes.ok) {
+        console.error('Failed to load entries:', entriesRes.status)
         return
       }
-      const data = await res.json()
-      setEntries(data)
+
+      const entriesData = await entriesRes.json()
+      setEntries(entriesData)
+
+      if (dreamRes.ok) {
+        const dreamData = await dreamRes.json()
+        setDreamGoal(dreamData)
+      }
     } catch (error) {
       console.error('Error loading entries:', error)
     } finally {
@@ -88,18 +98,23 @@ export default function HistoryPage() {
 
   // Статистика использования
   const usageStats = useMemo(() => {
-    if (entries.length === 0) return null
+    if (!dreamGoal && entries.length === 0) return null
 
-    const dates = entries.map(e => new Date(e.date)).sort((a, b) => a.getTime() - b.getTime())
-    const startDate = dates[0]
+    const entryDates = entries.map((entry) => new Date(entry.date)).sort((a, b) => a.getTime() - b.getTime())
+    const fallbackStartDate = entryDates[0] || new Date()
+    const startDate = dreamGoal?.createdAt ? new Date(dreamGoal.createdAt) : fallbackStartDate
     const today = new Date()
-    const calendarDays = differenceInCalendarDays(today, startDate) + 1
-    const plannedDays = entries.filter(e => e.planText).length
-    const evaluatedDays = entries.filter(e => e.evaluation).length
-    const usagePercent = calendarDays > 0 ? Math.round((plannedDays / calendarDays) * 100) : 0
+    const entriesUntilToday = entries.filter((entry) => !isAfter(new Date(entry.date), today))
+    const futurePlannedDays = entries.filter(
+      (entry) => !!entry.planText && isAfter(new Date(entry.date), today)
+    ).length
+    const calendarDays = Math.max(1, differenceInCalendarDays(today, startDate) + 1)
+    const plannedDays = entriesUntilToday.filter((entry) => !!entry.planText).length
+    const evaluatedDays = entriesUntilToday.filter((entry) => !!entry.evaluation).length
+    const usagePercent = Math.round((plannedDays / calendarDays) * 100)
 
-    return { startDate, calendarDays, plannedDays, evaluatedDays, usagePercent }
-  }, [entries])
+    return { startDate, calendarDays, plannedDays, evaluatedDays, futurePlannedDays, usagePercent }
+  }, [dreamGoal, entries])
 
   function getScoreColor(score: number): string {
     if (score >= 7) return 'bg-green-500'
@@ -186,6 +201,10 @@ export default function HistoryPage() {
           <div className="flex items-center gap-2">
             <span className="text-gray-400">Оценено:</span>
             <span className="text-white font-medium">{usageStats.evaluatedDays}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Впереди в плане:</span>
+            <span className="text-white font-medium">{usageStats.futurePlannedDays}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-gray-400">Использование:</span>

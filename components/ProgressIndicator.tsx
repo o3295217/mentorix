@@ -23,7 +23,7 @@ export default function ProgressIndicator({
   userName = '',
 }: ProgressIndicatorProps) {
   // Расчёт прогноза
-  const targetYears = 5
+  const targetYears = targetDays / 365
   const remainingDays = targetDays - effectiveDays
   const efficiency = currentSpeed / 10
   const yearsToGoal = efficiency > 0 ? (remainingDays / efficiency) / 365 : Infinity
