@@ -14,6 +14,7 @@ type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
   const [mounted, setMounted] = useState(false)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
@@ -110,6 +111,14 @@ export default function DailyPage() {
   const isGoalCompleted = useCallback((goalText: string): boolean => {
     return completedTaskTexts.some(taskText => areTasksSimilar(goalText, taskText))
   }, [completedTaskTexts])
+
+  useEffect(() => {
+    const textarea = newTaskTextareaRef.current
+    if (!textarea) return
+
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [newTaskText])
 
   // Заголовок для блока целей недели с датами
   const weekLabel = useMemo(() => {
@@ -399,6 +408,7 @@ export default function DailyPage() {
           {/* Добавление новой задачи */}
           <div className="mb-4 flex gap-2 items-start flex-shrink-0 pr-6">
             <textarea
+              ref={newTaskTextareaRef}
               value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
               onKeyDown={(e) => {

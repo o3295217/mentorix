@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-03-11 — Fix dream progress calculations and redesign progress view
+- 📄 Страницы: 1 файлов
+
+
 ### 2026-03-11 — Update progress metrics and refine task UI
 - 🔌 API: 2 файлов (route, route)
 - 🧩 Компоненты: 2 файлов (ProgressIndicator, Speedometer)
