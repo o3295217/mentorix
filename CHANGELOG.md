@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-03-11 — Fix developer docs update hooks
+- 📝 Документация: 3 файлов
+- 📦 Другое: 3 файлов
+
+
 ### 2026-03-11 — Fix daily task input autosize reset
 - 📄 Страницы: 1 файлов
 
