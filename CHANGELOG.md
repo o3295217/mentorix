@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-03-11 — Update progress view and onboarding docs
+- 🧩 Компоненты: 1 файлов (Speedometer)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+- 📦 Другое: 2 файлов
+
+
 ### 2026-03-11 — Fix developer docs update hooks
 - 📝 Документация: 3 файлов
 - 📦 Другое: 3 файлов
