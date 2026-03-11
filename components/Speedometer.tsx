@@ -121,12 +121,12 @@ export default function Speedometer({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Прогресс к цели</div>
+            <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Эффективный вклад</div>
             <div className="text-2xl font-bold text-white">{Math.round(effectiveDays * 10) / 10}</div>
             <div className="text-sm text-gray-500">эфф. дней из {targetDays}</div>
           </div>
           <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Выполнение плана</div>
+            <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Доля горизонта</div>
             <div className="text-2xl font-bold" style={{ color }}>{effectivePercent.toFixed(1)}%</div>
             <div className="text-sm text-gray-500">от общего горизонта мечты</div>
           </div>
