@@ -126,7 +126,9 @@ export default function HomePage() {
       {/* Progress Indicator */}
       {progressStats && (
         <ProgressIndicator
-          productiveDays={progressStats.productiveDays}
+          effectiveDays={progressStats.effectiveDays}
+          elapsedDays={progressStats.elapsedDays}
+          evaluatedDays={progressStats.evaluatedDays}
           currentStreak={progressStats.currentStreak}
           progressPercent={progressStats.progressPercent}
           targetDays={progressStats.targetDays}

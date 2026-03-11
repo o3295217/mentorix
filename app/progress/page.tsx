@@ -102,7 +102,7 @@ export default function ProgressPage() {
     return { name: 'Новичок', next: 10, progress: (days / 10) * 100 }
   }
 
-  const level = getLevel(stats.productiveDays)
+  const level = getLevel(stats.totalDays)
 
   // Список вех
   const milestones = [
@@ -125,47 +125,28 @@ export default function ProgressPage() {
 
       {/* Спидометр - центральный элемент */}
       <div className="card">
-        <div className="text-center mb-4">
-          <h2 className="font-bold text-gray-200">Скорость к мечте</h2>
-        </div>
         <Speedometer 
           speed={stats.currentSpeed}
-          progressPercent={stats.progressPercent}
           targetDays={stats.targetDays}
-          productiveDays={stats.productiveDays}
+          effectiveDays={stats.effectiveDays}
+          elapsedDays={stats.elapsedDays}
+          evaluatedDays={stats.evaluatedDays}
         />
       </div>
 
-      {/* Dashboard метрик */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card text-center">
-          <div className="text-3xl mb-2"></div>
-          <div className="text-3xl font-bold text-blue-400">{stats.productiveDays}</div>
-          <div className="text-sm text-gray-400 mt-1">дней пройдено</div>
-          <div className="text-xs text-gray-500 mt-1">из {stats.targetDays}</div>
+      {/* Компактные метрики */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
+          <div className="text-2xl font-bold text-blue-400">{stats.elapsedDays}</div>
+          <div className="text-xs text-gray-500">дней прошло</div>
         </div>
-
-        <div className="card text-center">
-          <div className="text-3xl mb-2"></div>
-          <div className="text-3xl font-bold text-green-400">{stats.fuelLevel}%</div>
-          <div className="text-sm text-gray-400 mt-1">топливо (баланс)</div>
-          <div className="text-xs text-gray-500 mt-1">здоровье + семья + энергия</div>
+        <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
+          <div className="text-2xl font-bold text-green-400">{stats.fuelLevel}%</div>
+          <div className="text-xs text-gray-500">баланс</div>
         </div>
-
-        <div className="card text-center">
-          <div className="text-3xl mb-2"></div>
-          <div className="text-3xl font-bold text-purple-400">
-            {milestones.filter(m => m.achieved).length}/{milestones.length}
-          </div>
-          <div className="text-sm text-gray-400 mt-1">вехи пройдено</div>
-          <div className="text-xs text-gray-500 mt-1">достижения</div>
-        </div>
-
-        <div className="card text-center">
-          <div className="text-3xl mb-2"></div>
-          <div className="text-3xl font-bold text-orange-400">{stats.avgSpeed30d}</div>
-          <div className="text-sm text-gray-400 mt-1">средняя скорость</div>
-          <div className="text-xs text-gray-500 mt-1">за 30 дней</div>
+        <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
+          <div className="text-2xl font-bold text-orange-400">{stats.avgSpeed30d}</div>
+          <div className="text-xs text-gray-500">скор. 30д</div>
         </div>
       </div>
 
@@ -179,7 +160,7 @@ export default function ProgressPage() {
             <div className="font-bold text-gray-200">{level.name}</div>
             {level.next && (
               <div className="text-sm text-gray-300">
-                До следующего: <span className="font-bold">{level.next - stats.productiveDays}</span> дней
+                До следующего: <span className="font-bold">{level.next - stats.totalDays}</span> дней
               </div>
             )}
           </div>
@@ -216,7 +197,21 @@ export default function ProgressPage() {
           <div className="absolute top-6 left-0 right-0 h-1 bg-gray-700 -z-10" style={{ width: 'calc(100% - 48px)', marginLeft: '24px' }}>
             <div
               className="h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500"
-              style={{ width: `${(stats.productiveDays / 1000) * 100}%` }}
+              style={{ width: `${(() => {
+                const days = stats.totalDays
+                const thresholds = [0, 10, 30, 100, 365, 1000]
+                let segmentIndex = 0
+                for (let i = 1; i < thresholds.length; i++) {
+                  if (days >= thresholds[i]) segmentIndex = i
+                  else break
+                }
+                const segmentWidth = 100 / (thresholds.length - 1)
+                if (segmentIndex >= thresholds.length - 1) return 100
+                const low = thresholds[segmentIndex]
+                const high = thresholds[segmentIndex + 1]
+                const fraction = (days - low) / (high - low)
+                return segmentIndex * segmentWidth + fraction * segmentWidth
+              })()}%` }}
             />
           </div>
         </div>

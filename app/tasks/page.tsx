@@ -294,13 +294,13 @@ export default function TasksPage() {
                 {strategicOpen.map((task) => (
                   <div key={task.id} className="p-4 bg-purple-900/30 rounded-lg border border-purple-700">
                     <p className="text-gray-200 mb-2">{task.taskText}</p>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">
                         {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
-                      <div className="flex gap-3 items-center">
+                      <div className="flex gap-2 items-center flex-wrap justify-end">
                         {tasksInPlan[task.id] ? (
-                          <span className="text-green-400 font-medium px-2 py-0.5 rounded bg-green-900/50">
+                          <span className="text-green-400 font-medium text-sm px-3 py-1 rounded bg-green-900/50">
                              в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
                               ? '' 
                               : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
@@ -308,26 +308,26 @@ export default function TasksPage() {
                         ) : (
                           <button
                             onClick={() => openDateModal(task)}
-                            className="text-green-400 font-medium hover:text-green-300"
+                            className="text-sm text-green-400 font-medium hover:text-green-300 px-3 py-1 rounded hover:bg-green-900/30 transition"
                           >
                             + В план
                           </button>
                         )}
                         {confirmCloseId === task.id ? (
-                          <div className="flex items-center gap-1 rounded px-2 py-0.5 bg-green-900/50">
-                            <span className="text-green-300">Задача выполнена?</span>
+                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-green-900/50 border border-green-700/50">
+                            <span className="text-sm text-green-300">Выполнена?</span>
                             <button
                               onClick={() => {
                                 closeTask(task.id)
                                 setConfirmCloseId(null)
                               }}
-                              className="w-5 h-5 flex items-center justify-center text-green-400 rounded text-xs hover:bg-green-800"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
                             >
                               Да
                             </button>
                             <button
                               onClick={() => setConfirmCloseId(null)}
-                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
                             >
                               Нет
                             </button>
@@ -335,34 +335,34 @@ export default function TasksPage() {
                         ) : (
                           <button
                             onClick={() => setConfirmCloseId(task.id)}
-                            className="text-purple-400 font-medium hover:text-purple-300"
+                            className="text-sm text-purple-400 font-medium hover:text-purple-300 px-3 py-1 rounded hover:bg-purple-900/30 transition"
                           >
                             Закрыть
                           </button>
                         )}
                         {confirmDeleteId === task.id ? (
-                          <div className="flex items-center gap-1 rounded px-2 py-0.5 bg-red-900/50">
-                            <span className="text-red-300">Удалить?</span>
+                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-red-900/50 border border-red-700/50">
+                            <span className="text-sm text-red-300">Удалить?</span>
                             <button
                               onClick={() => {
                                 deleteTask(task.id)
                                 setConfirmDeleteId(null)
                               }}
-                              className="w-5 h-5 flex items-center justify-center text-green-400 rounded text-xs hover:bg-green-800"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
                             >
-                              
+                              Да
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
                             >
-                              
+                              Нет
                             </button>
                           </div>
                         ) : (
                           <button
                             onClick={() => setConfirmDeleteId(task.id)}
-                            className="text-red-500 hover:text-red-400 font-medium"
+                            className="text-sm text-red-500 hover:text-red-400 font-medium px-3 py-1 rounded hover:bg-red-900/30 transition"
                           >
                             Удалить
                           </button>
@@ -385,13 +385,13 @@ export default function TasksPage() {
                 {operationalOpen.map((task) => (
                   <div key={task.id} className="p-4 bg-blue-900/30 rounded-lg border border-blue-700">
                     <p className="text-gray-200 mb-2">{task.taskText}</p>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">
                         {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
                       </span>
-                      <div className="flex gap-3 items-center">
+                      <div className="flex gap-2 items-center flex-wrap justify-end">
                         {tasksInPlan[task.id] ? (
-                          <span className="text-green-400 font-medium px-2 py-0.5 rounded bg-green-900/50">
+                          <span className="text-green-400 font-medium text-sm px-3 py-1 rounded bg-green-900/50">
                              в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
                               ? '' 
                               : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
@@ -399,26 +399,26 @@ export default function TasksPage() {
                         ) : (
                           <button
                             onClick={() => openDateModal(task)}
-                            className="text-green-400 hover:text-green-300 font-medium"
+                            className="text-sm text-green-400 font-medium hover:text-green-300 px-3 py-1 rounded hover:bg-green-900/30 transition"
                           >
                             + В план
                           </button>
                         )}
                         {confirmCloseId === task.id ? (
-                          <div className="flex items-center gap-1 rounded px-2 py-0.5 bg-green-900/50">
-                            <span className="text-green-300">Задача выполнена?</span>
+                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-green-900/50 border border-green-700/50">
+                            <span className="text-sm text-green-300">Выполнена?</span>
                             <button
                               onClick={() => {
                                 closeTask(task.id)
                                 setConfirmCloseId(null)
                               }}
-                              className="w-5 h-5 flex items-center justify-center text-green-400 rounded text-xs hover:bg-green-800"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
                             >
                               Да
                             </button>
                             <button
                               onClick={() => setConfirmCloseId(null)}
-                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
                             >
                               Нет
                             </button>
@@ -426,34 +426,34 @@ export default function TasksPage() {
                         ) : (
                           <button
                             onClick={() => setConfirmCloseId(task.id)}
-                            className="text-blue-400 hover:text-blue-300 font-medium"
+                            className="text-sm text-blue-400 font-medium hover:text-blue-300 px-3 py-1 rounded hover:bg-blue-900/30 transition"
                           >
                             Закрыть
                           </button>
                         )}
                         {confirmDeleteId === task.id ? (
-                          <div className="flex items-center gap-1 rounded px-2 py-0.5 bg-red-900/50">
-                            <span className="text-red-300">Удалить?</span>
+                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-red-900/50 border border-red-700/50">
+                            <span className="text-sm text-red-300">Удалить?</span>
                             <button
                               onClick={() => {
                                 deleteTask(task.id)
                                 setConfirmDeleteId(null)
                               }}
-                              className="w-5 h-5 flex items-center justify-center text-green-400 rounded text-xs hover:bg-green-800"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
                             >
-                              
+                              Да
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
+                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
                             >
-                              
+                              Нет
                             </button>
                           </div>
                         ) : (
                           <button
                             onClick={() => setConfirmDeleteId(task.id)}
-                            className="text-red-500 hover:text-red-400 font-medium"
+                            className="text-sm text-red-500 hover:text-red-400 font-medium px-3 py-1 rounded hover:bg-red-900/30 transition"
                           >
                             Удалить
                           </button>

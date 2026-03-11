@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-03-11 — AION logo: new nav animation + icon + title
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 3 файлов (ProgressIndicator, Speedometer, DreamSection)
+- 📄 Страницы: 6 файлов
+- 📚 Библиотеки: 1 файлов (types)
+- 📦 Другое: 1 файлов
+
+
 ### 2026-03-10 — refactor: stage 6 cleanup — remove showAllPeriods, pass detailLevel prop, remove IIFE, fix eslint-disable
 - 🧩 Компоненты: 1 файлов (Navigation)
 - 📦 Другое: 3 файлов

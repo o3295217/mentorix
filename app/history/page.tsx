@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, isToday } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, isToday, differenceInCalendarDays, isSameMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import { DailyEntry } from '@/lib/types'
@@ -86,6 +86,21 @@ export default function HistoryPage() {
     return matching
   }, [entries, searchQuery])
 
+  // Статистика использования
+  const usageStats = useMemo(() => {
+    if (entries.length === 0) return null
+
+    const dates = entries.map(e => new Date(e.date)).sort((a, b) => a.getTime() - b.getTime())
+    const startDate = dates[0]
+    const today = new Date()
+    const calendarDays = differenceInCalendarDays(today, startDate) + 1
+    const plannedDays = entries.filter(e => e.planText).length
+    const evaluatedDays = entries.filter(e => e.evaluation).length
+    const usagePercent = calendarDays > 0 ? Math.round((plannedDays / calendarDays) * 100) : 0
+
+    return { startDate, calendarDays, plannedDays, evaluatedDays, usagePercent }
+  }, [entries])
+
   function getScoreColor(score: number): string {
     if (score >= 7) return 'bg-green-500'
     if (score >= 5) return 'bg-yellow-500'
@@ -153,28 +168,63 @@ export default function HistoryPage() {
         </div>
       </div>
 
+      {/* Статистика использования */}
+      {usageStats && (
+        <div className="flex flex-wrap gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Старт:</span>
+            <span className="text-white font-medium">{format(usageStats.startDate, 'd MMMM yyyy', { locale: ru })}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Дней прошло:</span>
+            <span className="text-white font-medium">{usageStats.calendarDays}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Спланировано:</span>
+            <span className="text-white font-medium">{usageStats.plannedDays}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Оценено:</span>
+            <span className="text-white font-medium">{usageStats.evaluatedDays}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Использование:</span>
+            <span className={`font-bold ${
+              usageStats.usagePercent >= 80 ? 'text-green-400' :
+              usageStats.usagePercent >= 50 ? 'text-yellow-400' : 'text-red-400'
+            }`}>{usageStats.usagePercent}%</span>
+          </div>
+        </div>
+      )}
+
       {/* Календарная сетка */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {months.map(({ month, days, startDayOfWeek }) => (
-          <div key={month.toISOString()} className="card p-4">
-            <h2 className="font-semibold mb-3 text-white">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {months.map(({ month, days, startDayOfWeek }, index) => {
+          // Градиент: текущий месяц светлый, каждый следующий на тон темнее
+          // Компоненты RGB уменьшаются равномерно от светлого к тёмному
+          const r = Math.max(10, 26 - index * 3)
+          const g = Math.max(14, 31 - index * 3)
+          const b = Math.max(20, 45 - index * 4)
+          return (
+          <div key={month.toISOString()} className="rounded-2xl p-4" style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}>
+            <h2 className="text-base font-medium mb-2 text-white capitalize">
               {format(month, 'LLLL yyyy', { locale: ru })}
             </h2>
             
             {/* Заголовки дней недели */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
+            <div className="grid grid-cols-7">
               {weekDays.map(day => (
-                <div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
+                <div key={day} className="text-center text-[11px] font-medium text-gray-500 py-1.5">
                   {day}
                 </div>
               ))}
             </div>
             
             {/* Дни месяца */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7">
               {/* Пустые ячейки до начала месяца */}
               {Array.from({ length: startDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-20 sm:h-24"></div>
+                <div key={`empty-${i}`} className="h-[72px] border-t border-gray-800/60"></div>
               ))}
               
               {/* Дни */}
@@ -191,32 +241,30 @@ export default function HistoryPage() {
                   <Link
                     key={dateKey}
                     href={hasEvaluation ? `/evaluation/${dateKey}` : `/daily?date=${dateKey}`}
-                    className={`h-20 sm:h-24 rounded-lg border transition-all hover:scale-105 flex flex-col ${
-                      isTodayDate 
-                        ? 'ring-2 ring-purple-500 border-purple-300' 
-                        : 'border-gray-700'
-                    } ${
-                      isMatching ? 'ring-2 ring-yellow-400' : ''
-                    } ${
-                      entry 
-                        ? 'bg-gray-900/80' 
-                        : 'bg-gray-950'
+                    className={`h-[72px] border-t border-gray-800/60 flex flex-col transition-colors hover:bg-gray-800/40 ${
+                      isMatching ? 'bg-yellow-500/10' : ''
                     }`}
                   >
                     {/* Номер дня */}
-                    <div className="text-xs font-medium text-gray-400 p-1">
-                      {format(day, 'd')}
+                    <div className="flex justify-center pt-1">
+                      <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full ${
+                        isTodayDate
+                          ? 'bg-blue-500 text-white font-bold'
+                          : 'text-gray-400'
+                      }`}>
+                        {format(day, 'd')}
+                      </span>
                     </div>
                     
                     {/* Оценка по центру */}
                     <div className="flex-1 flex items-center justify-center">
                       {hasEvaluation && entry?.evaluation && (
-                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base ${getScoreColor(entry.evaluation.overallScore)}`}>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs ${getScoreColor(entry.evaluation.overallScore)}`}>
                           {entry.evaluation.overallScore}
                         </div>
                       )}
                       {entry && !hasEvaluation && (
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-blue-500 text-white text-xs">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center bg-blue-500/80 text-white text-[10px]">
                           •••
                         </div>
                       )}
@@ -224,10 +272,10 @@ export default function HistoryPage() {
                     
                     {/* Индикаторы П Ф О */}
                     {entry && (
-                      <div className="flex justify-center gap-1 text-xs pb-1">
-                        <span className={hasPlan ? 'text-green-400' : 'text-gray-400'}>П</span>
-                        <span className={hasFact ? 'text-green-400' : 'text-gray-400'}>Ф</span>
-                        <span className={hasEvaluation ? 'text-green-400' : 'text-gray-400'}>О</span>
+                      <div className="flex justify-center gap-0.5 text-[10px] pb-0.5">
+                        <span className={hasPlan ? 'text-green-400' : 'text-gray-600'}>П</span>
+                        <span className={hasFact ? 'text-green-400' : 'text-gray-600'}>Ф</span>
+                        <span className={hasEvaluation ? 'text-green-400' : 'text-gray-600'}>О</span>
                       </div>
                     )}
                   </Link>
@@ -235,7 +283,8 @@ export default function HistoryPage() {
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

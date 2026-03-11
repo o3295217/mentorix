@@ -3,7 +3,9 @@
 import Link from 'next/link'
 
 interface ProgressIndicatorProps {
-  productiveDays: number
+  effectiveDays: number
+  elapsedDays: number
+  evaluatedDays: number
   currentStreak: number
   progressPercent: number
   targetDays: number
@@ -12,7 +14,9 @@ interface ProgressIndicatorProps {
 }
 
 export default function ProgressIndicator({
-  productiveDays,
+  effectiveDays,
+  elapsedDays,
+  evaluatedDays,
   progressPercent,
   targetDays,
   currentSpeed = 0,
@@ -20,7 +24,7 @@ export default function ProgressIndicator({
 }: ProgressIndicatorProps) {
   // Расчёт прогноза
   const targetYears = 5
-  const remainingDays = targetDays - productiveDays
+  const remainingDays = targetDays - effectiveDays
   const efficiency = currentSpeed / 10
   const yearsToGoal = efficiency > 0 ? (remainingDays / efficiency) / 365 : Infinity
 
@@ -70,7 +74,7 @@ export default function ProgressIndicator({
         </div>
 
         <div className="flex justify-between text-base text-gray-400">
-          <span>{productiveDays} / {targetDays} дней</span>
+          <span>{elapsedDays} прошло · {evaluatedDays} оценено · {effectiveDays.toFixed(1)} эфф.</span>
           <span>{progressPercent.toFixed(1)}%</span>
         </div>
       </div>

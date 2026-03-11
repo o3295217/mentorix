@@ -64,7 +64,10 @@ export interface DailyEntry {
 export interface ProgressStats {
   currentSpeed: number
   totalDays: number
-  productiveDays: number
+  effectiveDays: number
+  elapsedDays: number
+  plannedDays: number
+  evaluatedDays: number
   currentStreak: number
   longestStreak: number
   avgSpeed30d: number

@@ -578,7 +578,6 @@ export default function DailyPage() {
                     type="checkbox"
                     checked={selectedTasks.has(task.id)}
                     onChange={() => toggleTaskSelection(task.id)}
-                    className="w-5 h-5 text-green-400 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                   />
 
                   {editingTaskId === task.id ? (
@@ -619,19 +618,19 @@ export default function DailyPage() {
                         }}
                         className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
                       >
-                        
+                        ✓
                       </button>
                       <button
                         onClick={() => setConfirmAction(null)}
                         className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
                       >
-                        
+                        ✗
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmAction({ taskId: task.id, type: 'postpone' })}
-                      className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-400 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
+                      className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
                       title="Перенести на завтра"
                     >
                       →
@@ -661,7 +660,7 @@ export default function DailyPage() {
                       return (
                         <button
                           onClick={() => openHabitModal(task.taskText)}
-                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-all"
+                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
                           title="Сделать привычкой"
                         >
                           ↻
@@ -679,22 +678,22 @@ export default function DailyPage() {
                         }}
                         className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
                       >
-                        
+                        ✓
                       </button>
                       <button
                         onClick={() => setConfirmAction(null)}
                         className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
                       >
-                        
+                        ✗
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmAction({ taskId: task.id, type: 'delete' })}
-                      className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+                      className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
                       title="Удалить задачу"
                     >
-                      
+                      ×
                     </button>
                   )}
                 </div>
@@ -732,7 +731,6 @@ export default function DailyPage() {
                             type="checkbox"
                             checked={true}
                             onChange={() => toggleTaskSelection(task.id)}
-                            className="w-5 h-5 text-green-400 rounded focus:ring-2 focus:ring-green-500 flex-shrink-0"
                           />
                           <span className="flex-1 text-base text-gray-400">
                             {task.taskText}
@@ -748,7 +746,7 @@ export default function DailyPage() {
                                 }}
                                 className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
                               >
-                                
+                                ✓
                               </button>
                               <button
                                 onClick={(e) => {
@@ -757,7 +755,7 @@ export default function DailyPage() {
                                 }}
                                 className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
                               >
-                                
+                                ✗
                               </button>
                             </div>
                           ) : (
@@ -766,10 +764,10 @@ export default function DailyPage() {
                                 e.stopPropagation()
                                 setConfirmAction({ taskId: task.id, type: 'delete' })
                               }}
-                              className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+                              className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
                               title="Удалить задачу"
                             >
-                              
+                              ×
                             </button>
                           )}
                         </div>
@@ -962,9 +960,17 @@ export default function DailyPage() {
           {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
         </button>
         {dailyEntry?.evaluation && (
-          <p className="mt-4 text-base text-green-400">
-            Оценка за этот день уже получена. Вы можете получить новую оценку.
-          </p>
+          <div className="mt-4 flex items-center gap-4">
+            <button
+              onClick={() => router.push(`/evaluation/${selectedDate}`)}
+              className="btn-secondary text-sm"
+            >
+              Посмотреть оценку →
+            </button>
+            <span className="text-sm text-gray-400">
+              или получите новую
+            </span>
+          </div>
         )}
       </div>
 

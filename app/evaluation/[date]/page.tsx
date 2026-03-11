@@ -202,23 +202,20 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
       <p className="text-lg text-gray-400">{format(date, 'd MMMM yyyy, EEEE', { locale: ru })}</p>
 
-      {/* ГЛАВНАЯ МЕТРИКА - Dream Progress Score */}
-      <div className="card text-center">
-        <h2 className="font-bold mb-2 text-purple-100"> Движение к мечте</h2>
-        <p className={`text-7xl font-bold ${getScoreColor(evaluation.dreamProgressScore || evaluation.overallScore)}`}>
-          {evaluation.dreamProgressScore || evaluation.overallScore}
-        </p>
-        <p className="text-gray-400 mt-2 text-lg">из 10</p>
-        <p className="text-sm text-gray-400 mt-3 max-w-md mx-auto">
-          Главная метрика: насколько этот день приблизил тебя к мечте
-        </p>
-      </div>
-
-      {/* Overall Score - вторичная метрика */}
-      <div className="card text-center">
-        <h2 className="text-xl font-semibold mb-2 text-white">Общая оценка (среднее по 4 показателям)</h2>
-        <p className={`text-5xl font-bold ${getScoreColor(evaluation.overallScore)}`}>{evaluation.overallScore}</p>
-        <p className="text-gray-400 mt-1">из 10</p>
+      {/* Две главные оценки в одну строку */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card text-center">
+          <h2 className="font-bold mb-2 text-purple-100">Движение к мечте</h2>
+          <p className={`text-5xl font-bold ${getScoreColor(evaluation.dreamProgressScore || evaluation.overallScore)}`}>
+            {evaluation.dreamProgressScore || evaluation.overallScore}
+          </p>
+          <p className="text-gray-400 mt-1">из 10</p>
+        </div>
+        <div className="card text-center">
+          <h2 className="font-bold mb-2 text-white">Общая оценка</h2>
+          <p className={`text-5xl font-bold ${getScoreColor(evaluation.overallScore)}`}>{evaluation.overallScore}</p>
+          <p className="text-gray-400 mt-1">из 10</p>
+        </div>
       </div>
 
       {/* Scores breakdown */}
