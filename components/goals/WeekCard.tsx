@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Goal } from '@/lib/types'
+import { Goal, GoalTag } from '@/lib/types'
 import { parseDateParam, toDateKey } from '@/lib/dates'
 import { WeekData } from './WeekStrip'
 
@@ -10,13 +10,17 @@ interface WeekCardProps {
   weekGoals: string[]
   isCurrentWeek: boolean
   trackedGoals: Goal[]
+  // Tags
+  tags: GoalTag[]
+  onCreateTag: (name: string, color: string) => void
+  onSetGoalTags: (weekKey: string, text: string, tags: string[]) => void
   // Drag
   draggedGoal: { weekKey: string; index: number; goal: string } | null
   setDraggedGoal: (goal: { weekKey: string; index: number; goal: string } | null) => void
   setDragOverWeek: (weekKey: string | null) => void
   onMoveGoal: (fromWeekKey: string, toWeekKey: string, index: number, goal: string) => void
   // CRUD
-  onAddWeekGoal: (weekKey: string, text: string) => void
+  onAddWeekGoal: (weekKey: string, text: string, tags?: string[]) => void
   onRemoveWeekGoal: (weekKey: string, index: number) => void
   onEditWeekGoal: (weekKey: string, index: number, text: string) => void
   // Tracking
@@ -42,6 +46,9 @@ export default function WeekCard({
   weekGoals,
   isCurrentWeek,
   trackedGoals,
+  tags,
+  onCreateTag,
+  onSetGoalTags,
   draggedGoal,
   setDraggedGoal,
   setDragOverWeek,
@@ -62,6 +69,13 @@ export default function WeekCard({
   const weekKey = week.key
   const [editingWeekGoal, setEditingWeekGoal] = useState<{ weekKey: string; index: number } | null>(null)
   const [editingWeekText, setEditingWeekText] = useState('')
+  // Tag selection for new goal
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [showNewTagInput, setShowNewTagInput] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState('#6B7280')
+  // Tag editing for existing goal
+  const [editingTagsGoal, setEditingTagsGoal] = useState<string | null>(null)
 
   return (
     <div
@@ -93,27 +107,105 @@ export default function WeekCard({
       </div>
 
       {/* Добавление цели в неделю */}
-      <div className="flex gap-1 mb-2">
-        <input
-          type="text"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              const target = e.target as HTMLInputElement
-              if (target.value.trim()) { onAddWeekGoal(weekKey, target.value); target.value = '' }
-            }
-          }}
-          placeholder="Цель на неделю..."
-          className="flex-1 px-2 py-1 text-xs border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600"
-        />
-        <button
-          onClick={(e) => {
-            const input = e.currentTarget.previousElementSibling as HTMLInputElement
-            if (input.value.trim()) { onAddWeekGoal(weekKey, input.value); input.value = '' }
-          }}
-          className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-lg transition-colors"
-        >
-          +
-        </button>
+      <div className="mb-2">
+        <div className="flex gap-1">
+          <input
+            type="text"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const target = e.target as HTMLInputElement
+                if (target.value.trim()) {
+                  onAddWeekGoal(weekKey, target.value, selectedTags.length > 0 ? selectedTags : undefined)
+                  target.value = ''
+                  setSelectedTags([])
+                }
+              }
+            }}
+            placeholder="Цель на неделю..."
+            className="flex-1 px-2 py-1 text-xs border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600"
+          />
+          <button
+            onClick={(e) => {
+              const input = e.currentTarget.parentElement?.querySelector('input[type="text"]') as HTMLInputElement
+              if (input?.value.trim()) {
+                onAddWeekGoal(weekKey, input.value, selectedTags.length > 0 ? selectedTags : undefined)
+                input.value = ''
+                setSelectedTags([])
+              }
+            }}
+            className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-lg transition-colors"
+          >
+            +
+          </button>
+        </div>
+        {/* Теги для новой цели */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {tags.map(tag => {
+              const isSelected = selectedTags.includes(tag.name)
+              return (
+                <button
+                  key={tag.id}
+                  onClick={() => setSelectedTags(prev =>
+                    isSelected ? prev.filter(t => t !== tag.name) : [...prev, tag.name]
+                  )}
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] transition-all ${
+                    isSelected ? 'ring-1 ring-offset-1 ring-offset-gray-900' : 'opacity-50 hover:opacity-80'
+                  }`}
+                  style={{
+                    backgroundColor: tag.color + '20',
+                    color: tag.color,
+                    ...(isSelected ? { ringColor: tag.color } : {}),
+                  }}
+                >
+                  {tag.name}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setShowNewTagInput(!showNewTagInput)}
+              className="text-[10px] text-gray-500 hover:text-gray-300 px-1 transition-colors"
+            >
+              + тег
+            </button>
+          </div>
+        )}
+        {(showNewTagInput || tags.length === 0) && (
+          <div className="flex items-center gap-1 mt-1">
+            <input
+              type="text"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newTagName.trim()) {
+                  onCreateTag(newTagName.trim(), newTagColor)
+                  setNewTagName('')
+                  setShowNewTagInput(false)
+                }
+              }}
+              placeholder="Новый тег..."
+              className="px-1.5 py-0.5 text-[10px] border border-gray-700 rounded w-20 bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600"
+            />
+            <input
+              type="color"
+              value={newTagColor}
+              onChange={(e) => setNewTagColor(e.target.value)}
+              className="w-4 h-4 rounded cursor-pointer border-0"
+            />
+            {newTagName.trim() && (
+              <button
+                onClick={() => {
+                  onCreateTag(newTagName.trim(), newTagColor)
+                  setNewTagName('')
+                  setShowNewTagInput(false)
+                }}
+                className="px-1 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              >
+                +
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Цели недели */}
@@ -228,6 +320,26 @@ export default function WeekCard({
                           ⏰ {parseDateParam(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                         </div>
                       )}
+                      {/* Теги цели */}
+                      {(trackedGoal?.tags || []).length > 0 && (
+                        <div className="flex flex-wrap gap-0.5 mt-0.5">
+                          {(trackedGoal?.tags || []).map(tagName => {
+                            const tagInfo = tags.find(t => t.name === tagName)
+                            return (
+                              <span
+                                key={tagName}
+                                className="inline-block px-1 py-0 rounded text-[9px]"
+                                style={{
+                                  backgroundColor: (tagInfo?.color || '#6B7280') + '20',
+                                  color: tagInfo?.color || '#6B7280',
+                                }}
+                              >
+                                {tagName}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -250,6 +362,19 @@ export default function WeekCard({
                   <button
                     draggable={false}
                     onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => setEditingTagsGoal(editingTagsGoal === goalKey ? null : goalKey)}
+                    className={`p-0.5 rounded transition-colors text-xs ${
+                      editingTagsGoal === goalKey
+                        ? 'text-blue-400 bg-blue-500/10'
+                        : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                    }`}
+                    title="Теги"
+                  >
+                    🏷
+                  </button>
+                  <button
+                    draggable={false}
+                    onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => { setEditingWeekGoal({ weekKey, index }); setEditingWeekText(goal) }}
                     className="text-gray-500 hover:text-gray-300 p-0.5 rounded hover:bg-gray-800 transition-colors text-xs"
                   >
@@ -264,6 +389,35 @@ export default function WeekCard({
                     &#10005;
                   </button>
                 </div>
+                {/* Выбор тегов для существующей цели */}
+                {editingTagsGoal === goalKey && tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-gray-700/50">
+                    {tags.map(tag => {
+                      const currentTags = trackedGoal?.tags || []
+                      const isActive = currentTags.includes(tag.name)
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => {
+                            const newTags = isActive
+                              ? currentTags.filter(t => t !== tag.name)
+                              : [...currentTags, tag.name]
+                            onSetGoalTags(weekKey, goal, newTags)
+                          }}
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] transition-all ${
+                            isActive ? 'ring-1 ring-offset-1 ring-offset-gray-900' : 'opacity-40 hover:opacity-70'
+                          }`}
+                          style={{
+                            backgroundColor: tag.color + '20',
+                            color: tag.color,
+                          }}
+                        >
+                          {tag.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })

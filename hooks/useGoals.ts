@@ -36,6 +36,7 @@ interface UseGoalsReturn {
   updateGoalPriority: (goalId: number, priority: number) => Promise<void>
   setGoalPriority: (periodKey: string, text: string, priority: number) => Promise<void>
   setGoalCompleted: (periodKey: string, text: string, completed: boolean) => Promise<void>
+  setGoalTags: (periodKey: string, text: string, tags: string[]) => Promise<void>
   processingGoals: Set<string>
   
   // Tags
@@ -335,7 +336,7 @@ export function useGoals(): UseGoalsReturn {
     }
   }, [showMessage])
 
-  const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0): Promise<Goal | null> => {
+  const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0, tags: string[] = []): Promise<Goal | null> => {
     const lockKey = `${periodKey}-${text}`
 
     // Use ref-based lock to prevent race conditions across renders
@@ -360,7 +361,7 @@ export function useGoals(): UseGoalsReturn {
       const res = await fetch('/api/goals/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, periodType, periodKey, priority }),
+        body: JSON.stringify({ text, periodType, periodKey, priority, tags }),
       })
       const newGoal = await res.json()
       if (newGoal.id) {
@@ -414,6 +415,28 @@ export function useGoals(): UseGoalsReturn {
     }
     await loadTrackedGoals()
   }, [goals, toggleGoalCompleted, createTrackedGoal, loadTrackedGoals])
+
+  const setGoalTags = useCallback(async (periodKey: string, text: string, newTags: string[]) => {
+    const trackedGoal = goals.find(g => g.periodKey === periodKey && g.text === text)
+
+    if (trackedGoal) {
+      try {
+        const res = await fetch('/api/goals/items', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: trackedGoal.id, tags: newTags }),
+        })
+        const updated = await res.json()
+        setGoals(prev => prev.map(g => g.id === trackedGoal.id ? { ...g, tags: updated.tags || newTags } : g))
+      } catch (error) {
+        console.error('Error updating goal tags:', error)
+        showMessage('❌ Ошибка обновления тегов')
+      }
+    } else {
+      await createTrackedGoal(periodKey, text, 0, newTags)
+    }
+    await loadTrackedGoals()
+  }, [goals, createTrackedGoal, loadTrackedGoals, showMessage])
 
   // Tags operations
   const loadTags = useCallback(async () => {
@@ -496,6 +519,7 @@ export function useGoals(): UseGoalsReturn {
     updateGoalPriority,
     setGoalPriority,
     setGoalCompleted,
+    setGoalTags,
     processingGoals,
     tags,
     createTag,

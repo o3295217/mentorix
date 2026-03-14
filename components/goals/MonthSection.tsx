@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Goal } from '@/lib/types'
+import { Goal, GoalTag } from '@/lib/types'
 import { monthNames } from '@/lib/goals-utils'
 import { useInlineEdit } from '@/hooks/useInlineEdit'
 import { useCopyDropdown } from '@/hooks/useCopyDropdown'
@@ -27,7 +27,7 @@ interface MonthSectionProps {
   dragOverWeek: string | null
   setDragOverWeek: (weekKey: string | null) => void
   onMoveGoal: (fromWeekKey: string, toWeekKey: string, index: number, goal: string) => void
-  onAddWeekGoal: (weekKey: string, text: string) => void
+  onAddWeekGoal: (weekKey: string, text: string, tags?: string[]) => void
   onRemoveWeekGoal: (weekKey: string, index: number) => void
   onEditWeekGoal: (weekKey: string, index: number, text: string) => void
   
@@ -37,6 +37,10 @@ interface MonthSectionProps {
   setExpandedGoals: (callback: (prev: Set<string>) => Set<string>) => void
   onToggleGoalCompletion: (weekKey: string, text: string, completed: boolean) => void
   onSetGoalPriority: (weekKey: string, text: string, priority: number) => void
+  // Tags
+  tags?: GoalTag[]
+  onCreateTag?: (name: string, color: string) => void
+  onSetGoalTags?: (weekKey: string, text: string, tags: string[]) => void
   // Filters
   searchQuery?: string
   filterStatus?: 'all' | 'active' | 'completed'
@@ -69,6 +73,9 @@ export default function MonthSection({
   setExpandedGoals,
   onToggleGoalCompletion,
   onSetGoalPriority,
+  tags = [],
+  onCreateTag,
+  onSetGoalTags,
   searchQuery = '',
   filterStatus = 'all',
   filterPriority = null,
@@ -78,6 +85,9 @@ export default function MonthSection({
   const { editingIndex, editingText, setEditingText, startEdit, cancelEdit, saveEdit } = useInlineEdit(onEditGoal)
   const { copyDropdownIndex, dropdownRef, toggleDropdown, closeDropdown } = useCopyDropdown()
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null)
+
+  // Определяем, прошёл ли месяц
+  const isPast = !isCurrent && new Date(year, month + 1, 0) < new Date()
 
   const weeksInMonth = useMemo(() => {
     const weeks: { num: number; key: string; start: Date; end: Date }[] = []
@@ -96,6 +106,22 @@ export default function MonthSection({
     }
     return weeks
   }, [year, month])
+
+  // Проверяем наличие целей в неделях
+  const hasWeekGoals = weeksInMonth.some(w => (periodGoals.get(w.key) || []).length > 0)
+  const isEmpty = goals.length === 0 && !hasWeekGoals
+
+  // Свёрнутый по умолчанию, если прошедший и пустой
+  const [collapsed, setCollapsed] = useState(isPast && isEmpty)
+
+  // Обновляем collapsed при изменении данных
+  useEffect(() => {
+    if (!isPast) {
+      setCollapsed(false)
+    } else if (isEmpty) {
+      setCollapsed(true)
+    }
+  }, [isPast, isEmpty])
 
   // Auto-expand current week
   useEffect(() => {
@@ -122,8 +148,17 @@ export default function MonthSection({
         : 'border-gray-800 bg-gray-900/20'
     }`}>
       {/* Заголовок месяца */}
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <span className="font-medium text-sm text-gray-200">
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-800/30 rounded-lg transition-colors select-none"
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        <svg
+          className={`w-3.5 h-3.5 text-gray-500 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        <span className={`font-medium text-sm ${collapsed ? 'text-gray-500' : 'text-gray-200'}`}>
           {monthNames[month]}
         </span>
         {isCurrent && (
@@ -132,7 +167,10 @@ export default function MonthSection({
         {goals.length > 0 && (
           <span className="text-xs text-gray-500">({goals.length})</span>
         )}
-        {progress.total > 0 && (
+        {collapsed && isEmpty && (
+          <span className="text-[10px] text-gray-600 ml-auto">пусто</span>
+        )}
+        {!collapsed && progress.total > 0 && (
           <div className="flex items-center gap-2 ml-auto">
             <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
               <div
@@ -145,6 +183,7 @@ export default function MonthSection({
         )}
       </div>
 
+      {!collapsed && (
       <div className="px-3 pb-3 space-y-2">
         {/* Добавление цели */}
         <div className="flex gap-2">
@@ -266,6 +305,9 @@ export default function MonthSection({
                   weekGoals={weekGoals}
                   isCurrentWeek={isCurrentWeek}
                   trackedGoals={trackedGoals}
+                  tags={tags}
+                  onCreateTag={onCreateTag || (() => {})}
+                  onSetGoalTags={onSetGoalTags || (() => {})}
                   draggedGoal={draggedGoal}
                   setDraggedGoal={setDraggedGoal}
                   setDragOverWeek={setDragOverWeek}
@@ -288,6 +330,7 @@ export default function MonthSection({
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

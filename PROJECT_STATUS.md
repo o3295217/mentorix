@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-03-11**
+> Последнее обновление: **2026-03-14**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (46)
+## API Endpoints (47)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -58,6 +58,7 @@
 | `/api/evaluate/batch` | GET, POST |
 | `/api/evaluate-period` | POST |
 | `/api/forecast` | POST |
+| `/api/goals/decompose` | POST |
 | `/api/goals/dream` | GET, POST |
 | `/api/goals/items` | GET, POST, PUT, DELETE |
 | `/api/goals/move` | POST |
@@ -100,14 +101,14 @@
 - `ThemeProvider`
 - `ThemeToggle`
 - `UncompletedTasksModal`
-- `goals/DreamSection`
-- `goals/HalfYearSection`
+- `goals/DreamBar`
+- `goals/GoalsChatPanel`
+- `goals/GoalsChatTrigger`
 - `goals/MonthSection`
-- `goals/QuarterSection`
-- `goals/TimelineNav`
+- `goals/MonthTimeline`
+- `goals/StrategyCards`
 - `goals/WeekCard`
 - `goals/WeekStrip`
-- `goals/YearSection`
 
 ## Модели БД (22)
 

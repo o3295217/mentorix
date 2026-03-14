@@ -846,14 +846,14 @@ export async function getUserStatsForAI(): Promise<string>
 - `UncompletedTasksModal`
 
 **Компоненты целей (goals/):**
-- `goals/DreamSection`
-- `goals/HalfYearSection`
+- `goals/DreamBar`
+- `goals/GoalsChatPanel`
+- `goals/GoalsChatTrigger`
 - `goals/MonthSection`
-- `goals/QuarterSection`
-- `goals/TimelineNav`
+- `goals/MonthTimeline`
+- `goals/StrategyCards`
 - `goals/WeekCard`
 - `goals/WeekStrip`
-- `goals/YearSection`
 
 ### Иерархия компонентов целей
 
