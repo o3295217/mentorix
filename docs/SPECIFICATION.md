@@ -161,7 +161,7 @@ Claude API оценивает день по следующим критерия�
 |--------|---------|----------|
 | `DreamGoal` | `dream_goal` | Мечта: goalText, years (горизонт в годах, по умолч. 5) |
 | `YearGoal` | `year_goals` | Цели на год: year, goalsJson (JSON массив строк). Unique: userId+year |
-| `PeriodGoal` | `period_goals` | Цели периодов (quarter, month, week, half_year): periodType, periodStart, periodEnd, goalsJson |
+| `PeriodGoal` | `period_goals` | Цели периодов (quarter, month, week, half_year): periodType, periodStart, periodEnd, goalsJson. POST использует upsert-паттерн (findFirst + update или create) |
 | `Goal` | `goals` | Трекинг отдельных целей: text, periodType, periodKey, completed, deadline, priority, tagsJson, sortOrder |
 | `GoalTag` | `goal_tags` | Теги целей: name, color. Unique: userId+name |
 

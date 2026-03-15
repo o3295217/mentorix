@@ -71,14 +71,16 @@ ai-assistant-spec/
 │   └── page.tsx              # Dashboard / Landing
 ├── components/               # React компоненты
 │   ├── goals/                # Компоненты целей
-│   │   ├── TimelineNav.tsx    # Навигация: чипы годов + табы кварталов/полугодий
-│   │   ├── DreamSection.tsx   # Мечта: line-clamp, прогресс-бар
-│   │   ├── YearSection.tsx    # Цели года (плоский, без аккордеона)
-│   │   ├── HalfYearSection.tsx
-│   │   ├── QuarterSection.tsx # Цели квартала (плоский, без аккордеона)
-│   │   ├── MonthSection.tsx    # Месяц: цели + композиция WeekStrip + WeekCard
+│   │   │   ├── DreamBar.tsx        # Компактная мечта: текст (click to expand) + горизонт + edit
+│   │   ├── HorizonsCard.tsx   # Rolling Wave визуализация (3 колонки: Детально/Укрупнённо/Направление)
+│   │   ├── StrategyCards.tsx  # Горизонтальные карточки целей по годам с прогрессом
+│   │   ├── QuarterView.tsx    # Квартальные цели (2x2 grid, Q1-Q4, прогресс-бары)
+│   │   ├── MonthTimeline.tsx  # Горизонтальная шкала 12 месяцев (sticky) с pill-превью задач
+│   │   ├── MonthSection.tsx   # Детализация месяца: цели с чекбоксами + WeekCard
 │   │   ├── WeekStrip.tsx      # Компактные бейджи W1-W5 с мини-прогрессом
-│   │   └── WeekCard.tsx       # Раскрытая неделя: цели, checkbox, priority, drag
+│   │   ├── WeekCard.tsx       # Раскрытая неделя: цели, checkbox, priority, drag
+│   │   ├── GoalsChatTrigger.tsx # Вертикальная кнопка ИИ-помощника
+│   │   └── GoalsChatPanel.tsx  # Выезжающая ИИ-панель декомпозиции
 │   ├── DatePickerWithIndicators.tsx
 │   ├── Speedometer.tsx       # Прогресс к мечте
 │   ├── BalanceFlags.tsx      # Флаги баланса
@@ -104,7 +106,7 @@ ai-assistant-spec/
 │   ├── api-utils.ts          # API утилиты, безопасность
 │   ├── dates.ts              # Работа с датами
 │   ├── fact-utils.ts         # Утилиты для фактов
-│   ├── goals-utils.ts        # Утилиты для целей
+│   ├── goals-utils.ts        # Утилиты для целей (getPeriodKey — единый алгоритм ключей периодов)
 │   ├── rate-limit.ts         # Rate limiting для API
 │   ├── task-match.ts         # Определение похожих задач
 │   ├── types.ts              # TypeScript типы
@@ -827,7 +829,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (14 основных + 8 для целей)
+### Список компонентов (14 основных + 10 для целей)
 
 **Основные:**
 - `AuthGuard`
@@ -849,8 +851,10 @@ export async function getUserStatsForAI(): Promise<string>
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
+- `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
+- `goals/QuarterView`
 - `goals/StrategyCards`
 - `goals/WeekCard`
 - `goals/WeekStrip`
@@ -1241,6 +1245,15 @@ if (!validation.success) {
 - Добавлен `ThemeToggle.tsx` — переключатель темы
 - `useDaily.ts` расширен до ~1100 строк
 - Обновлена документация
+
+### 15 марта 2026 — Rolling Wave визуализация + исправление багов
+- **Новые компоненты:** `HorizonsCard.tsx` (визуализация 3 горизонтов планирования), `QuarterView.tsx` (квартальные цели 2x2 grid)
+- **Редизайн:** `StrategyCards.tsx` (увеличенные карточки с прогресс-барами), `MonthTimeline.tsx` (pill-превью задач), `DreamBar.tsx` (3 состояния: collapsed/expanded/editing)
+- **Чекбоксы:** добавлены в `MonthSection.tsx` для целей месяца (как в WeekCard)
+- **Fix: Period API upsert** — `POST /api/goals/period` теперь `findFirst+update || create` вместо `create` (предотвращает дубликаты)
+- **Fix: Единый алгоритм недель** — `getPeriodKey` в `lib/goals-utils.ts` синхронизирован с `useGoals.ts` (добавлена поддержка `half_year`)
+- **Fix: Стабильность годов** — расчёт лет привязан к `dreamGoal.createdAt` вместо `currentYear`
+- **Дизайн:** тёмная тема для HorizonsCard, blue-400 точки, responsive grid, увеличенные шрифты
 
 ### Декабрь 2025
 - Добавлен `lib/api-utils.ts` — безопасность и утилиты

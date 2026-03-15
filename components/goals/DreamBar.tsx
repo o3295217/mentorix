@@ -14,6 +14,7 @@ interface DreamBarProps {
 
 export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetupComplete, onOpenChat }: DreamBarProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [text, setText] = useState('')
   const [years, setYears] = useState(5)
   const [saving, setSaving] = useState(false)
@@ -172,21 +173,25 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
     )
   }
 
-  // State 2: Compact bar
+  // State 2: Compact bar (collapsed/expanded read-only)
   return (
     <div
-      className="group relative overflow-hidden rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.06),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] px-6 py-4 cursor-pointer transition hover:border-slate-700 shadow-[0_18px_60px_rgba(2,6,23,0.20)]"
-      onClick={() => setIsEditing(true)}
+      className="group relative overflow-hidden rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.06),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] px-6 py-4 transition hover:border-slate-700 shadow-[0_18px_60px_rgba(2,6,23,0.20)]"
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10">
           <svg className="h-5 w-5 text-amber-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
         </div>
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
           <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Вектор</div>
-          <p className="text-[15px] text-slate-200 font-medium truncate leading-tight">{dreamGoal.goalText}</p>
+          <p className={`text-[15px] text-slate-200 font-medium leading-relaxed transition-all ${isExpanded ? '' : 'line-clamp-2'}`}>
+            {dreamGoal.goalText}
+          </p>
         </div>
-        {progress.total > 0 && (
+        {!isExpanded && progress.total > 0 && (
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
@@ -197,16 +202,38 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
             <span className="text-xs font-semibold tabular-nums text-amber-300">{progress.percent}%</span>
           </div>
         )}
-        <div className="text-xs text-slate-600 flex-shrink-0">
-          {dreamGoal.years} {dreamGoal.years === 1 ? 'г.' : 'л.'}
-        </div>
-        <svg
-          className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors flex-shrink-0"
-          fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
+        {!isExpanded && (
+          <div className="text-xs text-slate-600 flex-shrink-0">
+            {dreamGoal.years} {dreamGoal.years === 1 ? 'г.' : 'л.'}
+          </div>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); setIsEditing(true); setIsExpanded(false) }}
+          className="text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0 p-1 rounded-lg hover:bg-slate-800/60"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
-        </svg>
+          <svg
+            className="w-4 h-4"
+            fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
+          </svg>
+        </button>
       </div>
+      {isExpanded && progress.total > 0 && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/60">
+          <div className="text-xs text-slate-500">Горизонт: {dreamGoal.years} {dreamGoal.years === 1 ? 'год' : dreamGoal.years < 5 ? 'года' : 'лет'}</div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-3">
+            <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-500"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+            <span className="text-xs font-semibold tabular-nums text-amber-300">{progress.percent}%</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -131,15 +131,34 @@ export async function POST(request: NextRequest) {
     
     const { periodType, periodStart, periodEnd, goals } = validation.data
 
-    const periodGoal = await prisma.periodGoal.create({
-      data: {
+    const parsedStart = parseDateParam(periodStart)
+    const parsedEnd = parseDateParam(periodEnd)
+
+    // Upsert: найти существующую запись или создать новую
+    const existing = await prisma.periodGoal.findFirst({
+      where: {
         userId,
         periodType,
-        periodStart: parseDateParam(periodStart),
-        periodEnd: parseDateParam(periodEnd),
-        goalsJson: JSON.stringify(goals),
+        periodStart: parsedStart,
+        periodEnd: parsedEnd,
       },
+      orderBy: { createdAt: 'desc' },
     })
+
+    const periodGoal = existing
+      ? await prisma.periodGoal.update({
+          where: { id: existing.id },
+          data: { goalsJson: JSON.stringify(goals) },
+        })
+      : await prisma.periodGoal.create({
+          data: {
+            userId,
+            periodType,
+            periodStart: parsedStart,
+            periodEnd: parsedEnd,
+            goalsJson: JSON.stringify(goals),
+          },
+        })
 
     return NextResponse.json({ ...periodGoal, goals: safeParseJson<string[]>(periodGoal.goalsJson, []) })
   } catch (error) {

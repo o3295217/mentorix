@@ -5,7 +5,9 @@ import { monthNames, parseWeekKey } from '@/lib/goals-utils'
 import { useGoals } from '@/hooks'
 import { useGoalsChat } from '@/hooks/useGoalsChat'
 import DreamBar from '@/components/goals/DreamBar'
+import HorizonsCard from '@/components/goals/HorizonsCard'
 import StrategyCards from '@/components/goals/StrategyCards'
+import QuarterView from '@/components/goals/QuarterView'
 import MonthTimeline from '@/components/goals/MonthTimeline'
 import MonthSection from '@/components/goals/MonthSection'
 import GoalsChatTrigger from '@/components/goals/GoalsChatTrigger'
@@ -67,8 +69,9 @@ export default function GoalsPage() {
     startGuidedFlow,
   } = useGoalsChat(dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth)
 
-  // Вычисляемые значения
-  const years = dreamGoal ? Array.from({ length: dreamGoal.years }, (_, i) => currentYear + i) : []
+  // Вычисляемые значения — годы отсчитываются от года создания мечты, а не от текущего
+  const dreamStartYear = dreamGoal ? new Date(dreamGoal.createdAt).getFullYear() : currentYear
+  const years = dreamGoal ? Array.from({ length: dreamGoal.years }, (_, i) => dreamStartYear + i) : []
 
   const dreamProgress = useMemo(() => {
     const total = goals.length
@@ -187,6 +190,17 @@ export default function GoalsPage() {
         {/* Состояние 2: Полная карта планирования */}
         {pageState === 2 && (
           <>
+            {/* Горизонты планирования */}
+            {dreamGoal && (
+              <HorizonsCard
+                dreamYears={dreamGoal.years}
+                currentYear={currentYear}
+                periodGoals={periodGoals}
+                yearGoals={yearGoals}
+                selectedYear={selectedYear}
+              />
+            )}
+
             {/* Карточки по годам */}
             <StrategyCards
               years={years}
@@ -195,9 +209,32 @@ export default function GoalsPage() {
               currentYear={currentYear}
               yearGoals={yearGoals}
               periodGoals={periodGoals}
+              trackedGoals={goals}
               onAddYearGoal={addYearGoal}
               onRemoveYearGoal={removeYearGoal}
               onEditYearGoal={editYearGoal}
+            />
+
+            {/* Кварталы */}
+            <QuarterView
+              year={selectedYear}
+              periodGoals={periodGoals}
+              trackedGoals={goals}
+              onAddPeriodGoal={(key, text) => {
+                const q = parseInt(key.split('-Q')[1])
+                const qDate = new Date(selectedYear, (q - 1) * 3, 1)
+                addPeriodGoal(key, 'quarter', qDate, `Q${q}`, text)
+              }}
+              onRemovePeriodGoal={(key, index) => {
+                const q = parseInt(key.split('-Q')[1])
+                const qDate = new Date(selectedYear, (q - 1) * 3, 1)
+                removePeriodGoal(key, index, 'quarter', qDate, `Q${q}`)
+              }}
+              onEditPeriodGoal={(key, index, text) => {
+                const q = parseInt(key.split('-Q')[1])
+                const qDate = new Date(selectedYear, (q - 1) * 3, 1)
+                editPeriodGoal(key, index, 'quarter', qDate, `Q${q}`, text)
+              }}
             />
 
             {/* Шкала 12 месяцев */}
@@ -209,6 +246,7 @@ export default function GoalsPage() {
               currentMonth={currentMonth}
               periodGoals={periodGoals}
               calculatePeriodProgress={calculatePeriodProgress}
+              tags={tags}
             />
 
             {/* Wave rollover nudge */}

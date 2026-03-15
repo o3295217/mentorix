@@ -100,10 +100,10 @@ export default function WeekCard({
       }}
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className={`text-xs font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
+        <span className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
           Неделя {week.num}: {week.start.getDate()}-{week.end.getDate()}
         </span>
-        {isCurrentWeek && <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">сейчас</span>}
+        {isCurrentWeek && <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">сейчас</span>}
       </div>
 
       {/* Добавление цели в неделю */}
@@ -302,7 +302,7 @@ export default function WeekCard({
                     />
                     <div className="flex-1 min-w-0">
                       <div
-                        className={`text-xs ${isLongText ? 'cursor-pointer' : ''} ${isLongText && !isGoalExpanded ? 'line-clamp-2' : ''} ${isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}`}
+                        className={`text-sm ${isLongText ? 'cursor-pointer' : ''} ${isLongText && !isGoalExpanded ? 'line-clamp-2' : ''} ${isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}`}
                         onClick={() => {
                           if (isLongText) {
                             setExpandedGoals(prev => {
@@ -316,7 +316,7 @@ export default function WeekCard({
                         {goal}
                       </div>
                       {goalDeadline && (
-                        <div className={`text-[10px] mt-0.5 ${isDeadlineOverdue ? 'text-red-400 font-medium' : 'text-slate-500'}`}>
+                        <div className={`text-xs mt-0.5 ${isDeadlineOverdue ? 'text-red-400 font-medium' : 'text-slate-500'}`}>
                           ⏰ {parseDateParam(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                         </div>
                       )}
@@ -328,7 +328,7 @@ export default function WeekCard({
                             return (
                               <span
                                 key={tagName}
-                                className="inline-block px-1 py-0 rounded text-[9px]"
+                                className="inline-block px-1.5 py-0.5 rounded text-[10px]"
                                 style={{
                                   backgroundColor: (tagInfo?.color || '#6B7280') + '20',
                                   color: tagInfo?.color || '#6B7280',

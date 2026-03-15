@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-03-15 — feat(goals): полный визуальный редизайн — премиум стиль как на главной
+- 🧩 Компоненты: 8 файлов (DreamBar, GoalsChatPanel, GoalsChatTrigger...)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 3 файлов
+
+
 ### 2026-03-14 — feat: редизайн раздела «Цели» — Rolling Wave + ИИ-ассистент
 - 🔌 API: 1 файлов (route)
 - 🧩 Компоненты: 14 файлов (DreamProgress, ProgressIndicator, DreamBar...)

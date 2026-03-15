@@ -158,14 +158,14 @@ export default function MonthSection({
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
-        <span className={`font-semibold text-sm tracking-tight ${collapsed ? 'text-slate-500' : 'text-white'}`}>
+        <span className={`font-semibold text-base tracking-tight ${collapsed ? 'text-slate-500' : 'text-white'}`}>
           {monthNames[month]}
         </span>
         {isCurrent && (
-          <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md">сейчас</span>
+          <span className="text-xs font-medium uppercase tracking-[0.16em] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md">сейчас</span>
         )}
         {goals.length > 0 && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-800 text-[10px] font-semibold text-slate-400 tabular-nums">{goals.length}</span>
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-800 text-xs font-semibold text-slate-400 tabular-nums">{goals.length}</span>
         )}
         {collapsed && isEmpty && (
           <span className="text-[10px] text-slate-600 ml-auto">пусто</span>
@@ -202,18 +202,31 @@ export default function MonthSection({
         {goals.length > 0 && (() => {
           const sq = searchQuery.toLowerCase()
           const displayed = sq ? goals.filter(g => g.toLowerCase().includes(sq)) : goals
+          const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
           return displayed.length > 0 && (
           <div className="space-y-1">
-            {displayed.map((goal, index) => {
+            {displayed.map((goal, _index) => {
               const originalIndex = goals.indexOf(goal)
+              const trackedGoal = trackedGoals.find(g =>
+                g.periodKey === monthKey &&
+                (g.text === goal || g.text.startsWith(goal.slice(0, 30)) || goal.startsWith(g.text.slice(0, 30)))
+              )
+              const isCompleted = trackedGoal?.completed || false
+              const isProcessing = processingGoals.has(`${monthKey}:${goal}`)
               return (
               <div
                 key={originalIndex}
-                className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-slate-800/30 transition-colors group/item"
+                className={`flex items-center gap-2 py-1.5 px-2 rounded-xl transition-colors group/item ${isCompleted ? 'bg-green-500/5' : 'hover:bg-slate-800/30'}`}
               >
-                <span className="w-4 h-4 rounded-md bg-slate-800 text-slate-500 flex items-center justify-center text-[10px] font-medium flex-shrink-0">
-                  {originalIndex + 1}
-                </span>
+                <input
+                  type="checkbox"
+                  checked={isCompleted}
+                  disabled={isProcessing}
+                  onChange={() => {
+                    if (!isProcessing) onToggleGoalCompletion(monthKey, goal, !isCompleted)
+                  }}
+                  className={`w-4 h-4 rounded border-slate-600 text-green-500 focus:ring-green-400 flex-shrink-0 ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                />
                 {editingIndex === originalIndex ? (
                   <input
                     type="text"
@@ -228,7 +241,7 @@ export default function MonthSection({
                     autoFocus
                   />
                 ) : (
-                  <span className="text-sm text-slate-300 flex-1">{goal}</span>
+                  <span className={`text-sm flex-1 ${isCompleted ? 'line-through text-slate-500' : 'text-slate-300'}`}>{goal}</span>
                 )}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
                   {weeksInMonth.length > 0 && (

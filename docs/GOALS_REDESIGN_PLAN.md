@@ -150,14 +150,17 @@
 | Файл | Назначение |
 | ------ | ----------- |
 | `app/goals/page.tsx` | Страница: три состояния + layout |
-| `components/goals/DreamBar.tsx` | Компактная строка мечты |
-| `components/goals/StrategyCards.tsx` | Карточки целей по годам |
-| `components/goals/MonthTimeline.tsx` | Горизонтальная шкала 12 месяцев |
-| `components/goals/MonthDetail.tsx` | Детализация месяца (цели + недели) |
-| `components/goals/WeekCard.tsx` | Карточка недели с задачами |
+| `components/goals/DreamBar.tsx` | Мечта: collapsed (2-line clamp) → expanded (full text) → editing |
+| `components/goals/HorizonsCard.tsx` | Rolling Wave: 3 колонки (Детально/Укрупнённо/Направление) с точками и счётчиками |
+| `components/goals/StrategyCards.tsx` | Карточки целей по годам: прогресс-бар, summary, expand |
+| `components/goals/QuarterView.tsx` | Квартальные цели Q1-Q4: 2x2 grid, цветные прогресс-бары |
+| `components/goals/MonthTimeline.tsx` | 12 месяцев sticky bar с pill-превью задач |
+| `components/goals/MonthSection.tsx` | Детализация месяца: цели с чекбоксами + недели |
+| `components/goals/WeekCard.tsx` | Карточка недели: задачи, checkbox, priority, tags |
+| `components/goals/WeekStrip.tsx` | Компактные бейджи W1-W5 |
 | `components/goals/GoalsChatTrigger.tsx` | Вертикальная кнопка ИИ |
 | `components/goals/GoalsChatPanel.tsx` | Выезжающая ИИ-панель |
-| `hooks/useGoalsChat.ts` | Хук чата декомпозиции |
+| `hooks/useGoals.ts` | Хук управления целями |
 | `app/api/goals/decompose/route.ts` | API стрим для ИИ |
 | `lib/prompts/goals-decompose.ts` | Промпт декомпозиции |
 

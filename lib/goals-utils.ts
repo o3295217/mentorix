@@ -30,29 +30,28 @@ export const isOverdue = (deadline: string | null): boolean => {
   return toDateKey(parseDateParam(deadline)) < toDateKey(new Date())
 }
 
-// Получение ключа периода
-export const getPeriodKey = (periodType: 'quarter' | 'month' | 'week', date: Date): string => {
+// Получение ключа периода (алгоритм синхронизирован с useGoals.loadPeriodGoalsWithKey)
+export const getPeriodKey = (periodType: 'quarter' | 'month' | 'week' | 'half_year', date: Date): string => {
   const year = date.getFullYear()
   const month = date.getMonth()
   
   switch (periodType) {
     case 'quarter':
       return `${year}-Q${Math.floor(month / 3) + 1}`
+    case 'half_year':
+      return `${year}-H${month < 6 ? 1 : 2}`
     case 'month':
       return `${year}-${String(month + 1).padStart(2, '0')}`
     case 'week': {
-      // Для недели нужна дополнительная логика
       const firstDay = new Date(year, month, 1)
-      const weekStart = new Date(firstDay)
-      while (weekStart.getDay() !== 1) weekStart.setDate(weekStart.getDate() + 1)
-      
+      const current = new Date(firstDay)
+      while (current.getDay() !== 1 && current <= date) {
+        current.setDate(current.getDate() + 1)
+      }
       let weekNum = 1
-      while (weekStart <= date) {
-        if (date >= weekStart && date < new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)) {
-          break
-        }
-        weekStart.setDate(weekStart.getDate() + 7)
-        weekNum++
+      while (current <= date) {
+        current.setDate(current.getDate() + 7)
+        if (current <= date) weekNum++
       }
       return `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
     }

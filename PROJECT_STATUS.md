@@ -85,7 +85,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (22)
+## Компоненты (24)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -104,8 +104,10 @@
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
+- `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
+- `goals/QuarterView`
 - `goals/StrategyCards`
 - `goals/WeekCard`
 - `goals/WeekStrip`
