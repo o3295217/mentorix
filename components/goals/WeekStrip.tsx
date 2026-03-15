@@ -59,14 +59,14 @@ export default function WeekStrip({
           <button
             key={week.key}
             onClick={() => onSelectWeek(isSelected ? null : week.key)}
-            className={`flex-1 rounded-lg px-1.5 py-1.5 text-center transition-all ${
+            className={`flex-1 rounded-xl px-1.5 py-1.5 text-center transition-all ${
               isDragOver
                 ? 'bg-blue-500/20 border-2 border-blue-500/50 border-dashed'
                 : isSelected
-                  ? 'bg-blue-500/15 border border-blue-500/40'
+                  ? 'bg-gradient-to-b from-blue-500/15 to-blue-500/5 border border-blue-500/40'
                   : isCurrentWeek
-                    ? 'bg-gray-800/80 border border-blue-500/20'
-                    : 'bg-gray-800/40 border border-gray-800 hover:border-gray-700'
+                    ? 'bg-slate-800/80 border border-blue-400/20'
+                    : 'bg-slate-800/30 border border-slate-800 hover:border-slate-700'
             }`}
             onDragOver={(e) => {
               e.preventDefault()
@@ -82,16 +82,16 @@ export default function WeekStrip({
               setDragOverWeek(null)
             }}
           >
-            <div className="text-[10px] font-semibold text-gray-400">W{week.num}</div>
-            <div className="text-[9px] text-gray-600">{week.start.getDate()}-{week.end.getDate()}</div>
+            <div className="text-[10px] font-semibold text-slate-400">W{week.num}</div>
+            <div className="text-[9px] text-slate-600">{week.start.getDate()}-{week.end.getDate()}</div>
             {isCurrentWeek && <div className="w-1 h-1 rounded-full bg-blue-400 mx-auto mt-0.5" />}
             {wp.total > 0 && (
-              <div className="w-full h-0.5 bg-gray-700 rounded-full mt-1 overflow-hidden">
+              <div className="w-full h-0.5 bg-slate-700 rounded-full mt-1 overflow-hidden">
                 <div className="h-full bg-blue-500 rounded-full" style={{ width: `${wp.percent}%` }} />
               </div>
             )}
             {weekGoals.length > 0 && (
-              <div className="text-[9px] text-gray-500 mt-0.5">{wp.completed}/{wp.total}</div>
+              <div className="text-[9px] text-slate-500 mt-0.5">{wp.completed}/{wp.total}</div>
             )}
           </button>
         )

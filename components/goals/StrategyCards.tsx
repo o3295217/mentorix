@@ -15,6 +15,14 @@ interface StrategyCardsProps {
   onEditYearGoal: (year: number, index: number, text: string) => void
 }
 
+const YEAR_COLORS = [
+  { border: 'border-blue-400/30', bg: 'bg-blue-400/10', text: 'text-blue-300', glow: 'rgba(59,130,246,0.08)' },
+  { border: 'border-violet-400/30', bg: 'bg-violet-400/10', text: 'text-violet-300', glow: 'rgba(139,92,246,0.08)' },
+  { border: 'border-emerald-400/30', bg: 'bg-emerald-400/10', text: 'text-emerald-300', glow: 'rgba(52,211,153,0.08)' },
+  { border: 'border-amber-400/30', bg: 'bg-amber-400/10', text: 'text-amber-300', glow: 'rgba(251,191,36,0.08)' },
+  { border: 'border-rose-400/30', bg: 'bg-rose-400/10', text: 'text-rose-300', glow: 'rgba(251,113,133,0.08)' },
+]
+
 export default function StrategyCards({
   years,
   selectedYear,
@@ -28,8 +36,8 @@ export default function StrategyCards({
 }: StrategyCardsProps) {
   return (
     <div className="overflow-x-auto pb-2 -mx-1 scrollbar-hide">
-      <div className="flex gap-3 px-1 snap-x snap-mandatory md:snap-none" style={{ minWidth: 'min-content' }}>
-        {years.map(year => (
+      <div className="flex gap-4 px-1 snap-x snap-mandatory md:snap-none" style={{ minWidth: 'min-content' }}>
+        {years.map((year, i) => (
           <YearCard
             key={year}
             year={year}
@@ -37,6 +45,7 @@ export default function StrategyCards({
             isCurrent={year === currentYear}
             goals={yearGoals.get(year) || []}
             periodGoals={periodGoals}
+            color={YEAR_COLORS[i % YEAR_COLORS.length]}
             onSelect={() => onSelectYear(year)}
             onAddGoal={(text) => onAddYearGoal(year, text)}
             onRemoveGoal={(index) => onRemoveYearGoal(year, index)}
@@ -54,6 +63,7 @@ function YearCard({
   isCurrent,
   goals,
   periodGoals,
+  color,
   onSelect,
   onAddGoal,
   onRemoveGoal,
@@ -64,6 +74,7 @@ function YearCard({
   isCurrent: boolean
   goals: string[]
   periodGoals: Map<string, string[]>
+  color: typeof YEAR_COLORS[number]
   onSelect: () => void
   onAddGoal: (text: string) => void
   onRemoveGoal: (index: number) => void
@@ -93,39 +104,45 @@ function YearCard({
   return (
     <div
       className={`
-        flex-shrink-0 w-64 sm:w-72 rounded-xl border p-3 sm:p-4 transition-all cursor-pointer snap-center
+        flex-shrink-0 w-64 sm:w-72 rounded-[24px] border p-4 sm:p-5 transition-all cursor-pointer snap-center
         ${isSelected
-          ? 'border-blue-500/40 bg-blue-500/5 ring-1 ring-blue-500/20'
-          : 'border-gray-800 bg-gray-900/60 hover:border-gray-700'
+          ? 'border-blue-500/40 ring-1 ring-blue-500/20 shadow-[0_18px_60px_rgba(59,130,246,0.12)]'
+          : 'border-slate-800 hover:border-slate-700'
         }
       `}
+      style={{
+        background: `radial-gradient(circle at top left, ${color.glow}, transparent 50%), linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))`,
+      }}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('input, button, textarea')) return
         onSelect()
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-bold text-white">{year}</h3>
-          {isCurrent && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">
-              сейчас
-            </span>
-          )}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border ${color.border} ${color.bg}`}>
+            <span className={`text-sm font-bold tabular-nums ${color.text}`}>{String(year).slice(-2)}</span>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight text-white leading-none">{year}</h3>
+            {isCurrent && (
+              <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-blue-400">сейчас</span>
+            )}
+          </div>
         </div>
         {goals.length > 0 && (
-          <span className="text-xs text-gray-500 tabular-nums">{goals.length}</span>
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-800 text-[11px] font-semibold text-slate-400 tabular-nums">{goals.length}</span>
         )}
       </div>
 
       {/* Goals list */}
-      <div className="space-y-1 mb-3 max-h-40 overflow-y-auto chat-scrollbar">
+      <div className="space-y-1.5 mb-3 max-h-40 overflow-y-auto chat-scrollbar">
         {goals.length === 0 && (
-          <p className="text-xs text-gray-600 italic">Нет целей</p>
+          <p className="text-xs text-slate-600 italic">Нет целей</p>
         )}
         {goals.map((goal, index) => (
-          <div key={index} className="group/goal flex items-start gap-1.5 text-sm">
+          <div key={index} className="group/goal flex items-start gap-2 text-sm">
             {editingIndex === index ? (
               <input
                 type="text"
@@ -136,21 +153,21 @@ function YearCard({
                   if (e.key === 'Escape') cancelEdit()
                 }}
                 onBlur={() => saveEdit(index)}
-                className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                className="flex-1 bg-slate-950/50 border border-slate-700 rounded-lg px-2.5 py-1 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                 autoFocus
               />
             ) : (
               <>
-                <span className="text-gray-500 mt-0.5 flex-shrink-0 text-xs">•</span>
+                <span className={`mt-1 h-1.5 w-1.5 rounded-full flex-shrink-0 ${color.bg} ${color.border} border`} />
                 <span
-                  className="text-gray-300 leading-snug flex-1 cursor-text hover:text-gray-100 transition-colors"
+                  className="text-slate-300 leading-snug flex-1 cursor-text hover:text-slate-100 transition-colors"
                   onClick={(e) => { e.stopPropagation(); startEdit(index, goal) }}
                 >
                   {goal}
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemoveGoal(index) }}
-                  className="text-gray-600 hover:text-red-400 opacity-0 group-hover/goal:opacity-100 transition-opacity text-xs flex-shrink-0"
+                  className="text-slate-700 hover:text-red-400 opacity-0 group-hover/goal:opacity-100 transition-opacity text-xs flex-shrink-0"
                 >
                   ×
                 </button>
@@ -168,17 +185,17 @@ function YearCard({
           onChange={(e) => setNewGoal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder="+ цель на год"
-          className="flex-1 bg-transparent border border-gray-800 rounded-lg px-2.5 py-1 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-gray-600 transition-colors"
+          className="flex-1 bg-slate-950/30 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors"
           onClick={(e) => e.stopPropagation()}
         />
       </div>
 
       {/* Quarters (collapsed) */}
       {totalQuarterGoals > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-800">
+        <div className="mt-3 pt-3 border-t border-slate-800/60">
           <button
             onClick={(e) => { e.stopPropagation(); setShowQuarters(!showQuarters) }}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors w-full"
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors w-full"
           >
             <svg
               className={`w-3 h-3 transition-transform ${showQuarters ? 'rotate-90' : ''}`}
@@ -192,9 +209,9 @@ function YearCard({
             <div className="mt-2 space-y-2">
               {quarterData.filter(q => q.goals.length > 0).map(q => (
                 <div key={q.quarter} className="text-xs">
-                  <p className="text-gray-400 font-medium mb-0.5">Q{q.quarter}</p>
+                  <p className="text-slate-400 font-medium mb-0.5">Q{q.quarter}</p>
                   {q.goals.map((g, i) => (
-                    <p key={i} className="text-gray-500 pl-3">• {g}</p>
+                    <p key={i} className="text-slate-500 pl-3">• {g}</p>
                   ))}
                 </div>
               ))}

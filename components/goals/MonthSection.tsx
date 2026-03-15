@@ -142,49 +142,49 @@ export default function MonthSection({
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
 
   return (
-    <div id={`month-${monthKey}`} className={`rounded-lg border transition-colors ${
+    <div id={`month-${monthKey}`} className={`overflow-hidden rounded-[24px] border transition-colors ${
       isCurrent
-        ? 'border-blue-500/30 bg-blue-500/5'
-        : 'border-gray-800 bg-gray-900/20'
+        ? 'border-blue-500/30 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.06),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]'
+        : 'border-slate-800 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]'
     }`}>
       {/* Заголовок месяца */}
       <div
-        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-800/30 rounded-lg transition-colors select-none"
+        className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-slate-800/20 transition-colors select-none"
         onClick={() => setCollapsed(!collapsed)}
       >
         <svg
-          className={`w-3.5 h-3.5 text-gray-500 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          className={`w-3.5 h-3.5 text-slate-500 transition-transform ${collapsed ? '' : 'rotate-90'}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
-        <span className={`font-medium text-sm ${collapsed ? 'text-gray-500' : 'text-gray-200'}`}>
+        <span className={`font-semibold text-sm tracking-tight ${collapsed ? 'text-slate-500' : 'text-white'}`}>
           {monthNames[month]}
         </span>
         {isCurrent && (
-          <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">сейчас</span>
+          <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md">сейчас</span>
         )}
         {goals.length > 0 && (
-          <span className="text-xs text-gray-500">({goals.length})</span>
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-800 text-[10px] font-semibold text-slate-400 tabular-nums">{goals.length}</span>
         )}
         {collapsed && isEmpty && (
-          <span className="text-[10px] text-gray-600 ml-auto">пусто</span>
+          <span className="text-[10px] text-slate-600 ml-auto">пусто</span>
         )}
         {!collapsed && progress.total > 0 && (
           <div className="flex items-center gap-2 ml-auto">
-            <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all bg-blue-500"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500 tabular-nums">{progress.percent}%</span>
+            <span className="text-xs font-semibold text-slate-500 tabular-nums">{progress.percent}%</span>
           </div>
         )}
       </div>
 
       {!collapsed && (
-      <div className="px-3 pb-3 space-y-2">
+      <div className="px-4 pb-4 space-y-2">
         {/* Добавление цели */}
         <div className="flex gap-2">
           <input
@@ -193,9 +193,9 @@ export default function MonthSection({
             onChange={(e) => setNewGoal(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             placeholder="Цель на месяц..."
-            className="input text-sm py-1.5"
+            className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
           />
-          <button onClick={handleAdd} className="btn-primary text-sm px-3 py-1.5">+</button>
+          <button onClick={handleAdd} className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-blue-400">+</button>
         </div>
 
         {/* Список целей месяца */}
@@ -209,9 +209,9 @@ export default function MonthSection({
               return (
               <div
                 key={originalIndex}
-                className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-800/50 transition-colors group/item"
+                className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-slate-800/30 transition-colors group/item"
               >
-                <span className="w-4 h-4 rounded bg-gray-800 text-gray-500 flex items-center justify-center text-[10px] font-medium flex-shrink-0">
+                <span className="w-4 h-4 rounded-md bg-slate-800 text-slate-500 flex items-center justify-center text-[10px] font-medium flex-shrink-0">
                   {originalIndex + 1}
                 </span>
                 {editingIndex === originalIndex ? (
@@ -224,29 +224,29 @@ export default function MonthSection({
                       if (e.key === 'Enter') saveEdit(originalIndex)
                       if (e.key === 'Escape') cancelEdit()
                     }}
-                    className="flex-1 px-2 py-1 text-sm border border-gray-700 rounded-lg bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    className="flex-1 px-2 py-1 text-sm border border-slate-700 rounded-lg bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                     autoFocus
                   />
                 ) : (
-                  <span className="text-sm text-gray-200 flex-1">{goal}</span>
+                  <span className="text-sm text-slate-300 flex-1">{goal}</span>
                 )}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
                   {weeksInMonth.length > 0 && (
                     <div className="relative" ref={copyDropdownIndex === originalIndex ? dropdownRef : null}>
                       <button
                         onClick={() => toggleDropdown(originalIndex)}
-                        className="text-gray-500 hover:text-blue-400 p-1 rounded hover:bg-gray-800 transition-colors text-xs"
+                        className="text-slate-500 hover:text-blue-400 p-1 rounded-lg hover:bg-slate-800 transition-colors text-xs"
                         title="В неделю"
                       >
                         ↓
                       </button>
                       {copyDropdownIndex === originalIndex && (
-                        <div className="absolute right-0 top-7 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-10 py-1 min-w-[120px]">
+                        <div className="absolute right-0 top-7 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl z-10 py-1 min-w-[120px]">
                           {weeksInMonth.map(w => (
                             <button
                               key={w.num}
                               onClick={() => { onCopyGoal(goal, 'week', w.key); closeDropdown() }}
-                              className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors"
                             >
                               W{w.num} ({w.start.getDate()}-{w.end.getDate()})
                             </button>
@@ -257,13 +257,13 @@ export default function MonthSection({
                   )}
                   <button
                     onClick={() => startEdit(originalIndex, goal)}
-                    className="text-gray-500 hover:text-gray-300 p-1 rounded hover:bg-gray-800 transition-colors text-xs"
+                    className="text-slate-500 hover:text-slate-300 p-1 rounded-lg hover:bg-slate-800 transition-colors text-xs"
                   >
                     &#9998;
                   </button>
                   <button
                     onClick={() => onRemoveGoal(originalIndex)}
-                    className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-gray-800 transition-colors text-xs"
+                    className="text-slate-500 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition-colors text-xs"
                   >
                     &#10005;
                   </button>
@@ -277,7 +277,7 @@ export default function MonthSection({
 
         {/* Компактная полоска недель */}
         {weeksInMonth.length > 0 && (
-          <div className="pt-2 border-t border-gray-800 space-y-2">
+          <div className="pt-2 border-t border-slate-800/60 space-y-2">
             <WeekStrip
               weeks={weeksInMonth}
               expandedWeek={expandedWeek}

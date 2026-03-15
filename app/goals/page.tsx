@@ -213,11 +213,15 @@ export default function GoalsPage() {
 
             {/* Wave rollover nudge */}
             {waveNudge && (
-              <div className="card border border-amber-500/30 bg-amber-500/5 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">📅</span>
-                  <p className="text-sm text-gray-200">
-                    Наступает <strong>{waveNudge.label}</strong>. Давай разобьём на недели?
+              <div className="relative overflow-hidden rounded-[28px] border border-amber-500/30 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.08),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10">
+                    <svg className="h-5 w-5 text-amber-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-slate-200">
+                    Наступает <strong className="text-white">{waveNudge.label}</strong>. Давай разобьём на недели?
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -226,7 +230,7 @@ export default function GoalsPage() {
                       setSelectedYear(waveNudge.year)
                       setSelectedMonth(waveNudge.month)
                     }}
-                    className="btn-secondary text-xs px-3 py-1.5"
+                    className="inline-flex items-center rounded-full border border-slate-600 bg-slate-900/80 px-4 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
                   >
                     Перейти
                   </button>
@@ -237,9 +241,9 @@ export default function GoalsPage() {
                       setChatOpen(true)
                       sendMessage(`Помоги спланировать ${waveNudge.label} ${waveNudge.year}: разбей на недели с конкретными задачами.`)
                     }}
-                    className="btn-primary text-xs px-3 py-1.5"
+                    className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-blue-500 hover:to-blue-400"
                   >
-                    ИИ разобьёт
+                    ИОН разобьёт
                   </button>
                 </div>
               </div>
@@ -317,8 +321,8 @@ export default function GoalsPage() {
 
       {/* Toast */}
       {message && (
-        <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
-          <p className="font-medium text-white">{message}</p>
+        <div className="fixed bottom-4 right-4 rounded-2xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm shadow-[0_18px_60px_rgba(2,6,23,0.40)] p-4 z-50">
+          <p className="text-sm font-medium text-white">{message}</p>
         </div>
       )}
     </div>

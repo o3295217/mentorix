@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+### 2026-03-14 — feat: редизайн раздела «Цели» — Rolling Wave + ИИ-ассистент
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 14 файлов (DreamProgress, ProgressIndicator, DreamBar...)
+- 📄 Страницы: 2 файлов
+- 📚 Библиотеки: 1 файлов (goals-decompose)
+- 📝 Документация: 3 файлов
+- 📦 Другое: 4 файлов
+
+
 ### 2026-03-11 — Update progress view and onboarding docs
 - 🧩 Компоненты: 1 файлов (Speedometer)
 - 📄 Страницы: 1 файлов
