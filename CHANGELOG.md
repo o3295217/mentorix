@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-03-15 — feat(goals): Rolling Wave визуализация + bugfixes
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 7 файлов (DreamBar, HorizonsCard, MonthSection...)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 1 файлов (goals-utils)
+- 📝 Документация: 5 файлов
+
+
 ### 2026-03-15 — feat(goals): полный визуальный редизайн — премиум стиль как на главной
 - 🧩 Компоненты: 8 файлов (DreamBar, GoalsChatPanel, GoalsChatTrigger...)
 - 📄 Страницы: 1 файлов
