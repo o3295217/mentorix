@@ -39,10 +39,10 @@ export default function WeekStrip({
   const calculateWeekProgress = (weekKey: string) => {
     const wGoals = periodGoals.get(weekKey) || []
     const total = wGoals.length
-    const completed = wGoals.filter(goalText => {
+    const completed = Math.min(total, wGoals.filter(goalText => {
       const tracked = trackedGoals.find(g => g.periodKey === weekKey && g.text === goalText)
       return tracked?.completed
-    }).length
+    }).length)
     return { total, completed, percent: total > 0 ? Math.round((completed / total) * 100) : 0 }
   }
 

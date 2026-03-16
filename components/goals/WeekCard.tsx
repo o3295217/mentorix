@@ -287,22 +287,31 @@ export default function WeekCard({
                     autoFocus
                   />
                 ) : (
-                  <div className="flex items-start gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={isCompleted}
+                  <div className="flex items-start gap-2">
+                    <button
                       disabled={isProcessing}
                       draggable={false}
                       onMouseDown={(e) => e.stopPropagation()}
-                      onChange={(e) => {
+                      onClick={(e) => {
                         e.stopPropagation()
                         if (!isProcessing) onToggleGoalCompletion(weekKey, goal, !isCompleted)
                       }}
-                      className={`w-3.5 h-3.5 mt-0.5 rounded border-slate-600 text-green-500 focus:ring-green-400 flex-shrink-0 ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                    />
+                      className={`flex-shrink-0 flex items-center justify-center w-4.5 h-4.5 mt-0.5 rounded-md border transition-all ${
+                        isCompleted
+                          ? 'bg-green-500 border-green-500'
+                          : 'border-slate-600 hover:border-slate-400 bg-transparent'
+                      } ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                      style={{ width: '18px', height: '18px', minWidth: '18px' }}
+                    >
+                      {isCompleted && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div
-                        className={`text-sm ${isLongText ? 'cursor-pointer' : ''} ${isLongText && !isGoalExpanded ? 'line-clamp-2' : ''} ${isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}`}
+                        className={`text-sm ${isLongText ? 'cursor-pointer' : ''} ${isLongText && !isGoalExpanded ? 'line-clamp-2' : ''} ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}
                         onClick={() => {
                           if (isLongText) {
                             setExpandedGoals(prev => {

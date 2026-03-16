@@ -121,11 +121,13 @@ function YearCard({
   }, [year, periodGoals, trackedGoals])
 
   // Status label
-  const statusLabel = yearProgress.total === 0
-    ? (isPast ? 'не заполнено' : 'запланировано')
-    : yearProgress.percent === 100
-      ? 'выполнено'
-      : `${yearProgress.percent}% выполнено`
+  const statusLabel = goals.length === 0
+    ? (yearProgress.total > 0 ? `${yearProgress.total} подцелей` : (isPast ? 'не заполнено' : 'запланировано'))
+    : yearProgress.total === 0
+      ? (isPast ? 'не заполнено' : 'запланировано')
+      : yearProgress.percent === 100
+        ? 'выполнено'
+        : `${yearProgress.percent}% выполнено`
 
   // Summary: first goal as title or year only
   const summaryTitle = goals.length > 0 ? goals[0] : null

@@ -149,11 +149,16 @@ export function useGoals(): UseGoalsReturn {
     if (!text.trim()) return
     setYearGoals(prev => {
       const currentGoals = prev.get(year) || []
+      const normalized = text.trim().toLowerCase()
+      if (currentGoals.some(g => g.trim().toLowerCase() === normalized)) {
+        showMessage('Такая цель уже есть')
+        return prev
+      }
       const updatedGoals = [...currentGoals, text.trim()]
       saveYearGoals(year, updatedGoals)
       return new Map(prev).set(year, updatedGoals)
     })
-  }, [saveYearGoals])
+  }, [saveYearGoals, showMessage])
 
   const removeYearGoal = useCallback((year: number, index: number) => {
     setYearGoals(prev => {
@@ -263,11 +268,16 @@ export function useGoals(): UseGoalsReturn {
     if (!text.trim()) return
     setPeriodGoals(prev => {
       const currentGoals = prev.get(periodKey) || []
+      const normalized = text.trim().toLowerCase()
+      if (currentGoals.some(g => g.trim().toLowerCase() === normalized)) {
+        showMessage('Такая цель уже есть')
+        return prev
+      }
       const updatedGoals = [...currentGoals, text.trim()]
       savePeriodGoals(periodType, date, updatedGoals, label)
       return new Map(prev).set(periodKey, updatedGoals)
     })
-  }, [savePeriodGoals])
+  }, [savePeriodGoals, showMessage])
 
   const removePeriodGoal = useCallback((periodKey: string, index: number, periodType: PeriodType, date: Date, label: string) => {
     setPeriodGoals(prev => {
@@ -403,6 +413,7 @@ export function useGoals(): UseGoalsReturn {
   }, [goals, updateGoalPriority, createTrackedGoal, loadTrackedGoals])
 
   const setGoalCompleted = useCallback(async (periodKey: string, text: string, completed: boolean) => {
+    // Toggle the goal at the specified level
     const trackedGoal = goals.find(g => g.periodKey === periodKey && g.text === text)
     
     if (trackedGoal) {
@@ -413,6 +424,35 @@ export function useGoals(): UseGoalsReturn {
         await toggleGoalCompleted(newGoal.id, true)
       }
     }
+
+    // Sync completion across month ↔ week levels
+    const isWeekKey = /^\d{4}-\d{2}-W\d+$/.test(periodKey)
+    const isMonthKey = /^\d{4}-\d{2}$/.test(periodKey)
+
+    if (isWeekKey) {
+      // Week → sync to month (e.g. "2026-12-W2" → "2026-12")
+      const monthKey = periodKey.slice(0, 7)
+      const monthGoals = periodGoals.get(monthKey) || []
+      const hasMonthGoal = monthGoals.some(g => g === text)
+      if (hasMonthGoal) {
+        const monthTracked = goals.find(g => g.periodKey === monthKey && g.text === text)
+        if (monthTracked && monthTracked.completed !== completed) {
+          await toggleGoalCompleted(monthTracked.id, completed)
+        } else if (!monthTracked && completed) {
+          const created = await createTrackedGoal(monthKey, text, 0)
+          if (created) await toggleGoalCompleted(created.id, true)
+        }
+      }
+    } else if (isMonthKey) {
+      // Month → sync to all weeks (e.g. "2026-12" → "2026-12-W*")
+      const weekGoals = goals.filter(g => g.periodKey.startsWith(periodKey + '-W') && g.text === text)
+      for (const wg of weekGoals) {
+        if (wg.completed !== completed) {
+          await toggleGoalCompleted(wg.id, completed)
+        }
+      }
+    }
+
     await loadTrackedGoals()
   }, [goals, toggleGoalCompleted, createTrackedGoal, loadTrackedGoals])
 

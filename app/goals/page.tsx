@@ -220,6 +220,7 @@ export default function GoalsPage() {
               year={selectedYear}
               periodGoals={periodGoals}
               trackedGoals={goals}
+              currentYear={currentYear}
               onAddPeriodGoal={(key, text) => {
                 const q = parseInt(key.split('-Q')[1])
                 const qDate = new Date(selectedYear, (q - 1) * 3, 1)
@@ -302,6 +303,11 @@ export default function GoalsPage() {
               onCopyGoal={(goal, _targetType, targetKey) => {
                 const parsed = parseWeekKey(targetKey)
                 addPeriodGoal(targetKey, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, goal)
+                // Удаляем цель из месяца (перемещение, не копирование)
+                const goalIndex = monthGoals.findIndex(g => g === goal)
+                if (goalIndex !== -1) {
+                  removePeriodGoal(monthKey, goalIndex, 'month', monthDate, monthNames[selectedMonth])
+                }
               }}
               draggedGoal={draggedGoal}
               setDraggedGoal={setDraggedGoal}

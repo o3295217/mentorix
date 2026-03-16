@@ -18,40 +18,40 @@ export default function HorizonsCard({
   const now = new Date()
   const currentMonth = now.getMonth()
 
-  // Детально: ближайшие 3 месяца — считаем недельные + месячные цели
+  // Детально: ближайшие 3 месяца — уникальные цели из месяцев и недель
   const detailMonths = [0, 1, 2].map(offset => {
     const m = (currentMonth + offset) % 12
     const y = currentMonth + offset > 11 ? currentYear + 1 : currentYear
     return { month: m, year: y }
   })
 
-  const detailGoals = detailMonths.reduce((sum, { month, year }) => {
-    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
-    const monthGoals = periodGoals.get(monthKey) || []
-    // Count week goals for this month too
-    let weekCount = 0
-    for (let w = 1; w <= 5; w++) {
-      const weekKey = `${year}-${String(month + 1).padStart(2, '0')}-W${w}`
-      weekCount += (periodGoals.get(weekKey) || []).length
+  const detailGoals = (() => {
+    const unique = new Set<string>()
+    for (const { month, year } of detailMonths) {
+      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
+      for (const g of periodGoals.get(monthKey) || []) unique.add(g.trim().toLowerCase())
+      for (let w = 1; w <= 5; w++) {
+        const weekKey = `${monthKey}-W${w}`
+        for (const g of periodGoals.get(weekKey) || []) unique.add(g.trim().toLowerCase())
+      }
     }
-    return sum + monthGoals.length + weekCount
-  }, 0)
+    return unique.size
+  })()
 
-  // Укрупнённо: 3–12 месяцев — квартальные + месячные цели (кроме ближайших 3)
+  // Укрупнённо: 3–12 месяцев — уникальные цели из месяцев и кварталов
   const midGoals = (() => {
-    let count = 0
+    const unique = new Set<string>()
     for (let offset = 3; offset < 12; offset++) {
       const m = (currentMonth + offset) % 12
       const y = currentMonth + offset > 11 ? currentYear + 1 : currentYear
       const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`
-      count += (periodGoals.get(monthKey) || []).length
+      for (const g of periodGoals.get(monthKey) || []) unique.add(g.trim().toLowerCase())
     }
-    // Quarters for selected year
     for (let q = 1; q <= 4; q++) {
       const qKey = `${selectedYear}-Q${q}`
-      count += (periodGoals.get(qKey) || []).length
+      for (const g of periodGoals.get(qKey) || []) unique.add(g.trim().toLowerCase())
     }
-    return count
+    return unique.size
   })()
 
   // Направление: 1+ лет — годовые цели

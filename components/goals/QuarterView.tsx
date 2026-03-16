@@ -10,6 +10,7 @@ interface QuarterViewProps {
   onAddPeriodGoal: (key: string, text: string) => void
   onRemovePeriodGoal: (key: string, index: number) => void
   onEditPeriodGoal: (key: string, index: number, text: string) => void
+  currentYear?: number
 }
 
 const Q_COLORS = [
@@ -33,7 +34,11 @@ export default function QuarterView({
   onAddPeriodGoal,
   onRemovePeriodGoal,
   onEditPeriodGoal,
+  currentYear,
 }: QuarterViewProps) {
+  const now = new Date()
+  const nowYear = currentYear ?? now.getFullYear()
+  const nowQuarter = Math.floor(now.getMonth() / 3) + 1
   const quarters = useMemo(() => {
     return [1, 2, 3, 4].map(q => {
       const key = `${year}-Q${q}`
@@ -64,6 +69,7 @@ export default function QuarterView({
             percent={qd.percent}
             color={Q_COLORS[i]}
             months={Q_MONTHS[i]}
+            isPast={year < nowYear || (year === nowYear && qd.q < nowQuarter)}
             onAdd={(text) => onAddPeriodGoal(qd.key, text)}
             onRemove={(index) => onRemovePeriodGoal(qd.key, index)}
             onEdit={(index, text) => onEditPeriodGoal(qd.key, index, text)}
@@ -83,6 +89,7 @@ function QuarterCard({
   percent,
   color,
   months,
+  isPast,
   onAdd,
   onRemove,
   onEdit,
@@ -95,6 +102,7 @@ function QuarterCard({
   percent: number
   color: typeof Q_COLORS[number]
   months: string[]
+  isPast: boolean
   onAdd: (text: string) => void
   onRemove: (index: number) => void
   onEdit: (index: number, text: string) => void
@@ -102,6 +110,7 @@ function QuarterCard({
   const [newGoal, setNewGoal] = useState('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingText, setEditingText] = useState('')
+  const [collapsed, setCollapsed] = useState(isPast && goals.length === 0)
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -120,6 +129,25 @@ function QuarterCard({
       onEdit(index, editingText.trim())
     }
     setEditingIndex(null)
+  }
+
+  if (collapsed) {
+    return (
+      <div
+        className="rounded-[20px] border border-slate-800/60 px-4 py-2.5 transition-all hover:border-slate-700 cursor-pointer opacity-60 hover:opacity-80"
+        style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))' }}
+        onClick={() => setCollapsed(false)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${color.accent}`} />
+            <span className="text-sm font-bold text-slate-500">Q{quarter}</span>
+            <span className="text-[10px] text-slate-600">{months.join(' · ')}</span>
+          </div>
+          <span className="text-[10px] text-slate-600">развернуть</span>
+        </div>
+      </div>
+    )
   }
 
   return (

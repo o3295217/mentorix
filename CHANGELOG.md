@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-03-15 — chore: add .markdownlint.json — disable noisy rules
+- ⚙️ Конфигурация: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-03-15 — feat(goals): Rolling Wave визуализация + bugfixes
 - 🔌 API: 1 файлов (route)
 - 🧩 Компоненты: 7 файлов (DreamBar, HorizonsCard, MonthSection...)
