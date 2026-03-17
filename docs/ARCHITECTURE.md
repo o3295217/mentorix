@@ -153,9 +153,9 @@ ai-assistant-spec/
 | Оценка дня | `claude-sonnet-4-5-20250929` | Качество важнее скорости |
 | Оценка периода | `claude-sonnet-4-5-20250929` | Сложный анализ |
 | Прогноз | `claude-sonnet-4-5-20250929` | Важные выводы |
-| Чат о плане | `claude-3-5-haiku-20241022` | Скорость, низкая цена |
-| Проверка плана | `claude-3-5-haiku-20241022` | Скорость, низкая цена |
-| Update Insights | `claude-3-5-haiku-20241022` | Частые обновления |
+| Чат о плане | `claude-sonnet-4-20250514` | Качество коучинга |
+| Проверка плана | `claude-sonnet-4-20250514` | Качество анализа |
+| Update Insights | `claude-sonnet-4-20250514` | Качество наблюдений |
 
 ---
 
@@ -453,6 +453,17 @@ model UserInsights {
   updatedAt       DateTime @updatedAt
 }
 
+// Накопительный кэш знаний — каждая оценка добавляет наблюдения
+model InsightEntry {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  date      String   // дата дня (YYYY-MM-DD)
+  category  String   // pattern | strength | challenge | preference | motivator | observation
+  text      String   // конкретное наблюдение
+  score     Float?   // оценка дня
+  createdAt DateTime @default(now())
+}
+
 model UserStats {
   id                    Int      @id @default(autoincrement())
   userId                String   @unique
@@ -700,7 +711,8 @@ async function withRetry<T>(operation: () => Promise<T>, options?: RetryOptions)
 export async function evaluateDay(request: DailyEvaluationRequest): Promise<DailyEvaluationResponse>
 export async function evaluatePeriod(request: PeriodEvaluationRequest): Promise<PeriodEvaluationResponse>
 export async function generateForecast(request: ForecastRequest): Promise<ForecastResponse>
-export async function updateUserInsights(request: UpdateInsightsRequest): Promise<UserInsights>
+export async function updateUserInsights(request: UpdateInsightsRequest): Promise<UpdateInsightsResponse>
+// UpdateInsightsResponse = { profile: UserInsightsUpdate, entries: InsightEntryData[] }
 ```
 
 **Retry с exponential backoff:**
@@ -923,19 +935,21 @@ VK Cloud (РФ) → Cloudflare Worker (PoP) → Durable Object (US, wnam) → An
    ├── Парсим JSON ответ
    ├── Валидируем структуру
    ├── Сохраняем в Evaluation
-   └── Обновляем UserInsights (если есть)
+   ├── Загружаем кэш знаний (InsightEntry, до 100 записей)
+   ├── Обновляем UserInsights (профиль понимания)
+   └── Сохраняем новые наблюдения в InsightEntry (2-5 фактов за день)
 
 2. Проверка плана (POST /api/daily/check-plan)
    ├── Собираем: цели периодов, текущий план, историю
    ├── Формируем промпт (buildCheckPlanPrompt)
-   ├── Вызываем Claude Haiku через getAnthropicClient()
+   ├── Вызываем Claude Sonnet через getAnthropicClient()
    ├── Парсим JSON ответ
    └── Возвращаем рекомендации
 
 3. Чат о плане (POST /api/daily/chat)
-   ├── Собираем: цели, план, insights, история сообщений
+   ├── Собираем: цели, план, insights, кэш знаний (до 50 наблюдений), история сообщений
    ├── Формируем промпт (buildPlanChatContext)
-   ├── Вызываем Claude Haiku через getAnthropicClient()
+   ├── Вызываем Claude Sonnet через getAnthropicClient()
    └── Возвращаем ответ
 
 4. Прогноз (GET /api/forecast)

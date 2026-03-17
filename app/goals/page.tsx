@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { monthNames, parseWeekKey } from '@/lib/goals-utils'
+import { monthNames, parseWeekKey, getPeriodKey } from '@/lib/goals-utils'
 import { useGoals } from '@/hooks'
-import { useGoalsChat } from '@/hooks/useGoalsChat'
+import { useGoalsChat, ParsedGoal } from '@/hooks/useGoalsChat'
 import DreamBar from '@/components/goals/DreamBar'
 import HorizonsCard from '@/components/goals/HorizonsCard'
 import StrategyCards from '@/components/goals/StrategyCards'
@@ -163,13 +163,67 @@ export default function GoalsPage() {
     return { month: nextMonthIdx, year: nextYear, label: monthNames[nextMonthIdx] }
   }, [dreamGoal, pageState, periodGoals])
 
-  // Принять план — добавить цели из ИИ в текущий период
-  const handleAcceptGoals = useCallback((goals: string[]) => {
-    for (const goalText of goals) {
-      addPeriodGoal(monthKey, 'month', monthDate, monthNames[selectedMonth], goalText)
+  // Принять план — разложить цели из ИИ по правильным периодам
+  const handleAcceptGoals = useCallback((goals: ParsedGoal[]) => {
+    let yearCount = 0, periodCount = 0
+    const added: string[] = []
+
+    for (const goal of goals) {
+      if (goal.periodType === 'year') {
+        // Годовые цели: periodKey = "2026"
+        const year = parseInt(goal.periodKey, 10)
+        if (!isNaN(year)) {
+          addYearGoal(year, goal.text)
+          yearCount++
+        }
+      } else if (goal.periodType === 'quarter') {
+        // Квартальные: periodKey = "2026-Q1"
+        const match = goal.periodKey.match(/^(\d{4})-Q([1-4])$/)
+        if (match) {
+          const year = parseInt(match[1], 10)
+          const quarter = parseInt(match[2], 10)
+          const quarterDate = new Date(year, (quarter - 1) * 3, 1)
+          const key = getPeriodKey('quarter', quarterDate)
+          addPeriodGoal(key, 'quarter', quarterDate, `Q${quarter} ${year}`, goal.text)
+          periodCount++
+        }
+      } else if (goal.periodType === 'month') {
+        // Месячные: periodKey = "2026-03"
+        const match = goal.periodKey.match(/^(\d{4})-(\d{2})$/)
+        if (match) {
+          const year = parseInt(match[1], 10)
+          const month = parseInt(match[2], 10) - 1 // 0-indexed
+          const mDate = new Date(year, month, 1)
+          const key = getPeriodKey('month', mDate)
+          addPeriodGoal(key, 'month', mDate, monthNames[month], goal.text)
+          periodCount++
+        }
+      } else if (goal.periodType === 'week') {
+        // Недельные: periodKey = "2026-03-W1"
+        const match = goal.periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
+        if (match) {
+          const year = parseInt(match[1], 10)
+          const month = parseInt(match[2], 10) - 1
+          const weekNum = parseInt(match[3], 10)
+          // Вычисляем дату начала недели
+          const firstDay = new Date(year, month, 1)
+          const weekStart = new Date(firstDay)
+          // Находим первый понедельник
+          while (weekStart.getDay() !== 1) weekStart.setDate(weekStart.getDate() + 1)
+          // Сдвигаемся на нужную неделю
+          weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7)
+          const key = `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
+          addPeriodGoal(key, 'week', weekStart, `Неделя ${weekNum}`, goal.text)
+          periodCount++
+        }
+      }
     }
-    showMessage(`Добавлено ${goals.length} целей в ${monthNames[selectedMonth]}`)
-  }, [monthKey, monthDate, selectedMonth, addPeriodGoal, showMessage])
+
+    const parts: string[] = []
+    if (yearCount > 0) parts.push(`${yearCount} годовых`)
+    if (periodCount > 0) parts.push(`${periodCount} по периодам`)
+    showMessage(`Добавлено: ${parts.join(', ')} (всего ${goals.length})`)
+  }, [addYearGoal, addPeriodGoal, showMessage])
 
   return (
     <div>

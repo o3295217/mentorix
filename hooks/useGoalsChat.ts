@@ -8,13 +8,19 @@ interface ChatMessage {
   content: string
 }
 
+export interface ParsedGoal {
+  text: string
+  periodType: 'year' | 'quarter' | 'month' | 'week'
+  periodKey: string // e.g. "2026", "2026-Q1", "2026-03", "2026-03-W1"
+}
+
 interface UseGoalsChatReturn {
   messages: ChatMessage[]
   sendMessage: (text: string) => Promise<void>
   isLoading: boolean
   contextLabel: string
   clearMessages: () => void
-  extractGoals: (text: string) => string[]
+  extractGoals: (text: string) => ParsedGoal[]
   startGuidedFlow: () => void
 }
 
@@ -111,20 +117,58 @@ export function useGoalsChat(
     sendMessage('Помоги разложить мою мечту: предложи годовые цели, а потом разберём ближайший месяц на недели.')
   }, [sendMessage])
 
-  // Extract goal-like lines from AI response
-  const extractGoals = useCallback((text: string): string[] => {
+  // Extract goal-like lines from AI response with period markers
+  const extractGoals = useCallback((text: string): ParsedGoal[] => {
     const lines = text.split('\n')
-    const goals: string[] = []
+    const goals: ParsedGoal[] = []
+    
+    // Default to current month if no marker found
+    const defaultKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`
+    let currentPeriodType: 'year' | 'quarter' | 'month' | 'week' = 'month'
+    let currentPeriodKey = defaultKey
+    
     for (const line of lines) {
       const trimmed = line.trim()
+      
+      // Check for period markers: [YEAR:2026], [QUARTER:2026-Q1], [MONTH:2026-03], [WEEK:2026-03-W1]
+      const yearMatch = trimmed.match(/\[YEAR:(\d{4})\]/)
+      const quarterMatch = trimmed.match(/\[QUARTER:(\d{4}-Q[1-4])\]/)
+      const monthMatch = trimmed.match(/\[MONTH:(\d{4}-\d{2})\]/)
+      const weekMatch = trimmed.match(/\[WEEK:(\d{4}-\d{2}-W\d+)\]/)
+      
+      if (yearMatch) {
+        currentPeriodType = 'year'
+        currentPeriodKey = yearMatch[1]
+        continue
+      }
+      if (quarterMatch) {
+        currentPeriodType = 'quarter'
+        currentPeriodKey = quarterMatch[1]
+        continue
+      }
+      if (monthMatch) {
+        currentPeriodType = 'month'
+        currentPeriodKey = monthMatch[1]
+        continue
+      }
+      if (weekMatch) {
+        currentPeriodType = 'week'
+        currentPeriodKey = weekMatch[1]
+        continue
+      }
+      
       // Match numbered or bullet-point lines: "1. ...", "- ...", "• ...", "1) ..."
       const match = trimmed.match(/^(?:\d+[.)]\s*|[-–—•]\s+)(.+)/)
       if (match && match[1].length > 3 && match[1].length < 200) {
-        goals.push(match[1].trim())
+        goals.push({
+          text: match[1].trim(),
+          periodType: currentPeriodType,
+          periodKey: currentPeriodKey,
+        })
       }
     }
     return goals
-  }, [])
+  }, [selectedYear, selectedMonth])
 
   return {
     messages,

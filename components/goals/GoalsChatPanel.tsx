@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import type { ParsedGoal } from '@/hooks/useGoalsChat'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -14,8 +15,8 @@ interface GoalsChatPanelProps {
   onSendMessage: (message: string) => void
   isLoading: boolean
   contextLabel: string
-  extractGoals?: (text: string) => string[]
-  onAcceptGoals?: (goals: string[]) => void
+  extractGoals?: (text: string) => ParsedGoal[]
+  onAcceptGoals?: (goals: ParsedGoal[]) => void
 }
 
 export default function GoalsChatPanel({
@@ -134,6 +135,16 @@ export default function GoalsChatPanel({
               : []
             const canAccept = goals.length > 0 && onAcceptGoals && !acceptedMessages.has(i)
             const wasAccepted = acceptedMessages.has(i)
+            
+            // Count goals by period type for the button label
+            const periodCounts = goals.reduce((acc, g) => {
+              acc[g.periodType] = (acc[g.periodType] || 0) + 1
+              return acc
+            }, {} as Record<string, number>)
+            const periodLabels: Record<string, string> = { year: 'год', quarter: 'кв', month: 'мес', week: 'нед' }
+            const distribution = Object.entries(periodCounts)
+              .map(([type, count]) => `${count} ${periodLabels[type] || type}`)
+              .join(', ')
 
             return (
               <div key={i}>
@@ -160,7 +171,7 @@ export default function GoalsChatPanel({
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      Принять план ({goals.length})
+                      Принять план ({goals.length}: {distribution})
                     </button>
                   </div>
                 )}
