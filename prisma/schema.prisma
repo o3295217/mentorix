@@ -47,6 +47,7 @@ model User {
   profileBlocks ProfileBlock[]
   habits        Habit[]
   insights      UserInsights?
+  insightEntries InsightEntry[]
   stats         UserStats?
   periodEvaluations PeriodEvaluation[]
   worldContexts WorldContext[]
@@ -409,6 +410,22 @@ model UserInsights {
   updatedAt       DateTime @updatedAt
 
   @@map("user_insights")
+}
+
+// Накопительный кэш знаний — каждая оценка добавляет наблюдения
+model InsightEntry {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String   // дата дня к которому относится наблюдение (YYYY-MM-DD)
+  category  String   // pattern | strength | challenge | preference | motivator | observation
+  text      String   // конкретное наблюдение
+  score     Float?   // оценка дня, к которому относится
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, category])
+  @@map("insight_entries")
 }
 
 model UserStats {

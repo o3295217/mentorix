@@ -842,8 +842,8 @@ export default function DailyPage() {
         </div>
 
         {/* Chat - Right (40%) */}
-        <div className="lg:col-span-2 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
-          <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
+        <div className="lg:col-span-2 card flex flex-col" style={{ minHeight: '500px', maxHeight: '80vh' }}>
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <h2 className="text-xl font-bold">Обсуждение плана с ION</h2>
             {chatMessages.length > 0 && (
               <button 
@@ -859,7 +859,7 @@ export default function DailyPage() {
           {/* Сообщения чата - занимает всё свободное пространство */}
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 py-2 pl-2 pr-6 bg-gray-900 rounded-l-lg chat-scrollbar"
+            className="flex-1 overflow-y-auto space-y-3 py-2 -mr-6 pr-3 chat-scrollbar"
           >
             {chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
@@ -898,33 +898,34 @@ export default function DailyPage() {
               chatMessages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg ${
-                    msg.role === 'user'
-                      ? 'bg-primary-900/30'
-                      : 'bg-gray-800 border border-gray-700'
-                  }`}
+                  className={msg.role === 'user'
+                    ? 'flex justify-end'
+                    : ''
+                  }
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">
-                      {msg.role === 'user' ? userName : 'ION'}
-                    </span>
-                  </div>
-                  <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
+                  {msg.role === 'user' ? (
+                    <div className="max-w-[85%] bg-primary-900/30 rounded-2xl px-4 py-2.5">
+                      <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  ) : (
+                    <div className="py-1">
+                      <div className="text-sm font-medium text-gray-400 mb-1">ION</div>
+                      <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  )}
                 </div>
               ))
             )}
             {sendingChat && (
-              <div className="p-3 rounded-lg bg-gray-800 border border-gray-700">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">ION</span>
-                  <span className="text-sm text-gray-400">печатает...</span>
-                </div>
+              <div className="py-1">
+                <div className="text-sm font-medium text-gray-400 mb-1">ION</div>
+                <span className="text-sm text-gray-500">печатает...</span>
               </div>
             )}
           </div>
 
           {/* Ввод сообщения - прижато к низу */}
-          <div className="flex gap-2 items-center mt-3 flex-shrink-0 pr-6">
+          <div className="flex gap-2 items-center mt-3 flex-shrink-0">
             <textarea
               value={chatInput}
               onChange={(e) => {

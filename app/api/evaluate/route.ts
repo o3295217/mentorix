@@ -228,6 +228,14 @@ export async function POST(request: NextRequest) {
       const currentInsights = await prisma.userInsights.findFirst({
         where: { userId }
       })
+
+      // Загрузить накопленный кэш знаний (все наблюдения)
+      const knowledgeCache = await prisma.insightEntry.findMany({
+        where: { userId },
+        select: { date: true, category: true, text: true },
+        orderBy: { createdAt: 'desc' },
+        take: 100, // последние 100 наблюдений
+      })
       
       // Получить историю последних 7 дней для контекста
       const sevenDaysAgo = new Date()
@@ -257,6 +265,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Подготовить запрос для обновления insights
+      const dateKey = `${dailyEntry.date.getFullYear()}-${String(dailyEntry.date.getMonth() + 1).padStart(2, '0')}-${String(dailyEntry.date.getDate()).padStart(2, '0')}`
       const insightsUpdate = await updateUserInsights({
         currentInsights: currentInsights ? {
           patterns: currentInsights.patterns || undefined,
@@ -267,25 +276,47 @@ export async function POST(request: NextRequest) {
           motivators: currentInsights.motivators || undefined,
         } : null,
         evaluationCount: (currentInsights?.evaluationCount || 0) + 1,
+        date: dateKey,
         planText: dailyEntry.planText || '',
         factText: derived.factText,
         evaluationFeedback: evaluationResponse.feedback,
         dreamProgressScore: evaluationResponse.dream_progress_score,
         overallScore: evaluationResponse.overall_score,
-        recentDays
+        recentDays,
+        knowledgeCache,
       })
+
+      // Сохранить новые наблюдения в кэш знаний
+      if (insightsUpdate.entries && insightsUpdate.entries.length > 0) {
+        const validCategories = ['pattern', 'strength', 'challenge', 'preference', 'motivator', 'observation']
+        const validEntries = insightsUpdate.entries.filter(
+          e => e.text && e.category && validCategories.includes(e.category)
+        )
+        if (validEntries.length > 0) {
+          await prisma.insightEntry.createMany({
+            data: validEntries.map(e => ({
+              userId,
+              date: dateKey,
+              category: e.category,
+              text: e.text,
+              score: evaluationResponse.overall_score,
+            }))
+          })
+          console.log(`[KnowledgeCache] Added ${validEntries.length} entries for ${dateKey}`)
+        }
+      }
 
       // Сохранить обновлённый профиль
       if (currentInsights) {
         await prisma.userInsights.update({
           where: { id: currentInsights.id },
           data: {
-            patterns: insightsUpdate.patterns || currentInsights.patterns,
-            strengths: insightsUpdate.strengths || currentInsights.strengths,
-            challenges: insightsUpdate.challenges || currentInsights.challenges,
-            preferences: insightsUpdate.preferences || currentInsights.preferences,
-            recommendations: insightsUpdate.recommendations || currentInsights.recommendations,
-            motivators: insightsUpdate.motivators || currentInsights.motivators,
+            patterns: insightsUpdate.profile.patterns || currentInsights.patterns,
+            strengths: insightsUpdate.profile.strengths || currentInsights.strengths,
+            challenges: insightsUpdate.profile.challenges || currentInsights.challenges,
+            preferences: insightsUpdate.profile.preferences || currentInsights.preferences,
+            recommendations: insightsUpdate.profile.recommendations || currentInsights.recommendations,
+            motivators: insightsUpdate.profile.motivators || currentInsights.motivators,
             evaluationCount: (currentInsights.evaluationCount || 0) + 1
           }
         })
@@ -293,12 +324,12 @@ export async function POST(request: NextRequest) {
         await prisma.userInsights.create({
           data: {
             userId,
-            patterns: insightsUpdate.patterns,
-            strengths: insightsUpdate.strengths,
-            challenges: insightsUpdate.challenges,
-            preferences: insightsUpdate.preferences,
-            recommendations: insightsUpdate.recommendations,
-            motivators: insightsUpdate.motivators,
+            patterns: insightsUpdate.profile.patterns,
+            strengths: insightsUpdate.profile.strengths,
+            challenges: insightsUpdate.profile.challenges,
+            preferences: insightsUpdate.profile.preferences,
+            recommendations: insightsUpdate.profile.recommendations,
+            motivators: insightsUpdate.profile.motivators,
             evaluationCount: 1
           }
         })

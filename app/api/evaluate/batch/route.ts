@@ -357,12 +357,20 @@ export async function POST(request: NextRequest) {
         const sevenDaysAgo = new Date()
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
         
-        const recentEntries = await prisma.dailyEntry.findMany({
-          where: { userId, date: { gte: sevenDaysAgo }, evaluation: { isNot: null } },
-          include: { evaluation: true },
-          orderBy: { date: 'desc' },
-          take: 7,
-        })
+        const [recentEntries, knowledgeCache] = await Promise.all([
+          prisma.dailyEntry.findMany({
+            where: { userId, date: { gte: sevenDaysAgo }, evaluation: { isNot: null } },
+            include: { evaluation: true },
+            orderBy: { date: 'desc' },
+            take: 7,
+          }),
+          prisma.insightEntry.findMany({
+            where: { userId },
+            select: { date: true, category: true, text: true },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }),
+        ])
 
         const recentDays = recentEntries.map((entry) => {
           const planTasks = entry.planText?.split('\n').filter((t) => t.trim()).length || 0
@@ -376,6 +384,9 @@ export async function POST(request: NextRequest) {
           }
         })
 
+        const today = new Date()
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
         const insightsUpdate = await updateUserInsights({
           currentInsights: currentInsights
             ? {
@@ -388,24 +399,44 @@ export async function POST(request: NextRequest) {
               }
             : null,
           evaluationCount: (currentInsights?.evaluationCount || 0) + results.evaluated,
+          date: todayKey,
           planText: '',
           factText: '',
-          evaluationFeedback: 'Batch evaluation completed',
+          evaluationFeedback: `Batch evaluation: ${results.evaluated} days evaluated`,
           dreamProgressScore: 5,
           overallScore: 5,
           recentDays,
+          knowledgeCache,
         })
+
+        // Сохранить новые наблюдения
+        if (insightsUpdate.entries && insightsUpdate.entries.length > 0) {
+          const validCategories = ['pattern', 'strength', 'challenge', 'preference', 'motivator', 'observation']
+          const validEntries = insightsUpdate.entries.filter(
+            e => e.text && e.category && validCategories.includes(e.category)
+          )
+          if (validEntries.length > 0) {
+            await prisma.insightEntry.createMany({
+              data: validEntries.map(e => ({
+                userId,
+                date: todayKey,
+                category: e.category,
+                text: e.text,
+              }))
+            })
+          }
+        }
 
         if (currentInsights) {
           await prisma.userInsights.update({
             where: { id: currentInsights.id },
             data: {
-              patterns: insightsUpdate.patterns || currentInsights.patterns,
-              strengths: insightsUpdate.strengths || currentInsights.strengths,
-              challenges: insightsUpdate.challenges || currentInsights.challenges,
-              preferences: insightsUpdate.preferences || currentInsights.preferences,
-              recommendations: insightsUpdate.recommendations || currentInsights.recommendations,
-              motivators: insightsUpdate.motivators || currentInsights.motivators,
+              patterns: insightsUpdate.profile.patterns || currentInsights.patterns,
+              strengths: insightsUpdate.profile.strengths || currentInsights.strengths,
+              challenges: insightsUpdate.profile.challenges || currentInsights.challenges,
+              preferences: insightsUpdate.profile.preferences || currentInsights.preferences,
+              recommendations: insightsUpdate.profile.recommendations || currentInsights.recommendations,
+              motivators: insightsUpdate.profile.motivators || currentInsights.motivators,
               evaluationCount: (currentInsights.evaluationCount || 0) + results.evaluated,
             },
           })
@@ -413,12 +444,12 @@ export async function POST(request: NextRequest) {
           await prisma.userInsights.create({
             data: {
               userId,
-              patterns: insightsUpdate.patterns,
-              strengths: insightsUpdate.strengths,
-              challenges: insightsUpdate.challenges,
-              preferences: insightsUpdate.preferences,
-              recommendations: insightsUpdate.recommendations,
-              motivators: insightsUpdate.motivators,
+              patterns: insightsUpdate.profile.patterns,
+              strengths: insightsUpdate.profile.strengths,
+              challenges: insightsUpdate.profile.challenges,
+              preferences: insightsUpdate.profile.preferences,
+              recommendations: insightsUpdate.profile.recommendations,
+              motivators: insightsUpdate.profile.motivators,
               evaluationCount: results.evaluated,
             },
           })

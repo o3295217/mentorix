@@ -142,7 +142,7 @@ function QuarterCard({
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${color.accent}`} />
             <span className="text-sm font-bold text-slate-500">Q{quarter}</span>
-            <span className="text-[10px] text-slate-600">{months.join(' · ')}</span>
+            <span className="text-xs text-slate-600">{months.join(' · ')}</span>
           </div>
           <span className="text-[10px] text-slate-600">развернуть</span>
         </div>
@@ -162,7 +162,7 @@ function QuarterCard({
           <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${color.accent}`} />
           <span className="text-sm font-bold text-white">Q{quarter}</span>
         </div>
-        <span className="text-[10px] text-slate-500">{months.join(' · ')}</span>
+        <span className="text-xs text-slate-500">{months.join(' · ')}</span>
       </div>
 
       {/* Progress bar */}

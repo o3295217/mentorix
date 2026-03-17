@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-03-16 — update
+- 🧩 Компоненты: 6 файлов (HorizonsCard, MonthSection, QuarterView...)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 3 файлов
+- 📦 Другое: 2 файлов
+
+
 ### 2026-03-15 — chore: add .markdownlint.json — disable noisy rules
 - ⚙️ Конфигурация: 1 файлов
 - 📝 Документация: 1 файлов

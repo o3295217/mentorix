@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-03-16**
+> Последнее обновление: **2026-03-17**
 
 ## Общая информация
 
@@ -112,7 +112,7 @@
 - `goals/WeekCard`
 - `goals/WeekStrip`
 
-## Модели БД (22)
+## Модели БД (23)
 
 ### User
 | Поле | Тип |
@@ -140,6 +140,7 @@
 | profileBlocks | `ProfileBlock[]` |
 | habits | `Habit[]` |
 | insights | `UserInsights?` |
+| insightEntries | `InsightEntry[]` |
 | stats | `UserStats?` |
 | periodEvaluations | `PeriodEvaluation[]` |
 | worldContexts | `WorldContext[]` |
@@ -429,6 +430,18 @@
 | evaluationCount | `Int` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
+
+### InsightEntry
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String` |
+| user | `User` |
+| date | `String` |
+| category | `String` |
+| text | `String` |
+| score | `Float?` |
+| createdAt | `DateTime` |
 
 ### UserStats
 | Поле | Тип |

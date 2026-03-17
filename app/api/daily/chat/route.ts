@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const weekPeriod = getPeriodDates(targetDate, 'week')
     const monthPeriod = getPeriodDates(targetDate, 'month')
 
-    // Получить контекст (мечта, цели, профиль, insights, история, прогресс целей, статистика)
+    // Получить контекст (мечта, цели, профиль, insights, история, прогресс целей, статистика, кэш знаний)
     const [
       dream,
       weekGoalsRecord,
@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       recentEntries,
       trackedGoals,
       cumulativeStats,
+      knowledgeCache,
     ] = await Promise.all([
       prisma.dreamGoal.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.periodGoal.findFirst({
@@ -154,6 +155,13 @@ export async function POST(request: NextRequest) {
       }),
       // Накопительная статистика
       getUserStatsForAI(userId),
+      // Накопленные наблюдения (кэш знаний)
+      prisma.insightEntry.findMany({
+        where: { userId },
+        select: { date: true, category: true, text: true },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
     ])
 
     const weekGoals = safeParseJson<string[]>(weekGoalsRecord?.goalsJson, [])
@@ -230,6 +238,7 @@ export async function POST(request: NextRequest) {
         motivators: userInsights.motivators,
         evaluationCount: userInsights.evaluationCount,
       } : undefined,
+      knowledgeCache,
     }
 
     const context = buildPlanChatContext(chatRequest)
@@ -292,7 +301,7 @@ export async function POST(request: NextRequest) {
     // Вызов Claude API
     const startTime = Date.now()
     const response = await getAnthropicClient().messages.create({
-      model: 'claude-3-5-haiku-20241022',  // Haiku для чата - дешевле
+      model: 'claude-sonnet-4-20250514',  // Sonnet для чата
       max_tokens: 1024,
       system: [
         {
@@ -315,7 +324,7 @@ export async function POST(request: NextRequest) {
     await logAIUsage({
       userId,
       endpoint: 'chat',
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-sonnet-4-20250514',
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
       durationMs,

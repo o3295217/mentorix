@@ -172,7 +172,7 @@ export default function GoalsPage() {
   }, [monthKey, monthDate, selectedMonth, addPeriodGoal, showMessage])
 
   return (
-    <div className={`transition-all duration-300 ${chatOpen ? 'mr-[400px] max-md:mr-0' : ''}`}>
+    <div>
       <div className="space-y-4">
         {/* DreamBar — управляет состояниями 0, 1, 2 */}
         <DreamBar

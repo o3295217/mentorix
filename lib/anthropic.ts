@@ -413,7 +413,7 @@ export async function evaluatePeriod(
   // Вызов Claude API с кэшированием и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-3-5-haiku-20241022', // Быстрая модель для периодических оценок
+      model: 'claude-sonnet-4-20250514', // Sonnet для периодических оценок
       max_tokens: 8192,
       messages: [
         {
@@ -510,6 +510,7 @@ export interface UpdateInsightsRequest {
   evaluationFeedback: string
   dreamProgressScore: number
   overallScore: number
+  date: string // YYYY-MM-DD дата оцениваемого дня
   // Последние N дней для контекста
   recentDays?: Array<{
     date: string
@@ -518,6 +519,12 @@ export interface UpdateInsightsRequest {
     dreamScore: number
     overallScore: number
   }>
+  // Накопленные наблюдения из кэша
+  knowledgeCache?: Array<{
+    date: string
+    category: string
+    text: string
+  }>
 }
 
 const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивности. Твоя задача — обновить профиль понимания пользователя на основе его планов и результатов.
@@ -525,7 +532,11 @@ const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивн�
 ТЕКУЩИЙ ПРОФИЛЬ (если есть):
 {current_insights}
 
+НАКОПЛЕННЫЕ ЗНАНИЯ О ПОЛЬЗОВАТЕЛЕ:
+{knowledge_cache}
+
 ДАННЫЕ СЕГОДНЯШНЕГО ДНЯ:
+- Дата: {date}
 - План: {plan_text}
 - Выполнено: {fact_text}
 - Оценка дня: {overall_score}/10
@@ -538,42 +549,78 @@ const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивн�
 КОЛИЧЕСТВО ОЦЕНЁННЫХ ДНЕЙ: {evaluation_count}
 
 ЗАДАЧА:
-На основе накопленных данных обнови или сформируй профиль понимания пользователя.
+1. Обнови обобщённый профиль на основе ВСЕХ накопленных знаний + нового дня
+2. Извлеки из СЕГОДНЯШНЕГО ДНЯ конкретные наблюдения-факты о пользователе
 
 Верни JSON:
 {
-  "patterns": "Выявленные паттерны поведения (продуктивное время, склонность откладывать, и т.д.)",
-  "strengths": "Сильные стороны пользователя",
-  "challenges": "Сложности и зоны роста",
-  "preferences": "Предпочтения в планировании (количество задач, типы задач)",
-  "recommendations": "Персональные рекомендации для повышения эффективности",
-  "motivators": "Что мотивирует пользователя (если удалось выявить)"
+  "profile": {
+    "patterns": "Обобщённые паттерны поведения на основе ВСЕХ данных",
+    "strengths": "Сильные стороны (на основе всех наблюдений)",
+    "challenges": "Сложности и зоны роста",
+    "preferences": "Предпочтения в планировании",
+    "recommendations": "Персональные рекомендации",
+    "motivators": "Что мотивирует пользователя"
+  },
+  "entries": [
+    {"category": "pattern", "text": "конкретное наблюдение из сегодняшнего дня"},
+    {"category": "strength", "text": "что получилось хорошо"},
+    {"category": "challenge", "text": "с чем были сложности"},
+    {"category": "observation", "text": "любой важный факт о пользователе"}
+  ]
 }
 
-ВАЖНО:
-- Если данных мало (< 5 дней), делай осторожные выводы
-- Обновляй существующий профиль, а не заменяй полностью
+КАТЕГОРИИ для entries:
+- pattern — замеченный паттерн поведения (откладывает, делает утром, перевыполняет)
+- strength — проявленная сильная сторона
+- challenge — проблема или сложность
+- preference — выявленное предпочтение
+- motivator — что дало энергию/мотивацию
+- observation — любой важный факт о пользователе
+
+ПРАВИЛА:
+- В entries пиши ТОЛЬКО конкретные факты из СЕГОДНЯШНЕГО дня (2-5 штук)
+- В profile обобщай ВСЕ накопленные знания + новый день
 - Будь конкретен, избегай общих фраз
 - Пиши на русском языке
 - Отвечай ТОЛЬКО JSON без пояснений`
 
-function isUserInsightsUpdate(obj: unknown): obj is UserInsightsUpdate {
+export interface InsightEntryData {
+  category: string
+  text: string
+}
+
+export interface UpdateInsightsResponse {
+  profile: UserInsightsUpdate
+  entries: InsightEntryData[]
+}
+
+function isUpdateInsightsResponse(obj: unknown): obj is UpdateInsightsResponse {
   if (typeof obj !== 'object' || obj === null) return false
-  // At least one field should be present
   const r = obj as Record<string, unknown>
+  // Accept both new format (profile+entries) and legacy format (flat fields)
+  if (r.profile && typeof r.profile === 'object') {
+    return true
+  }
+  // Legacy flat format — wrap it
   return (
     typeof r.patterns === 'string' ||
     typeof r.strengths === 'string' ||
-    typeof r.challenges === 'string' ||
-    typeof r.preferences === 'string' ||
-    typeof r.recommendations === 'string' ||
-    typeof r.motivators === 'string'
+    typeof r.challenges === 'string'
   )
+}
+
+function normalizeInsightsResponse(raw: UpdateInsightsResponse | UserInsightsUpdate): UpdateInsightsResponse {
+  // Legacy flat format
+  if (!('profile' in raw)) {
+    return { profile: raw as UserInsightsUpdate, entries: [] }
+  }
+  return raw as UpdateInsightsResponse
 }
 
 export async function updateUserInsights(
   request: UpdateInsightsRequest
-): Promise<UserInsightsUpdate> {
+): Promise<UpdateInsightsResponse> {
   const currentInsightsText = request.currentInsights
     ? JSON.stringify(request.currentInsights, null, 2)
     : 'Профиль пока не сформирован'
@@ -584,9 +631,15 @@ export async function updateUserInsights(
       ).join('\n')
     : 'Нет данных'
 
+  const knowledgeCacheText = request.knowledgeCache && request.knowledgeCache.length > 0
+    ? request.knowledgeCache.map(e => `- [${e.date}] (${e.category}) ${e.text}`).join('\n')
+    : 'Пока нет накопленных наблюдений'
+
   // Sanitize user inputs and use function replacement to avoid double replacement attacks
   const prompt = UPDATE_INSIGHTS_PROMPT
     .replace('{current_insights}', () => sanitizeUserInput(currentInsightsText))
+    .replace('{knowledge_cache}', () => sanitizeUserInput(knowledgeCacheText))
+    .replace('{date}', () => sanitizeUserInput(request.date))
     .replace('{plan_text}', () => sanitizeUserInput(request.planText))
     .replace('{fact_text}', () => sanitizeUserInput(request.factText))
     .replace('{overall_score}', () => String(request.overallScore))
@@ -598,7 +651,7 @@ export async function updateUserInsights(
   // Используем Haiku с retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
       messages: [
         {
@@ -613,9 +666,11 @@ export async function updateUserInsights(
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  return extractJsonFromAIResponse<UserInsightsUpdate>(
+  const raw = extractJsonFromAIResponse<UpdateInsightsResponse | UserInsightsUpdate>(
     responseText,
-    isUserInsightsUpdate,
+    isUpdateInsightsResponse,
     'updateUserInsights'
   )
+
+  return normalizeInsightsResponse(raw)
 }

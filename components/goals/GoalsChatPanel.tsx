@@ -65,23 +65,17 @@ export default function GoalsChatPanel({
         `}
         style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.99), rgba(2,6,23,1))' }}
       >
-        {/* Desktop: vertical collapse button on left edge */}
+        {/* Desktop: minimal close button on left edge */}
         <button
           onClick={onClose}
-          className="hidden md:flex flex-col items-center justify-center w-8 flex-shrink-0
-            bg-slate-800/60 hover:bg-slate-700/60 border-r border-slate-800
-            text-slate-500 hover:text-slate-200 transition-colors group"
+          className="hidden md:flex items-center justify-center w-6 flex-shrink-0
+            bg-slate-800/40 hover:bg-slate-700/60 border-r border-slate-800/60
+            text-slate-600 hover:text-slate-300 transition-colors"
           title="Скрыть ИОН"
         >
-          <svg className="w-4 h-4 rotate-0 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          <span
-            className="text-[9px] font-medium tracking-wider mt-2 opacity-60 group-hover:opacity-100"
-            style={{ writingMode: 'vertical-rl' }}
-          >
-            Скрыть
-          </span>
         </button>
 
         {/* Main chat column */}

@@ -249,7 +249,7 @@ export default function MonthSection({
                         <div className="relative" ref={copyDropdownIndex === originalIndex ? dropdownRef : null}>
                           <button
                             onClick={() => toggleDropdown(originalIndex)}
-                            className="text-slate-500 hover:text-blue-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-xs"
+                            className="text-slate-500 hover:text-blue-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-sm"
                             title="Переместить в неделю"
                           >
                             ↓ в неделю
@@ -271,11 +271,11 @@ export default function MonthSection({
                       )}
                       <button
                         onClick={() => startEdit(originalIndex, goal)}
-                        className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-xs"
+                        className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-sm"
                       >✎</button>
                       <button
                         onClick={() => onRemoveGoal(originalIndex)}
-                        className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-xs"
+                        className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-sm"
                       >✕</button>
                     </div>
                   </div>
@@ -325,21 +325,31 @@ export default function MonthSection({
                     }}
                   >
                     {/* Заголовок недели */}
-                    <div className="mb-2 pb-2 border-b border-slate-800/60">
+                    <div className="mb-2 pb-2 border-b border-slate-800/60 flex items-baseline gap-2">
                       <div className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
                         Неделя {week.num}
                       </div>
-                      <div className="text-[11px] text-slate-600">
+                      <div className={`text-[11px] ${isCurrentWeek ? 'text-blue-400/60' : 'text-slate-600'}`}>
                         {week.start.getDate()}-{week.end.getDate()} {monthNames[week.end.getMonth()]?.slice(0, 3)}
                       </div>
-                      {isCurrentWeek && <div className="text-[10px] text-blue-400 mt-0.5">сейчас</div>}
+                    </div>
+
+                    {/* Добавить задачу в неделю */}
+                    <div className="mb-2">
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={newWeekGoals[week.key] || ''}
+                          onChange={(e) => setNewWeekGoals(prev => ({ ...prev, [week.key]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleAddWeekGoal(week.key) }}
+                          placeholder="+ задача"
+                          className="flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700"
+                        />
+                      </div>
                     </div>
 
                     {/* Задачи недели */}
-                    <div className="flex-1 space-y-1 min-h-[40px]">
-                      {filtered.length === 0 && (
-                        <p className="text-slate-700 text-xs text-center py-2">—</p>
-                      )}
+                    <div className="flex-1 space-y-1">
                       {filtered.map(goal => {
                         const index = weekGoals.indexOf(goal)
                         const tracked = trackedGoals.find(g =>
@@ -418,19 +428,7 @@ export default function MonthSection({
                       })}
                     </div>
 
-                    {/* Добавить задачу в неделю */}
-                    <div className="mt-2 pt-2 border-t border-slate-800/40">
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          value={newWeekGoals[week.key] || ''}
-                          onChange={(e) => setNewWeekGoals(prev => ({ ...prev, [week.key]: e.target.value }))}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleAddWeekGoal(week.key) }}
-                          placeholder="+ задача"
-                          className="flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700"
-                        />
-                      </div>
-                    </div>
+
                   </div>
                 )
               })}

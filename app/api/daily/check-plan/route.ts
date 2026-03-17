@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     // Вызов Claude API
     const startTime = Date.now()
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-3-5-haiku-20241022',  // Haiku для проверки плана - дешевле
+      model: 'claude-sonnet-4-20250514',  // Sonnet для проверки плана
       max_tokens: 1024,
       system: [
         {
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
     await logAIUsage({
       userId,
       endpoint: 'check-plan',
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-sonnet-4-20250514',
       inputTokens: message.usage.input_tokens,
       outputTokens: message.usage.output_tokens,
       durationMs,
