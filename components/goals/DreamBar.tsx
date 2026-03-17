@@ -89,6 +89,22 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
                 {y} {y === 1 ? 'год' : y < 5 ? 'года' : 'лет'}
               </button>
             ))}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={years}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (v >= 1 && v <= 30) setYears(v)
+                }}
+                className="w-12 px-2 py-1 rounded-full text-xs font-semibold text-center bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="text-xs text-slate-500">
+                {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}
+              </span>
+            </div>
           </div>
           <div className="flex-1" />
           {dreamGoal && (

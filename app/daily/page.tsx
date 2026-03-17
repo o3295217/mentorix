@@ -29,6 +29,9 @@ export default function DailyPage() {
   // Inline-подтверждение действий (taskId + тип действия)
   const [confirmAction, setConfirmAction] = useState<{ taskId: number; type: 'delete' | 'postpone' } | null>(null)
   
+  // Inline-подтверждение удаления extra tasks
+  const [confirmExtraDelete, setConfirmExtraDelete] = useState<number | null>(null)
+  
   // Сворачивание выполненных задач
   const [showCompleted, setShowCompleted] = useState(false)
   
@@ -76,6 +79,12 @@ export default function DailyPage() {
     addTask,
     addExtraTask,
     removeExtraTask,
+    startEditingExtraTask,
+    saveEditedExtraTask,
+    cancelEditingExtraTask,
+    editingExtraTaskIndex,
+    editingExtraTaskText,
+    setEditingExtraTaskText,
     addGoalToTasks,
     removeTask,
     postponeTask,
@@ -815,14 +824,60 @@ export default function DailyPage() {
               <div className="space-y-1">
                 {extraTasks.map((text, index) => (
                   <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100">
-                    <span className="flex-1">{text}</span>
-                    <button
-                      onClick={() => removeExtraTask(index)}
-                      className="text-red-500 hover:text-red-400 text-sm px-2 py-1"
-                      title="Удалить"
-                    >
-                      
-                    </button>
+                    {editingExtraTaskIndex === index ? (
+                      <input
+                        type="text"
+                        value={editingExtraTaskText}
+                        onChange={(e) => setEditingExtraTaskText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            saveEditedExtraTask(index)
+                          } else if (e.key === 'Escape') {
+                            cancelEditingExtraTask()
+                          }
+                        }}
+                        onBlur={() => saveEditedExtraTask(index)}
+                        autoFocus
+                        className="flex-1 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100"
+                      />
+                    ) : (
+                      <span
+                        className="flex-1 cursor-default"
+                        onDoubleClick={() => startEditingExtraTask(index, text)}
+                        title="Дважды кликните для редактирования"
+                      >
+                        {text}
+                      </span>
+                    )}
+                    {confirmExtraDelete === index ? (
+                      <div className="flex items-center gap-1 bg-red-900/50 rounded px-1">
+                        <span className="text-xs text-red-300">Удалить?</span>
+                        <button
+                          onClick={() => {
+                            removeExtraTask(index)
+                            setConfirmExtraDelete(null)
+                          }}
+                          className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => setConfirmExtraDelete(null)}
+                          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
+                        >
+                          ✗
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmExtraDelete(index)}
+                        className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
+                        title="Удалить"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -963,26 +1018,40 @@ export default function DailyPage() {
         <p className="text-base text-gray-300 mb-4">
           После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
         </p>
-        <button
-          onClick={handleEvaluateClick}
-          disabled={evaluating || selectedTasks.size === 0}
-          className="btn-primary disabled:opacity-50"
-        >
-          {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
-        </button>
-        {dailyEntry?.evaluation && (
-          <div className="mt-4 flex items-center gap-4">
-            <button
-              onClick={() => router.push(`/evaluation/${selectedDate}`)}
-              className="btn-secondary text-sm"
-            >
-              Посмотреть оценку →
-            </button>
-            <span className="text-sm text-gray-400">
-              или получите новую
-            </span>
-          </div>
-        )}
+        {(() => {
+          const hasEvaluation = !!dailyEntry?.evaluation
+          const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && dailyEntry.evaluation?.createdAt
+            && new Date(dailyEntry.updatedAt) > new Date(dailyEntry.evaluation.createdAt)
+          return (
+            <div className="flex items-center gap-3 flex-wrap">
+              {!hasEvaluation ? (
+                <button
+                  onClick={handleEvaluateClick}
+                  disabled={evaluating || selectedTasks.size === 0}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => router.push(`/evaluation/${selectedDate}`)}
+                    className="btn-primary"
+                  >
+                    Посмотреть оценку →
+                  </button>
+                  <button
+                    onClick={handleEvaluateClick}
+                    disabled={evaluating || selectedTasks.size === 0}
+                    className={`btn-secondary text-sm disabled:opacity-50 ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
+                  >
+                    {evaluating ? 'Получение оценки...' : planChangedAfterEval ? 'Обновить оценку ↻' : 'Получить заново'}
+                  </button>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {message && (

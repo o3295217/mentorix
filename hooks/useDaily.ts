@@ -106,6 +106,12 @@ interface UseDailyReturn {
   addTask: () => void
   addExtraTask: () => void
   removeExtraTask: (index: number) => void
+  startEditingExtraTask: (index: number, currentText: string) => void
+  saveEditedExtraTask: (index: number) => void
+  cancelEditingExtraTask: () => void
+  editingExtraTaskIndex: number | null
+  editingExtraTaskText: string
+  setEditingExtraTaskText: (text: string) => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
   postponeTask: (taskId: number, taskText: string) => Promise<void>
@@ -149,6 +155,8 @@ export function useDaily(): UseDailyReturn {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editingTaskText, setEditingTaskText] = useState('')
+  const [editingExtraTaskIndex, setEditingExtraTaskIndex] = useState<number | null>(null)
+  const [editingExtraTaskText, setEditingExtraTaskText] = useState('')
   const [checkingPlan, setCheckingPlan] = useState(false)
   const [checkPlanResult, setCheckPlanResult] = useState<CheckPlanResult | null>(null)
   
@@ -697,6 +705,29 @@ export function useDaily(): UseDailyReturn {
     void saveExtraTasks(updated)
   }, [extraTasks, saveExtraTasks])
 
+  const startEditingExtraTask = useCallback((index: number, currentText: string) => {
+    setEditingExtraTaskIndex(index)
+    setEditingExtraTaskText(currentText)
+  }, [])
+
+  const saveEditedExtraTask = useCallback((index: number) => {
+    if (!editingExtraTaskText.trim()) {
+      setEditingExtraTaskIndex(null)
+      setEditingExtraTaskText('')
+      return
+    }
+    const updated = extraTasks.map((t, i) => (i === index ? editingExtraTaskText.trim() : t))
+    setExtraTasks(updated)
+    setEditingExtraTaskIndex(null)
+    setEditingExtraTaskText('')
+    void saveExtraTasks(updated)
+  }, [editingExtraTaskText, extraTasks, saveExtraTasks])
+
+  const cancelEditingExtraTask = useCallback(() => {
+    setEditingExtraTaskIndex(null)
+    setEditingExtraTaskText('')
+  }, [])
+
   const buildTasksFromTexts = useCallback((texts: string[]): OpenTask[] => {
     return texts
       .map((t) => t.trim())
@@ -1209,6 +1240,12 @@ export function useDaily(): UseDailyReturn {
     addTask,
     addExtraTask,
     removeExtraTask,
+    startEditingExtraTask,
+    saveEditedExtraTask,
+    cancelEditingExtraTask,
+    editingExtraTaskIndex,
+    editingExtraTaskText,
+    setEditingExtraTaskText,
     addGoalToTasks,
     removeTask,
     postponeTask,
