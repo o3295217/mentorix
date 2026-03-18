@@ -71,7 +71,8 @@ export default function GoalsPage() {
 
   // Вычисляемые значения — годы отсчитываются от года создания мечты, а не от текущего
   const dreamStartYear = dreamGoal ? new Date(dreamGoal.createdAt).getFullYear() : currentYear
-  const years = dreamGoal ? Array.from({ length: dreamGoal.years }, (_, i) => dreamStartYear + i) : []
+  const dreamYearsCount = dreamGoal?.months ? Math.ceil(dreamGoal.months / 12) : 0
+  const years = dreamGoal ? Array.from({ length: dreamYearsCount }, (_, i) => dreamStartYear + i) : []
 
   const dreamProgress = useMemo(() => {
     const total = goals.length
@@ -96,7 +97,7 @@ export default function GoalsPage() {
   // Загрузка годовых целей
   useEffect(() => {
     if (dreamGoal) {
-      const allYears = Array.from({ length: dreamGoal.years }, (_, i) => currentYear + i)
+      const allYears = Array.from({ length: dreamYearsCount }, (_, i) => currentYear + i)
       allYears.forEach(year => loadYearGoals(year))
     }
   }, [dreamGoal, currentYear, loadYearGoals])
@@ -247,7 +248,7 @@ export default function GoalsPage() {
             {/* Горизонты планирования */}
             {dreamGoal && (
               <HorizonsCard
-                dreamYears={dreamGoal.years}
+                dreamMonths={dreamGoal.months}
                 currentYear={currentYear}
                 periodGoals={periodGoals}
                 yearGoals={yearGoals}

@@ -57,7 +57,7 @@ export function useGoalsChat(
     try {
       const context = {
         dream: dreamGoal?.goalText || '',
-        dreamYears: dreamGoal?.years || 5,
+        dreamMonths: dreamGoal?.months || undefined,
         yearGoals: Object.fromEntries(yearGoals),
         periodGoals: Object.fromEntries(periodGoals),
         selectedYear,

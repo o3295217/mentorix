@@ -1,15 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { formatHorizon } from '@/lib/dates'
 
 interface DreamProgressProps {
   dreamGoal: string
-  years?: number
+  months?: number | null
 }
 
-export default function DreamProgress({ dreamGoal, years }: DreamProgressProps) {
+export default function DreamProgress({ dreamGoal, months }: DreamProgressProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const yearsLabel = years ? `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}` : null
+  const horizonLabel = months ? formatHorizon(months) : null
 
   if (!dreamGoal || dreamGoal === 'Не указана') {
     return (
@@ -70,7 +71,7 @@ export default function DreamProgress({ dreamGoal, years }: DreamProgressProps) 
         <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/35 px-4 py-3 flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Горизонт</div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-100">{yearsLabel || 'не задан'}</div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-100">{horizonLabel || 'не задан'}</div>
           </div>
           <div className="text-sm text-slate-500 leading-6 text-right max-w-[200px]">
             Мечта должна быть опорой для недель и дней

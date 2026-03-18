@@ -1,4 +1,5 @@
 import { UserProfile, GoalsHierarchy, DailyContext, DailyEvaluationResponse } from './types'
+import { formatHorizon } from '@/lib/dates'
 
 // Форматирование профиля пользователя для промпта
 export function formatUserProfile(profile?: UserProfile): string {
@@ -33,9 +34,10 @@ ${details.join('\n')}
 
 // Форматирование иерархии целей
 export function formatGoalsHierarchy(goals: GoalsHierarchy): string {
-  const yearsLabel = goals.dreamYears ? `${goals.dreamYears} ${goals.dreamYears === 1 ? 'год' : goals.dreamYears < 5 ? 'года' : 'лет'}` : 'срок не указан'
+  const horizonMonths = goals.dreamMonths || (goals.dreamYears ? goals.dreamYears * 12 : 0)
+  const horizonLabel = horizonMonths ? formatHorizon(horizonMonths) : 'срок не указан'
   return `
-🎯 МЕЧТА (${yearsLabel}):
+🎯 МЕЧТА (${horizonLabel}):
 ${goals.dreamGoal}
 
 📅 ЦЕЛИ НА ТЕКУЩИЙ ГОД:

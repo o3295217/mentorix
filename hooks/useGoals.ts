@@ -10,7 +10,7 @@ export type { DreamGoal, Goal, GoalTag } from '@/lib/types'
 interface UseGoalsReturn {
   // Dream
   dreamGoal: DreamGoal | null
-  saveDream: (text: string, years: number) => Promise<void>
+  saveDream: (text: string, months: number | null) => Promise<void>
   
   // Year goals
   yearGoals: Map<number, string[]>
@@ -103,12 +103,12 @@ export function useGoals(): UseGoalsReturn {
     }
   }, [showMessage])
 
-  const saveDream = useCallback(async (text: string, years: number) => {
+  const saveDream = useCallback(async (text: string, months: number | null) => {
     try {
       const res = await fetch('/api/goals/dream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goalText: text, years }),
+        body: JSON.stringify({ goalText: text, months }),
       })
       const data = await res.json()
       setDreamGoal(data)

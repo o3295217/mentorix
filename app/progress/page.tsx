@@ -127,7 +127,7 @@ export default function ProgressPage() {
       <div className="card">
         <Speedometer 
           speed={stats.currentSpeed}
-          targetDays={stats.targetDays}
+          targetDays={stats.targetDays ?? undefined}
           effectiveDays={stats.effectiveDays}
           elapsedDays={stats.elapsedDays}
           evaluatedDays={stats.evaluatedDays}

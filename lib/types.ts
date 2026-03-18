@@ -4,7 +4,7 @@
 export interface DreamGoal {
   id: number
   goalText: string
-  years: number
+  months: number | null
   createdAt: string
   updatedAt: string
 }

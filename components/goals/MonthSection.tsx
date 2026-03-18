@@ -202,7 +202,7 @@ export default function MonthSection({
           </div>
 
           {unassignedGoals.length > 0 && (
-            <div className="space-y-1">
+            <div className="space-y-0">
               {unassignedGoals.map(({ text: goal, idx: originalIndex }) => {
                 const tracked = trackedGoals.find(g =>
                   g.periodKey === monthKey &&
@@ -213,12 +213,12 @@ export default function MonthSection({
                 return (
                   <div
                     key={originalIndex}
-                    className={`flex items-center gap-3 py-2 px-3 rounded-xl transition-colors group/item ${isCompleted ? 'bg-green-500/5' : 'hover:bg-slate-800/30'}`}
+                    className={`flex items-center gap-3 py-0.5 px-3 rounded-xl transition-colors group/item ${isCompleted ? 'bg-green-500/5' : 'hover:bg-slate-800/30'}`}
                   >
                     <button
                       disabled={isProcessing}
                       onClick={() => { if (!isProcessing) onToggleGoalCompletion(monthKey, goal, !isCompleted) }}
-                      className={`flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-lg border transition-all ${
+                      className={`flex-shrink-0 flex items-center justify-center w-4 h-4 rounded border transition-all ${
                         isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-600 hover:border-slate-400 bg-transparent'
                       } ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                     >

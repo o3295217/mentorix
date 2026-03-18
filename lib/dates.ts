@@ -95,3 +95,35 @@ export function toDateKey(date: Date): string {
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
+
+// Форматирование горизонта в месяцах в человекочитаемую строку
+export function formatHorizon(totalMonths: number, short = false): string {
+  const y = Math.floor(totalMonths / 12)
+  const m = totalMonths % 12
+
+  const pluralYears = (n: number) => {
+    const mod10 = n % 10
+    const mod100 = n % 100
+    if (mod10 === 1 && mod100 !== 11) return 'год'
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'года'
+    return 'лет'
+  }
+
+  const pluralMonths = (n: number) => {
+    const mod10 = n % 10
+    const mod100 = n % 100
+    if (mod10 === 1 && mod100 !== 11) return 'месяц'
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'месяца'
+    return 'месяцев'
+  }
+
+  if (short) {
+    if (y === 0) return `${m} мес`
+    if (m === 0) return `${y} ${y === 1 ? 'г.' : 'л.'}`
+    return `${y} г. ${m} мес`
+  }
+
+  if (y === 0) return `${m} ${pluralMonths(m)}`
+  if (m === 0) return `${y} ${pluralYears(y)}`
+  return `${y} ${pluralYears(y)} и ${m} мес`
+}

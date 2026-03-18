@@ -239,7 +239,8 @@ export async function POST(request: NextRequest) {
           extraTasks,
           goals: {
             dreamGoal: dream?.goalText || 'Не указана',
-            dreamYears: dream?.years,
+            dreamYears: dream?.months ? Math.ceil(dream.months / 12) : undefined,
+            dreamMonths: dream?.months || undefined,
             yearGoals: safeParseJson(currentYearGoal?.goalsJson, []),
             halfYearGoals: safeParseJson(halfYearGoals?.goalsJson, []),
             quarterGoals: safeParseJson(quarterGoals?.goalsJson, []),

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'ION Assistant - Вход',
+  title: 'AION - Вход',
   description: 'Вход в систему',
 }
 

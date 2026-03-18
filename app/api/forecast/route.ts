@@ -228,7 +228,8 @@ export async function POST(request: NextRequest) {
       horizonEnd: horizonEnd,
       // Контекст
       dreamGoal: dream.goalText,
-      dreamYears: dream.years,
+      dreamYears: dream.months ? Math.ceil(dream.months / 12) : undefined,
+      dreamMonths: dream.months || undefined,
       userProfile: userProfile
         ? {
             name: userProfile.name || undefined,
@@ -269,7 +270,7 @@ export async function POST(request: NextRequest) {
         },
         dream: {
           goal: dream.goalText,
-          years: dream.years,
+          months: dream.months,
         },
       },
     })

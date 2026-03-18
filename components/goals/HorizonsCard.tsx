@@ -1,7 +1,9 @@
 'use client'
 
+import { formatHorizon } from '@/lib/dates'
+
 interface HorizonsCardProps {
-  dreamYears: number
+  dreamMonths: number | null
   currentYear: number
   periodGoals: Map<string, string[]>
   yearGoals: Map<number, string[]>
@@ -9,7 +11,7 @@ interface HorizonsCardProps {
 }
 
 export default function HorizonsCard({
-  dreamYears,
+  dreamMonths,
   currentYear,
   periodGoals,
   yearGoals,
@@ -84,7 +86,7 @@ export default function HorizonsCard({
     },
     {
       label: 'НАПРАВЛЕНИЕ',
-      period: dreamYears > 1 ? `1–${dreamYears} ${dreamYears < 5 ? 'года' : 'лет'}` : '1 год',
+      period: dreamMonths && dreamMonths > 12 ? `1 год – ${formatHorizon(dreamMonths)}` : dreamMonths ? formatHorizon(dreamMonths) : '1+ лет',
       desc: 'Только цели и контрольные точки',
       count: directionGoals,
       dots: dots(directionGoals, 25),

@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser, changePassword } from '@/lib/auth';
 
+const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
+
 // Получение текущего пользователя
 export async function GET(request: Request) {
   try {
+    // Однопользовательский режим — возвращаем мок-пользователя
+    if (!AUTH_ENABLED) {
+      return NextResponse.json({
+        user: { id: 'local-user', email: 'local@localhost', name: 'Local User', role: 'user', onboardingCompleted: true }
+      });
+    }
+
     const user = await getAuthUser(request);
     
     if (!user) {

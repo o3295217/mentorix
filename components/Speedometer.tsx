@@ -102,7 +102,7 @@ export default function Speedometer({
             >
               {label}
             </span>
-            <span className="text-sm text-gray-500">Плановый срок: {targetDuration}</span>
+            <span className="text-sm text-gray-500">{targetDays ? `Плановый срок: ${targetDuration}` : ''}</span>
           </div>
 
           <div className="space-y-2">
@@ -123,7 +123,7 @@ export default function Speedometer({
           <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4">
             <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Эффективный вклад</div>
             <div className="text-2xl font-bold text-white">{Math.round(effectiveDays * 10) / 10}</div>
-            <div className="text-sm text-gray-500">эфф. дней из {targetDays}</div>
+            <div className="text-sm text-gray-500">{targetDays ? `эфф. дней из ${targetDays}` : 'эфф. дней'}</div>
           </div>
           <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4">
             <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Доля горизонта</div>

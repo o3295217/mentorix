@@ -2,27 +2,38 @@
 
 import { useState, useEffect } from 'react'
 import { DreamGoal } from '@/lib/types'
+import { formatHorizon } from '@/lib/dates'
 
 interface DreamBarProps {
   dreamGoal: DreamGoal | null
-  onSave: (text: string, years: number) => Promise<void>
+  onSave: (text: string, months: number | null) => Promise<void>
   progress: { total: number; completed: number; percent: number }
   isSetup: boolean
   onSetupComplete: () => void
   onOpenChat: () => void
 }
 
+const HORIZON_PRESETS = [
+  { months: 3, label: '3 мес' },
+  { months: 6, label: '6 мес' },
+  { months: 12, label: '1 год' },
+  { months: 24, label: '2 года' },
+  { months: 36, label: '3 года' },
+  { months: 60, label: '5 лет' },
+  { months: 120, label: '10 лет' },
+]
+
 export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetupComplete, onOpenChat }: DreamBarProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [text, setText] = useState('')
-  const [years, setYears] = useState(5)
+  const [months, setMonths] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (dreamGoal) {
       setText(dreamGoal.goalText)
-      setYears(dreamGoal.years)
+      setMonths(dreamGoal.months)
     }
   }, [dreamGoal])
 
@@ -30,7 +41,7 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
     if (!text.trim()) return
     setSaving(true)
     try {
-      await onSave(text, years)
+      await onSave(text, months)
       setIsEditing(false)
     } finally {
       setSaving(false)
@@ -76,40 +87,41 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
         <div className="flex items-center gap-4 mt-4 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Горизонт:</span>
-            {[1, 3, 5, 10].map((y) => (
+            {HORIZON_PRESETS.map((p) => (
               <button
-                key={y}
-                onClick={() => setYears(y)}
+                key={p.months}
+                onClick={() => setMonths(p.months)}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  years === y
+                  months === p.months
                     ? 'bg-blue-600 text-white'
                     : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
                 }`}
               >
-                {y} {y === 1 ? 'год' : y < 5 ? 'года' : 'лет'}
+                {p.label}
               </button>
             ))}
             <div className="flex items-center gap-1.5">
               <input
-                type="number"
-                min={1}
-                max={30}
-                value={years}
+                type="text"
+                inputMode="numeric"
+                value={months ?? ''}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value, 10)
-                  if (v >= 1 && v <= 30) setYears(v)
+                  const raw = e.target.value.replace(/\D/g, '')
+                  if (raw === '') { setMonths(null); return }
+                  const v = parseInt(raw, 10)
+                  if (v >= 1 && v <= 360) setMonths(v)
+                  else if (v === 0) setMonths(null)
                 }}
-                className="w-12 px-2 py-1 rounded-full text-xs font-semibold text-center bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-14 px-2 py-1 rounded-full text-xs font-semibold text-center bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+                placeholder="—"
               />
-              <span className="text-xs text-slate-500">
-                {years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}
-              </span>
+              <span className="text-xs text-slate-500">мес</span>
             </div>
           </div>
           <div className="flex-1" />
           {dreamGoal && (
             <button
-              onClick={() => { setIsEditing(false); setText(dreamGoal.goalText); setYears(dreamGoal.years) }}
+              onClick={() => { setIsEditing(false); setText(dreamGoal.goalText); setMonths(dreamGoal.months) }}
               className="inline-flex items-center rounded-full border border-slate-600 bg-slate-900/80 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
             >
               Отмена
@@ -155,7 +167,7 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
             <p className="text-[15px] text-slate-200 font-medium leading-7">&ldquo;{dreamGoal.goalText}&rdquo;</p>
           </div>
           <div className="mt-3 text-xs text-slate-500">
-            Горизонт: {dreamGoal.years} {dreamGoal.years === 1 ? 'год' : dreamGoal.years < 5 ? 'года' : 'лет'}
+            {dreamGoal.months ? `Горизонт: ${formatHorizon(dreamGoal.months)}` : ''}
           </div>
         </div>
 
@@ -218,9 +230,9 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
             <span className="text-xs font-semibold tabular-nums text-amber-300">{progress.percent}%</span>
           </div>
         )}
-        {!isExpanded && (
+        {!isExpanded && dreamGoal.months && (
           <div className="text-xs text-slate-600 flex-shrink-0">
-            {dreamGoal.years} {dreamGoal.years === 1 ? 'г.' : 'л.'}
+            {formatHorizon(dreamGoal.months, true)}
           </div>
         )}
         <button
@@ -237,7 +249,7 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
       </div>
       {isExpanded && progress.total > 0 && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/60">
-          <div className="text-xs text-slate-500">Горизонт: {dreamGoal.years} {dreamGoal.years === 1 ? 'год' : dreamGoal.years < 5 ? 'года' : 'лет'}</div>
+          <div className="text-xs text-slate-500">{dreamGoal.months ? `Горизонт: ${formatHorizon(dreamGoal.months)}` : ''}</div>
           <div className="flex-1" />
           <div className="flex items-center gap-3">
             <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">

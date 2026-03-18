@@ -57,13 +57,16 @@ export default function Landing() {
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           {/* Logo */}
           <div className="landing-fade-in mb-6 flex flex-col items-center">
-            <span className="text-5xl sm:text-6xl font-black tracking-tight">
-              <span className="text-blue-400">I</span>
-              <span className="text-white">ON</span>
-            </span>
-            <span className="text-sm sm:text-base tracking-[0.3em] uppercase font-medium mt-1 landing-gradient-text-subtle">
-              ассистент
-            </span>
+            <div className="inline-flex flex-col items-stretch">
+              <span className="text-5xl sm:text-6xl font-black tracking-tight inline-flex">
+                <span className="aion-letter-a">A</span>
+                <span className="aion-letter-i">I</span>
+                <span className="aion-letters-on">ON</span>
+              </span>
+              <span className="aion-subtitle text-sm sm:text-base uppercase font-medium mt-1 landing-gradient-text-subtle">
+                {'ассистент'.split('').map((c, i) => <span key={i}>{c}</span>)}
+              </span>
+            </div>
           </div>
 
           {/* Headline */}

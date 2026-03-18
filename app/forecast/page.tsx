@@ -23,7 +23,8 @@ interface ForecastApiResponse {
     }
     dream: {
       goal: string
-      years: number
+      years?: number
+      months?: number
     }
   }
 }
@@ -430,7 +431,7 @@ export default function ForecastPage() {
               <div className="md:col-span-2">
                 <p className="text-gray-400 mb-1">Мечта</p>
                 <p className="font-bold">{forecast.metadata.dream.goal}</p>
-                <p className="text-xs text-gray-500">{forecast.metadata.dream.years} лет</p>
+                <p className="text-xs text-gray-500">{forecast.metadata.dream.months ? `${Math.floor(forecast.metadata.dream.months / 12)} лет${forecast.metadata.dream.months % 12 ? ` и ${forecast.metadata.dream.months % 12} мес` : ''}` : forecast.metadata.dream.years ? `${forecast.metadata.dream.years} лет` : 'срок не указан'}</p>
               </div>
             </div>
           </div>

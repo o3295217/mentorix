@@ -5,7 +5,7 @@ import { requireUserId } from '@/lib/get-user-id'
 
 const DreamGoalSchema = z.object({
   goalText: z.string().min(1, "Goal text is required"),
-  years: z.number().int().min(1).max(30).optional().default(5),
+  months: z.number().int().min(1).max(360).nullable().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { goalText, years } = validation.data
+    const { goalText, months } = validation.data
 
     const dream = await prisma.$transaction(async (tx) => {
       const existingDreams = await tx.dreamGoal.findMany({
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId,
             goalText,
-            years,
+            months,
           },
         })
       }
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         where: { id: canonicalDream.id },
         data: {
           goalText,
-          years,
+          months,
         },
       })
 

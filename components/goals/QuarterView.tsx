@@ -190,16 +190,17 @@ function QuarterCard({
         {goals.map((goal, index) => (
           <div key={index} className="group/qg flex items-start gap-1.5 text-xs">
             {editingIndex === index ? (
-              <input
-                type="text"
+              <textarea
                 value={editingText}
-                onChange={(e) => setEditingText(e.target.value)}
+                onChange={(e) => { setEditingText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveEdit(index)
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(index) }
                   if (e.key === 'Escape') setEditingIndex(null)
                 }}
                 onBlur={() => saveEdit(index)}
-                className="flex-1 bg-slate-950/50 border border-slate-700 rounded-lg px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
+                rows={1}
+                className="flex-1 bg-slate-950/50 border border-slate-700 rounded-lg px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none overflow-hidden"
                 autoFocus
               />
             ) : (
@@ -224,13 +225,13 @@ function QuarterCard({
       </div>
 
       {/* Add goal */}
-      <input
-        type="text"
+      <textarea
         value={newGoal}
-        onChange={(e) => setNewGoal(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+        onChange={(e) => { setNewGoal(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }}
         placeholder={`+ цель Q${quarter}`}
-        className="w-full bg-slate-950/30 border border-slate-800 rounded-xl px-2.5 py-1 text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors"
+        rows={1}
+        className="w-full bg-slate-950/30 border border-slate-800 rounded-xl px-2.5 py-1 text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors resize-none overflow-hidden"
       />
     </div>
   )

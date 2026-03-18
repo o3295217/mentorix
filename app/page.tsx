@@ -237,7 +237,7 @@ export default function HomePage() {
 
       {/* Секция 1: Мечта + Прогресс — симметричный 50/50 */}
       <div className="grid items-stretch gap-6 lg:grid-cols-2">
-        <DreamProgress dreamGoal={dreamGoal?.goalText || ''} years={dreamGoal?.years} />
+        <DreamProgress dreamGoal={dreamGoal?.goalText || ''} months={dreamGoal?.months} />
 
         {progressStats ? (
           <ProgressIndicator

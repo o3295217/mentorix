@@ -1,8 +1,10 @@
+import { formatHorizon } from '@/lib/dates'
+
 const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
 interface GoalsContext {
   dream: string
-  dreamYears: number
+  dreamMonths?: number
   yearGoals: Record<string, string[]>
   periodGoals: Record<string, string[]>
   selectedYear: number
@@ -10,7 +12,7 @@ interface GoalsContext {
 }
 
 export function buildGoalsDecomposePrompt(context: GoalsContext): string {
-  const { dream, dreamYears, yearGoals, periodGoals, selectedYear, selectedMonth } = context
+  const { dream, dreamMonths, yearGoals, periodGoals, selectedYear, selectedMonth } = context
 
   const yearGoalsSummary = Object.entries(yearGoals || {})
     .filter(([, goals]) => Array.isArray(goals) && goals.length > 0)
@@ -27,7 +29,7 @@ export function buildGoalsDecomposePrompt(context: GoalsContext): string {
   return `Ты — ИИ-помощник по стратегическому планированию целей. Твоя задача — помочь пользователю декомпозировать мечту на конкретные, измеримые шаги по временным горизонтам.
 
 МЕЧТА ПОЛЬЗОВАТЕЛЯ: "${dream}"
-ГОРИЗОНТ ПЛАНИРОВАНИЯ: ${dreamYears} лет
+ГОРИЗОНТ ПЛАНИРОВАНИЯ: ${dreamMonths ? formatHorizon(dreamMonths) : 'не указан'}
 ТЕКУЩИЙ ФОКУС: ${MONTH_NAMES[selectedMonth]} ${selectedYear}
 ТЕКУЩИЙ ГОД: ${selectedYear}
 ТЕКУЩИЙ КВАРТАЛ: Q${currentQuarter}

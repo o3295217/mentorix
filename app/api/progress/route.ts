@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         select: { createdAt: true },
       }),
     ])
-    const dreamYears = dreamGoal?.years || 5
+    const dreamMonths = dreamGoal?.months || null
 
     // Начало отсчёта: дата создания мечты, затем fallback на первую запись
     const firstEntry = await prisma.dailyEntry.findFirst({
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
           '1000': false,
         },
         progressPercent: 0,
-        targetDays: dreamYears * 365,
+        targetDays: dreamMonths ? Math.round(dreamMonths * 30.44) : null,
       })
     }
 
@@ -162,8 +162,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Процент прогресса к мечте
-    const targetDays = dreamYears * 365
-    const progressPercent = Math.min(100, (effectiveDays / targetDays) * 100)
+    const targetDays = dreamMonths ? Math.round(dreamMonths * 30.44) : null
+    const progressPercent = targetDays ? Math.min(100, (effectiveDays / targetDays) * 100) : 0
 
     // Данные для графика последних 30 дней
     const last30DaysData = last30Days.map((e) => ({

@@ -20,6 +20,7 @@ export interface UserProfile {
 export interface GoalsHierarchy {
   dreamGoal: string
   dreamYears?: number
+  dreamMonths?: number
   yearGoals: string[]
   halfYearGoals: string[]
   quarterGoals: string[]
@@ -237,7 +238,8 @@ export interface ForecastRequest {
   
   // Контекст
   dreamGoal: string
-  dreamYears: number
+  dreamYears?: number
+  dreamMonths?: number
   userProfile?: UserProfile
 }
 

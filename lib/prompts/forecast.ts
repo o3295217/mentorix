@@ -4,6 +4,7 @@ import {
   ExecutionQuality,
 } from './types'
 import { formatUserProfile } from './core'
+import { formatHorizon } from '@/lib/dates'
 
 // Расчет качества выполнения за базовый период
 function calculateExecutionQuality(days: DayDataFull[]): ExecutionQuality {
@@ -122,7 +123,7 @@ export function buildForecastPrompt(request: ForecastRequest): string {
 
 ${userProfileSection}
 
-🌟 МЕЧТА ПОЛЬЗОВАТЕЛЯ (${request.dreamYears} лет):
+🌟 МЕЧТА ПОЛЬЗОВАТЕЛЯ${request.dreamMonths ? ` (${formatHorizon(request.dreamMonths)})` : ''}:
 ${request.dreamGoal}
 
 ---
@@ -160,7 +161,7 @@ ${request.horizonGoals.length > 0
 3. ПРОГНОЗ ДОСТИЖЕНИЯ МЕЧТЫ:
    При текущем качестве выполнения (${quality.completionRate}% задач, ${quality.strategicCompletionRate}% стратегических):
    - Сколько лет до мечты реально?
-   - Идет ли по плану (${request.dreamYears} лет)?
+   - Идет ли по плану${request.dreamMonths ? ` (${formatHorizon(request.dreamMonths)})` : ''}?
    - Какой % прогресса в год при текущем темпе?
    - Какой % нужен для достижения вовремя?
    - Что конкретно нужно изменить?
@@ -224,7 +225,7 @@ ${request.horizonGoals.length > 0
     "estimatedYears": число (реальный срок при текущем темпе),
     "onTrack": true/false,
     "progressPerYear": число (% в год при текущем темпе),
-    "requiredProgressPerYear": число (% нужно для достижения за ${request.dreamYears} лет),
+    "requiredProgressPerYear": число (% нужно для достижения${request.dreamMonths ? ` за ${formatHorizon(request.dreamMonths)}` : ''}),
     "gap": число (разрыв между текущим и требуемым),
     "adjustmentNeeded": "Что конкретно изменить"
   },
