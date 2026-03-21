@@ -14,10 +14,10 @@ export interface Evaluation {
   id: number
   dailyEntryId: number
   dreamProgressScore: number
-  strategyScore: number
-  operationsScore: number
-  teamScore: number
-  efficiencyScore: number
+  strategicFocusScore: number
+  productivityScore: number
+  lifeBalanceScore: number
+  disciplineScore: number
   overallScore: number
   feedbackText: string
   planVsFactText: string
@@ -124,8 +124,10 @@ export interface TrendDataPoint {
   date: string
   overallScore: number
   dreamProgressScore: number
-  strategyScore: number
-  operationsScore: number
+  strategicFocusScore: number
+  productivityScore: number
+  lifeBalanceScore: number
+  disciplineScore: number
 }
 
 // === СТАТИСТИКА ДЛЯ АНАЛИТИКИ ===

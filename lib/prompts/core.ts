@@ -85,10 +85,10 @@ ${parts.join('\n')}
 // Ответ когда НЕТ МЕЧТЫ
 export const NO_DREAM_RESPONSE: DailyEvaluationResponse = {
   dream_progress_score: 0,
-  strategy_score: 0,
-  operations_score: 0,
-  team_score: 0,
-  efficiency_score: 0,
+  strategic_focus_score: 0,
+  productivity_score: 0,
+  life_balance_score: 0,
+  discipline_score: 0,
   overall_score: 0,
   plan_vs_fact: 'Невозможно проанализировать без мечты',
   alignment: {
@@ -104,15 +104,11 @@ export const NO_DREAM_RESPONSE: DailyEvaluationResponse = {
     family: 'критично',
     energy: 'критично',
   },
-  feedback: `Невозможно оценить твой день, потому что ты НЕ ЗНАЕШЬ КУДА ИДЕШЬ.
-
-У тебя нет мечты. Ты просто существуешь, а не живешь.
-
-Эта система создана чтобы привести тебя к мечте. Но если мечты нет - система бесполезна.
-
-Зайди в раздел "Цели" и заполни свою мечту на 5 лет. Что ты хочешь достичь? Кем хочешь стать? Куда хочешь прийти?
-
-Без мечты все остальное - просто суета.`,
+  feedback: {
+    conclusion: 'Невозможно оценить день без мечты. Ты не знаешь куда идёшь.',
+    worked: '',
+    blocks: 'Нет мечты — нет направления. Зайди в раздел «Цели» и заполни мечту на 5 лет.',
+  },
   recommendations: 'Зайди в раздел «Цели» и заполни мечту. Прямо сейчас.',
 }
 
@@ -120,10 +116,10 @@ export const NO_DREAM_RESPONSE: DailyEvaluationResponse = {
 export function getNoGoalsResponse(dreamGoal: string): DailyEvaluationResponse {
   return {
     dream_progress_score: 1,
-    strategy_score: 1,
-    operations_score: 1,
-    team_score: 1,
-    efficiency_score: 1,
+    strategic_focus_score: 1,
+    productivity_score: 1,
+    life_balance_score: 1,
+    discipline_score: 1,
     overall_score: 1,
     plan_vs_fact: 'Невозможно проанализировать без промежуточных целей',
     alignment: {
@@ -139,19 +135,11 @@ export function getNoGoalsResponse(dreamGoal: string): DailyEvaluationResponse {
       family: 'внимание',
       energy: 'внимание',
     },
-    feedback: `У тебя есть мечта: "${dreamGoal}"
-
-Это хорошо. Но у тебя нет ПЛАНА как к ней прийти.
-
-Это как хотеть попасть в Москву, но не знать в какую сторону идти.
-
-Мечта без плана - просто фантазия. Нужно разбить ее на конкретные шаги:
-- Что сделать за год чтобы приблизиться к мечте?
-- Какие задачи на квартал?
-- Что сделать в этом месяце?
-- Чем заняться на этой неделе?
-
-Заполни хотя бы годовые и месячные цели. Тогда можно будет оценить твой прогресс.`,
+    feedback: {
+      conclusion: `У тебя есть мечта: "${dreamGoal}" — но нет плана как к ней прийти.`,
+      worked: 'Мечта сформулирована — это уже первый шаг.',
+      blocks: 'Мечта без плана — просто фантазия. Нужно разбить её на шаги: год, квартал, месяц, неделя.',
+    },
     recommendations: 'Зайди в раздел «Цели» и заполни цели на год, квартал, месяц, неделю',
   }
 }

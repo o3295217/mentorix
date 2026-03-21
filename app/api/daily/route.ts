@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { parseDateParam, toDateKey } from '@/lib/dates'
 import { splitLines } from '@/lib/fact-utils'
 import { requireUserId } from '@/lib/get-user-id'
+import { syncCompletedWorkForEntry, recalculateWorkSummary } from '@/lib/completed-work'
 
 const DailyEntrySchema = z.object({
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -178,6 +179,23 @@ export async function POST(request: NextRequest) {
           },
           include: { evaluation: true },
         })
+
+    // Синхронизация CompletedWork (если есть отмеченные задачи)
+    if (selectedTasksJson !== undefined || extraTasksJson !== undefined) {
+      try {
+        await syncCompletedWorkForEntry({
+          userId,
+          entryId: entry.id,
+          date: entry.date,
+          planText: entry.planText,
+          selectedTasksJson: entry.selectedTasksJson,
+          extraTasksJson: entry.extraTasksJson,
+        })
+        await recalculateWorkSummary(userId, entry.date)
+      } catch (cwError) {
+        console.error('[CompletedWork] sync failed:', cwError)
+      }
+    }
 
     return NextResponse.json(entry)
   } catch (error) {

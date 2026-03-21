@@ -175,10 +175,10 @@ export interface EvaluationRequest {
 
 // Старый интерфейс ответа (deprecated)
 export interface EvaluationResponse {
-  strategy_score: number
-  operations_score: number
-  team_score: number
-  efficiency_score: number
+  strategic_focus_score: number
+  productivity_score: number
+  life_balance_score: number
+  discipline_score: number
   overall_score: number
   plan_vs_fact: string
   feedback: string
@@ -223,10 +223,10 @@ function isDailyEvaluationResponse(obj: unknown): obj is DailyEvaluationResponse
   // Validate required score fields
   const scoreFields = [
     'dream_progress_score',
-    'strategy_score',
-    'operations_score',
-    'team_score',
-    'efficiency_score',
+    'strategic_focus_score',
+    'productivity_score',
+    'life_balance_score',
+    'discipline_score',
     'overall_score',
   ]
 
@@ -237,8 +237,14 @@ function isDailyEvaluationResponse(obj: unknown): obj is DailyEvaluationResponse
     }
   }
 
-  // Validate required string fields
-  if (typeof r.feedback !== 'string' || r.feedback.length === 0) {
+  // Validate feedback (structured object or string)
+  if (typeof r.feedback === 'object' && r.feedback !== null) {
+    const fb = r.feedback as Record<string, unknown>
+    if (typeof fb.conclusion !== 'string' || fb.conclusion.length === 0) {
+      console.error('[Validation] Missing or invalid feedback.conclusion')
+      return false
+    }
+  } else if (typeof r.feedback !== 'string' || (r.feedback as string).length === 0) {
     console.error('[Validation] Missing or invalid feedback')
     return false
   }
@@ -361,10 +367,10 @@ export async function evaluateDayNewWithUsage(
   const result = {
     ...parsedResponse,
     dream_progress_score: clampScore(parsedResponse.dream_progress_score),
-    strategy_score: clampScore(parsedResponse.strategy_score),
-    operations_score: clampScore(parsedResponse.operations_score),
-    team_score: clampScore(parsedResponse.team_score),
-    efficiency_score: clampScore(parsedResponse.efficiency_score),
+    strategic_focus_score: clampScore(parsedResponse.strategic_focus_score),
+    productivity_score: clampScore(parsedResponse.productivity_score),
+    life_balance_score: clampScore(parsedResponse.life_balance_score),
+    discipline_score: clampScore(parsedResponse.discipline_score),
     overall_score: clampScore(parsedResponse.overall_score),
   }
 
@@ -391,13 +397,15 @@ export async function evaluateDay(
 
   // Конвертируем ответ обратно в старый формат
   return {
-    strategy_score: newResponse.strategy_score,
-    operations_score: newResponse.operations_score,
-    team_score: newResponse.team_score,
-    efficiency_score: newResponse.efficiency_score,
+    strategic_focus_score: newResponse.strategic_focus_score,
+    productivity_score: newResponse.productivity_score,
+    life_balance_score: newResponse.life_balance_score,
+    discipline_score: newResponse.discipline_score,
     overall_score: newResponse.overall_score,
     plan_vs_fact: newResponse.plan_vs_fact,
-    feedback: newResponse.feedback,
+    feedback: typeof newResponse.feedback === 'object'
+      ? `${newResponse.feedback.conclusion}\n${newResponse.feedback.worked}\n${newResponse.feedback.blocks}`
+      : newResponse.feedback as unknown as string,
     alignment: newResponse.alignment,
     recommendations: newResponse.recommendations,
   }

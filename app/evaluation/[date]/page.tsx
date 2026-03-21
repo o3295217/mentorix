@@ -218,23 +218,27 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         </div>
       </div>
 
-      {/* Scores breakdown */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Scores breakdown — 5 категорий */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="card text-center">
-          <p className="text-sm text-gray-400 mb-1">Стратегия</p>
-          <p className={`text-3xl font-bold ${getScoreColor(evaluation.strategyScore)}`}>{evaluation.strategyScore}</p>
+          <p className="text-sm text-gray-400 mb-1">Движение к мечте</p>
+          <p className={`text-3xl font-bold ${getScoreColor(evaluation.dreamProgressScore)}`}>{evaluation.dreamProgressScore}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-gray-400 mb-1">Операции</p>
-          <p className={`text-3xl font-bold ${getScoreColor(evaluation.operationsScore)}`}>{evaluation.operationsScore}</p>
+          <p className="text-sm text-gray-400 mb-1">Стратег. фокус</p>
+          <p className={`text-3xl font-bold ${getScoreColor(evaluation.strategicFocusScore)}`}>{evaluation.strategicFocusScore}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-gray-400 mb-1">Команда</p>
-          <p className={`text-3xl font-bold ${getScoreColor(evaluation.teamScore)}`}>{evaluation.teamScore}</p>
+          <p className="text-sm text-gray-400 mb-1">Продуктивность</p>
+          <p className={`text-3xl font-bold ${getScoreColor(evaluation.productivityScore)}`}>{evaluation.productivityScore}</p>
         </div>
         <div className="card text-center">
-          <p className="text-sm text-gray-400 mb-1">Эффективность</p>
-          <p className={`text-3xl font-bold ${getScoreColor(evaluation.efficiencyScore)}`}>{evaluation.efficiencyScore}</p>
+          <p className="text-sm text-gray-400 mb-1">Баланс жизни</p>
+          <p className={`text-3xl font-bold ${getScoreColor(evaluation.lifeBalanceScore)}`}>{evaluation.lifeBalanceScore}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-sm text-gray-400 mb-1">Дисциплина</p>
+          <p className={`text-3xl font-bold ${getScoreColor(evaluation.disciplineScore)}`}>{evaluation.disciplineScore}</p>
         </div>
       </div>
 
@@ -306,10 +310,47 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         </div>
       </div>
 
-      {/* Feedback */}
+      {/* Feedback — 3 целевых блока */}
       <div className="card">
         <h2 className="font-bold mb-4 text-red-100"> Обратная связь</h2>
-        <p className="text-gray-200 whitespace-pre-wrap">{evaluation.feedbackText}</p>
+        {(() => {
+          // Пробуем распарсить структурированный feedback (новый формат)
+          let feedbackBlocks: { conclusion?: string; worked?: string; blocks?: string } | null = null
+          try {
+            const parsed = JSON.parse(evaluation.feedbackText)
+            if (parsed && typeof parsed === 'object' && parsed.conclusion) {
+              feedbackBlocks = parsed
+            }
+          } catch {
+            // Старый формат — plain text
+          }
+
+          if (feedbackBlocks) {
+            return (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-purple-300 mb-1">🎯 Главный вывод</h3>
+                  <p className="text-gray-200 whitespace-pre-wrap">{feedbackBlocks.conclusion}</p>
+                </div>
+                {feedbackBlocks.worked && (
+                  <div>
+                    <h3 className="font-semibold text-green-300 mb-1">✅ Что сработало</h3>
+                    <p className="text-gray-200 whitespace-pre-wrap">{feedbackBlocks.worked}</p>
+                  </div>
+                )}
+                {feedbackBlocks.blocks && (
+                  <div>
+                    <h3 className="font-semibold text-orange-300 mb-1">⚠️ Что тормозит</h3>
+                    <p className="text-gray-200 whitespace-pre-wrap">{feedbackBlocks.blocks}</p>
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // Fallback для старых записей — plain text
+          return <p className="text-gray-200 whitespace-pre-wrap">{evaluation.feedbackText}</p>
+        })()}
       </div>
 
       {/* Suggested Tasks */}

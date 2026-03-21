@@ -1150,12 +1150,12 @@ export function useDaily(): UseDailyReturn {
     // Факт = отмеченные задачи
     const completedTasks = tasks.filter(t => selectedTasks.has(t.id))
     if (completedTasks.length === 0 && extraTasks.length === 0) {
-      showMessage('❌ Отметьте выполненные задачи или добавьте внеплан')
+      showMessage('Отметьте выполненные задачи или добавьте внеплан')
       return
     }
 
     setEvaluating(true)
-    showMessage('⏳ Получение оценки от ИИ...', 0)
+    showMessage('Получение оценки от ИИ...', 0)
 
     try {
       let entryId = dailyEntry?.id
@@ -1174,7 +1174,7 @@ export function useDaily(): UseDailyReturn {
 
         const savedEntry = await saveRes.json()
         if (!savedEntry?.id) {
-          showMessage('❌ Ошибка при сохранении данных')
+          showMessage('Ошибка при сохранении данных')
           setEvaluating(false)
           return
         }
@@ -1192,17 +1192,17 @@ export function useDaily(): UseDailyReturn {
       })
 
       if (res.ok) {
-        showMessage('✅ Оценка получена!')
+        showMessage('Оценка получена!', 1500)
         setTimeout(() => {
           router.push(`/evaluation/${selectedDate}`)
-        }, 1000)
+        }, 1500)
       } else {
         const error = await res.json()
-        showMessage(`❌ Ошибка: ${error.error}`)
+        showMessage(`Ошибка: ${error.error}`)
       }
     } catch (error) {
       console.error('Error evaluating:', error)
-      showMessage('❌ Ошибка при получении оценки')
+      showMessage('Ошибка при получении оценки')
     } finally {
       setEvaluating(false)
     }

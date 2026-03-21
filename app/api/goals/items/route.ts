@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client'
 import { parseDateParam } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
+import { syncCompletedWorkForGoal, removeCompletedWorkForGoal } from '@/lib/completed-work'
 
 // Конвертация числа приоритета в строку
 const priorityNumToStr = (num: number): string => {
@@ -149,6 +150,25 @@ export async function PUT(request: NextRequest) {
         historyJson: JSON.stringify(history),
       },
     })
+
+    // Синхронизация CompletedWork при изменении статуса выполнения
+    if (completed !== undefined && completed !== existingGoal.completed) {
+      try {
+        if (completed) {
+          await syncCompletedWorkForGoal({
+            userId,
+            goalId: goal.id,
+            goalText: goal.text,
+            periodKey: goal.periodKey,
+            completedAt: goal.completedAt || new Date(),
+          })
+        } else {
+          await removeCompletedWorkForGoal(userId, goal.id)
+        }
+      } catch (cwError) {
+        console.error('[CompletedWork] goal sync failed:', cwError)
+      }
+    }
 
     return NextResponse.json({
       ...goal,

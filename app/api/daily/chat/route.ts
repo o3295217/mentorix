@@ -15,6 +15,7 @@ import { getUserStatsForAI } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { getAnthropicClient } from '@/lib/anthropic'
+import { getWorkContextForAI } from '@/lib/completed-work'
 
 const ChatSchema = z.object({
   date: z.string(),
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
       trackedGoals,
       cumulativeStats,
       knowledgeCache,
+      workContext,
     ] = await Promise.all([
       prisma.dreamGoal.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.periodGoal.findFirst({
@@ -162,6 +164,8 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         take: 50,
       }),
+      // Контекст фактически выполненной работы
+      getWorkContextForAI(userId, targetDate),
     ])
 
     const weekGoals = safeParseJson<string[]>(weekGoalsRecord?.goalsJson, [])
@@ -239,6 +243,7 @@ export async function POST(request: NextRequest) {
         evaluationCount: userInsights.evaluationCount,
       } : undefined,
       knowledgeCache,
+      workContext,
     }
 
     const context = buildPlanChatContext(chatRequest)

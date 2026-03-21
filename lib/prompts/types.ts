@@ -68,19 +68,26 @@ export interface SuggestedTask {
   reason: string // Почему эта задача важна
 }
 
+// Структурированная обратная связь (3 блока)
+export interface FeedbackBlocks {
+  conclusion: string  // Главный вывод: 1-2 предложения, движение к мечте или нет
+  worked: string      // Что сработало: конкретные действия + почему они приблизили к мечте
+  blocks: string      // Что тормозит: паттерны, откладывания, разрывы (без пересказа задач)
+}
+
 // Ответ для дневной оценки
 export interface DailyEvaluationResponse {
   dream_progress_score: number // 1-10
-  strategy_score: number
-  operations_score: number
-  team_score: number
-  efficiency_score: number
+  strategic_focus_score: number
+  productivity_score: number
+  life_balance_score: number
+  discipline_score: number
   overall_score: number
   plan_vs_fact: string
   alignment: AlignmentChain
   balance_flags: BalanceFlags
   horizontal_alignment?: HorizontalAlignment
-  feedback: string
+  feedback: FeedbackBlocks
   recommendations: string
   suggested_tasks?: SuggestedTask[] // Предложенные задачи
 }
@@ -96,6 +103,14 @@ export interface DailyEvaluationRequest {
   userProfile?: UserProfile
   context?: DailyContext
   openTasks: string[]
+  previousFeedback?: PreviousDayFeedback[] // Рекомендации и фидбэк прошлых дней
+}
+
+// Краткая выжимка из предыдущей оценки
+export interface PreviousDayFeedback {
+  date: string
+  recommendations: string
+  feedbackConclusion: string // Главный вывод (или первые 200 символов для старых записей)
 }
 
 // === ПЕРИОДИЧЕСКИЕ ОЦЕНКИ ===
@@ -107,10 +122,10 @@ export interface DayData {
   factText: string
   dreamProgressScore: number
   overallScore: number
-  strategyScore: number
-  operationsScore: number
-  teamScore: number
-  efficiencyScore: number
+  strategicFocusScore: number
+  productivityScore: number
+  lifeBalanceScore: number
+  disciplineScore: number
   healthFlag?: string
   familyFlag?: string
   energyFlag?: string
@@ -138,7 +153,7 @@ export interface BehaviorPatterns {
 export interface Trends {
   dreamProgressTrend: 'растет' | 'стабильно' | 'падает'
   overallTrend: 'растет' | 'стабильно' | 'падает'
-  strategyTrend: 'растет' | 'стабильно' | 'падает'
+  strategicFocusTrend: 'растет' | 'стабильно' | 'падает'
   description: string
 }
 
@@ -166,9 +181,9 @@ export interface PeriodEvaluationResponse {
 
   // Блоки оценки (упрощенная структура для JSON)
   professionalBlock: {
-    strategyAvg: number
-    operationsAvg: number
-    teamAvg: number
+    strategicFocusAvg: number
+    productivityAvg: number
+    disciplineAvg: number
     analysis: string
   }
   personalBlock: {

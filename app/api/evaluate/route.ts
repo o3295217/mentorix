@@ -10,6 +10,7 @@ import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
+import { recalculateWorkSummary } from '@/lib/completed-work'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
@@ -116,6 +117,37 @@ export async function POST(request: NextRequest) {
       where: { userId, isClosed: false },
     })
 
+    // Получить последние 3 оценки для контекста (чтобы не повторять рекомендации)
+    const recentEvaluations = await prisma.evaluation.findMany({
+      where: {
+        dailyEntry: { userId },
+      },
+      include: {
+        dailyEntry: { select: { date: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    })
+
+    const previousFeedback = recentEvaluations.map((ev) => {
+      let feedbackConclusion = ''
+      try {
+        const parsed = JSON.parse(ev.feedbackText)
+        if (parsed && typeof parsed === 'object' && parsed.conclusion) {
+          feedbackConclusion = parsed.conclusion
+        } else {
+          feedbackConclusion = ev.feedbackText.slice(0, 200)
+        }
+      } catch {
+        feedbackConclusion = ev.feedbackText.slice(0, 200)
+      }
+      return {
+        date: ev.dailyEntry.date.toLocaleDateString('ru-RU'),
+        recommendations: ev.recommendationsText,
+        feedbackConclusion,
+      }
+    })
+
     // Получить профиль пользователя
     const userProfile = await prisma.userProfile.findFirst({
       where: { userId },
@@ -169,6 +201,7 @@ export async function POST(request: NextRequest) {
         exerciseTime: dailyEntry.exerciseTime || undefined,
       },
       openTasks: openTasks.map((t) => `[${t.taskType}] ${t.taskText}`),
+      previousFeedback: previousFeedback.length > 0 ? previousFeedback : undefined,
     }
 
     // Вызвать Claude API (с логированием usage)
@@ -188,12 +221,14 @@ export async function POST(request: NextRequest) {
     // Подготовить данные для сохранения (DRY - не дублируем в create/update)
     const evaluationData = {
       dreamProgressScore: evaluationResponse.dream_progress_score,
-      strategyScore: evaluationResponse.strategy_score,
-      operationsScore: evaluationResponse.operations_score,
-      teamScore: evaluationResponse.team_score,
-      efficiencyScore: evaluationResponse.efficiency_score,
+      strategicFocusScore: evaluationResponse.strategic_focus_score,
+      productivityScore: evaluationResponse.productivity_score,
+      lifeBalanceScore: evaluationResponse.life_balance_score,
+      disciplineScore: evaluationResponse.discipline_score,
       overallScore: evaluationResponse.overall_score,
-      feedbackText: evaluationResponse.feedback,
+      feedbackText: typeof evaluationResponse.feedback === 'object'
+        ? JSON.stringify(evaluationResponse.feedback)
+        : evaluationResponse.feedback,
       planVsFactText: evaluationResponse.plan_vs_fact,
       alignmentDayWeek: evaluationResponse.alignment.day_to_week,
       alignmentWeekMonth: evaluationResponse.alignment.week_to_month,
@@ -280,7 +315,9 @@ export async function POST(request: NextRequest) {
         date: dateKey,
         planText: dailyEntry.planText || '',
         factText: derived.factText,
-        evaluationFeedback: evaluationResponse.feedback,
+        evaluationFeedback: typeof evaluationResponse.feedback === 'object'
+          ? `${evaluationResponse.feedback.conclusion}\n${evaluationResponse.feedback.worked}\n${evaluationResponse.feedback.blocks}`
+          : evaluationResponse.feedback,
         dreamProgressScore: evaluationResponse.dream_progress_score,
         overallScore: evaluationResponse.overall_score,
         recentDays,
@@ -347,6 +384,13 @@ export async function POST(request: NextRequest) {
       await recalculateUserStats(userId)
     } catch (statsError) {
       console.error('[UserStats] Failed to recalculate stats:', statsError)
+    }
+
+    // === ПЕРЕСЧЁТ СВОДОК ВЫПОЛНЕННОЙ РАБОТЫ ===
+    try {
+      await recalculateWorkSummary(userId, dailyEntry.date)
+    } catch (wsError) {
+      console.error('[WorkSummary] Failed to recalculate:', wsError)
     }
 
     return NextResponse.json(evaluation)

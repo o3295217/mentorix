@@ -55,6 +55,8 @@ model User {
   passwordResetTokens PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   chatMessages  ChatMessage[]
+  completedWork CompletedWork[]
+  workSummaries WorkSummary[]
 
   @@map("users")
 }
@@ -195,10 +197,10 @@ model Evaluation {
   dailyEntry            DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
   
   dreamProgressScore    Int        @default(5)
-  strategyScore         Int
-  operationsScore       Int
-  teamScore             Int
-  efficiencyScore       Int
+  strategicFocusScore   Int        @default(5)
+  productivityScore     Int        @default(5)
+  lifeBalanceScore      Int        @default(5)
+  disciplineScore       Int        @default(5)
   overallScore          Float
   feedbackText          String
   planVsFactText        String
@@ -485,6 +487,46 @@ model EmailVerificationToken {
   @@index([userId])
   @@index([token])
   @@map("email_verification_tokens")
+}
+
+// ==================== ВЫПОЛНЕННАЯ РАБОТА ====================
+
+model CompletedWork {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime
+  type        String   // task | goal | habit | extra
+  text        String
+  category    String?  // стратегические | операционные | привычки | созвоны
+  goalLink    String?  // periodKey цели (например week:2026-03-W3)
+  sourceType  String?  // dailyEntry | goal | habit
+  sourceId    Int?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([userId, goalLink])
+  @@map("completed_work")
+}
+
+model WorkSummary {
+  id                Int      @id @default(autoincrement())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodType        String   // week | month | quarter
+  periodKey         String   // 2026-03-W3, 2026-03, 2026-Q1
+  summaryText       String   // компактная сводка для контекста ИИ
+  keyAchievements   String   @default("[]") // JSON array строк
+  tasksCompleted    Int      @default(0)
+  goalsCompleted    Int      @default(0)
+  topCategoriesJson String?  // JSON {"стратегические": 5, "операционные": 12}
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, periodType, periodKey])
+  @@index([userId, periodType])
+  @@map("work_summaries")
 }
 
 // ==================== ЧАТ ====================

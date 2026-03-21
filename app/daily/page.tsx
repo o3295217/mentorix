@@ -45,6 +45,11 @@ export default function DailyPage() {
       return new Set()
     }
   })
+
+  // Виджет «Сделано на этой неделе»
+  const [weekFacts, setWeekFacts] = useState<Array<{ id: number; text: string; type: string; category: string | null }>>([])
+  const [weekFactsTotal, setWeekFactsTotal] = useState(0)
+  const [showWeekFacts, setShowWeekFacts] = useState(false)
   
   // Сохраняем отклонённые предложения в localStorage
   useEffect(() => {
@@ -310,6 +315,20 @@ export default function DailyPage() {
     setMounted(true)
   }, [])
 
+  // Загрузка фактов текущей недели
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/facts?period=week&limit=200')
+        if (res.ok) {
+          const data = await res.json()
+          setWeekFacts(data.items)
+          setWeekFactsTotal(data.stats.total)
+        }
+      } catch { /* игнорируем */ }
+    })()
+  }, [selectedDate])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -395,6 +414,37 @@ export default function DailyPage() {
           )}
         </div>
       </div>
+
+      {/* Виджет «Сделано на этой неделе» */}
+      {weekFactsTotal > 0 && (
+        <div className="rounded-xl bg-green-500/5 border border-green-500/20 p-4">
+          <button
+            onClick={() => setShowWeekFacts(!showWeekFacts)}
+            className="w-full flex items-center justify-between"
+          >
+            <h3 className="text-sm font-medium text-green-300">
+              Сделано на этой неделе: {weekFactsTotal} {weekFactsTotal === 1 ? 'задача' : weekFactsTotal < 5 ? 'задачи' : 'задач'}
+            </h3>
+            <span className="text-green-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
+          </button>
+          {showWeekFacts && (
+            <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+              {weekFacts.map(item => (
+                <div key={item.id} className="flex items-center gap-2 text-sm">
+                  <span className="text-green-500">✓</span>
+                  <span className="text-gray-300">{item.text}</span>
+                  {item.category && (
+                    <span className={`text-[10px] ml-auto ${
+                      item.category === 'стратегические' ? 'text-orange-400' :
+                      item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'
+                    }`}>{item.category}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Plan and Chat side by side - 60/40 */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -1013,7 +1063,13 @@ export default function DailyPage() {
       </div>
 
       {/* Evaluate */}
-      <div className="card bg-gradient-to-r from-primary-900/30 to-purple-900/30 border border-primary-700">
+      <div className="card relative overflow-hidden bg-gradient-to-r from-primary-900/30 to-purple-900/30 border border-primary-700">
+        {/* Animated progress bar */}
+        {evaluating && (
+          <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 animate-[eval-progress_1.5s_ease-in-out_infinite]" style={{ width: '40%' }} />
+          </div>
+        )}
         <h2 className="text-xl font-bold mb-4 text-white">Получить оценку дня от ION</h2>
         <p className="text-base text-gray-300 mb-4">
           После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
@@ -1023,42 +1079,72 @@ export default function DailyPage() {
           const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && dailyEntry.evaluation?.createdAt
             && new Date(dailyEntry.updatedAt) > new Date(dailyEntry.evaluation.createdAt)
           return (
-            <div className="flex items-center gap-3 flex-wrap">
-              {!hasEvaluation ? (
-                <button
-                  onClick={handleEvaluateClick}
-                  disabled={evaluating || selectedTasks.size === 0}
-                  className="btn-primary disabled:opacity-50"
-                >
-                  {evaluating ? 'Получение оценки...' : 'Получить оценку дня'}
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => router.push(`/evaluation/${selectedDate}`)}
-                    className="btn-primary"
-                  >
-                    Посмотреть оценку →
-                  </button>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                {!hasEvaluation ? (
                   <button
                     onClick={handleEvaluateClick}
                     disabled={evaluating || selectedTasks.size === 0}
-                    className={`btn-secondary text-sm disabled:opacity-50 ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
+                    className="btn-primary disabled:opacity-50 flex items-center gap-2"
                   >
-                    {evaluating ? 'Получение оценки...' : planChangedAfterEval ? 'Обновить оценку ↻' : 'Получить заново'}
+                    {evaluating ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Анализирую...
+                      </>
+                    ) : 'Получить оценку дня'}
                   </button>
-                </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => router.push(`/evaluation/${selectedDate}`)}
+                      className="btn-primary"
+                    >
+                      Посмотреть оценку →
+                    </button>
+                    <button
+                      onClick={handleEvaluateClick}
+                      disabled={evaluating || selectedTasks.size === 0}
+                      className={`btn-secondary text-sm disabled:opacity-50 flex items-center gap-2 ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
+                    >
+                      {evaluating ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Анализирую...
+                        </>
+                      ) : planChangedAfterEval ? 'Обновить оценку ↻' : 'Получить заново'}
+                    </button>
+                  </>
+                )}
+              </div>
+              {/* Inline status message */}
+              {message && (
+                <div className={`flex items-center gap-2 text-sm transition-all duration-300 ${
+                  message.includes('Ошибка') ? 'text-red-400' : message.includes('получена') ? 'text-green-400' : 'text-slate-400'
+                }`}>
+                  {message.includes('Ошибка') && (
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  {message.includes('получена') && (
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {message}
+                </div>
               )}
             </div>
           )
         })()}
       </div>
-
-      {message && (
-        <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
-          <p className="font-medium text-white">{message}</p>
-        </div>
-      )}
 
       {/* Модальное окно создания привычки */}
       {showHabitModal && (

@@ -25,10 +25,11 @@ export async function GET(request: NextRequest) {
     const trendData = entries.map((entry) => ({
       date: toDateKey(entry.date),
       overallScore: entry.evaluation?.overallScore || 0,
-      strategyScore: entry.evaluation?.strategyScore || 0,
-      operationsScore: entry.evaluation?.operationsScore || 0,
-      teamScore: entry.evaluation?.teamScore || 0,
-      efficiencyScore: entry.evaluation?.efficiencyScore || 0,
+      dreamProgressScore: entry.evaluation?.dreamProgressScore || 0,
+      strategicFocusScore: entry.evaluation?.strategicFocusScore || 0,
+      productivityScore: entry.evaluation?.productivityScore || 0,
+      lifeBalanceScore: entry.evaluation?.lifeBalanceScore || 0,
+      disciplineScore: entry.evaluation?.disciplineScore || 0,
     }))
 
     return NextResponse.json(trendData)

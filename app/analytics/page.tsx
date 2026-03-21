@@ -104,10 +104,10 @@ export default function AnalyticsPage() {
                 <Tooltip />
                 <Legend />
                 <Line type="monotone" dataKey="overallScore" stroke="#0ea5e9" name="Общая оценка" strokeWidth={2} />
-                <Line type="monotone" dataKey="strategyScore" stroke="#8b5cf6" name="Стратегия" />
-                <Line type="monotone" dataKey="operationsScore" stroke="#10b981" name="Операции" />
-                <Line type="monotone" dataKey="teamScore" stroke="#f59e0b" name="Команда" />
-                <Line type="monotone" dataKey="efficiencyScore" stroke="#ef4444" name="Эффективность" />
+                <Line type="monotone" dataKey="strategicFocusScore" stroke="#8b5cf6" name="Стратег. фокус" />
+                <Line type="monotone" dataKey="productivityScore" stroke="#10b981" name="Продуктивность" />
+                <Line type="monotone" dataKey="lifeBalanceScore" stroke="#f59e0b" name="Баланс жизни" />
+                <Line type="monotone" dataKey="disciplineScore" stroke="#ef4444" name="Дисциплина" />
               </LineChart>
             </ResponsiveContainer>
           </div>

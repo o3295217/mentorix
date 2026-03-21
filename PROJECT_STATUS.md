@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-03-18**
+> Последнее обновление: **2026-03-21**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (47)
+## API Endpoints (49)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -57,6 +57,8 @@
 | `/api/evaluate` | POST |
 | `/api/evaluate/batch` | GET, POST |
 | `/api/evaluate-period` | POST |
+| `/api/facts` | GET |
+| `/api/facts/summary` | GET |
 | `/api/forecast` | POST |
 | `/api/goals/decompose` | POST |
 | `/api/goals/dream` | GET, POST |
@@ -112,7 +114,7 @@
 - `goals/WeekCard`
 - `goals/WeekStrip`
 
-## Модели БД (23)
+## Модели БД (25)
 
 ### User
 | Поле | Тип |
@@ -148,6 +150,8 @@
 | passwordResetTokens | `PasswordResetToken[]` |
 | emailVerificationTokens | `EmailVerificationToken[]` |
 | chatMessages | `ChatMessage[]` |
+| completedWork | `CompletedWork[]` |
+| workSummaries | `WorkSummary[]` |
 
 ### Session
 | Поле | Тип |
@@ -257,10 +261,10 @@
 | dailyEntryId | `Int` |
 | dailyEntry | `DailyEntry` |
 | dreamProgressScore | `Int` |
-| strategyScore | `Int` |
-| operationsScore | `Int` |
-| teamScore | `Int` |
-| efficiencyScore | `Int` |
+| strategicFocusScore | `Int` |
+| productivityScore | `Int` |
+| lifeBalanceScore | `Int` |
+| disciplineScore | `Int` |
 | overallScore | `Float` |
 | feedbackText | `String` |
 | planVsFactText | `String` |
@@ -477,6 +481,35 @@
 | expiresAt | `DateTime` |
 | usedAt | `DateTime?` |
 | createdAt | `DateTime` |
+
+### CompletedWork
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String` |
+| user | `User` |
+| date | `DateTime` |
+| type | `String` |
+| text | `String` |
+| category | `String?` |
+| goalLink | `String?` |
+| sourceType | `String?` |
+| sourceId | `Int?` |
+| createdAt | `DateTime` |
+
+### WorkSummary
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String` |
+| user | `User` |
+| periodType | `String` |
+| periodKey | `String` |
+| summaryText | `String` |
+| keyAchievements | `String` |
+| tasksCompleted | `Int` |
+| goalsCompleted | `Int` |
+| topCategoriesJson | `String?` |
 
 ### ChatMessage
 | Поле | Тип |

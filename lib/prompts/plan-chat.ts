@@ -52,6 +52,7 @@ export interface PlanChatRequest {
   profile?: UserProfile
   insights?: UserInsights // Профиль понимания пользователя
   knowledgeCache?: Array<{ date: string; category: string; text: string }> // Накопленные наблюдения
+  workContext?: string // Контекст фактически выполненной работы
 }
 
 // Системный промпт для чата о плане дня
@@ -255,6 +256,11 @@ export function buildPlanChatContext(request: PlanChatRequest): string {
       parts.push(`  ${categoryNames[cat] || cat}:`)
       items.forEach(item => parts.push(`  • ${item}`))
     }
+  }
+
+  // Фактически выполненная работа
+  if (request.workContext) {
+    parts.push(`\n${request.workContext}`)
   }
 
   // Накопительная статистика

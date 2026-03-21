@@ -28,7 +28,7 @@ function formatDaysData(days: DayData[]): string {
       if (day.familyFlag) flags.push(`Семья: ${day.familyFlag}`)
       if (day.energyFlag) flags.push(`Энергия: ${day.energyFlag}`)
 
-      return `День ${index + 1} (${day.date}): Dream ${day.dreamProgressScore}/10, Overall ${day.overallScore}/10 | Strategy ${day.strategyScore}/10, Ops ${day.operationsScore}/10, Team ${day.teamScore}/10, Eff ${day.efficiencyScore}/10${flags.length > 0 ? ' | ' + flags.join(', ') : ''}`
+      return `День ${index + 1} (${day.date}): Dream ${day.dreamProgressScore}/10, Overall ${day.overallScore}/10 | StrFocus ${day.strategicFocusScore}/10, Prod ${day.productivityScore}/10, Balance ${day.lifeBalanceScore}/10, Discipline ${day.disciplineScore}/10${flags.length > 0 ? ' | ' + flags.join(', ') : ''}`
     })
     .join('\n')
 }
@@ -79,23 +79,24 @@ ${daysData}
 1. РАССЧИТАЙ СРЕДНИЕ ПОКАЗАТЕЛИ:
    - Средний dreamProgressScore
    - Средний overallScore
-   - Средние по каждому показателю (strategy, operations, team, efficiency)
+   - Средние по каждому показателю (strategicFocus, productivity, lifeBalance, discipline)
 
 2. АНАЛИЗ ПРОФЕССИОНАЛЬНОГО БЛОКА:
-   - Стратегическое развитие (средний strategyScore)
-   - Операционное управление (средний operationsScore)
-   - Работа с командой (средний teamScore)
+   - Стратегический фокус (средний strategicFocusScore)
+   - Продуктивность (средний productivityScore)
+   - Дисциплина (средний disciplineScore)
    - Общий анализ: что работало, что нет
 
 3. АНАЛИЗ ЛИЧНОГО БЛОКА:
    - Здоровье: анализ healthFlag, сон, энергия (оценка 1-10)
    - Семья: анализ familyFlag, время с близкими (оценка 1-10)
    - Энергия: анализ energyFlag, восстановление (оценка 1-10)
+   - Баланс жизни (средний lifeBalanceScore)
    - Что угрожает балансу
 
 4. АНАЛИЗ СОЦИАЛЬНОГО БЛОКА:
-   - Командная работа (оценка 1-10)
-   - Делегирование, развитие людей
+   - Взаимодействие с людьми (оценка 1-10)
+   - Нетворкинг, командная работа
 
 5. БАЛАНС И РИСКИ:
    - Work-Life Balance (оценка 1-10)

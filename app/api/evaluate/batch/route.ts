@@ -295,12 +295,14 @@ export async function POST(request: NextRequest) {
         // Сохранить оценку
         const evaluationData = {
           dreamProgressScore: evaluationResponse.dream_progress_score,
-          strategyScore: evaluationResponse.strategy_score,
-          operationsScore: evaluationResponse.operations_score,
-          teamScore: evaluationResponse.team_score,
-          efficiencyScore: evaluationResponse.efficiency_score,
+          strategicFocusScore: evaluationResponse.strategic_focus_score,
+          productivityScore: evaluationResponse.productivity_score,
+          lifeBalanceScore: evaluationResponse.life_balance_score,
+          disciplineScore: evaluationResponse.discipline_score,
           overallScore: evaluationResponse.overall_score,
-          feedbackText: evaluationResponse.feedback,
+          feedbackText: typeof evaluationResponse.feedback === 'object'
+            ? JSON.stringify(evaluationResponse.feedback)
+            : evaluationResponse.feedback,
           planVsFactText: evaluationResponse.plan_vs_fact,
           alignmentDayWeek: evaluationResponse.alignment.day_to_week,
           alignmentWeekMonth: evaluationResponse.alignment.week_to_month,
