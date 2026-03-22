@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import type { ParsedGoal } from '@/hooks/useGoalsChat'
 
 interface ChatMessage {
@@ -16,6 +16,78 @@ interface GoalBlock {
 }
 
 const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+
+// Regex matching any period marker line
+const PERIOD_MARKER_RE = /^\[(YEAR|HALF_YEAR|QUARTER|MONTH|WEEK):[^\]]+\]\s*$/
+
+interface ContentSection {
+  type: 'text' | 'goals'
+  text: string // raw text for 'text' sections
+  block?: GoalBlock // for 'goals' sections
+}
+
+/** Split assistant message into alternating text and goals sections */
+function splitMessageIntoSections(content: string, blocks: GoalBlock[]): ContentSection[] {
+  if (blocks.length === 0) {
+    return [{ type: 'text', text: content }]
+  }
+
+  const cleaned = content
+    .replace(/\[PROFILE:[^\]]*\]/g, '')
+    .replace(/\[PROFILE_DECLINED\]/g, '')
+    .replace(/\[HORIZON:\d+\]/g, '')
+    .trim()
+
+  const lines = cleaned.split('\n')
+  const sections: ContentSection[] = []
+  let textBuffer: string[] = []
+  let blockIndex = 0
+
+  for (const line of lines) {
+    if (PERIOD_MARKER_RE.test(line.trim()) && blockIndex < blocks.length) {
+      // Flush text buffer
+      if (textBuffer.length > 0) {
+        const text = textBuffer.join('\n').trim()
+        if (text) sections.push({ type: 'text', text })
+        textBuffer = []
+      }
+      // Skip (marker line itself is not needed, label is in the block)
+      continue
+    }
+
+    // Check if this line is a goal line belonging to current block
+    const isGoalLine = /^\s*(\d+[\.\)]\s|[-•]\s)/.test(line) && blockIndex < blocks.length
+    if (isGoalLine) {
+      // Accumulate goal lines — they'll be represented by the block
+      // Check if we've accumulated all goals for this block
+      const block = blocks[blockIndex]
+      const goalText = line.replace(/^\s*(\d+[\.\)]\s*|[-•]\s*)/, '').trim()
+      const isLastGoal = block.goals.some(
+        (g, gi) => gi === block.goals.length - 1 && g.text === goalText
+      )
+      if (isLastGoal) {
+        sections.push({ type: 'goals', text: '', block })
+        blockIndex++
+      }
+    } else {
+      textBuffer.push(line)
+    }
+  }
+
+  // Flush remaining text
+  if (textBuffer.length > 0) {
+    const text = textBuffer.join('\n').trim()
+    if (text) sections.push({ type: 'text', text })
+  }
+
+  // If some blocks weren't matched (fallback), append them
+  while (blockIndex < blocks.length) {
+    sections.push({ type: 'goals', text: '', block: blocks[blockIndex] })
+    blockIndex++
+  }
+
+  return sections
+}
 
 function groupGoalsByBlock(goals: ParsedGoal[]): GoalBlock[] {
   const blocks: GoalBlock[] = []
@@ -207,53 +279,77 @@ export default function GoalsChatPanel({
               : []
             const blocks = groupGoalsByBlock(goals)
 
-            return (
-              <div key={i}>
-                <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'text-blue-400'
-                        : 'text-slate-200'
-                    }`}
-                  >
-                    <div className="space-y-2">{msg.content.replace(/\[PROFILE:[^\]]*\]/g, '').replace(/\[PROFILE_DECLINED\]/g, '').replace(/\[HORIZON:\d+\]/g, '').trim().split(/\n{2,}/).map((p, j) => <p key={j} className="whitespace-pre-wrap">{p}</p>)}</div>
+            if (msg.role === 'user') {
+              return (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed text-blue-400">
+                    <div className="space-y-2">{msg.content.trim().split(/\n{2,}/).map((p, j) => <p key={j} className="whitespace-pre-wrap">{p}</p>)}</div>
                   </div>
                 </div>
-                {/* Per-block accept buttons */}
-                {blocks.length > 0 && onAcceptGoals && (
-                  <div className="flex flex-wrap gap-1.5 mt-2 ml-1">
-                    {blocks.map((block) => {
-                      const blockKey = `${i}-${block.periodType}-${block.periodKey}`
-                      const isAccepted = acceptedBlocks.has(blockKey)
-                      if (isAccepted) {
+              )
+            }
+
+            // Assistant message — split into sections with inline accept buttons
+            const sections = splitMessageIntoSections(msg.content, blocks)
+
+            return (
+              <div key={i} className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed text-slate-200">
+                  <div className="space-y-3">
+                    {sections.map((section, si) => {
+                      if (section.type === 'text') {
                         return (
-                          <span key={blockKey} className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-800/40 border border-slate-700/40 rounded-full px-2.5 py-1">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            {block.label} ({block.goals.length})
-                          </span>
+                          <div key={si} className="space-y-2">
+                            {section.text.split(/\n{2,}/).map((p, j) => (
+                              <p key={j} className="whitespace-pre-wrap">{p}</p>
+                            ))}
+                          </div>
                         )
                       }
+
+                      // Goals block with inline accept button
+                      const block = section.block!
+                      const blockKey = `${i}-${block.periodType}-${block.periodKey}`
+                      const isAccepted = acceptedBlocks.has(blockKey)
+
                       return (
-                        <button
-                          key={blockKey}
-                          onClick={() => {
-                            onAcceptGoals(block.goals)
-                            setAcceptedBlocks(prev => new Set(prev).add(blockKey))
-                          }}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-full px-2.5 py-1 transition-colors"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          {block.label} ({block.goals.length})
-                        </button>
+                        <div key={si} className="border border-slate-700/40 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{block.label}</span>
+                            {onAcceptGoals && (
+                              isAccepted ? (
+                                <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-800/40 border border-slate-700/40 rounded-full px-2.5 py-1">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Принято
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    onAcceptGoals(block.goals)
+                                    setAcceptedBlocks(prev => new Set(prev).add(blockKey))
+                                  }}
+                                  className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-full px-2.5 py-1 transition-colors"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Принять ({block.goals.length})
+                                </button>
+                              )
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {block.goals.map((goal, gi) => (
+                              <p key={gi} className="whitespace-pre-wrap text-slate-300">{gi + 1}. {goal.text}</p>
+                            ))}
+                          </div>
+                        </div>
                       )
                     })}
                   </div>
-                )}
+                </div>
               </div>
             )
           })}

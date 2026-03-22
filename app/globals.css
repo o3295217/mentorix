@@ -67,6 +67,22 @@
     @apply w-full px-4 py-2 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[120px] bg-gray-900 text-gray-100 placeholder-gray-500;
   }
 
+  /* Расширяемые поля ввода в профиле */
+  .expandable-input {
+    resize: none;
+    overflow: hidden;
+    height: 42px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    transition: height 0.2s ease;
+  }
+
+  .expandable-input--focused {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: auto;
+  }
+
   /* Анимация подмигивания для целей */
   .animate-blink {
     animation: blink 0.5s ease-in-out 3;
