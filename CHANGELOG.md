@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-03-22 — update
+- 🔌 API: 1 файлов (route)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-03-22 — fix: прогресс года, дубликаты PeriodGoal, сохранение CompletedWork
 - 🔌 API: 4 файлов (route, route, route...)
 - 🧩 Компоненты: 2 файлов (GoalsChatPanel, StrategyCards)

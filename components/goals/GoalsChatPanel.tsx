@@ -9,7 +9,7 @@ interface ChatMessage {
 }
 
 interface GoalBlock {
-  periodType: 'year' | 'quarter' | 'month' | 'week'
+  periodType: 'year' | 'half_year' | 'quarter' | 'month' | 'week'
   periodKey: string
   label: string
   goals: ParsedGoal[]
@@ -33,6 +33,10 @@ function groupGoalsByBlock(goals: ParsedGoal[]): GoalBlock[] {
 
 function formatBlockLabel(periodType: string, periodKey: string): string {
   if (periodType === 'year') return `${periodKey} год`
+  if (periodType === 'half_year') {
+    const m = periodKey.match(/^(\d{4})-H([12])$/)
+    return m ? `H${m[2]} ${m[1]}` : periodKey
+  }
   if (periodType === 'quarter') {
     const m = periodKey.match(/^(\d{4})-Q([1-4])$/)
     return m ? `Q${m[2]} ${m[1]}` : periodKey
@@ -184,6 +188,7 @@ export default function GoalsChatPanel({
                   'Разложи мечту на годовые цели',
                   'Что мне делать в этом месяце?',
                   'Помоги спланировать ближайшую неделю',
+                  'Проверь мой план — что поменять?',
                 ].map((hint) => (
                   <button
                     key={hint}
@@ -208,11 +213,11 @@ export default function GoalsChatPanel({
                   <div
                     className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                       msg.role === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white'
-                        : 'bg-slate-800/80 text-slate-200 border border-slate-700/60'
+                        ? 'text-blue-400'
+                        : 'text-slate-200'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content.replace(/\[PROFILE:[^\]]*\]/g, '').replace(/\[PROFILE_DECLINED\]/g, '').replace(/\[HORIZON:\d+\]/g, '').trim()}</div>
+                    <div className="space-y-2">{msg.content.replace(/\[PROFILE:[^\]]*\]/g, '').replace(/\[PROFILE_DECLINED\]/g, '').replace(/\[HORIZON:\d+\]/g, '').trim().split(/\n{2,}/).map((p, j) => <p key={j} className="whitespace-pre-wrap">{p}</p>)}</div>
                   </div>
                 </div>
                 {/* Per-block accept buttons */}

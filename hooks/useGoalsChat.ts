@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { DreamGoal } from '@/lib/types'
+import { DreamGoal, Goal } from '@/lib/types'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -10,8 +10,8 @@ interface ChatMessage {
 
 export interface ParsedGoal {
   text: string
-  periodType: 'year' | 'quarter' | 'month' | 'week'
-  periodKey: string // e.g. "2026", "2026-Q1", "2026-03", "2026-03-W1"
+  periodType: 'year' | 'half_year' | 'quarter' | 'month' | 'week'
+  periodKey: string // e.g. "2026", "2026-H1", "2026-Q1", "2026-03", "2026-03-W1"
 }
 
 export interface ParsedProfile {
@@ -43,6 +43,7 @@ export function useGoalsChat(
   periodGoals: Map<string, string[]>,
   selectedYear: number,
   selectedMonth: number,
+  goals: Goal[] = [],
 ): UseGoalsChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -66,11 +67,21 @@ export function useGoalsChat(
     setMessages(prev => [...prev, userMessage])
 
     try {
+      // Build completed goals map from tracked goals
+      const completedGoals: Record<string, string[]> = {}
+      for (const g of goals) {
+        if (g.completed) {
+          if (!completedGoals[g.periodKey]) completedGoals[g.periodKey] = []
+          completedGoals[g.periodKey].push(g.text)
+        }
+      }
+
       const context = {
         dream: dreamGoal?.goalText || '',
         dreamMonths: dreamGoal?.months || undefined,
         yearGoals: Object.fromEntries(yearGoals),
         periodGoals: Object.fromEntries(periodGoals),
+        completedGoals,
         selectedYear,
         selectedMonth,
       }
@@ -135,14 +146,15 @@ export function useGoalsChat(
     
     // Default to current month if no marker found
     const defaultKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`
-    let currentPeriodType: 'year' | 'quarter' | 'month' | 'week' = 'month'
+    let currentPeriodType: 'year' | 'half_year' | 'quarter' | 'month' | 'week' = 'month'
     let currentPeriodKey = defaultKey
     
     for (const line of lines) {
       const trimmed = line.trim()
       
-      // Check for period markers: [YEAR:2026], [QUARTER:2026-Q1], [MONTH:2026-03], [WEEK:2026-03-W1]
+      // Check for period markers: [YEAR:2026], [HALF_YEAR:2026-H1], [QUARTER:2026-Q1], [MONTH:2026-03], [WEEK:2026-03-W1]
       const yearMatch = trimmed.match(/\[YEAR:(\d{4})\]/)
+      const halfYearMatch = trimmed.match(/\[HALF_YEAR:(\d{4}-H[12])\]/)
       const quarterMatch = trimmed.match(/\[QUARTER:(\d{4}-Q[1-4])\]/)
       const monthMatch = trimmed.match(/\[MONTH:(\d{4}-\d{2})\]/)
       const weekMatch = trimmed.match(/\[WEEK:(\d{4}-\d{2}-W\d+)\]/)
@@ -150,6 +162,11 @@ export function useGoalsChat(
       if (yearMatch) {
         currentPeriodType = 'year'
         currentPeriodKey = yearMatch[1]
+        continue
+      }
+      if (halfYearMatch) {
+        currentPeriodType = 'half_year'
+        currentPeriodKey = halfYearMatch[1]
         continue
       }
       if (quarterMatch) {

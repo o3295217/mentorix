@@ -70,7 +70,7 @@ export default function GoalsPage() {
     extractHorizon,
     extractProfileDeclined,
     startGuidedFlow,
-  } = useGoalsChat(dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth)
+  } = useGoalsChat(dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth, goals)
 
   // Вычисляемые значения — годы отсчитываются от года создания мечты, а не от текущего
   const dreamStartYear = dreamGoal ? new Date(dreamGoal.createdAt).getFullYear() : currentYear
@@ -152,19 +152,42 @@ export default function GoalsPage() {
   const monthProgress = calculatePeriodProgress(monthKey)
   const monthDate = new Date(selectedYear, selectedMonth, 1)
 
-  // Wave rollover: check if next month is approaching and has no goals
+  // Wave rollover: check if approaching periods need decomposition
   const waveNudge = useMemo(() => {
     if (!dreamGoal || pageState < 2) return null
     const now = new Date()
     const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
     if (daysLeft > 7) return null // only nudge in the last 7 days of the month
+
     const nextMonth = now.getMonth() + 1
     const nextYear = nextMonth > 11 ? now.getFullYear() + 1 : now.getFullYear()
     const nextMonthIdx = nextMonth > 11 ? 0 : nextMonth
     const nextMonthKey = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}`
     const nextGoals = periodGoals.get(nextMonthKey) || []
+
+    // Проверяем текущий месяц — если нет недельных целей, предложи разбить
+    const currentMonthWeekKeys = [1, 2, 3, 4, 5].map(w => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-W${w}`)
+    const hasWeekGoals = currentMonthWeekKeys.some(k => (periodGoals.get(k) || []).length > 0)
+    const currentMonthGoals = periodGoals.get(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`) || []
+
+    if (currentMonthGoals.length > 0 && !hasWeekGoals) {
+      return {
+        month: now.getMonth(),
+        year: now.getFullYear(),
+        label: monthNames[now.getMonth()],
+        action: 'weeks' as const,
+        message: `Разбей цели ${monthNames[now.getMonth()]} по неделям`,
+      }
+    }
+
     if (nextGoals.length > 0) return null
-    return { month: nextMonthIdx, year: nextYear, label: monthNames[nextMonthIdx] }
+    return {
+      month: nextMonthIdx,
+      year: nextYear,
+      label: monthNames[nextMonthIdx],
+      action: 'month' as const,
+      message: `Помоги спланировать ${monthNames[nextMonthIdx]} ${nextYear}: разбей на недели с конкретными задачами.`,
+    }
   }, [dreamGoal, pageState, periodGoals])
 
   // Принять план — разложить цели из ИИ по правильным периодам
@@ -189,6 +212,17 @@ export default function GoalsPage() {
           const quarterDate = new Date(year, (quarter - 1) * 3, 1)
           const key = getPeriodKey('quarter', quarterDate)
           addPeriodGoal(key, 'quarter', quarterDate, `Q${quarter} ${year}`, goal.text)
+          periodCount++
+        }
+      } else if (goal.periodType === 'half_year') {
+        // Полугодовые: periodKey = "2026-H1"
+        const match = goal.periodKey.match(/^(\d{4})-H([12])$/)
+        if (match) {
+          const year = parseInt(match[1], 10)
+          const half = parseInt(match[2], 10)
+          const halfDate = new Date(year, (half - 1) * 6, 1)
+          const key = getPeriodKey('half_year', halfDate)
+          addPeriodGoal(key, 'half_year', halfDate, `H${half} ${year}`, goal.text)
           periodCount++
         }
       } else if (goal.periodType === 'month') {
@@ -365,7 +399,9 @@ export default function GoalsPage() {
                     </svg>
                   </div>
                   <p className="text-sm text-slate-200">
-                    Наступает <strong className="text-white">{waveNudge.label}</strong>. Давай разобьём на недели?
+                    {waveNudge.action === 'weeks'
+                      ? <>У <strong className="text-white">{waveNudge.label}</strong> есть цели, но нет недельной разбивки.</>
+                      : <>Наступает <strong className="text-white">{waveNudge.label}</strong>. Давай разобьём на недели?</>}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -383,11 +419,11 @@ export default function GoalsPage() {
                       setSelectedYear(waveNudge.year)
                       setSelectedMonth(waveNudge.month)
                       setChatOpen(true)
-                      sendMessage(`Помоги спланировать ${waveNudge.label} ${waveNudge.year}: разбей на недели с конкретными задачами.`)
+                      sendMessage(waveNudge.message)
                     }}
                     className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-blue-500 hover:to-blue-400"
                   >
-                    ИОН разобьёт
+                    Разбить на шаги
                   </button>
                 </div>
               </div>
