@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-03-22 — fix: прогресс года, дубликаты PeriodGoal, сохранение CompletedWork
+- 🔌 API: 4 файлов (route, route, route...)
+- 🧩 Компоненты: 2 файлов (GoalsChatPanel, StrategyCards)
+- 📄 Страницы: 2 файлов
+- 📚 Библиотеки: 2 файлов (completed-work, goals-decompose)
+- 🗄️ База данных: 4 файлов
+- 📝 Документация: 2 файлов
+- 📦 Другое: 2 файлов
+
+
 ### 2026-03-21 — feat: система учёта выполненной работы (CompletedWork + WorkSummary)
 - 🔌 API: 10 файлов (route, route, route...)
 - 🧩 Компоненты: 1 файлов (GoalsChatPanel)

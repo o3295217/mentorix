@@ -84,14 +84,15 @@ export async function GET(request: NextRequest) {
     const date = parseDateParam(dateStr)
     const { start, end } = getPeriodDates(date, type)
 
-    const periodGoal = await prisma.periodGoal.findFirst({
+    // Ищем по точному periodStart, а не по диапазону — предотвращает подтягивание чужих периодов
+    const periodGoal = await prisma.periodGoal.findUnique({
       where: {
-        userId,
-        periodType: type,
-        periodStart: { lte: date },
-        periodEnd: { gte: date },
+        userId_periodType_periodStart: {
+          userId,
+          periodType: type,
+          periodStart: start,
+        },
       },
-      orderBy: { createdAt: 'desc' },
     })
 
     const goals = periodGoal ? safeParseJson<string[]>(periodGoal.goalsJson, []) : []
