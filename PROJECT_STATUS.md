@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-03-21**
+> Последнее обновление: **2026-03-22**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (49)
+## API Endpoints (50)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -65,6 +65,7 @@
 | `/api/goals/items` | GET, POST, PUT, DELETE |
 | `/api/goals/move` | POST |
 | `/api/goals/period` | GET, POST |
+| `/api/goals/planning-profile` | GET, POST |
 | `/api/goals/tags` | GET, POST, DELETE |
 | `/api/goals/year` | GET, POST |
 | `/api/habits` | GET, POST, PUT, DELETE |
@@ -114,7 +115,7 @@
 - `goals/WeekCard`
 - `goals/WeekStrip`
 
-## Модели БД (25)
+## Модели БД (26)
 
 ### User
 | Поле | Тип |
@@ -152,6 +153,7 @@
 | chatMessages | `ChatMessage[]` |
 | completedWork | `CompletedWork[]` |
 | workSummaries | `WorkSummary[]` |
+| planningProfile | `PlanningProfile?` |
 
 ### Session
 | Поле | Тип |
@@ -521,6 +523,21 @@
 | role | `String` |
 | content | `String` |
 | createdAt | `DateTime` |
+
+### PlanningProfile
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String` |
+| user | `User` |
+| hoursPerWeek | `Int?` |
+| experienceLevel | `String?` |
+| hasBudget | `String?` |
+| currentWorkload | `String?` |
+| constraints | `String?` |
+| declined | `Boolean` |
+| createdAt | `DateTime` |
+| updatedAt | `DateTime` |
 
 
 ## Зависимости

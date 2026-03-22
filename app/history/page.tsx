@@ -42,7 +42,7 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<TabType>('calendar')
 
-  // Достижения
+  // Сделано
   const [factsData, setFactsData] = useState<FactsResponse | null>(null)
   const [factsPeriod, setFactsPeriod] = useState<'week' | 'month' | 'custom' | 'all'>('week')
   const [factsType, setFactsType] = useState<'all' | 'task' | 'goal'>('all')
@@ -212,7 +212,7 @@ export default function HistoryPage() {
                 activeTab === 'achievements' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
               }`}
             >
-              Достижения
+              Сделано
             </button>
           </div>
         </div>
@@ -410,7 +410,7 @@ export default function HistoryPage() {
   )
 }
 
-// ==================== Компонент вкладки «Достижения» ====================
+// ==================== Компонент вкладки «Сделано» ====================
 
 function AchievementsTab({
   factsData,

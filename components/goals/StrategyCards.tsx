@@ -96,29 +96,18 @@ function YearCard({
 }) {
   const [newGoal, setNewGoal] = useState('')
   const [expanded, setExpanded] = useState(false)
+  const [titleExpanded, setTitleExpanded] = useState(false)
   const { editingIndex, editingText, setEditingText, startEdit, cancelEdit, saveEdit } = useInlineEdit(onEditGoal)
 
   // Calculate total progress across all periods for this year
   const yearProgress = useMemo(() => {
-    let total = 0
-    let completed = 0
-    // Count monthly goals
-    for (let m = 1; m <= 12; m++) {
-      const mKey = `${year}-${String(m).padStart(2, '0')}`
-      const mGoals = periodGoals.get(mKey) || []
-      total += mGoals.length
-      completed += mGoals.filter(g => trackedGoals.find(t => t.periodKey === mKey && t.text === g && t.completed)).length
-      // Count week goals
-      for (let w = 1; w <= 5; w++) {
-        const wKey = `${mKey}-W${w}`
-        const wGoals = periodGoals.get(wKey) || []
-        total += wGoals.length
-        completed += wGoals.filter(g => trackedGoals.find(t => t.periodKey === wKey && t.text === g && t.completed)).length
-      }
-    }
+    const yearPrefix = `${year}-`
+    const yearGoalItems = trackedGoals.filter(t => t.periodKey.startsWith(yearPrefix))
+    const total = yearGoalItems.length
+    const completed = yearGoalItems.filter(t => t.completed).length
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0
     return { total, completed, percent }
-  }, [year, periodGoals, trackedGoals])
+  }, [year, trackedGoals])
 
   // Status label
   const statusLabel = goals.length === 0
@@ -161,7 +150,51 @@ function YearCard({
 
       {/* Summary title — first goal as bold headline */}
       {summaryTitle ? (
-        <h3 className="text-lg font-bold tracking-tight text-white mt-1 leading-tight line-clamp-2">{summaryTitle}</h3>
+        editingIndex === 0 ? (
+          <input
+            type="text"
+            value={editingText}
+            onChange={(e) => setEditingText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveEdit(0)
+              if (e.key === 'Escape') cancelEdit()
+            }}
+            onBlur={() => saveEdit(0)}
+            className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-2.5 py-1.5 text-lg font-bold text-white mt-1 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <div className="group/title relative mt-1">
+            <h3
+              className={`text-lg font-bold tracking-tight text-white leading-tight cursor-pointer pr-5 ${titleExpanded ? '' : 'line-clamp-2'}`}
+              onClick={(e) => { e.stopPropagation(); setTitleExpanded(!titleExpanded) }}
+              onDoubleClick={(e) => { e.stopPropagation(); startEdit(0, summaryTitle) }}
+            >
+              {summaryTitle}
+            </h3>
+            <div className="absolute top-0 right-0 flex gap-1 opacity-0 group-hover/title:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => { e.stopPropagation(); startEdit(0, summaryTitle) }}
+                className="text-slate-600 hover:text-blue-400 transition-colors"
+                title="Редактировать"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemoveGoal(0) }}
+                className="text-slate-600 hover:text-red-400 transition-colors"
+                title="Удалить"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )
       ) : (
         <div className="mt-1">
           <h3 className="text-base font-semibold tracking-tight text-slate-500 italic">Нет целей</h3>

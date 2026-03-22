@@ -139,7 +139,7 @@ export async function syncCompletedWorkForGoal(params: {
   })
 }
 
-// Удалить запись о выполнении цели (если uncomplete)
+// Удалить запись о выполнении цели (если uncomplete — цель не удалена, а именно отменено выполнение)
 export async function removeCompletedWorkForGoal(userId: string, goalId: number): Promise<void> {
   await prisma.completedWork.deleteMany({
     where: { userId, sourceType: 'goal', sourceId: goalId },

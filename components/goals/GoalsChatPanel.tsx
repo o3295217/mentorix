@@ -212,7 +212,7 @@ export default function GoalsChatPanel({
                         : 'bg-slate-800/80 text-slate-200 border border-slate-700/60'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="whitespace-pre-wrap">{msg.content.replace(/\[PROFILE:[^\]]*\]/g, '').replace(/\[PROFILE_DECLINED\]/g, '').replace(/\[HORIZON:\d+\]/g, '').trim()}</div>
                   </div>
                 </div>
                 {/* Per-block accept buttons */}

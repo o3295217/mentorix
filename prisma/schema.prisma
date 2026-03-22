@@ -57,6 +57,7 @@ model User {
   chatMessages  ChatMessage[]
   completedWork CompletedWork[]
   workSummaries WorkSummary[]
+  planningProfile PlanningProfile?
 
   @@map("users")
 }
@@ -116,8 +117,8 @@ model PeriodGoal {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([userId, periodType, periodStart])
   @@index([userId])
-  @@index([userId, periodType, periodStart])
   @@map("period_goals")
 }
 
@@ -543,4 +544,22 @@ model ChatMessage {
   @@index([userId])
   @@index([userId, date])
   @@map("chat_messages")
+}
+
+// ==================== ПРОФИЛЬ ПЛАНИРОВАНИЯ ====================
+
+model PlanningProfile {
+  id               Int      @id @default(autoincrement())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hoursPerWeek     Int?      // сколько часов в неделю готов выделять
+  experienceLevel  String?   // none | beginner | intermediate | expert
+  hasBudget        String?   // none | limited | available
+  currentWorkload  String?   // fulltime | parttime | freelance | free
+  constraints      String?   // свободный текст: ограничения
+  declined         Boolean  @default(false) // пользователь отказался заполнять профиль
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("planning_profiles")
 }

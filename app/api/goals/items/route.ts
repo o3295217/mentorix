@@ -212,6 +212,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
+    // Отвязываем CompletedWork записи (факт работы сохраняется, но sourceId обнуляется)
+    await prisma.completedWork.updateMany({
+      where: { userId, sourceType: 'goal', sourceId: numericId },
+      data: { sourceId: 0 },
+    })
+
     await prisma.goal.delete({ where: { id: numericId } })
 
     return NextResponse.json({ success: true })

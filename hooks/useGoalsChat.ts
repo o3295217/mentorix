@@ -14,6 +14,14 @@ export interface ParsedGoal {
   periodKey: string // e.g. "2026", "2026-Q1", "2026-03", "2026-03-W1"
 }
 
+export interface ParsedProfile {
+  hoursPerWeek?: number
+  experienceLevel?: string
+  hasBudget?: string
+  currentWorkload?: string
+  constraints?: string
+}
+
 interface UseGoalsChatReturn {
   messages: ChatMessage[]
   sendMessage: (text: string) => Promise<void>
@@ -21,6 +29,9 @@ interface UseGoalsChatReturn {
   contextLabel: string
   clearMessages: () => void
   extractGoals: (text: string) => ParsedGoal[]
+  extractProfile: (text: string) => ParsedProfile | null
+  extractHorizon: (text: string) => number | null
+  extractProfileDeclined: (text: string) => boolean
   startGuidedFlow: () => void
 }
 
@@ -114,7 +125,7 @@ export function useGoalsChat(
   // Start guided cascade flow — auto-send initial prompt to AI
   const startGuidedFlow = useCallback(() => {
     if (messagesRef.current.length > 0 || isLoadingRef.current) return
-    sendMessage('Помоги разложить мою мечту: предложи годовые цели, а потом разберём ближайший месяц на недели.')
+    sendMessage('Привет! Помоги мне спланировать путь к моей мечте.')
   }, [sendMessage])
 
   // Extract goal-like lines from AI response with period markers
@@ -170,6 +181,41 @@ export function useGoalsChat(
     return goals
   }, [selectedYear, selectedMonth])
 
+  // Extract [HORIZON:N] marker from AI response
+  const extractHorizon = useCallback((text: string): number | null => {
+    const match = text.match(/\[HORIZON:(\d+)\]/)
+    if (!match) return null
+    const months = parseInt(match[1], 10)
+    return months > 0 && months <= 360 ? months : null
+  }, [])
+
+  // Extract [PROFILE_DECLINED] marker from AI response
+  const extractProfileDeclined = useCallback((text: string): boolean => {
+    return text.includes('[PROFILE_DECLINED]')
+  }, [])
+
+  // Extract [PROFILE:...] marker from AI response
+  const extractProfile = useCallback((text: string): ParsedProfile | null => {
+    const match = text.match(/\[PROFILE:([^\]]+)\]/)
+    if (!match) return null
+
+    const pairs = match[1].split('|')
+    const data: Record<string, string> = {}
+    for (const pair of pairs) {
+      const [key, ...rest] = pair.split('=')
+      if (key && rest.length > 0) data[key.trim()] = rest.join('=').trim()
+    }
+
+    const profile: ParsedProfile = {}
+    if (data.hours) profile.hoursPerWeek = parseInt(data.hours, 10) || undefined
+    if (data.experience) profile.experienceLevel = data.experience
+    if (data.workload) profile.currentWorkload = data.workload
+    if (data.budget) profile.hasBudget = data.budget
+    if (data.constraints) profile.constraints = data.constraints
+
+    return Object.keys(profile).length > 0 ? profile : null
+  }, [])
+
   return {
     messages,
     sendMessage,
@@ -177,6 +223,9 @@ export function useGoalsChat(
     contextLabel,
     clearMessages,
     extractGoals,
+    extractProfile,
+    extractHorizon,
+    extractProfileDeclined,
     startGuidedFlow,
   }
 }

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAnthropicClient } from '@/lib/anthropic'
 import { requireUserId } from '@/lib/get-user-id'
 import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    await requireUserId(request)
+    const userId = await requireUserId(request)
 
     const body = await request.json()
     const { message, context, history } = body
@@ -14,7 +15,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 })
     }
 
-    const systemPrompt = buildGoalsDecomposePrompt(context || {})
+    // Загружаем профиль планирования
+    const planningProfile = await prisma.planningProfile.findUnique({ where: { userId } })
+
+    const systemPrompt = buildGoalsDecomposePrompt(context || {}, planningProfile)
     const anthropic = getAnthropicClient()
 
     const chatHistory = Array.isArray(history)

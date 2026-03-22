@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { monthNames, parseWeekKey, getPeriodKey } from '@/lib/goals-utils'
 import { useGoals } from '@/hooks'
-import { useGoalsChat, ParsedGoal } from '@/hooks/useGoalsChat'
+import { useGoalsChat, ParsedGoal, ParsedProfile } from '@/hooks/useGoalsChat'
 import DreamBar from '@/components/goals/DreamBar'
 import HorizonsCard from '@/components/goals/HorizonsCard'
 import StrategyCards from '@/components/goals/StrategyCards'
@@ -66,6 +66,9 @@ export default function GoalsPage() {
     isLoading: chatLoading,
     contextLabel,
     extractGoals,
+    extractProfile,
+    extractHorizon,
+    extractProfileDeclined,
     startGuidedFlow,
   } = useGoalsChat(dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth)
 
@@ -225,6 +228,53 @@ export default function GoalsPage() {
     if (periodCount > 0) parts.push(`${periodCount} по периодам`)
     showMessage(`Добавлено: ${parts.join(', ')} (всего ${goals.length})`)
   }, [addYearGoal, addPeriodGoal, showMessage])
+
+  // Автосохранение профиля планирования при обнаружении маркера [PROFILE:] в последнем сообщении
+  const lastSavedProfileRef = useRef('')
+  const lastSavedHorizonRef = useRef(0)
+  const profileDeclineSavedRef = useRef(false)
+  useEffect(() => {
+    if (chatLoading || chatMessages.length === 0) return
+    const lastMsg = chatMessages[chatMessages.length - 1]
+    if (lastMsg.role !== 'assistant') return
+
+    // Сохранение профиля
+    const profile = extractProfile(lastMsg.content)
+    if (profile) {
+      const profileKey = JSON.stringify(profile)
+      if (profileKey !== lastSavedProfileRef.current) {
+        lastSavedProfileRef.current = profileKey
+        fetch('/api/goals/planning-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...profile, declined: false }),
+        }).then(() => {
+          showMessage('Профиль планирования сохранён')
+        }).catch(() => {
+          lastSavedProfileRef.current = ''
+        })
+      }
+    }
+
+    // Сохранение отказа от профиля
+    if (!profileDeclineSavedRef.current && extractProfileDeclined(lastMsg.content)) {
+      profileDeclineSavedRef.current = true
+      fetch('/api/goals/planning-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ declined: true }),
+      }).catch(() => {
+        profileDeclineSavedRef.current = false
+      })
+    }
+
+    // Сохранение горизонта
+    const horizon = extractHorizon(lastMsg.content)
+    if (horizon && horizon !== lastSavedHorizonRef.current && dreamGoal) {
+      lastSavedHorizonRef.current = horizon
+      saveDream(dreamGoal.goalText, horizon)
+    }
+  }, [chatMessages, chatLoading, extractProfile, extractHorizon, extractProfileDeclined, showMessage, dreamGoal, saveDream])
 
   return (
     <div>

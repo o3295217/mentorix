@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-03-21 — feat: система учёта выполненной работы (CompletedWork + WorkSummary)
+- 🔌 API: 10 файлов (route, route, route...)
+- 🧩 Компоненты: 1 файлов (GoalsChatPanel)
+- 📄 Страницы: 4 файлов
+- 📚 Библиотеки: 8 файлов (anthropic, completed-work, core...)
+- 🗄️ База данных: 3 файлов
+- 📝 Документация: 2 файлов
+- 📦 Другое: 7 файлов
+
+
 ### 2026-03-18 — update
 - 🔌 API: 7 файлов (route, route, route...)
 - 🧩 Компоненты: 7 файлов (DreamProgress, Landing, Speedometer...)
