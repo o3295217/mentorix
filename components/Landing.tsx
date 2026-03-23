@@ -78,9 +78,10 @@ export default function Landing() {
 
           {/* Sub */}
           <p className="landing-fade-in landing-delay-2 mt-8 max-w-2xl mx-auto text-lg sm:text-xl text-gray-400 leading-relaxed">
-            Опиши свою цель. Выбери свой срок. Каждый день&nbsp;—
-            планируй, действуй, получай честную оценку от&nbsp;ИИ.
-            Он покажет, где ты сейчас и&nbsp;что делать дальше.
+            Опиши мечту&nbsp;— ИОН поможет выбрать срок, разложить путь
+            по&nbsp;периодам и&nbsp;спланировать каждый день. Он&nbsp;проверяет план,
+            предлагает правки и&nbsp;учится на&nbsp;твоём опыте&nbsp;—
+            с&nbsp;каждым днём точнее.
           </p>
 
           {/* CTA */}
@@ -173,7 +174,7 @@ export default function Landing() {
             </h2>
             <p className="landing-reveal landing-reveal-delay-2 mt-4 max-w-2xl mx-auto text-lg text-gray-400 leading-relaxed">
               Утром ты формируешь план. Вечером фиксируешь, что получилось.
-              А&nbsp;дальше&nbsp;— ИИ разбирает твой день по&nbsp;косточкам.
+              А&nbsp;дальше&nbsp;— ИОН разбирает твой день по&nbsp;косточкам.
             </p>
           </div>
 
@@ -203,7 +204,7 @@ export default function Landing() {
               },
               {
                 time: 'Оценка',
-                title: 'Получи разбор от ИИ',
+                title: 'Получи разбор от ИОН',
                 desc: 'Балл от 1 до 10, анализ по 5 критериям, флаги баланса жизни и персональные рекомендации.',
                 accent: 'blue',
               },
@@ -257,11 +258,11 @@ export default function Landing() {
                   {/* Criteria bars */}
                   <div className="space-y-3">
                     {[
-                      { name: 'Прогресс к мечте', value: 8 },
-                      { name: 'Стратегия', value: 7 },
-                      { name: 'Операционное', value: 9 },
-                      { name: 'Командное', value: 7.5 },
-                      { name: 'Эффективность', value: 6.5 },
+                      { name: 'Движение к мечте', value: 8 },
+                      { name: 'Стратег. фокус', value: 7 },
+                      { name: 'Продуктивность', value: 9 },
+                      { name: 'Баланс жизни', value: 7.5 },
+                      { name: 'Дисциплина', value: 7 },
                     ].map((c) => (
                       <div key={c.name}>
                         <div className="flex justify-between text-sm mb-1">
@@ -306,18 +307,18 @@ export default function Landing() {
                 Шаг третий
               </span>
               <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight">
-                ИИ, который
+                ИОН, который
                 <br />
                 <span className="landing-gradient-text">видит картину целиком</span>
               </h2>
               <p className="mt-6 text-lg text-gray-400 leading-relaxed">
-                Не просто «молодец» или «плохо». ИИ оценивает день по&nbsp;пяти критериям,
+                Не просто «молодец» или «плохо». ИОН оценивает день по&nbsp;пяти критериям,
                 следит за&nbsp;балансом жизни и&nbsp;даёт конкретные рекомендации.
               </p>
               <ul className="mt-6 space-y-3">
                 {[
                   'Балл от 1 до 10 с развёрнутым объяснением',
-                  'Анализ: прогресс к мечте, стратегия, операционное, командное, эффективность',
+                  'Анализ: движение к мечте, стратег. фокус, продуктивность, баланс жизни, дисциплина',
                   'Флаги баланса: здоровье, семья, энергия',
                   'Персональные рекомендации на завтра',
                 ].map((text) => (
@@ -355,7 +356,7 @@ export default function Landing() {
               },
               {
                 title: 'Прогноз достижения',
-                desc: 'ИИ считает, когда ты доберёшься до цели при текущем темпе. Ускоряешься — дата приближается.',
+                desc: 'ИОН считает, когда ты доберёшься до цели при текущем темпе. Ускоряешься — дата приближается.',
                 accent: 'purple',
               },
               {
@@ -421,7 +422,7 @@ export default function Landing() {
           </h2>
           <p className="landing-reveal landing-reveal-delay-1 mt-4 text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto">
             ION соединяет стратегию и&nbsp;тактику. Твоя мечта декомпозируется до&nbsp;конкретных
-            задач на&nbsp;сегодня, а&nbsp;ИИ каждый вечер проверяет: ты&nbsp;ближе к&nbsp;цели
+            задач на&nbsp;сегодня, а&nbsp;ИОН каждый вечер проверяет: ты&nbsp;ближе к&nbsp;цели
             или топчешься на&nbsp;месте.
           </p>
 

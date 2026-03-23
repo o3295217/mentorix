@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     if (from && to) {
       dateFrom = new Date(from)
       dateTo = new Date(to)
+      dateTo.setHours(23, 59, 59, 999)
     } else {
       const now = new Date()
       if (period === 'week') {

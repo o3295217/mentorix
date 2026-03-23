@@ -50,6 +50,10 @@ export default function DailyPage() {
   const [weekFacts, setWeekFacts] = useState<Array<{ id: number; text: string; type: string; category: string | null }>>([])
   const [weekFactsTotal, setWeekFactsTotal] = useState(0)
   const [showWeekFacts, setShowWeekFacts] = useState(false)
+  // Виджет «Сделано сегодня»
+  const [todayFacts, setTodayFacts] = useState<Array<{ id: number; text: string; type: string; category: string | null }>>([])
+  const [todayFactsTotal, setTodayFactsTotal] = useState(0)
+  const [showTodayFacts, setShowTodayFacts] = useState(false)
   
   // Сохраняем отклонённые предложения в localStorage
   useEffect(() => {
@@ -315,15 +319,26 @@ export default function DailyPage() {
     setMounted(true)
   }, [])
 
-  // Загрузка фактов текущей недели
+  // Загрузка фактов текущей недели и сегодня
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/facts?period=week&limit=200')
-        if (res.ok) {
-          const data = await res.json()
-          setWeekFacts(data.items)
-          setWeekFactsTotal(data.stats.total)
+        const [weekRes, todayRes] = await Promise.all([
+          fetch('/api/facts?period=week&limit=200'),
+          fetch(`/api/facts?from=${selectedDate}&to=${selectedDate}&limit=200`),
+        ])
+        if (weekRes.ok) {
+          const data = await weekRes.json()
+          // Неделя — только задачи и цели (без привычек и extras)
+          const tasksAndGoals = (data.items as Array<{ id: number; text: string; type: string; category: string | null }>).filter((i: { type: string }) => i.type === 'task' || i.type === 'goal')
+          setWeekFacts(tasksAndGoals)
+          setWeekFactsTotal(tasksAndGoals.length)
+        }
+        if (todayRes.ok) {
+          const data = await todayRes.json()
+          // Сегодня — всё выполненное
+          setTodayFacts(data.items)
+          setTodayFactsTotal(data.stats.total)
         }
       } catch { /* игнорируем */ }
     })()
@@ -415,33 +430,69 @@ export default function DailyPage() {
         </div>
       </div>
 
-      {/* Виджет «Сделано на этой неделе» */}
-      {weekFactsTotal > 0 && (
-        <div className="rounded-xl bg-green-500/5 border border-green-500/20 p-4">
-          <button
-            onClick={() => setShowWeekFacts(!showWeekFacts)}
-            className="w-full flex items-center justify-between"
-          >
-            <h3 className="text-sm font-medium text-green-300">
-              Сделано на этой неделе: {weekFactsTotal} {weekFactsTotal === 1 ? 'задача' : weekFactsTotal < 5 ? 'задачи' : 'задач'}
-            </h3>
-            <span className="text-green-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
-          </button>
-          {showWeekFacts && (
-            <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-              {weekFacts.map(item => (
-                <div key={item.id} className="flex items-center gap-2 text-sm">
-                  <span className="text-green-500">✓</span>
-                  <span className="text-gray-300">{item.text}</span>
-                  {item.category && (
-                    <span className={`text-[10px] ml-auto ${
-                      item.category === 'стратегические' ? 'text-orange-400' :
-                      item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'
-                    }`}>{item.category}</span>
-                  )}
-                </div>
-              ))}
-            </div>
+      {/* Виджеты «Сделано сегодня» и «Сделано на этой неделе» */}
+      {(todayFactsTotal > 0 || weekFactsTotal > 0) && (
+        <div className={`grid grid-cols-1 ${todayFactsTotal > 0 && weekFactsTotal > 0 ? 'md:grid-cols-2' : ''} gap-4`}>
+          {/* Сделано сегодня */}
+          {todayFactsTotal > 0 && (
+          <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4">
+            <button
+              onClick={() => setShowTodayFacts(!showTodayFacts)}
+              className="w-full flex items-center justify-between"
+            >
+              <h3 className="text-sm font-medium text-blue-300">
+                Сделано сегодня: {todayFactsTotal} {todayFactsTotal === 1 ? 'дело' : todayFactsTotal >= 2 && todayFactsTotal <= 4 ? 'дела' : 'дел'}
+              </h3>
+              <span className="text-blue-400 text-xs">{showTodayFacts ? '▲ скрыть' : '▼ показать'}</span>
+            </button>
+            {showTodayFacts && (
+              <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                {todayFacts.map(item => (
+                  <div key={item.id} className="flex items-center gap-2 text-sm">
+                    <span className="text-blue-500">✓</span>
+                    <span className="text-gray-300">{item.text}</span>
+                    {item.category && (
+                      <span className={`text-[10px] ml-auto ${
+                        item.category === 'стратегические' ? 'text-orange-400' :
+                        item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'
+                      }`}>{item.category}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* Сделано на этой неделе */}
+          {weekFactsTotal > 0 && (
+          <div className="rounded-xl bg-green-500/5 border border-green-500/20 p-4">
+            <button
+              onClick={() => setShowWeekFacts(!showWeekFacts)}
+              className="w-full flex items-center justify-between"
+            >
+              <h3 className="text-sm font-medium text-green-300">
+                Сделано на неделе: {weekFactsTotal} {weekFactsTotal === 1 ? 'дело' : weekFactsTotal >= 2 && weekFactsTotal <= 4 ? 'дела' : 'дел'}
+              </h3>
+              <span className="text-green-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
+            </button>
+            {showWeekFacts && (
+              <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                {weekFacts.map(item => (
+                  <div key={item.id} className="flex items-center gap-2 text-sm">
+                    <span className="text-green-500">✓</span>
+                    <span className="text-gray-300">{item.text}</span>
+                    {item.category && (
+                      <span className={`text-[10px] ml-auto ${
+                        item.category === 'стратегические' ? 'text-orange-400' :
+                        item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'
+                      }`}>{item.category}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           )}
         </div>
       )}
