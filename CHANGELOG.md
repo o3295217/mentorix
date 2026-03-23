@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-03-23 — fix: filter habits by category, fix date range in facts API
+- 🔌 API: 1 файлов (route)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-03-23 — update
 - 🧩 Компоненты: 1 файлов (Landing)
 - 📝 Документация: 1 файлов
