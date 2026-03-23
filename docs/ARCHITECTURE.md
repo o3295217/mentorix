@@ -836,6 +836,7 @@ export async function getUserStatsForAI(): Promise<string>
 | `plan-chat.ts` | `PLAN_CHAT_SYSTEM_PROMPT`, `buildPlanChatContext()` |
 | `forecast.ts` | `buildForecastPrompt()` |
 | `period.ts` | `buildPeriodEvaluationPrompt()` |
+| `goals-decompose.ts` | `buildGoalsDecomposePrompt()` — декомпозиция целей через ИИ |
 
 ---
 

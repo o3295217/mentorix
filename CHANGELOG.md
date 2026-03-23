@@ -7,6 +7,14 @@
 ## [Unreleased]
 
 ### 2026-03-22 — update
+- 🧩 Компоненты: 2 файлов (ExpandableInput, GoalsChatPanel)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 1 файлов (goals-decompose)
+- 📝 Документация: 4 файлов
+- 📦 Другое: 2 файлов
+
+
+### 2026-03-22 — update
 - 🧩 Компоненты: 2 файлов (GoalsChatPanel, GoalsChatTrigger)
 - 📄 Страницы: 1 файлов
 - 📚 Библиотеки: 1 файлов (goals-decompose)

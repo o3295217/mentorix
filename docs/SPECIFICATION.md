@@ -89,11 +89,12 @@
 
 Claude API оценивает день по следующим критериям:
 
-1. **Стратегическое развитие** (1-10)
-2. **Операционное управление** (1-10)
-3. **Работа с командой** (1-10)
-4. **Эффективность времени** (1-10)
-5. **Общая оценка** (среднее значение)
+1. **Движение к мечте** (1-10) — **ГЛАВНАЯ МЕТРИКА**: приблизил ли день к глобальной цели
+2. **Стратегический фокус** (1-10) — работа над долгосрочными целями
+3. **Продуктивность** (1-10) — выполнение текущих задач
+4. **Баланс жизни** (1-10) — здоровье, семья, энергия
+5. **Дисциплина** (1-10) — следование плану и привычкам
+6. **Общая оценка** (среднее 5 метрик)
 
 **Дополнительно:**
 - Текстовая обратная связь (жесткая, конструктивная)
@@ -159,7 +160,7 @@ Claude API оценивает день по следующим критерия�
 
 | Модель | Таблица | Описание |
 |--------|---------|----------|
-| `DreamGoal` | `dream_goal` | Мечта: goalText, years (горизонт в годах, по умолч. 5) |
+| `DreamGoal` | `dream_goal` | Мечта: goalText, months (горизонт в месяцах, по умолч. 60) |
 | `YearGoal` | `year_goals` | Цели на год: year, goalsJson (JSON массив строк). Unique: userId+year |
 | `PeriodGoal` | `period_goals` | Цели периодов (quarter, month, week, half_year): periodType, periodStart, periodEnd, goalsJson. POST использует upsert-паттерн (findFirst + update или create) |
 | `Goal` | `goals` | Трекинг отдельных целей: text, periodType, periodKey, completed, deadline, priority, tagsJson, sortOrder |
@@ -170,7 +171,7 @@ Claude API оценивает день по следующим критерия�
 | Модель | Таблица | Описание |
 |--------|---------|----------|
 | `DailyEntry` | `daily_entries` | Запись дня: date (unique per user), planText, factText, planSnapshotJson, extraTasksJson, контекст дня (emotionalState, energyLevel, sleepQuality, familyTime, exerciseTime и др.), selectedTasksJson |
-| `Evaluation` | `evaluations` | Оценка от ИИ (1:1 с DailyEntry): **dreamProgressScore** (главная метрика), strategyScore, operationsScore, teamScore, efficiencyScore, overallScore, feedbackText, planVsFactText, 6 полей alignment (вертикальный), 3 флага баланса (health/family/energy), 3 поля горизонтального alignment (work↔health/family/values), recommendationsText, suggestedTasksJson |
+| `Evaluation` | `evaluations` | Оценка от ИИ (1:1 с DailyEntry): **dreamProgressScore** (главная метрика), strategicFocusScore, productivityScore, lifeBalanceScore, disciplineScore, overallScore, feedbackText, planVsFactText, 6 полей alignment (вертикальный), 3 флага баланса (health/family/energy), 3 поля горизонтального alignment (work↔health/family/values), recommendationsText, suggestedTasksJson |
 | `PeriodEvaluation` | `period_evaluations` | Оценка периода (неделя/месяц/квартал/год): dreamProgressScore, overallScore, блоки (professional/personal/social/balance), patterns, trends, goalsCompletion, alignment, feedbackText, recommendationsText, insights |
 
 ### 4.4. Задачи
@@ -336,11 +337,11 @@ Claude API оценивает день по следующим критерия�
 **Критерии оценки (6 метрик):**
 
 1. **dream_progress_score** (1-10) — **ГЛАВНАЯ МЕТРИКА**: приблизил ли день к мечте
-2. **strategy_score** (1-10) — стратегическое развитие
-3. **operations_score** (1-10) — операционное управление
-4. **team_score** (1-10) — работа с командой
-5. **efficiency_score** (1-10) — эффективность времени
-6. **overall_score** — среднее арифметическое 4 классических показателей
+2. **strategic_focus_score** (1-10) — стратегический фокус
+3. **productivity_score** (1-10) — продуктивность
+4. **life_balance_score** (1-10) — баланс жизни
+5. **discipline_score** (1-10) — дисциплина
+6. **overall_score** — среднее арифметическое 5 показателей
 
 **Вертикальный alignment (6 уровней):**
 ```
@@ -369,11 +370,11 @@ Claude API оценивает день по следующим критерия�
 ```json
 {
   "dream_progress_score": 7,
-  "strategy_score": 6,
-  "operations_score": 8,
-  "team_score": 5,
-  "efficiency_score": 7,
-  "overall_score": 6.5,
+  "strategic_focus_score": 6,
+  "productivity_score": 8,
+  "life_balance_score": 7,
+  "discipline_score": 6,
+  "overall_score": 6.8,
   "plan_vs_fact": "анализ выполнения",
   "alignment": {
     "day_to_week": "работает — ...",
@@ -398,7 +399,7 @@ Claude API оценивает день по следующим критерия�
 Анализ периода (неделя/месяц/квартал/год) на основе дневных оценок.
 
 **Блоки оценки:**
-- Профессиональный (strategy/operations/team усреднённо)
+- Профессиональный (strategic_focus/productivity/discipline усреднённо)
 - Личный (health/family/energy по 10-балльной шкале)
 - Социальный (teamwork)
 - Баланс (work-life balance, риск выгорания)
@@ -558,7 +559,7 @@ Claude API оценивает день по следующим критерия�
 **URL:** `/analytics`
 
 **Компоненты:**
-- Графики оценок (Recharts): dream_progress, overall, strategy, operations, team, efficiency
+- Графики оценок (Recharts): dream_progress, overall, strategic_focus, productivity, life_balance, discipline
 - Выбор периода (30/60/90 дней)
 - Средняя оценка, тренд (растёт/падает)
 - Статистика использования ИИ

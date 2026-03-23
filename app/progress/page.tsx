@@ -143,41 +143,73 @@ export default function ProgressPage() {
               <div className="text-xs text-gray-500">прошло дней</div>
             </div>
             <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-              <div className="text-2xl font-bold text-violet-400">{stats.plannedDays}</div>
+              <div className={`text-2xl font-bold ${stats.elapsedDays > 0 && (stats.plannedDays / stats.elapsedDays) >= 0.8 ? 'text-green-400' : stats.elapsedDays > 0 && (stats.plannedDays / stats.elapsedDays) >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>{stats.plannedDays}</div>
               <div className="text-xs text-gray-500">запланировано</div>
             </div>
             <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-              <div className="text-2xl font-bold text-cyan-400">{stats.evaluatedDays}</div>
+              <div className={`text-2xl font-bold ${stats.plannedDays > 0 && (stats.evaluatedDays / stats.plannedDays) >= 0.8 ? 'text-green-400' : stats.plannedDays > 0 && (stats.evaluatedDays / stats.plannedDays) >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>{stats.evaluatedDays}</div>
               <div className="text-xs text-gray-500">оценено ИИ</div>
             </div>
             <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-              <div className="text-2xl font-bold text-emerald-400">{stats.effectiveDays}</div>
+              <div className={`text-2xl font-bold ${stats.evaluatedDays > 0 && (stats.effectiveDays / stats.evaluatedDays) >= 0.7 ? 'text-green-400' : stats.evaluatedDays > 0 && (stats.effectiveDays / stats.evaluatedDays) >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>{stats.effectiveDays}</div>
               <div className="text-xs text-gray-500">эфф. вклад</div>
             </div>
           </div>
           <div className="mt-3 text-sm text-gray-500">
-            Воронка прогресса: календарные дни → запланированные дни → оценённые дни → эффективный вклад.
+            Воронка прогресса: календарные дни → запланированные дни → оценённые дни → эффективный вклад. Цвет показывает, где теряется прогресс.
           </div>
         </div>
 
         <div className="rounded-2xl border border-gray-800 bg-gray-900/50 p-4">
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-3">Прогресс дисциплины</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-              <div className="text-2xl font-bold text-amber-400">{stats.currentStreak}</div>
-              <div className="text-xs text-gray-500">серия сейчас</div>
-            </div>
-            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50">
-              <div className="text-2xl font-bold text-orange-400">{stats.longestStreak}</div>
-              <div className="text-xs text-gray-500">лучшая серия</div>
-            </div>
-            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50 col-span-2">
-              <div className="text-sm text-gray-500 mb-1">Текущее состояние</div>
-              <div className="flex items-center justify-center gap-4 text-sm text-gray-300 flex-wrap">
-                <span>Баланс жизни: {stats.fuelLevel}%</span>
-                <span>Средний темп 30д: {stats.avgSpeed30d}/10</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50 group relative cursor-help">
+              <div className={`text-2xl font-bold ${stats.currentStreak >= 7 ? 'text-green-400' : stats.currentStreak >= 3 ? 'text-amber-400' : 'text-red-400'}`}>{stats.currentStreak}</div>
+              <div className="text-xs text-gray-500">дней подряд с оценкой 7+</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-xl">
+                {stats.currentStreak >= 7
+                  ? 'Отличная серия! Вы стабильно продуктивны день за днём.'
+                  : stats.currentStreak >= 3
+                    ? 'Неплохо! Продолжайте — устойчивая серия начинается от 7 дней подряд.'
+                    : 'Серия прервана. Чтобы она росла, нужно получать оценку 7+ несколько дней подряд. Хорошая серия — от 7 дней.'}
               </div>
             </div>
+            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50 group relative cursor-help">
+              <div className={`text-2xl font-bold ${stats.longestStreak >= 14 ? 'text-green-400' : stats.longestStreak >= 5 ? 'text-amber-400' : 'text-orange-400'}`}>{stats.longestStreak}</div>
+              <div className="text-xs text-gray-500">рекорд подряд за {stats.totalDays} дн.</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-xl">
+                {stats.longestStreak >= 14
+                  ? 'Впечатляющий рекорд! Вы умеете держать дисциплину долго.'
+                  : stats.longestStreak >= 5
+                    ? 'Хороший рекорд. Следующая цель — 14 дней (2 продуктивные недели подряд).'
+                    : 'Рекорд пока скромный. Попробуйте выдержать 7 дней подряд — это первая серьёзная цель.'}
+              </div>
+            </div>
+            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50 group relative cursor-help">
+              <div className={`text-2xl font-bold ${stats.fuelLevel >= 70 ? 'text-green-400' : stats.fuelLevel >= 40 ? 'text-amber-400' : 'text-red-400'}`}>{stats.fuelLevel}%</div>
+              <div className="text-xs text-gray-500">баланс жизни</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-xl">
+                {stats.fuelLevel >= 70
+                  ? 'Хороший баланс! Здоровье, семья и энергия в порядке в большинстве дней.'
+                  : stats.fuelLevel >= 40
+                    ? `Средний уровень (${stats.fuelLevel}%) — баланс нарушается слишком часто. Стремитесь к 80%+.`
+                    : `Низкий баланс (${stats.fuelLevel}%). В большинстве дней страдает здоровье, семья или энергия. Идеал — выше 80%.`}
+              </div>
+            </div>
+            <div className="bg-gray-800/60 rounded-lg py-3 px-2 text-center border border-gray-700/50 group relative cursor-help">
+              <div className={`text-2xl font-bold ${stats.avgSpeed30d >= 7 ? 'text-green-400' : stats.avgSpeed30d >= 5 ? 'text-amber-400' : 'text-red-400'}`}>{stats.avgSpeed30d}<span className="text-base text-gray-500">/10</span></div>
+              <div className="text-xs text-gray-500">темп за 30 дней</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-xl">
+                {stats.avgSpeed30d >= 7
+                  ? 'Отличный темп! Ваши дни эффективно приближают к мечте.'
+                  : stats.avgSpeed30d >= 5
+                    ? `Средний темп (${stats.avgSpeed30d}/10) — дни работают на мечту, но не в полную силу. Цель — 7+.`
+                    : `Низкий темп (${stats.avgSpeed30d}/10). Большинство дней слабо приближают к мечте. Цель — выше 7 из 10.`}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-sm text-gray-500">
+            Наведите на показатель для подробной расшифровки. Цвет: 🟢 хорошо, 🟡 средне, 🔴 нужно улучшить.
           </div>
         </div>
       </div>

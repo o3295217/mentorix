@@ -88,6 +88,17 @@
     animation: blink 0.5s ease-in-out 3;
   }
 
+  /* Переливающаяся звезда мечты */
+  @keyframes star-shimmer {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(251,191,36,0.3)); color: #fcd34d; }
+    25%      { filter: drop-shadow(0 0 6px rgba(251,191,36,0.7)) drop-shadow(0 0 12px rgba(245,158,11,0.3)); color: #fde68a; }
+    50%      { filter: drop-shadow(0 0 3px rgba(251,191,36,0.4)); color: #fbbf24; }
+    75%      { filter: drop-shadow(0 0 8px rgba(251,191,36,0.8)) drop-shadow(0 0 16px rgba(245,158,11,0.35)); color: #fef3c7; }
+  }
+  .star-shimmer {
+    animation: star-shimmer 3s ease-in-out infinite;
+  }
+
   /* Progress bar для оценки */
   @keyframes eval-progress {
     0% { transform: translateX(-100%); }
