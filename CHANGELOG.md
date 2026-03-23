@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-03-23 — feat: progress UX improvements, split done widget, fix facts API date range
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 1 файлов (Landing)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-03-23 — docs: синхронизация документации с кодом
 - 🧩 Компоненты: 1 файлов (DreamBar)
 - 📄 Страницы: 1 файлов

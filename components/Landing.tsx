@@ -71,9 +71,9 @@ export default function Landing() {
 
           {/* Headline */}
           <h1 className="landing-fade-in landing-delay-1 text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-[1.1] tracking-tight">
-            Превращаем мечту
+            Направь каждый день к&nbsp;мечте&nbsp;—
             <br />
-            <span className="landing-gradient-text">в ежедневное действие</span>
+            <span className="landing-gradient-text">ИОН не&nbsp;даст сбиться с&nbsp;пути</span>
           </h1>
 
           {/* Sub */}
