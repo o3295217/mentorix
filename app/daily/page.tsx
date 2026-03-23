@@ -329,10 +329,10 @@ export default function DailyPage() {
         ])
         if (weekRes.ok) {
           const data = await weekRes.json()
-          // Неделя — только задачи и цели (без привычек и extras)
-          const tasksAndGoals = (data.items as Array<{ id: number; text: string; type: string; category: string | null }>).filter((i: { type: string }) => i.type === 'task' || i.type === 'goal')
-          setWeekFacts(tasksAndGoals)
-          setWeekFactsTotal(tasksAndGoals.length)
+          // Неделя — без привычек (фильтр по category, т.к. type всегда 'task')
+          const withoutHabits = (data.items as Array<{ id: number; text: string; type: string; category: string | null }>).filter((i) => i.category !== 'привычки')
+          setWeekFacts(withoutHabits)
+          setWeekFactsTotal(withoutHabits.length)
         }
         if (todayRes.ok) {
           const data = await todayRes.json()

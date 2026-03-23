@@ -33,9 +33,8 @@ export async function GET(request: NextRequest) {
     let dateTo: Date | undefined
 
     if (from && to) {
-      dateFrom = new Date(from)
-      dateTo = new Date(to)
-      dateTo.setHours(23, 59, 59, 999)
+      dateFrom = new Date(from + 'T00:00:00.000Z')
+      dateTo = new Date(to + 'T23:59:59.999Z')
     } else {
       const now = new Date()
       if (period === 'week') {
