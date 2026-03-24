@@ -111,7 +111,7 @@ export default function ProgressIndicator({
             {primaryLever} — главный рычаг
           </div>
           <p className="text-[15px] text-slate-300 leading-7">
-            При текущем темпе {displayName.toLowerCase()} придёт к цели через{' '}
+            При текущем темпе {displayName} придёт к цели через{' '}
             <span className={`font-semibold ${status.accent}`}>{formatDuration(yearsToGoal)}</span>.
           </p>
           <div className="space-y-2">
