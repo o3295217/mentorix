@@ -17,6 +17,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [showInviteCode, setShowInviteCode] = useState(false);
   const [requiresVerification, setRequiresVerification] = useState(false);
+  const [userExists, setUserExists] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +48,9 @@ export default function RegisterPage() {
         if (response.status === 403 && data.error?.includes('приглашения')) {
           setShowInviteCode(true);
         }
+        if (data.code === 'USER_EXISTS') {
+          setUserExists(true);
+        }
         setError(data.error || 'Ошибка регистрации');
         return;
       }
@@ -67,6 +71,33 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  // Пользователь уже зарегистрирован — предлагаем войти
+  if (userExists) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6 text-center">
+            <svg className="w-16 h-16 text-yellow-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-yellow-200 mb-2">
+              Вы уже зарегистрированы
+            </h2>
+            <p className="text-yellow-400 mb-6">
+              Аккаунт с email <strong>{email}</strong> уже существует. Войдите в систему.
+            </p>
+            <Link
+              href="/login"
+              className="inline-flex justify-center py-2 px-6 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            >
+              Перейти на страницу входа
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Показываем сообщение о необходимости верификации
   if (requiresVerification) {

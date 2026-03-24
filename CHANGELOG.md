@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-03-24 — update
+- 🧩 Компоненты: 1 файлов (ProgressIndicator)
+- 📄 Страницы: 2 файлов
+- 📚 Библиотеки: 1 файлов (daily)
+- 📝 Документация: 2 файлов
+
+
 ### 2026-03-23 — fix: use parseDateParam for from/to in facts API to match storage timezone
 - 🔌 API: 1 файлов (route)
 - 📝 Документация: 1 файлов

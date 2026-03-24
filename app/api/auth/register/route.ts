@@ -62,6 +62,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Проверяем, существует ли пользователь (до проверки лимита)
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'Пользователь с таким email уже зарегистрирован', code: 'USER_EXISTS' },
+        { status: 409 }
+      );
+    }
+
     // Проверяем лимит пользователей
     const maxUsers = parseInt(process.env.MAX_USERS || '0');
     if (maxUsers > 0) {
