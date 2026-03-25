@@ -86,17 +86,38 @@ export function useGoalsChat(
         selectedMonth,
       }
 
-      const res = await fetch('/api/goals/decompose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          context,
-          history: currentHistory,
-        }),
-      })
-
-      if (!res.ok) throw new Error(`API error: ${res.status}`)
+      // Retry logic for transient proxy/API errors
+      let res: Response | null = null
+      const maxRetries = 2
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          res = await fetch('/api/goals/decompose', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: text,
+              context,
+              history: currentHistory,
+            }),
+          })
+          if (res.ok) break
+          // Don't retry client errors (4xx)
+          if (res.status >= 400 && res.status < 500) throw new Error(`API error: ${res.status}`)
+          // Retry server errors (5xx)
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+            continue
+          }
+          throw new Error(`API error: ${res.status}`)
+        } catch (fetchError) {
+          if (attempt < maxRetries && !(fetchError instanceof Error && fetchError.message.startsWith('API error: 4'))) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+            continue
+          }
+          throw fetchError
+        }
+      }
+      if (!res || !res.ok) throw new Error('API request failed after retries')
 
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
@@ -118,16 +139,17 @@ export function useGoalsChat(
         }
       }
     } catch (error) {
-      console.error('Goals chat error:', error)
+      const errMsg = error instanceof Error ? error.message : String(error)
+      console.error('Goals chat error:', errMsg, error)
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ Произошла ошибка при обращении к ИИ. Попробуй снова.',
+        content: `❌ Произошла ошибка при обращении к ИИ. Попробуй снова.\n(${errMsg})`,
       }])
     } finally {
       isLoadingRef.current = false
       setIsLoading(false)
     }
-  }, [dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth])
+  }, [dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth, goals])
 
   const clearMessages = useCallback(() => {
     setMessages([])

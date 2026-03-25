@@ -44,6 +44,31 @@ export async function POST(request: Request) {
       );
     }
 
+    // Валидация формата email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Некорректный формат email' },
+        { status: 400 }
+      );
+    }
+
+    // Блокировка заведомо невалидных/тестовых доменов
+    const blockedDomains = [
+      'example.com', 'example.org', 'example.net',
+      'test.com', 'test.org', 'localhost',
+      'mailinator.com', 'tempmail.com', 'throwaway.email',
+      'guerrillamail.com', 'sharklasers.com', 'guerrillamailblock.com',
+      'yopmail.com', 'trashmail.com', 'fakeinbox.com',
+    ];
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (!emailDomain || blockedDomains.includes(emailDomain)) {
+      return NextResponse.json(
+        { error: 'Регистрация с этого домена email невозможна' },
+        { status: 400 }
+      );
+    }
+
     const registrationMode = process.env.REGISTRATION_MODE || 'open';
     
     // Проверяем invite code для режима invite

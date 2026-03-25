@@ -43,6 +43,7 @@ rsync -avz --delete \
     --exclude '.env.production' \
     --exclude 'backups/*' \
     --exclude 'vkcloud-key/*.pem' \
+    --exclude 'logs/' \
     "$LOCAL_PATH/" "$SERVER:$REMOTE_PATH/"
 
 # 3. Пересборка на сервере

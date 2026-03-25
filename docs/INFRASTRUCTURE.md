@@ -1,6 +1,6 @@
 # Инфраструктура проекта AI Assistant
 
-> Актуальность: 17 февраля 2026
+> Актуальность: 25 марта 2026
 
 ## Серверы
 
@@ -78,6 +78,16 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 0 3 * * * cd /home/ubuntu/ai-assistant-spec && ./scripts/backup-db.sh
 ```
 
+### Проверка алертов мониторинга (с мака)
+```bash
+bash scripts/check-alerts.sh
+```
+
+### Зафиксированные IP
+```bash
+ssh vk 'cat /home/ubuntu/ai-assistant-spec/logs/monitor/known_ips.txt'
+```
+
 ## Cloudflare Worker — прокси для Anthropic API
 
 Anthropic блокирует API-запросы с российских IP. Для обхода используется Cloudflare Worker + Durable Object:
@@ -123,12 +133,86 @@ Host vk
   IdentityFile ~/Documents/GooglDisk/ai-assistant-spec/vkcloud-key/ai-assistant-vk-43wvzX3E.pem
 ```
 
+## Безопасность
+
+> Обновлено: 25 марта 2026 — после инцидента с криптомайнером TeamTNT
+
+### Инцидент (24 марта 2026)
+Контейнер `ai-assistant-production` был заражён криптомайнером TeamTNT через открытый порт 3000 (был доступен всему интернету, минуя nginx). Малварь скачала бинарники в `/tmp/` и запустила 5 процессов-майнеров. Хост-система не пострадала — заражение ограничилось контейнером.
+
+### Принятые меры
+
+| Мера | Статус | Описание |
+|------|--------|----------|
+| Порт 3000 → 127.0.0.1 | ✅ | Контейнер слушает только localhost, доступ только через nginx |
+| ufw firewall | ✅ | Включён, разрешены только порты 22, 80, 443 |
+| read_only: true | ✅ | Файловая система контейнера только для чтения |
+| tmpfs /tmp noexec | ✅ | /tmp — 50 МБ, флаг noexec запрещает выполнение бинарников |
+| no-new-privileges | ✅ | Запрет эскалации привилегий внутри контейнера |
+| Контейнер пересоздан | ✅ | Чистый образ собран с нуля (--no-cache) |
+
+### Checklist при деплое
+- [ ] Убедиться что порт 3000 привязан к `127.0.0.1` в docker-compose
+- [ ] Убедиться что `ufw` активен (`sudo ufw status`)
+- [ ] Проверить процессы в контейнере (`docker exec ai-assistant-production ps aux`)
+- [ ] Проверить `/tmp/` в контейнере (`docker exec ai-assistant-production ls -la /tmp/`)
+- [ ] Проверить что мониторинг в cron (`ssh vk 'crontab -l'`)
+- [ ] Проверить алерты (`bash scripts/check-alerts.sh`)
+
+### Мониторинг безопасности
+
+Автоматический скрипт `scripts/monitor.sh` запускается каждые 30 минут через cron и проверяет:
+
+| # | Проверка | Алерт при |
+|---|---------|----------|
+| 1 | Процессы контейнера | Более 3 процессов |
+| 2 | Файлы в /tmp/ | Наличие файлов |
+| 3 | Health endpoint | HTTP ≠ 200 |
+| 4 | CPU/RAM контейнера | CPU > 80% |
+| 5 | CPU/RAM/диск хоста | Диск > 85% |
+| 6 | Подозрительные процессы | xmrig, cryptonight и т.д. |
+| 7 | Firewall | ufw не активен |
+| 8 | Порт 3000 | Открыт на 0.0.0.0 |
+| 9 | Docker security flags | read_only или no-new-privileges отключены |
+| 10 | SSH-входы | Вход с неизвестным SSH-ключом |
+| 11 | Anthropic API | > 100 вызовов за 30 мин |
+| 12 | Ротация логов | Автоочистка старше 30 дней |
+
+**SSH-мониторинг** работает по отпечатку ключа (не по IP). IP владельца автоматически записываются в `known_ips.txt` — удобно при использовании VPN.
+
+**Логи:**
+- `/home/ubuntu/ai-assistant-spec/logs/monitor/YYYY-MM-DD.log` — ежедневный лог
+- `/home/ubuntu/ai-assistant-spec/logs/monitor/alerts.log` — только алерты
+- `/home/ubuntu/ai-assistant-spec/logs/monitor/known_ips.txt` — зафиксированные IP владельца
+- `/home/ubuntu/ai-assistant-spec/logs/monitor/cron.log` — вывод cron
+
+**Проверка алертов (с мака):**
+```bash
+bash scripts/check-alerts.sh
+```
+
+**Cron (на сервере):**
+```
+*/30 * * * * sudo /bin/sh /home/ubuntu/ai-assistant-spec/scripts/monitor.sh >> /home/ubuntu/ai-assistant-spec/logs/monitor/cron.log 2>&1
+```
+
+### Ротация секретов
+После компрометации контейнера нужно сменить:
+- `ANTHROPIC_API_KEY` — на https://console.anthropic.com
+- `AUTH_SECRET` — сгенерировать новый: `openssl rand -hex 32`
+- `ANTHROPIC_PROXY_SECRET` — обновить в Cloudflare Secrets и `.env.production`
+
+---
+
 ## Известные особенности
 - Проект на сервере НЕ git-репозиторий — синхронизация через rsync
 - Cookie: флаг `Secure=true` (HTTPS через nginx + Let's Encrypt)
 - Prisma: используется `prisma db push` (не migrate) при старте контейнера
 - Docker Compose требует флаг `--env-file .env.production` (не читает автоматически)
 - Nginx слушает порты 80 и 443, проксирует на localhost:3000
+- Порт 3000 привязан к 127.0.0.1 — недоступен извне
+- ufw включён: разрешены только 22/tcp, 80/tcp, 443/tcp
+- Контейнер app: read_only + tmpfs noexec + no-new-privileges
 - SSH может быть нестабильным при множестве параллельных сессий
 - Anthropic API блокирует запросы с IP в РФ — используется Cloudflare Worker прокси
 - Все вызовы Anthropic SDK идут через `getAnthropicClient()` из `lib/anthropic.ts` (с автоматическим проксированием)

@@ -78,7 +78,12 @@ export async function POST(request: NextRequest) {
         { status: statusCode }
       )
     }
-    console.error('Goals decompose error:', error)
+    console.error('Goals decompose error:', {
+      message: (error as Error)?.message,
+      name: (error as Error)?.name,
+      status: (error as { status?: number })?.status,
+      statusCode: (error as { statusCode?: number })?.statusCode,
+    })
     return NextResponse.json({ error: 'Failed to process request' }, { status: 500 })
   }
 }

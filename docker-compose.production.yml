@@ -47,7 +47,7 @@ services:
       dockerfile: Dockerfile
     container_name: ai-assistant-production
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_assistant}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_assistant}
@@ -89,6 +89,13 @@ services:
       start_period: 40s
     # Security: run as non-root
     user: "1001:1001"
+    # Security: read-only filesystem — prevents malware from writing/executing binaries
+    read_only: true
+    tmpfs:
+      - /tmp:size=50M,noexec,nosuid,nodev
+      - /app/.next/cache:size=200M,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
     # Resource limits
     deploy:
       resources:

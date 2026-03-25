@@ -2,7 +2,7 @@
 
 > Пошаговое руководство по развёртыванию на VK Cloud (или любом Ubuntu-сервере)
 > 
-> Актуальность: 17 февраля 2026
+> Актуальность: 25 марта 2026
 
 ---
 
@@ -55,7 +55,7 @@ rsync -avz --delete \
   --exclude 'node_modules' --exclude '.next' --exclude '.git' \
   --exclude 'data/*.db' --exclude '.env' --exclude '.env.local' \
   --exclude '.env.production' --exclude 'backups/*' \
-  --exclude 'vkcloud-key/*.pem' \
+  --exclude 'vkcloud-key/*.pem' --exclude 'logs/' \
   /Users/oleggluskov/Documents/GooglDisk/ai-assistant-spec/ vk:/home/ubuntu/ai-assistant-spec/
 ```
 
@@ -233,6 +233,112 @@ WantedBy=multi-user.target
 sudo systemctl enable ai-assistant
 sudo systemctl start ai-assistant
 ```
+
+---
+
+## Безопасность
+
+### Обязательные настройки
+
+Все меры безопасности уже настроены в `docker-compose.production.yml`:
+
+```yaml
+# Порт доступен только nginx'у (не извне)
+ports:
+  - "127.0.0.1:3000:3000"
+
+# Файловая система только для чтения
+read_only: true
+tmpfs:
+  - /tmp:size=50M,noexec,nosuid,nodev
+  - /app/.next/cache:size=200M,noexec,nosuid,nodev
+
+# Запрет эскалации привилегий
+security_opt:
+  - no-new-privileges:true
+
+# Запуск от непривилегированного пользователя
+user: "1001:1001"
+```
+
+### Файрволл (ufw)
+
+```bash
+# Включение (выполнить один раз на сервере)
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+
+# Проверка
+sudo ufw status verbose
+```
+
+### Проверка безопасности контейнера
+
+```bash
+# Порт слушает только localhost
+ss -tlnp | grep 3000
+# Ожидаемый результат: 127.0.0.1:3000
+
+# Только 1 процесс (next-server)
+docker exec ai-assistant-production ps aux
+
+# /tmp/ пустой
+docker exec ai-assistant-production ls -la /tmp/
+
+# Файловая система read-only
+docker exec ai-assistant-production sh -c 'echo test > /app/test' 
+# Ожидаемый результат: Read-only file system
+```
+
+---
+
+## Мониторинг
+
+Автоматический скрипт безопасности запускается каждые 30 минут.
+
+### Настройка (выполнить один раз)
+```bash
+# Добавить в crontab на сервере
+ssh vk
+crontab -e
+# Добавить строку:
+*/30 * * * * sudo /bin/sh /home/ubuntu/ai-assistant-spec/scripts/monitor.sh >> /home/ubuntu/ai-assistant-spec/logs/monitor/cron.log 2>&1
+```
+
+### Проверка алертов (с мака)
+```bash
+bash scripts/check-alerts.sh
+```
+
+Скрипт покажет:
+- Алерты за сегодня
+- Последний запуск мониторинга (состояние сервера)
+- Зафиксированные IP владельца
+
+### Что проверяется
+- Процессы и файлы в контейнере (индикаторы малвари)
+- Health endpoint, CPU/RAM, диск
+- Firewall, порт 3000, Docker security flags
+- SSH-входы с неизвестным ключом
+- Аномальная активность Anthropic API
+
+### Логи мониторинга
+```bash
+# На сервере
+ls ~/ai-assistant-spec/logs/monitor/
+
+# Алерты
+cat ~/ai-assistant-spec/logs/monitor/alerts.log
+
+# Зафиксированные IP
+cat ~/ai-assistant-spec/logs/monitor/known_ips.txt
+```
+
+> **Важно:** папка `logs/` исключена из rsync — логи мониторинга не затираются при деплое.
 
 ---
 
