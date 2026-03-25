@@ -191,6 +191,45 @@ Host vk
 bash scripts/check-alerts.sh
 ```
 
+### Telegram-бот (@ai_ion_assist_monitor_bot)
+
+Бот для управления сервером прямо из Telegram. Работает как systemd-сервис `tg-bot` на сервере (long polling).
+
+**Интерфейс:** inline-кнопки с русскоязычными названиями. При любом сообщении или `/start` показывает меню.
+
+**Кнопки:**
+| Кнопка | Действие |
+|--------|----------|
+| 📊 Состояние сервера | Статус контейнеров, нагрузка, диск, безопасность |
+| 🛡 Проверка безопасности | Запуск полной проверки (12 чеков из monitor.sh) |
+| ⚠️ Алерты за сегодня | Список сегодняшних алертов из alerts.log |
+| 👥 Пользователи | Список пользователей из базы данных |
+| 🌐 IP-адреса | Зафиксированные SSH-входы владельца |
+
+**Безопасность:** бот отвечает только на chat_id владельца (`200374835`).
+
+**Файлы:**
+- `scripts/tg-bot.sh` — скрипт бота
+- `scripts/tg-bot.service` — systemd unit-файл
+
+**Управление сервисом:**
+```bash
+# Статус
+sudo systemctl status tg-bot
+
+# Перезапуск
+sudo systemctl restart tg-bot
+
+# Логи
+sudo journalctl -u tg-bot --no-pager -n 50
+```
+
+**Автоматические уведомления** (кроме кнопок):
+- Алерты мониторинга — из `scripts/monitor.sh` (каждые 30 мин)
+- Новые регистрации — из `app/api/auth/register/route.ts`
+- Ошибки Anthropic API — из `lib/anthropic.ts` (после исчерпания ретраев)
+- Общая утилита: `lib/telegram.ts` (дедупликация, кулдаун 5 мин)
+
 **Cron (на сервере):**
 ```
 */30 * * * * sudo /bin/sh /home/ubuntu/ai-assistant-spec/scripts/monitor.sh >> /home/ubuntu/ai-assistant-spec/logs/monitor/cron.log 2>&1
