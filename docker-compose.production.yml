@@ -68,6 +68,11 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       # AI API
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_PROXY_URL=${ANTHROPIC_PROXY_URL:-}
+      - ANTHROPIC_PROXY_SECRET=${ANTHROPIC_PROXY_SECRET:-}
+      # Telegram notifications
+      - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
+      - TG_CHAT_ID=${TG_CHAT_ID:-}
     volumes:
       # Backup directory
       - ./backups:/app/backups

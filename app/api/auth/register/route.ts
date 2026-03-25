@@ -5,21 +5,7 @@ import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { sendEmail, getEmailVerificationContent } from '@/lib/email';
-
-const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '';
-const TG_CHAT_ID = process.env.TG_CHAT_ID || '';
-
-async function notifyTelegram(name: string, email: string) {
-  if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
-  try {
-    const text = `👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${email}`;
-    await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TG_CHAT_ID, parse_mode: 'HTML', text }),
-    });
-  } catch { /* не блокируем регистрацию */ }
-}
+import { notifyTelegram } from '@/lib/telegram';
 
 // Rate limiter для регистрации - защита от спама
 const registerRateLimiter = {
@@ -159,7 +145,7 @@ export async function POST(request: Request) {
         // Не блокируем регистрацию, но логируем ошибку
       }
 
-      notifyTelegram(name, email);
+      notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${email}`);
 
       return NextResponse.json({
         success: true,
@@ -181,7 +167,7 @@ export async function POST(request: Request) {
       user: result.session.user,
     });
 
-    notifyTelegram(name, email);
+    notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${email}`);
 
     // Устанавливаем cookie
     const useSecureCookie = process.env.COOKIE_SECURE === 'true';

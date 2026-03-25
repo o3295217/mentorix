@@ -14,6 +14,7 @@ import { DAILY_EVALUATION_SYSTEM_PROMPT, buildUserDataPrompt, validateGoals } fr
 import { buildPeriodEvaluationPrompt } from './prompts/period'
 import { buildForecastPrompt } from './prompts/forecast'
 import { extractJsonFromAIResponse, isValidScore, clampScore, sanitizeUserInput } from './api-utils'
+import { notifyTelegram } from './telegram'
 
 // ============================================================================
 // API KEY VALIDATION (Lazy initialization for build-time compatibility)
@@ -100,6 +101,15 @@ async function withRetry<T>(
       const shouldRetry = isRateLimitError || isServerError || isNetworkError
 
       if (!shouldRetry || attempt === maxRetries) {
+        // Telegram notification on final failure
+        const status = 'status' in (error as object) ? (error as { status: number }).status : 'N/A';
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const shortMsg = errMsg.length > 200 ? errMsg.slice(0, 200) + '...' : errMsg;
+        notifyTelegram(
+          `🔴 <b>Anthropic API Error</b>\nStatus: ${status}\n${shortMsg}\nRetries: ${attempt}/${maxRetries}`,
+          `anthropic-${isRateLimitError ? '429' : isServerError ? '5xx' : 'network'}`
+        );
+
         if (isRateLimitError) {
           throw new AIServiceError(
             'Rate limit exceeded. Please try again later.',

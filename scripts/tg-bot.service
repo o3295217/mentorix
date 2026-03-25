@@ -1,0 +1,16 @@
+[Unit]
+Description=AI Assistant Telegram Bot
+After=docker.service
+Requires=docker.service
+
+[Service]
+ExecStart=/bin/sh /home/ubuntu/ai-assistant-spec/scripts/tg-bot.sh
+Restart=always
+RestartSec=10
+User=ubuntu
+WorkingDirectory=/home/ubuntu/ai-assistant-spec
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
