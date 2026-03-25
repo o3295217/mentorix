@@ -6,6 +6,21 @@ import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { sendEmail, getEmailVerificationContent } from '@/lib/email';
 
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '';
+const TG_CHAT_ID = process.env.TG_CHAT_ID || '';
+
+async function notifyTelegram(name: string, email: string) {
+  if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
+  try {
+    const text = `👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${email}`;
+    await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TG_CHAT_ID, parse_mode: 'HTML', text }),
+    });
+  } catch { /* не блокируем регистрацию */ }
+}
+
 // Rate limiter для регистрации - защита от спама
 const registerRateLimiter = {
   limit: 3, // 3 попытки
@@ -144,6 +159,8 @@ export async function POST(request: Request) {
         // Не блокируем регистрацию, но логируем ошибку
       }
 
+      notifyTelegram(name, email);
+
       return NextResponse.json({
         success: true,
         requiresVerification: true,
@@ -163,6 +180,8 @@ export async function POST(request: Request) {
       success: true,
       user: result.session.user,
     });
+
+    notifyTelegram(name, email);
 
     // Устанавливаем cookie
     const useSecureCookie = process.env.COOKIE_SECURE === 'true';

@@ -15,15 +15,29 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 DATE_TAG=$(date '+%Y-%m-%d')
 LOG_FILE="$LOG_DIR/$DATE_TAG.log"
 
+# Telegram
+TG_BOT_TOKEN="8008848660:AAHZy9dyuVAtHyiv498TZ4rNRMvBHL8cGzo"
+TG_CHAT_ID="200374835"
+
 mkdir -p "$LOG_DIR"
 
 log() {
   echo "[$TIMESTAMP] $1" >> "$LOG_FILE"
 }
 
+tg_send() {
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+    -d chat_id="$TG_CHAT_ID" \
+    -d parse_mode="HTML" \
+    -d text="$1" > /dev/null 2>&1 || true
+}
+
 alert() {
   echo "[$TIMESTAMP] ALERT: $1" >> "$ALERT_FILE"
   echo "[$TIMESTAMP] ALERT: $1" >> "$LOG_FILE"
+  tg_send "🚨 <b>AI Assistant Alert</b>
+$1
+<i>$TIMESTAMP</i>"
 }
 
 log "===== Monitor run started ====="
