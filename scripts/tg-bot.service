@@ -4,7 +4,7 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-ExecStart=/bin/sh /home/ubuntu/ai-assistant-spec/scripts/tg-bot.sh
+ExecStart=/usr/bin/bash /home/ubuntu/ai-assistant-spec/scripts/tg-bot.sh
 Restart=always
 RestartSec=10
 User=ubuntu

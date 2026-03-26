@@ -27,9 +27,23 @@ log() {
 
 tg_send() {
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-    -d chat_id="$TG_CHAT_ID" \
-    -d parse_mode="HTML" \
-    -d text="$1" > /dev/null 2>&1 || true
+    --data-urlencode "chat_id=$TG_CHAT_ID" \
+    --data-urlencode "parse_mode=HTML" \
+    --data-urlencode "text=$1" > /dev/null 2>&1 || true
+}
+
+# Отправить алерт с кнопками действий
+tg_send_action() {
+  TEXT="$1"
+  KEYBOARD="$2"
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"chat_id\": $TG_CHAT_ID,
+      \"parse_mode\": \"HTML\",
+      \"text\": $(echo "$TEXT" | jq -Rs .),
+      \"reply_markup\": $KEYBOARD
+    }" > /dev/null 2>&1 || true
 }
 
 alert() {
@@ -38,6 +52,21 @@ alert() {
   tg_send "🚨 <b>AI Assistant Alert</b>
 $1
 <i>$TIMESTAMP</i>"
+}
+
+# Алерт с кнопкой действия
+alert_action() {
+  MSG="$1"
+  CALLBACK="$2"
+  BTN_TEXT="$3"
+  echo "[$TIMESTAMP] ALERT: $MSG" >> "$ALERT_FILE"
+  echo "[$TIMESTAMP] ALERT: $MSG" >> "$LOG_FILE"
+  KEYBOARD="{\"inline_keyboard\":[[{\"text\":\"$BTN_TEXT\",\"callback_data\":\"$CALLBACK\"},{\"text\":\"❌ Игнорировать\",\"callback_data\":\"dismiss\"}]]}"
+  tg_send_action "🚨 <b>AI Assistant Alert</b>
+
+$MSG
+
+<i>$TIMESTAMP</i>" "$KEYBOARD"
 }
 
 log "===== Monitor run started ====="
@@ -49,7 +78,7 @@ PROC_COUNT=$(docker exec "$CONTAINER" ps aux 2>/dev/null | wc -l)
 PROC_LIST=$(docker exec "$CONTAINER" ps aux 2>/dev/null || echo "CONTAINER_DOWN")
 
 if echo "$PROC_LIST" | grep -q "CONTAINER_DOWN"; then
-  alert "Container $CONTAINER is DOWN"
+  alert_action "❌ Контейнер <b>$CONTAINER</b> не запущен!" "act_restart" "🔄 Перезапустить контейнер"
 elif [ "$PROC_COUNT" -gt 4 ]; then
   # Ожидаем: header + next-server + ps aux = 3 строки. 4 — с запасом.
   alert "Suspicious process count in container: $PROC_COUNT (expected <=4)"
@@ -58,7 +87,7 @@ fi
 
 # Проверка на известные имена майнеров
 if echo "$PROC_LIST" | grep -qiE 'xmrig|javae|kworker.*nextjs|kdevtmpfsi|cryptonight|minergate|stratum|pool\.|crypto'; then
-  alert "CRYPTOMINER DETECTED in container!"
+  alert_action "☠️ КРИПТОМАЙНЕР обнаружен в контейнере!" "act_kill" "🛑 Остановить и пересобрать"
   alert "Processes: $PROC_LIST"
 fi
 
@@ -83,7 +112,7 @@ log "Container /tmp/ files: $TMP_COUNT"
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:3000/api/health 2>/dev/null || echo "000")
 
 if [ "$HTTP_CODE" != "200" ]; then
-  alert "Health check FAILED: HTTP $HTTP_CODE"
+  alert_action "🌐 Сайт недоступен! Health check: HTTP $HTTP_CODE" "act_restart" "🔄 Перезапустить контейнер"
 else
   log "Health check: OK (200)"
 fi
@@ -97,7 +126,7 @@ CPU_PCT=$(echo "$STATS" | cut -f1 | tr -d '%')
 if [ "$CPU_PCT" != "N/A" ] && [ -n "$CPU_PCT" ]; then
   CPU_INT=$(echo "$CPU_PCT" | cut -d'.' -f1)
   if [ "${CPU_INT:-0}" -gt 80 ] 2>/dev/null; then
-    alert "High CPU in container: $CPU_PCT%"
+    alert_action "⚡ Высокая нагрузка CPU: $CPU_PCT%" "act_restart" "🔄 Перезапустить контейнер"
   fi
 fi
 
@@ -112,7 +141,7 @@ HOST_DISK=$(df -h / 2>/dev/null | awk 'NR==2{print $5 " used (" $3 "/" $2 ")"}' 
 
 DISK_PCT=$(df / 2>/dev/null | awk 'NR==2{print $5}' | tr -d '%' || echo "0")
 if [ "${DISK_PCT:-0}" -gt 85 ] 2>/dev/null; then
-  alert "Disk usage high: $DISK_PCT%"
+  alert_action "💾 Диск заполнен на $DISK_PCT%!" "act_cleanup" "🧹 Очистить диск"
 fi
 
 log "Host: CPU=$HOST_CPU% | MEM=$HOST_MEM | DISK=$HOST_DISK"
@@ -126,8 +155,8 @@ if [ -n "$SUSPICIOUS" ]; then
   alert "SUSPICIOUS PROCESSES ON HOST: $SUSPICIOUS"
 fi
 
-# Процессы с аномально высоким CPU (>50%), исключая Docker, системные и healthcheck
-HOST_HIGH_CPU=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1 && $3>50 && $11!~/docker|containerd|sshd|systemd|telegraf|nginx|postgres|node/' | head -5 || true)
+# Процессы с аномально высоким CPU (>50%), исключая Docker, системные, healthcheck и саму команду ps
+HOST_HIGH_CPU=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1 && $3>50 && $11!~/docker|containerd|sshd|systemd|telegraf|nginx|postgres|node|ps|awk|sort|grep|monitor/' | head -5 || true)
 
 if [ -n "$HOST_HIGH_CPU" ]; then
   alert "High CPU processes on host: $HOST_HIGH_CPU"

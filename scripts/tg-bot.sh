@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # =============================================================================
 # AI Assistant — Telegram Bot (polling)
 # Слушает команды и нажатия кнопок из Telegram
@@ -243,6 +243,103 @@ cmd_menu() {
 Выберите действие:" "$MAIN_KEYBOARD"
 }
 
+# ---- Действия по алертам (подтверждение через кнопки) ----
+
+# 🔄 Перезапустить контейнер (при health fail / high CPU / container down)
+act_restart() {
+  send "🔄 <b>Перезапуск контейнера...</b>"
+  
+  cd "$APP_DIR"
+  docker compose -f docker-compose.production.yml --env-file .env.production restart app 2>&1
+  RESULT=$?
+  
+  sleep 5
+  
+  HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/api/health" 2>/dev/null || echo "ERR")
+  
+  if [ "$HEALTH" = "200" ]; then
+    send_with_buttons "✅ <b>Контейнер перезапущен</b>
+
+Сайт доступен (Health: 200).
+Время: $(date '+%H:%M:%S')" "$MAIN_KEYBOARD"
+  else
+    send_with_buttons "⚠️ <b>Контейнер перезапущен, но сайт недоступен</b>
+
+Health: $HEALTH
+
+Возможно нужна ручная проверка." "$MAIN_KEYBOARD"
+  fi
+}
+
+# 🧹 Очистить диск (при disk > 85%)
+act_cleanup() {
+  send "🧹 <b>Очистка диска...</b>"
+  
+  # Удаляем неиспользуемые Docker образы, контейнеры, volumes
+  DOCKER_FREED=$(docker system prune -f 2>&1 | tail -1 || echo "N/A")
+  
+  # Удаляем логи мониторинга старше 7 дней
+  OLD_LOGS=$(find "$LOG_DIR" -name "*.log" -mtime +7 -type f 2>/dev/null | wc -l)
+  find "$LOG_DIR" -name "*.log" -mtime +7 -type f -delete 2>/dev/null || true
+  
+  # Ротация логов Docker контейнера
+  docker logs "$CONTAINER" --since 72h > /dev/null 2>&1
+  
+  # Итоговый размер диска
+  DISK_AFTER=$(df -h / | awk 'NR==2{print $5 " (" $3 "/" $2 ")"}')
+  
+  send_with_buttons "✅ <b>Очистка завершена</b>
+
+Docker: $DOCKER_FREED
+Старых логов удалено: $OLD_LOGS
+Диск сейчас: $DISK_AFTER" "$MAIN_KEYBOARD"
+}
+
+# 🛑 Остановить и пересобрать (при обнаружении малвари)
+act_kill() {
+  send "🛑 <b>Экстренная остановка контейнера...</b>
+
+⚠️ Контейнер будет остановлен, удалён и пересобран с нуля."
+
+  cd "$APP_DIR"
+  
+  # Стоп и удаление
+  docker compose -f docker-compose.production.yml --env-file .env.production stop app 2>&1
+  docker compose -f docker-compose.production.yml --env-file .env.production rm -f app 2>&1
+  
+  # Пересборка без кэша
+  docker compose -f docker-compose.production.yml --env-file .env.production build --no-cache app 2>&1
+  
+  # Запуск
+  docker compose -f docker-compose.production.yml --env-file .env.production up -d app 2>&1
+  
+  sleep 10
+  
+  HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/api/health" 2>/dev/null || echo "ERR")
+  PROCS=$(docker exec "$CONTAINER" ps aux 2>/dev/null | wc -l || echo "?")
+  
+  if [ "$HEALTH" = "200" ]; then
+    send_with_buttons "✅ <b>Контейнер пересобран и запущен</b>
+
+Health: $HEALTH
+Процессов: $PROCS
+
+⚠️ Рекомендуется проверить хост вручную." "$MAIN_KEYBOARD"
+  else
+    send_with_buttons "❌ <b>Проблемы после пересборки</b>
+
+Health: $HEALTH
+Процессов: $PROCS
+
+Требуется ручное вмешательство!" "$MAIN_KEYBOARD"
+  fi
+}
+
+# Игнорировать алерт
+act_dismiss() {
+  send_with_buttons "👌 <b>Алерт проигнорирован</b>" "$MAIN_KEYBOARD"
+}
+
 # ---- Главный цикл ----
 
 echo "$(date) Бот запущен, ожидание команд..."
@@ -250,7 +347,7 @@ echo "$(date) Бот запущен, ожидание команд..."
 while true; do
   OFFSET=$(get_offset)
 
-  RESPONSE=$(curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates?offset=$OFFSET&timeout=30&allowed_updates=[\"message\",\"callback_query\"]" 2>/dev/null)
+  RESPONSE=$(curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates?offset=$OFFSET&timeout=30" 2>/dev/null)
 
   if [ -z "$RESPONSE" ]; then
     sleep 5
@@ -267,6 +364,12 @@ while true; do
   INDEX=0
   while [ "$INDEX" -lt "$UCOUNT" ]; do
     UPDATE_ID=$(echo "$RESPONSE" | jq -r ".result[$INDEX].update_id" 2>/dev/null)
+
+    # Пропускаем если update_id невалидный
+    if [ -z "$UPDATE_ID" ] || [ "$UPDATE_ID" = "null" ]; then
+      INDEX=$((INDEX + 1))
+      continue
+    fi
 
     # Определяем тип: сообщение или нажатие кнопки
     MSG_CHAT=$(echo "$RESPONSE" | jq -r ".result[$INDEX].message.chat.id // empty" 2>/dev/null)
@@ -291,11 +394,15 @@ while true; do
       echo "$(date) Кнопка: $CB_DATA от $CB_CHAT"
 
       case "$CB_DATA" in
-        status) cmd_status ;;
-        check)  cmd_check ;;
-        alerts) cmd_alerts ;;
-        users)  cmd_users ;;
-        ips)    cmd_ips ;;
+        status)      cmd_status ;;
+        check)       cmd_check ;;
+        alerts)      cmd_alerts ;;
+        users)       cmd_users ;;
+        ips)         cmd_ips ;;
+        act_restart) act_restart ;;
+        act_cleanup) act_cleanup ;;
+        act_kill)    act_kill ;;
+        dismiss)     act_dismiss ;;
       esac
       continue
     fi

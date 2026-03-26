@@ -336,9 +336,15 @@ export async function POST(request: NextRequest) {
       success: true,
     })
 
-    const assistantMessage = response.content[0].type === 'text' 
+    const rawMessage = response.content[0].type === 'text' 
       ? response.content[0].text 
       : ''
+
+    // Убираем markdown-форматирование из ответа (**, *, #)
+    const assistantMessage = rawMessage
+      .replace(/\*\*(.+?)\*\*/g, '$1')  // **жирный** → жирный
+      .replace(/\*(.+?)\*/g, '$1')       // *курсив* → курсив
+      .replace(/^#{1,6}\s+/gm, '')       // # заголовки → простой текст
 
     console.log('[Plan Chat] Response length:', assistantMessage.length)
 
