@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
 
+const ALLOWED_CHAT_ROLES = new Set(['user', 'assistant'])
+
 // GET - получить историю сообщений за день
 export async function GET(request: NextRequest) {
   const userId = await requireUserId(request)
@@ -45,8 +47,12 @@ export async function POST(request: NextRequest) {
   try {
     const { date, role, content } = await request.json()
 
-    if (!date || !role || !content) {
+    if (typeof date !== 'string' || typeof role !== 'string' || typeof content !== 'string' || !date || !role || !content) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    if (!ALLOWED_CHAT_ROLES.has(role)) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
 
     const message = await prisma.chatMessage.create({

@@ -6,12 +6,27 @@
 # Запускается как systemd-сервис: tg-bot.service
 # =============================================================================
 
-TG_BOT_TOKEN="8008848660:AAHZy9dyuVAtHyiv498TZ4rNRMvBHL8cGzo"
-TG_CHAT_ID="200374835"
+TG_ENV_FILE="/home/ubuntu/.tg-bot-env"
+TG_TOKEN_FILE="${TG_BOT_TOKEN_FILE:-/home/ubuntu/.tg-bot-token}"
 CONTAINER="ai-assistant-production"
 APP_DIR="/home/ubuntu/ai-assistant-spec"
 LOG_DIR="$APP_DIR/logs/monitor"
 OFFSET_FILE="$LOG_DIR/.tg_offset"
+
+if [ -f "$TG_ENV_FILE" ]; then
+  . "$TG_ENV_FILE"
+fi
+
+if [ -z "${TG_BOT_TOKEN:-}" ] && [ -r "$TG_TOKEN_FILE" ]; then
+  TG_BOT_TOKEN=$(cat "$TG_TOKEN_FILE")
+fi
+
+if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
+  echo "TG_BOT_TOKEN and TG_CHAT_ID must be configured" >&2
+  exit 1
+fi
+
+mkdir -p "$LOG_DIR"
 
 # Безопасность: отвечаем только владельцу
 is_owner() {

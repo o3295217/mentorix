@@ -14,10 +14,21 @@ ALERT_FILE="$LOG_DIR/alerts.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 DATE_TAG=$(date '+%Y-%m-%d')
 LOG_FILE="$LOG_DIR/$DATE_TAG.log"
+TG_ENV_FILE="/home/ubuntu/.tg-bot-env"
+TG_TOKEN_FILE="${TG_BOT_TOKEN_FILE:-/home/ubuntu/.tg-bot-token}"
 
-# Telegram
-TG_BOT_TOKEN="8008848660:AAHZy9dyuVAtHyiv498TZ4rNRMvBHL8cGzo"
-TG_CHAT_ID="200374835"
+if [ -f "$TG_ENV_FILE" ]; then
+  . "$TG_ENV_FILE"
+fi
+
+if [ -z "${TG_BOT_TOKEN:-}" ] && [ -r "$TG_TOKEN_FILE" ]; then
+  TG_BOT_TOKEN=$(cat "$TG_TOKEN_FILE")
+fi
+
+TG_NOTIFICATIONS_ENABLED=true
+if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
+  TG_NOTIFICATIONS_ENABLED=false
+fi
 
 mkdir -p "$LOG_DIR"
 
@@ -26,6 +37,7 @@ log() {
 }
 
 tg_send() {
+  [ "$TG_NOTIFICATIONS_ENABLED" = "true" ] || return 0
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     --data-urlencode "chat_id=$TG_CHAT_ID" \
     --data-urlencode "parse_mode=HTML" \
@@ -34,6 +46,7 @@ tg_send() {
 
 # Отправить алерт с кнопками действий
 tg_send_action() {
+  [ "$TG_NOTIFICATIONS_ENABLED" = "true" ] || return 0
   TEXT="$1"
   KEYBOARD="$2"
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
@@ -70,6 +83,10 @@ $MSG
 }
 
 log "===== Monitor run started ====="
+
+if [ "$TG_NOTIFICATIONS_ENABLED" != "true" ]; then
+  log "Telegram notifications disabled: missing TG_BOT_TOKEN or TG_CHAT_ID"
+fi
 
 # -----------------------------------------------------------------------------
 # 1. Проверка процессов в контейнере (главный индикатор компрометации)

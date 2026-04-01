@@ -15,4 +15,4 @@ tag = "v1"
 new_sqlite_classes = ["AnthropicProxyDO"]
 
 [vars]
-ALLOWED_ORIGINS = "*"
+ALLOWED_ORIGINS = "https://assist.labaiion.ru"

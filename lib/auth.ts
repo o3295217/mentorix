@@ -4,9 +4,25 @@
  */
 
 import bcrypt from 'bcrypt';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { prisma } from './prisma';
 
 const BCRYPT_ROUNDS = 12;
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function isTimingSafeStringEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left, 'utf8');
+  const rightBuffer = Buffer.from(right, 'utf8');
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
 
 /**
  * Хеширование пароля через bcrypt с salt
@@ -46,7 +62,7 @@ async function verifyPassword(
 
   // Legacy SHA-256: проверяем и мигрируем
   const legacyHash = await legacySha256Hash(password);
-  if (legacyHash !== hash) return false;
+  if (!isTimingSafeStringEqual(legacyHash, hash)) return false;
 
   // Пароль верный — перехешируем на bcrypt
   if (userId) {
@@ -230,17 +246,17 @@ export async function createSession(
   const token = generateSessionToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 дней
 
-  const session = await prisma.session.create({
+  await prisma.session.create({
     data: {
       userId,
-      token,
+      token: hashToken(token),
       expiresAt,
       userAgent,
       ipAddress,
     },
   });
 
-  return session;
+  return { token, expiresAt };
 }
 
 // Получить пользователя по ID (для создания сессии после верификации)
@@ -269,7 +285,7 @@ export async function getUserByEmail(email: string): Promise<{ id: string; name:
 export async function validateSession(token: string): Promise<AuthUser | null> {
   try {
     const session = await prisma.session.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
       include: { user: true },
     });
 
@@ -297,8 +313,10 @@ export async function validateSession(token: string): Promise<AuthUser | null> {
 // Выход (удаление сессии)
 export async function logoutUser(token: string): Promise<boolean> {
   try {
-    await prisma.session.delete({ where: { token } });
-    return true;
+    const result = await prisma.session.deleteMany({
+      where: { token: hashToken(token) },
+    });
+    return result.count > 0;
   } catch {
     return false;
   }

@@ -5,6 +5,52 @@
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com';
 
+function getAllowedOrigins(env) {
+  return String(env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function getCorsOrigin(request, env) {
+  const requestOrigin = request.headers.get('origin');
+  const allowedOrigins = getAllowedOrigins(env);
+
+  if (!requestOrigin) {
+    return allowedOrigins[0] || null;
+  }
+
+  return allowedOrigins.includes(requestOrigin) ? requestOrigin : null;
+}
+
+function buildCorsHeaders(request, env) {
+  const origin = getCorsOrigin(request, env);
+  const headers = {
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type,x-api-key,anthropic-version,anthropic-beta,x-proxy-secret',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+
+  if (origin) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+
+  return headers;
+}
+
+function jsonResponse(payload, init = {}) {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  return new Response(JSON.stringify(payload), {
+    ...init,
+    headers,
+  });
+}
+
 // ============================
 // DURABLE OBJECT — запускается в US (wnam)
 // ============================
@@ -46,44 +92,46 @@ export class AnthropicProxyDO {
 // WORKER — входная точка
 // ============================
 function validateProxySecret(request, env) {
-  const proxySecret = request.headers.get('x-proxy-secret');
-  if (env.PROXY_SECRET && proxySecret !== env.PROXY_SECRET) {
-    return false;
+  if (!env.PROXY_SECRET) {
+    return { status: 503, payload: { error: 'Proxy not configured' } };
   }
-  return true;
+
+  const proxySecret = request.headers.get('x-proxy-secret');
+  if (proxySecret !== env.PROXY_SECRET) {
+    return { status: 403, payload: { error: 'Forbidden' } };
+  }
+
+  return null;
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const corsHeaders = buildCorsHeaders(request, env);
 
-    // Отладка
+    if (request.headers.get('origin') && !corsHeaders['Access-Control-Allow-Origin']) {
+      return new Response('Forbidden', {
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
+
+    // Отладочный эндпоинт отключён
     if (url.pathname === '/debug') {
-      return new Response(JSON.stringify({
-        colo: request.cf?.colo,
-        country: request.cf?.country,
-        city: request.cf?.city,
-      }, null, 2), { headers: { 'Content-Type': 'application/json' } });
+      return new Response('Not found', { status: 404, headers: corsHeaders });
     }
 
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': env.ALLOWED_ORIGINS || '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': '*',
-          'Access-Control-Max-Age': '86400',
-        },
+        headers: corsHeaders,
       });
     }
 
     // Проверяем секрет
-    if (!validateProxySecret(request, env)) {
-      return new Response(JSON.stringify({ error: 'Unauthorized proxy access' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const authError = validateProxySecret(request, env);
+    if (authError) {
+      return jsonResponse(authError.payload, { status: authError.status, headers: corsHeaders });
     }
 
     // Собираем заголовки для Anthropic
@@ -126,7 +174,9 @@ export default {
       for (const [key, value] of Object.entries(result.headers || {})) {
         responseHeaders.set(key, value);
       }
-      responseHeaders.set('Access-Control-Allow-Origin', env.ALLOWED_ORIGINS || '*');
+      for (const [key, value] of Object.entries(corsHeaders)) {
+        responseHeaders.set(key, value);
+      }
 
       return new Response(result.body, {
         status: result.status,
@@ -134,9 +184,9 @@ export default {
         headers: responseHeaders,
       });
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Proxy error', message: error.message }), {
+      return jsonResponse({ error: 'Proxy error', message: error.message }, {
         status: 502,
-        headers: { 'Content-Type': 'application/json' },
+        headers: corsHeaders,
       });
     }
   },
