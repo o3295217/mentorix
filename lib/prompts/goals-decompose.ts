@@ -21,6 +21,32 @@ interface PlanningProfileData {
   declined?: boolean | null
 }
 
+interface UserProfileData {
+  name?: string | null
+  occupation?: string | null
+  industry?: string | null
+  maritalStatus?: string | null
+  hobbies?: string | null
+  sports?: string | null
+  location?: string | null
+  age?: number | null
+  education?: string | null
+  teamSize?: number | null
+  workExperience?: string | null
+  values?: string | null
+  challenges?: string | null
+  other?: string | null
+}
+
+interface ProfileBlockData {
+  title: string
+  categories: {
+    title: string
+    items: { fieldName: string; fieldValue: string; content?: string | null }[]
+  }[]
+  items: { fieldName: string; fieldValue: string; content?: string | null }[]
+}
+
 const EXPERIENCE_LABELS: Record<string, string> = {
   none: 'нет опыта',
   beginner: 'начальный',
@@ -51,7 +77,48 @@ function formatProfileSection(profile: PlanningProfileData | null): string {
   if (profile.currentWorkload) lines.push(`  Загрузка: ${WORKLOAD_LABELS[profile.currentWorkload] || profile.currentWorkload}`)
   if (profile.constraints) lines.push(`  Ограничения: ${profile.constraints}`)
 
-  return lines.length > 0 ? `ПРОФИЛЬ ПЛАНИРОВАНИЯ ПОЛЬЗОВАТЕЛЯ:\n${lines.join('\n')}` : ''
+  return lines.length > 0 ? `ПАРАМЕТРЫ ПЛАНИРОВАНИЯ:\n${lines.join('\n')}` : ''
+}
+
+function formatUserProfile(userProfile: UserProfileData | null, profileBlocks: ProfileBlockData[]): string {
+  const lines: string[] = []
+
+  if (userProfile) {
+    if (userProfile.name) lines.push(`  Имя: ${userProfile.name}`)
+    if (userProfile.age) lines.push(`  Возраст: ${userProfile.age}`)
+    if (userProfile.location) lines.push(`  Локация: ${userProfile.location}`)
+    if (userProfile.occupation) lines.push(`  Занятость: ${userProfile.occupation}`)
+    if (userProfile.industry) lines.push(`  Отрасль: ${userProfile.industry}`)
+    if (userProfile.education) lines.push(`  Образование: ${userProfile.education}`)
+    if (userProfile.workExperience) lines.push(`  Опыт работы: ${userProfile.workExperience}`)
+    if (userProfile.teamSize) lines.push(`  Размер команды: ${userProfile.teamSize}`)
+    if (userProfile.hobbies) lines.push(`  Хобби: ${userProfile.hobbies}`)
+    if (userProfile.sports) lines.push(`  Спорт: ${userProfile.sports}`)
+    if (userProfile.values) lines.push(`  Ценности: ${userProfile.values}`)
+    if (userProfile.challenges) lines.push(`  Вызовы: ${userProfile.challenges}`)
+    if (userProfile.other) lines.push(`  Дополнительно: ${userProfile.other}`)
+  }
+
+  for (const block of profileBlocks) {
+    const blockLines: string[] = []
+    for (const item of block.items) {
+      blockLines.push(`    ${item.fieldName}: ${item.fieldValue}${item.content ? ` — ${item.content}` : ''}`)
+    }
+    for (const cat of block.categories) {
+      if (cat.items.length > 0) {
+        blockLines.push(`    ${cat.title}:`)
+        for (const item of cat.items) {
+          blockLines.push(`      ${item.fieldName}: ${item.fieldValue}${item.content ? ` — ${item.content}` : ''}`)
+        }
+      }
+    }
+    if (blockLines.length > 0) {
+      lines.push(`  [${block.title}]`)
+      lines.push(...blockLines)
+    }
+  }
+
+  return lines.length > 0 ? `ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (страница "Профиль"):\n${lines.join('\n')}` : ''
 }
 
 function hasCompleteProfile(profile: PlanningProfileData | null): boolean {
@@ -59,7 +126,7 @@ function hasCompleteProfile(profile: PlanningProfileData | null): boolean {
   return profile.hoursPerWeek != null && !!profile.experienceLevel && !!profile.currentWorkload
 }
 
-export function buildGoalsDecomposePrompt(context: GoalsContext, planningProfile?: PlanningProfileData | null): string {
+export function buildGoalsDecomposePrompt(context: GoalsContext, planningProfile?: PlanningProfileData | null, userProfile?: UserProfileData | null, profileBlocks?: ProfileBlockData[]): string {
   const { dream, dreamMonths, yearGoals, periodGoals, completedGoals, selectedYear, selectedMonth } = context
 
   const yearGoalsSummary = Object.entries(yearGoals || {})
@@ -94,39 +161,55 @@ export function buildGoalsDecomposePrompt(context: GoalsContext, planningProfile
   const nextMonthYear = selectedMonth === 11 ? selectedYear + 1 : selectedYear
 
   const profileSection = formatProfileSection(planningProfile || null)
+  const userProfileSection = formatUserProfile(userProfile || null, profileBlocks || [])
   const profileFilled = hasCompleteProfile(planningProfile || null)
   const profileDeclined = planningProfile?.declined === true
 
+  // Определяем, заполнен ли профиль пользователя (страница Профиль)
+  const hasUserProfile = !!(userProfile && (userProfile.name || userProfile.occupation || userProfile.industry || userProfile.age))
+
   return `Ты — ИИ-помощник по стратегическому планированию целей. Твоя задача — помочь пользователю декомпозировать мечту на конкретные, измеримые шаги по временным горизонтам.
+
+ВАЖНО — "ПРОФИЛЬ":
+"Профиль" — это страница "Профиль" в приложении. Его данные ниже в секции "ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ". Если пользователь спрашивает "ты видел мой профиль?" — он имеет в виду именно эти данные. Используй их при планировании.
 
 АБСОЛЮТНЫЙ ЗАПРЕТ:
 Ты НЕ ИМЕЕШЬ ПРАВА выдавать план декомпозиции (метки [WEEK:...], [MONTH:...], [QUARTER:...] и т.д.), пока НЕ ВЫПОЛНЕНЫ ОБА условия:
-1. Профиль планирования заполнен ИЛИ пользователь явно отказался его заполнять
+1. Ты знаешь ключевые параметры пользователя (из профиля или из ответов на вопросы) ИЛИ пользователь отказался отвечать
 2. Горизонт планирования согласован с пользователем
 Если хотя бы одно условие не выполнено — ЗАПРЕЩЕНО выдавать план. Вместо этого задай следующий вопрос по порядку.
 
 СТРОГИЙ ПОРЯДОК ДИАЛОГА (НАРУШАТЬ НЕЛЬЗЯ):
 Этапы идут строго последовательно. Каждый этап ПОЛНОСТЬЮ завершается перед переходом к следующему.
 
-ЭТАП 1 — ПРОФИЛЬ ПЛАНИРОВАНИЯ:
-${profileFilled ? `Профиль заполнен. Этап 1 пройден. Используй данные профиля при планировании:
+ЭТАП 1 — ЗНАКОМСТВО С ПОЛЬЗОВАТЕЛЕМ:
+${profileFilled ? `Параметры планирования уже получены. Этап 1 пройден. Используй эти данные:
 - Подбирай количество и сложность целей под доступное время (${planningProfile?.hoursPerWeek || '?'} ч/нед)
 - Учитывай текущую загрузку и опыт пользователя
-- Если нужно уточнить что-то для конкретной мечты — задай один точечный вопрос и продолжай планирование` : profileDeclined ? `Пользователь ранее отказался заполнять профиль. Этап 1 пройден. НЕ ПРЕДЛАГАЙ заполнять профиль повторно. Сразу переходи к этапу 2.` : `Профиль НЕ заполнен. Этап 1 НЕ пройден.
-ТВОЁ ПЕРВОЕ СООБЩЕНИЕ ОБЯЗАТЕЛЬНО должно быть предложением заполнить профиль:
-"Чтобы составить реалистичный план под тебя, мне нужно задать несколько вопросов. Это поможет подобрать правильный темп и объём задач. Можем заполнить профиль планирования?"
-- Если пользователь согласен — задавай вопросы СТРОГО ПО ОДНОМУ, жди ответа на каждый:
-  Вопрос 1: "Сколько часов в неделю ты готов выделять на достижение мечты?"
-  Вопрос 2: "Какой у тебя опыт в этой области?" (нет / начальный / средний / экспертный)
-  Вопрос 3: "Какая у тебя сейчас основная занятость?" (полная занятость / частичная / фриланс / свободен)
-  Вопрос 4: "Есть ли бюджет для инвестиций в мечту?" (нет / ограниченный / есть)
-  Вопрос 5: "Есть ли ещё ограничения, которые стоит учесть?" (необязательный вопрос)
-- КРИТИЧЕСКИ ВАЖНО: РОВНО ОДИН вопрос за сообщение! Подтверди предыдущий ответ одним предложением, затем задай РОВНО ОДИН следующий вопрос. Никогда не задавай два вопроса в одном ответе.
-- Когда все ответы собраны — выведи итоговый профиль маркером:
+- Также используй данные из профиля пользователя для персонализации плана
+- Если нужно уточнить что-то для конкретной мечты — задай один точечный вопрос и продолжай планирование` : profileDeclined ? `Пользователь ранее отказался отвечать на вопросы. Этап 1 пройден. НЕ ПРЕДЛАГАЙ отвечать повторно. Используй данные из профиля пользователя (если есть). Сразу переходи к этапу 2.` : `Этап 1 НЕ пройден. Действуй по ситуации:
+
+${hasUserProfile ? `ПРОФИЛЬ ЗАПОЛНЕН — пользователь уже рассказал о себе на странице "Профиль".
+Твоё первое сообщение: покажи, что ты изучил профиль. Обратись по имени (если есть). Кратко отметь, что ты знаешь о нём (1-2 факта из профиля, которые релевантны мечте). Затем задай ТОЛЬКО те вопросы, ответов на которые НЕТ в профиле:
+- Сколько часов в неделю готов выделять? (этого точно нет в профиле — спроси всегда)
+- Какой опыт в области мечты? (спроси, только если из профиля неясно)
+- Есть ли бюджет? (спроси, только если для мечты это важно)
+Объедини приветствие и первый вопрос в одном сообщении. Не задавай вопросы, ответы на которые очевидны из профиля (например, если в профиле occupation="разработчик" — не спрашивай про занятость).` : `ПРОФИЛЬ НЕ ЗАПОЛНЕН — ты ничего не знаешь о пользователе.
+Твоё первое сообщение: предложи заполнить профиль на странице "Профиль" — это поможет составить персональный план. Скажи: "Я вижу, что твой профиль пока не заполнен. Если заполнишь его — я смогу лучше адаптировать план под тебя. Но можем и так продолжить — я задам несколько вопросов."
+- Если пользователь хочет продолжить без профиля — задавай вопросы ПО ОДНОМУ:
+  1. "Сколько часов в неделю ты готов выделять на достижение мечты?"
+  2. "Какой у тебя опыт в этой области?" (нет / начальный / средний / экспертный)
+  3. "Какая у тебя сейчас основная занятость?" (полная занятость / частичная / фриланс / свободен)
+  4. "Есть ли бюджет для инвестиций в мечту?" (нет / ограниченный / есть)
+  5. "Есть ли ещё ограничения, которые стоит учесть?" (необязательно)`}
+
+- КРИТИЧЕСКИ ВАЖНО: РОВНО ОДИН вопрос за сообщение! Подтверди предыдущий ответ одним предложением, затем задай РОВНО ОДИН следующий вопрос.
+- Когда все нужные ответы собраны — выведи итоговый маркер:
   [PROFILE:hours=ЧИСЛО|experience=УРОВЕНЬ|workload=УРОВЕНЬ|budget=УРОВЕНЬ|constraints=ТЕКСТ]
   Значения: experience: none/beginner/intermediate/expert; workload: fulltime/parttime/freelance/free; budget: none/limited/available
+  Если данные взяты из профиля — подставь ближайшее значение (например, occupation="разработчик" → workload=fulltime).
 - Если пользователь отказался — НЕ НАСТАИВАЙ, выведи [PROFILE_DECLINED] и переходи к этапу 2.
-- ЗАПРЕЩЕНО переходить к горизонту и плану, пока профиль не заполнен или не отклонён!`}
+- ЗАПРЕЩЕНО переходить к горизонту и плану, пока этап 1 не завершён!`}
 
 ЭТАП 2 — ГОРИЗОНТ ПЛАНИРОВАНИЯ:
 Переходи к этому этапу ТОЛЬКО после завершения этапа 1.
@@ -156,7 +239,9 @@ ${profileFilled ? `Профиль заполнен. Этап 1 пройден. �
 ТЕКУЩИЙ КВАРТАЛ: Q${currentQuarter}
 ТЕКУЩИЙ МЕСЯЦ: ${String(selectedMonth + 1).padStart(2, '0')}
 
-${profileSection || 'ПРОФИЛЬ ПЛАНИРОВАНИЯ: не заполнен'}
+${userProfileSection || 'ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ: не заполнен'}
+
+${profileSection || 'ПАРАМЕТРЫ ПЛАНИРОВАНИЯ: не заданы'}
 
 ${yearGoalsSummary ? `СУЩЕСТВУЮЩИЕ ГОДОВЫЕ ЦЕЛИ:\n${yearGoalsSummary}` : 'Годовых целей пока нет.'}
 

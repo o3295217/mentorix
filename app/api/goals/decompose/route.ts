@@ -48,10 +48,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 })
     }
 
-    // Загружаем профиль планирования
-    const planningProfile = await prisma.planningProfile.findUnique({ where: { userId } })
+    // Загружаем профиль планирования и профиль пользователя
+    const [planningProfile, userProfile, profileBlocks] = await Promise.all([
+      prisma.planningProfile.findUnique({ where: { userId } }),
+      prisma.userProfile.findFirst({ where: { userId } }),
+      prisma.profileBlock.findMany({
+        where: { userId },
+        include: {
+          categories: {
+            include: { items: { orderBy: { order: 'asc' } } },
+            orderBy: { order: 'asc' },
+          },
+          items: {
+            where: { categoryId: null },
+            orderBy: { order: 'asc' },
+          },
+        },
+        orderBy: { order: 'asc' },
+      }),
+    ])
 
-    const systemPrompt = buildGoalsDecomposePrompt(context, planningProfile)
+    const systemPrompt = buildGoalsDecomposePrompt(context, planningProfile, userProfile, profileBlocks)
     const anthropic = getAnthropicClient()
 
     const chatHistory = Array.isArray(history)

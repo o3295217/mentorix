@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-04-03 — update
+- 🔌 API: 28 файлов (route, route, route...)
+- 🧩 Компоненты: 6 файлов (AuthProvider, Landing, UncompletedTasksModal...)
+- 📄 Страницы: 7 файлов
+- 📚 Библиотеки: 4 файлов (api-utils, auth-constants, rate-limit...)
+- ⚙️ Конфигурация: 1 файлов
+- 📝 Документация: 4 файлов
+- 📦 Другое: 3 файлов
+
+
 ### 2026-04-01 — update
 - 📝 Документация: 1 файлов
 

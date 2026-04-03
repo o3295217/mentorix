@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DreamGoal } from '@/lib/types'
 import { formatHorizon } from '@/lib/dates'
 
@@ -29,6 +29,35 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
   const [text, setText] = useState('')
   const [months, setMonths] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleTextClick = () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+      setIsEditing(true)
+      setIsExpanded(false)
+    } else {
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null
+        setIsExpanded(prev => !prev)
+      }, 250)
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+
+  const handleBlur = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = ''
+    }
+  }
 
   useEffect(() => {
     if (dreamGoal) {
@@ -36,6 +65,18 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
       setMonths(dreamGoal.months)
     }
   }, [dreamGoal])
+
+  // При открытии редактирования — сразу разворачиваем textarea под весь текст
+  useEffect(() => {
+    if (!isEditing) return
+    const id = requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+    })
+    return () => cancelAnimationFrame(id)
+  }, [isEditing])
 
   const handleSave = async () => {
     if (!text.trim()) return
@@ -77,9 +118,11 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
           {dreamGoal ? 'Редактировать мечту' : 'Твоя мечта'}
         </div>
         <textarea
+          ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full px-4 py-3 border border-slate-700 rounded-2xl bg-slate-950/50 text-[15px] text-slate-200 leading-7 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-none"
+          onChange={handleChange}
+          onBlur={handleBlur}
+          className="w-full px-4 py-3 border border-slate-700 rounded-2xl bg-slate-950/50 text-[15px] text-slate-200 leading-7 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-none overflow-hidden"
           rows={3}
           placeholder="Например: Построить международную IT-компанию и жить у океана..."
           autoFocus
@@ -164,7 +207,23 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
             </button>
           </div>
           <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/35 p-4">
-            <p className="text-[15px] text-slate-200 font-medium leading-7">&ldquo;{dreamGoal.goalText}&rdquo;</p>
+            <p onClick={handleTextClick} className={`text-[15px] text-slate-200 font-medium leading-7 cursor-pointer select-none ${isExpanded ? '' : 'line-clamp-2'}`}>&ldquo;{dreamGoal.goalText}&rdquo;</p>
+            {!isExpanded && (
+              <button
+                onClick={() => setIsExpanded(true)}
+                className="mt-2 text-[13px] font-semibold text-amber-400 border border-amber-400/40 rounded-lg px-3 py-0.5 hover:bg-amber-400/10 transition-colors"
+              >
+                Показать полностью ↓
+              </button>
+            )}
+            {isExpanded && (
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="mt-2 text-[13px] font-semibold text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Свернуть ↑
+              </button>
+            )}
           </div>
           <div className="mt-3 text-sm font-medium text-amber-400/70">
             {dreamGoal.months ? `Горизонт: ${formatHorizon(dreamGoal.months)}` : ''}
@@ -210,14 +269,27 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10">
           <svg className="h-5 w-5 star-shimmer" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
         </div>
-        <div
-          className="flex-1 min-w-0 cursor-pointer"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
+        <div className="flex-1 min-w-0">
           <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">Вектор</div>
-          <p className={`text-[15px] text-slate-200 font-medium leading-relaxed transition-all ${isExpanded ? '' : 'line-clamp-2'}`}>
+          <p onClick={handleTextClick} className={`text-[15px] text-slate-200 font-medium leading-relaxed transition-all cursor-pointer select-none ${isExpanded ? '' : 'line-clamp-2'}`}>
             {dreamGoal.goalText}
           </p>
+          {!isExpanded && (
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="mt-2 text-[13px] font-semibold text-amber-400 border border-amber-400/40 rounded-lg px-3 py-0.5 hover:bg-amber-400/10 transition-colors"
+            >
+              Показать полностью ↓
+            </button>
+          )}
+          {isExpanded && (
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="mt-2 text-[13px] font-semibold text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Свернуть ↑
+            </button>
+          )}
         </div>
         {!isExpanded && progress.total > 0 && (
           <div className="flex items-center gap-3 flex-shrink-0">
