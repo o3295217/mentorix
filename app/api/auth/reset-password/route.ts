@@ -1,14 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPasswordForReset as hashPassword } from '@/lib/auth';
-import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
-
-// Rate limiter
-const resetPasswordRateLimiter = {
-  limit: 5, // 5 попыток
-  windowMs: 15 * 60 * 1000, // 15 минут
-  keyPrefix: 'reset-password',
-};
+import { MIN_PASSWORD_LENGTH } from '@/lib/auth-constants'
+import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
 
 // GET - проверка валидности токена
 export async function GET(request: Request) {
@@ -54,7 +48,7 @@ export async function POST(request: Request) {
   try {
     // Rate limiting
     const clientId = getClientIdentifier(request);
-    const rateLimit = checkRateLimit(clientId, resetPasswordRateLimiter);
+    const rateLimit = checkRateLimit(clientId, rateLimiters.auth);
 
     if (!rateLimit.success) {
       return NextResponse.json(
@@ -73,9 +67,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (password.length < 8) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: 'Пароль должен быть не менее 8 символов' },
+        { error: `Пароль должен быть не менее ${MIN_PASSWORD_LENGTH} символов` },
         { status: 400 }
       );
     }

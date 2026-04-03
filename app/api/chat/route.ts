@@ -7,6 +7,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUserId } from '@/lib/get-user-id';
+import { z } from 'zod'
+
+const StoredMessagesSchema = z.object({
+  date: z.string().trim().min(1).max(32),
+  messages: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string().max(4000),
+  })).max(200),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,15 +61,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request);
-    const body = await request.json();
-    const { date, messages } = body;
-
-    if (!date || !Array.isArray(messages)) {
+    const validation = StoredMessagesSchema.safeParse(await request.json())
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Date and messages array are required' },
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
-      );
+      )
     }
+
+    const { date, messages } = validation.data
 
     // Транзакция: удаляем старые сообщения и создаём новые
     await prisma.$transaction(async (tx) => {
@@ -75,7 +84,7 @@ export async function POST(request: NextRequest) {
       // Создаём новые сообщения
       if (messages.length > 0) {
         await tx.chatMessage.createMany({
-          data: messages.map((msg: { role: string; content: string }) => ({
+          data: messages.map((msg) => ({
             userId,
             date,
             role: msg.role,

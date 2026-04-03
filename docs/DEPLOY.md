@@ -95,6 +95,10 @@ COOKIE_SECURE=true
 ANTHROPIC_PROXY_URL=https://anthropic-proxy.o3295217.workers.dev
 ANTHROPIC_PROXY_SECRET=<секрет-прокси>
 
+# Telegram уведомления приложения
+TG_BOT_TOKEN=<telegram-bot-token>
+TG_CHAT_ID=<telegram-chat-id>
+
 # SMTP для отправки писем (верификация, сброс пароля)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -105,6 +109,8 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
 > **Примечание:** Anthropic блокирует запросы с российских IP. Если сервер в РФ, необходимо использовать Cloudflare Worker прокси. Подробнее — см. [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
+
+> **Важно:** после перехода на хеширование session token'ов при первом деплое миграции `20260401000000_invalidate_existing_sessions` все существующие сессии будут инвалидированы.
 
 ---
 

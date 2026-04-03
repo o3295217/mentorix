@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { monthNames, parseWeekKey, getPeriodKey } from '@/lib/goals-utils'
 import { useGoals } from '@/hooks'
-import { useGoalsChat, ParsedGoal, ParsedProfile } from '@/hooks/useGoalsChat'
+import { useGoalsChat, ParsedGoal } from '@/hooks/useGoalsChat'
 import DreamBar from '@/components/goals/DreamBar'
 import HorizonsCard from '@/components/goals/HorizonsCard'
 import StrategyCards from '@/components/goals/StrategyCards'
@@ -193,7 +193,6 @@ export default function GoalsPage() {
   // Принять план — разложить цели из ИИ по правильным периодам
   const handleAcceptGoals = useCallback((goals: ParsedGoal[]) => {
     let yearCount = 0, periodCount = 0
-    const added: string[] = []
 
     for (const goal of goals) {
       if (goal.periodType === 'year') {
@@ -347,7 +346,6 @@ export default function GoalsPage() {
               onSelectYear={setSelectedYear}
               currentYear={currentYear}
               yearGoals={yearGoals}
-              periodGoals={periodGoals}
               trackedGoals={goals}
               onAddYearGoal={addYearGoal}
               onRemoveYearGoal={removeYearGoal}

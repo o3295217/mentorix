@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { z } from 'zod'
+
+const PlanningProfileSchema = z.object({
+  hoursPerWeek: z.union([z.coerce.number().int().min(0).max(168), z.null()]).optional(),
+  experienceLevel: z.union([z.enum(['none', 'beginner', 'intermediate', 'expert']), z.literal(''), z.null()]).optional(),
+  hasBudget: z.union([z.enum(['none', 'limited', 'available']), z.literal(''), z.null()]).optional(),
+  currentWorkload: z.union([z.enum(['fulltime', 'parttime', 'freelance', 'free']), z.literal(''), z.null()]).optional(),
+  constraints: z.union([z.string().max(500), z.literal(''), z.null()]).optional(),
+  declined: z.boolean().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,8 +30,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { hoursPerWeek, experienceLevel, hasBudget, currentWorkload, constraints, declined } = body
+    const validation = PlanningProfileSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
+    }
+
+    const { hoursPerWeek, experienceLevel, hasBudget, currentWorkload, constraints, declined } = validation.data
 
     const data: Record<string, unknown> = {}
     if (hoursPerWeek != null) data.hoursPerWeek = Number(hoursPerWeek)

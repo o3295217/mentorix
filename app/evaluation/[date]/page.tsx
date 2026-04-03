@@ -62,7 +62,9 @@ function computeTasksWithStatus(
           }
         })
       }
-    } catch {}
+    } catch {
+      // Игнорируем ошибки парсинга extra tasks
+    }
   }
   
   return result

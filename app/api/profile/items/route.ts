@@ -1,22 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { z } from 'zod'
+
+const ProfileItemCreateSchema = z.object({
+  blockId: z.coerce.number().int().positive().optional(),
+  categoryId: z.coerce.number().int().positive().optional(),
+  fieldName: z.string().trim().min(1).max(120),
+  fieldValue: z.string().trim().min(1).max(4000),
+}).refine((data) => data.blockId || data.categoryId, {
+  message: 'Block ID or Category ID is required',
+  path: ['blockId'],
+})
+
+const ProfileItemUpdateSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  fieldName: z.string().trim().min(1).max(120).optional(),
+  fieldValue: z.string().trim().min(1).max(4000).optional(),
+  order: z.coerce.number().int().min(0).max(100000).optional(),
+})
 
 // POST /api/profile/items - создать новый пункт в блоке или категории
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { blockId, categoryId, fieldName, fieldValue } = body
-
-    if ((!blockId && !categoryId) || !fieldName || !fieldValue) {
-      return NextResponse.json({ error: 'Block ID or Category ID, field name and field value are required' }, { status: 400 })
+    const validation = ProfileItemCreateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+
+    const { blockId, categoryId, fieldName, fieldValue } = validation.data
 
     // Проверяем принадлежность блока пользователю
     if (blockId) {
       const block = await prisma.profileBlock.findFirst({
-        where: { id: parseInt(blockId), userId }
+        where: { id: blockId, userId }
       })
       if (!block) {
         return NextResponse.json({ error: 'Block not found' }, { status: 404 })
@@ -26,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Проверяем принадлежность категории через блок
     if (categoryId) {
       const category = await prisma.profileCategory.findFirst({
-        where: { id: parseInt(categoryId) },
+        where: { id: categoryId },
         include: { block: true }
       })
       if (!category || category.block.userId !== userId) {
@@ -36,8 +57,8 @@ export async function POST(request: NextRequest) {
 
     // Получаем максимальный order для нового пункта
     const whereClause = categoryId
-      ? { categoryId: parseInt(categoryId) }
-      : { blockId: parseInt(blockId), categoryId: null }
+      ? { categoryId }
+      : { blockId, categoryId: null }
 
     const maxOrder = await prisma.profileItem.aggregate({
       where: whereClause,
@@ -46,10 +67,10 @@ export async function POST(request: NextRequest) {
 
     const item = await prisma.profileItem.create({
       data: {
-        blockId: blockId ? parseInt(blockId) : null,
-        categoryId: categoryId ? parseInt(categoryId) : null,
-        fieldName: fieldName.trim(),
-        fieldValue: fieldValue.trim(),
+        blockId: blockId ?? null,
+        categoryId: categoryId ?? null,
+        fieldName,
+        fieldValue,
         content: null, // Deprecated field for backward compatibility
         order: (maxOrder._max.order || 0) + 1,
       },
@@ -115,26 +136,24 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { id, fieldName, fieldValue, order } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    const validation = ProfileItemUpdateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
 
-    const numericId = typeof id === 'number' ? id : parseInt(id)
-    if (isNaN(numericId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const { id: numericId, fieldName, fieldValue, order } = validation.data
 
     if (!await verifyItemOwnership(numericId, userId)) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
     const updateData: { fieldName?: string; fieldValue?: string; order?: number } = {}
-    if (fieldName !== undefined) updateData.fieldName = fieldName.trim()
-    if (fieldValue !== undefined) updateData.fieldValue = fieldValue.trim()
-    if (order !== undefined) updateData.order = parseInt(order)
+    if (fieldName !== undefined) updateData.fieldName = fieldName
+    if (fieldValue !== undefined) updateData.fieldValue = fieldValue
+    if (order !== undefined) updateData.order = order
 
     const item = await prisma.profileItem.update({
       where: { id: numericId },

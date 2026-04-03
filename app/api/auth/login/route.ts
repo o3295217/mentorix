@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
 import { loginUser } from '@/lib/auth';
-import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
-
-// Rate limiter для login - строгий для защиты от брутфорса
-const loginRateLimiter = {
-  limit: 5, // 5 попыток
-  windowMs: 15 * 60 * 1000, // 15 минут
-  keyPrefix: 'login',
-};
 
 export async function POST(request: Request) {
   try {
     // Проверяем rate limit
     const clientId = getClientIdentifier(request);
-    const rateLimit = checkRateLimit(clientId, loginRateLimiter);
+    const rateLimit = checkRateLimit(clientId, rateLimiters.auth);
     
     if (!rateLimit.success) {
       return NextResponse.json(

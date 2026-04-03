@@ -18,9 +18,10 @@ function setThemeCookie(response: NextResponse, theme: ThemePreference) {
 export async function GET(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const user = (await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-    })) as unknown as { themePreference?: ThemePreference } | null
+      select: { themePreference: true },
+    })
 
     const theme = user?.themePreference ?? DEFAULT_THEME_PREFERENCE
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (userExists) {
       await prisma.user.update({
         where: { id: userId },
-        data: { themePreference: nextThemeRaw } as any,
+        data: { themePreference: nextThemeRaw },
       })
     }
 

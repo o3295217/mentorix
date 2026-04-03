@@ -5,6 +5,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths,
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import { DailyEntry, DreamGoal } from '@/lib/types'
+import { safeParseJson } from '@/lib/safe-json'
 
 interface MonthData {
   month: Date
@@ -351,7 +352,7 @@ export default function HistoryPage() {
                 const entry = entriesMap.get(dateKey)
                 const hasEvaluation = !!entry?.evaluation
                 const hasPlan = !!entry?.planText
-                const hasFact = entry?.selectedTasksJson && JSON.parse(entry.selectedTasksJson).length > 0
+                const hasFact = safeParseJson<string[]>(entry?.selectedTasksJson, []).length > 0
                 const isMatching = matchingDates.has(dateKey)
                 const isTodayDate = isToday(day)
                 

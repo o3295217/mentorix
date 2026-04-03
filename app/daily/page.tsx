@@ -18,7 +18,6 @@ export default function DailyPage() {
   const [mounted, setMounted] = useState(false)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
-  const [userName, setUserName] = useState<string>('Вы')
 
   // Модальное окно создания привычки
   const [showHabitModal, setShowHabitModal] = useState(false)
@@ -231,27 +230,6 @@ export default function DailyPage() {
     // Продолжаем оценку
     evaluate(router)
   }
-
-  // Загрузка имени пользователя
-  useEffect(() => {
-    const loadUserName = async () => {
-      try {
-        const res = await fetch('/api/auth/me')
-        if (res.ok) {
-          const data = await res.json()
-          if (data?.user?.name) {
-            setUserName(data.user.name)
-          } else if (data?.user?.email) {
-            // Если нет имени, берём первую часть email
-            setUserName(data.user.email.split('@')[0])
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }
-    loadUserName()
-  }, [])
 
   // Прокрутка чата вниз при новых сообщениях
   useEffect(() => {

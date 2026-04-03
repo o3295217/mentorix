@@ -10,7 +10,6 @@ interface StrategyCardsProps {
   onSelectYear: (year: number) => void
   currentYear: number
   yearGoals: Map<number, string[]>
-  periodGoals: Map<string, string[]>
   trackedGoals: Goal[]
   onAddYearGoal: (year: number, text: string) => void
   onRemoveYearGoal: (year: number, index: number) => void
@@ -31,7 +30,6 @@ export default function StrategyCards({
   onSelectYear,
   currentYear,
   yearGoals,
-  periodGoals,
   trackedGoals,
   onAddYearGoal,
   onRemoveYearGoal,
@@ -52,7 +50,6 @@ export default function StrategyCards({
               isCurrent={year === currentYear}
               isPast={year < currentYear}
               goals={yearGoals.get(year) || []}
-              periodGoals={periodGoals}
               trackedGoals={trackedGoals}
               color={YEAR_COLORS[i % YEAR_COLORS.length]}
               onSelect={() => onSelectYear(year)}
@@ -73,7 +70,6 @@ function YearCard({
   isCurrent: _isCurrent,
   isPast,
   goals,
-  periodGoals,
   trackedGoals,
   color,
   onSelect,
@@ -86,7 +82,6 @@ function YearCard({
   isCurrent: boolean
   isPast: boolean
   goals: string[]
-  periodGoals: Map<string, string[]>
   trackedGoals: Goal[]
   color: typeof YEAR_COLORS[number]
   onSelect: () => void

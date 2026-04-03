@@ -5,19 +5,35 @@ import { PeriodEvaluationRequest, DayData } from '@/lib/prompts/types'
 import { parseDateParam } from '@/lib/dates'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
+import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+const PeriodEvaluationSchema = z.object({
+  periodType: z.enum(['week', 'month', 'quarter', 'year', 'custom']),
+  periodStart: z.string().trim().min(1).max(32),
+  periodEnd: z.string().trim().min(1).max(32),
+})
 
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { periodType, periodStart, periodEnd } = body
-
-    if (!periodType || !periodStart || !periodEnd) {
+    const rateLimit = checkRateLimit(userId, rateLimiters.ai)
+    if (!rateLimit.success) {
       return NextResponse.json(
-        { error: 'periodType, periodStart, and periodEnd are required' },
+        { error: 'Too many requests. Please wait before evaluating another period.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
+
+    const validation = PeriodEvaluationSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
       )
     }
+
+    const { periodType, periodStart, periodEnd } = validation.data
 
     const startDate = parseDateParam(periodStart)
     const endDate = parseDateParam(periodEnd)
@@ -49,7 +65,11 @@ export async function POST(request: NextRequest) {
     // Фильтруем только дни с оценками
     const daysWithEvaluations = dailyEntries.filter((entry) => entry.evaluation)
 
-    console.log(`Period evaluation: ${dailyEntries.length} total days, ${daysWithEvaluations.length} with evaluations`)
+    console.log('[Period Evaluation] Request summary:', {
+      periodType,
+      totalDays: dailyEntries.length,
+      daysWithEvaluations: daysWithEvaluations.length,
+    })
 
     if (daysWithEvaluations.length === 0) {
       return NextResponse.json(
@@ -148,9 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Вызвать Claude API для периодической оценки
-    console.log('Calling Claude API for period evaluation...')
     const evaluationResponse = await evaluatePeriod(evaluationRequest)
-    console.log('Claude API response received')
 
     // Сохранить периодическую оценку
     const periodEvaluation = await prisma.periodEvaluation.create({

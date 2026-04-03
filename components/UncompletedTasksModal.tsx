@@ -68,8 +68,6 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
     }
   }
 
-  const allDecided = tasks.every(t => decisions[t.id])
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900/80 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">

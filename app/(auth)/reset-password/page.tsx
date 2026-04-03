@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { MIN_PASSWORD_LENGTH } from '@/lib/auth-constants'
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -53,8 +54,8 @@ function ResetPasswordForm() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('Пароль должен быть не менее 6 символов');
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Пароль должен быть не менее ${MIN_PASSWORD_LENGTH} символов`);
       return;
     }
 

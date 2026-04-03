@@ -168,27 +168,6 @@ export function useDaily(): UseDailyReturn {
   // Функция получения ключа чата для даты
   const getChatKey = useCallback((date: string) => `daily:chat:${date}`, [])
   
-  // Очистка старых чатов (>14 дней)
-  const cleanupOldChats = useCallback(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const keys = Object.keys(window.localStorage)
-      const chatKeys = keys.filter(k => k.startsWith('daily:chat:'))
-      const cutoffDate = new Date()
-      cutoffDate.setDate(cutoffDate.getDate() - 14)
-      
-      chatKeys.forEach(key => {
-        const dateStr = key.replace('daily:chat:', '')
-        const chatDate = new Date(dateStr)
-        if (!isNaN(chatDate.getTime()) && chatDate < cutoffDate) {
-          window.localStorage.removeItem(key)
-        }
-      })
-    } catch {
-      // ignore
-    }
-  }, [])
-  
   // Habits state
   const [habits, setHabits] = useState<Habit[]>([])
   const [habitSuggestions, setHabitSuggestions] = useState<HabitSuggestion[]>([])
@@ -202,9 +181,6 @@ export function useDaily(): UseDailyReturn {
   // AbortController для отмены fetch при быстрой смене даты
   const abortControllerRef = useRef<AbortController | null>(null)
   
-  // Ref для предыдущей даты (для сохранения чата при смене)
-  const previousDateRef = useRef(selectedDate)
-
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {

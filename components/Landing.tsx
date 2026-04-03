@@ -140,7 +140,7 @@ export default function Landing() {
                       { level: 'Квартал', text: 'Конкретные результаты', color: 'from-blue-500/60 to-blue-400/60', width: '70%' },
                       { level: 'Месяц', text: 'Ближайшие шаги', color: 'from-blue-500/40 to-blue-400/40', width: '55%' },
                       { level: 'Неделя', text: 'Фокус прямо сейчас', color: 'from-blue-500/25 to-blue-400/25', width: '40%' },
-                    ].map((item, i) => (
+                    ].map((item) => (
                       <div key={item.level} className="flex items-center gap-4">
                         <div
                           className={`h-10 rounded-lg bg-gradient-to-r ${item.color} flex items-center px-4 transition-all duration-500`}

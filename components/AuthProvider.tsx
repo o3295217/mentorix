@@ -40,9 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (pathToCheck: string | null) => {
     // На страницах авторизации (login, register и т.д.) — не проверяем
-    if (isAuthPage(pathname)) {
+    if (isAuthPage(pathToCheck)) {
       setLoading(false)
       return
     }
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Ставим loading при начале проверки — убирает мерцание при смене маршрута
     setLoading(true)
 
-    const optional = isOptionalAuthPage(pathname)
+    const optional = isOptionalAuthPage(pathToCheck)
 
     try {
       const res = await fetch('/api/auth/me')
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         // На главной не редиректим — покажем Landing
         if (!optional) {
-          router.push(`/login?redirect=${encodeURIComponent(pathname || '/')}`)
+          router.push(`/login?redirect=${encodeURIComponent(pathToCheck || '/')}`)
         }
         return
       }
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData)
         
         // Редирект на онбординг для новых пользователей
-        if (!userData.onboardingCompleted && pathname !== '/onboarding') {
+        if (!userData.onboardingCompleted && pathToCheck !== '/onboarding') {
           router.push('/onboarding')
         }
       }
@@ -81,11 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [pathname, router])
+  }, [router])
 
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    void checkAuth(pathname)
+  }, [checkAuth, pathname])
 
   const logout = useCallback(async () => {
     try {
@@ -103,8 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     isAuthenticated: !!user,
     logout,
-    refresh: checkAuth,
-  }), [user, loading, logout, checkAuth])
+    refresh: () => checkAuth(pathname),
+  }), [user, loading, logout, checkAuth, pathname])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

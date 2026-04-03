@@ -124,6 +124,22 @@ export function getClientIdentifier(request: Request): string {
 
 // Pre-configured rate limiters for different endpoints
 export const rateLimiters = {
+  // Shared auth endpoints limits
+  auth: {
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+    keyPrefix: 'auth',
+  },
+  authRecovery: {
+    limit: 3,
+    windowMs: 15 * 60 * 1000,
+    keyPrefix: 'auth-recovery',
+  },
+  authRegistration: {
+    limit: 3,
+    windowMs: 60 * 60 * 1000,
+    keyPrefix: 'auth-register',
+  },
   // AI endpoints - stricter limits (expensive)
   ai: {
     limit: 10, // 10 requests

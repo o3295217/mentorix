@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(evaluations)
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },

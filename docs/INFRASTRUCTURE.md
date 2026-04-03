@@ -218,7 +218,12 @@ bash scripts/check-alerts.sh
 | Диск заполнен > 85% | 🧹 Очистить диск | Docker prune + удаление логов старше 7 дней |
 | Криптомайнер обнаружен | 🛑 Остановить и пересобрать | Stop → rm → build --no-cache → up (~1-2 мин) |
 
-**Безопасность:** бот отвечает только на chat_id владельца (`200374835`).
+**Безопасность:** бот отвечает только на `TG_CHAT_ID` владельца. Бот-токен больше не хранится в репозитории.
+
+**Хранение секретов на сервере:**
+- `/home/ubuntu/.tg-bot-token` — только `TG_BOT_TOKEN`
+- `/home/ubuntu/.tg-bot-env` — `TG_CHAT_ID=...`
+- `/home/ubuntu/ai-assistant-spec/.env.production` — `TG_BOT_TOKEN` и `TG_CHAT_ID` для контейнера приложения
 
 **Файлы:**
 - `scripts/tg-bot.sh` — скрипт бота (bash + jq для парсинга JSON)
@@ -237,6 +242,13 @@ sudo systemctl restart tg-bot
 sudo journalctl -u tg-bot --no-pager -n 50
 ```
 
+**После ротации Telegram-токена:**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart tg-bot
+cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml up -d --force-recreate app
+```
+
 **Автоматические уведомления** (кроме кнопок):
 - Алерты мониторинга — из `scripts/monitor.sh` (каждые 30 мин)
 - Новые регистрации — из `app/api/auth/register/route.ts`
@@ -253,6 +265,11 @@ sudo journalctl -u tg-bot --no-pager -n 50
 - `ANTHROPIC_API_KEY` — на https://console.anthropic.com
 - `AUTH_SECRET` — сгенерировать новый: `openssl rand -hex 32`
 - `ANTHROPIC_PROXY_SECRET` — обновить в Cloudflare Secrets и `.env.production`
+- `TG_BOT_TOKEN` — перевыпустить через @BotFather и обновить в `.tg-bot-token` и `.env.production`
+
+### Сессии после P0-фикса
+- Сессионные токены в БД теперь хранятся как SHA-256 hash
+- При выкладке миграции `20260401000000_invalidate_existing_sessions` все старые сессии удаляются, пользователи должны перелогиниться
 
 ---
 

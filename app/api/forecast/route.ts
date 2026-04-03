@@ -6,6 +6,20 @@ import { parseDateParam } from '@/lib/dates'
 import { buildFactFromSelection } from '@/lib/fact-utils'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
+import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+const ForecastSchema = z.object({
+  basePeriodType: z.enum(['week', 'month', 'quarter', 'year', 'custom']),
+  basePeriodStart: z.string().trim().min(1).max(32),
+  basePeriodEnd: z.string().trim().min(1).max(32),
+  forecastHorizon: z.enum(['week', 'month', 'quarter', 'year', 'dream']),
+  horizonStart: z.string().trim().min(1).max(32).optional(),
+  horizonEnd: z.string().trim().min(1).max(32).optional(),
+}).refine((data) => data.forecastHorizon === 'dream' || (!!data.horizonStart && !!data.horizonEnd), {
+  message: 'horizonStart and horizonEnd are required unless forecastHorizon is dream',
+  path: ['horizonStart'],
+})
 
 // Подсчет задач в тексте плана/факта
 function countTasks(text: string): { total: number; strategic: number } {
@@ -56,31 +70,30 @@ function countCompletedTasks(planText: string, factText: string): { completed: n
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
+    const rateLimit = checkRateLimit(userId, rateLimiters.ai)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before generating another forecast.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
+
+    const validation = ForecastSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
+    }
+
     const {
-      // База для анализа (прошлое)
       basePeriodType,
       basePeriodStart,
       basePeriodEnd,
-      // Горизонт прогноза (будущее)
       forecastHorizon,
       horizonStart,
       horizonEnd,
-    } = body
-
-    if (!basePeriodType || !basePeriodStart || !basePeriodEnd) {
-      return NextResponse.json(
-        { error: 'basePeriodType, basePeriodStart and basePeriodEnd are required' },
-        { status: 400 }
-      )
-    }
-
-    if (!forecastHorizon) {
-      return NextResponse.json(
-        { error: 'forecastHorizon is required' },
-        { status: 400 }
-      )
-    }
+    } = validation.data
 
     // Получить мечту
     const dream = await prisma.dreamGoal.findFirst({
@@ -275,7 +288,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },

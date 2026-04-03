@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
 import { parseDateParam } from '@/lib/dates'
@@ -49,10 +50,11 @@ export async function GET(request: NextRequest) {
       // all — без ограничения по дате
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = { userId }
-    if (dateFrom) where.date = { ...where.date, gte: dateFrom }
-    if (dateTo) where.date = { ...where.date, lte: dateTo }
+    const where: Prisma.CompletedWorkWhereInput = { userId }
+    const dateFilter: Prisma.DateTimeFilter = {}
+    if (dateFrom) dateFilter.gte = dateFrom
+    if (dateTo) dateFilter.lte = dateTo
+    if (dateFilter.gte || dateFilter.lte) where.date = dateFilter
     if (type !== 'all') where.type = type
     if (goalLink) where.goalLink = goalLink
 
@@ -94,7 +96,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items, stats, limit, offset })
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },

@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail, getPasswordResetEmailContent } from '@/lib/email';
-import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
-
-// Rate limiter - защита от спама
-const forgotPasswordRateLimiter = {
-  limit: 3, // 3 попытки
-  windowMs: 15 * 60 * 1000, // 15 минут
-  keyPrefix: 'forgot-password',
-};
+import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
 
 // Генерация токена
 function generateResetToken(): string {
@@ -21,7 +14,7 @@ export async function POST(request: Request) {
   try {
     // Rate limiting
     const clientId = getClientIdentifier(request);
-    const rateLimit = checkRateLimit(clientId, forgotPasswordRateLimiter);
+    const rateLimit = checkRateLimit(clientId, rateLimiters.authRecovery);
 
     if (!rateLimit.success) {
       return NextResponse.json(

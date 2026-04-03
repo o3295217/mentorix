@@ -3,22 +3,55 @@ import { getAnthropicClient } from '@/lib/anthropic'
 import { requireUserId } from '@/lib/get-user-id'
 import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+const GoalsDecomposeSchema = z.object({
+  message: z.string().trim().min(1).max(2000),
+  context: z.object({
+    dream: z.string().trim().max(500),
+    dreamMonths: z.number().int().min(1).max(600).optional(),
+    yearGoals: z.record(z.string(), z.array(z.string().trim().max(500)).max(50)),
+    periodGoals: z.record(z.string(), z.array(z.string().trim().max(500)).max(50)),
+    completedGoals: z.record(z.string(), z.array(z.string().trim().max(500)).max(50)).optional(),
+    selectedYear: z.number().int().min(2000).max(2100),
+    selectedMonth: z.number().int().min(0).max(11),
+  }),
+  history: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string().max(4000),
+  })).max(20).optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
+    const rateLimit = checkRateLimit(userId, rateLimiters.ai)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before sending another message.', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
 
-    const body = await request.json()
-    const { message, context, history } = body
+    const validation = GoalsDecomposeSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
+    }
 
-    if (!message || typeof message !== 'string' || message.length > 2000) {
+    const { message, context, history } = validation.data
+
+    if (!message) {
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 })
     }
 
     // Загружаем профиль планирования
     const planningProfile = await prisma.planningProfile.findUnique({ where: { userId } })
 
-    const systemPrompt = buildGoalsDecomposePrompt(context || {}, planningProfile)
+    const systemPrompt = buildGoalsDecomposePrompt(context, planningProfile)
     const anthropic = getAnthropicClient()
 
     const chatHistory = Array.isArray(history)

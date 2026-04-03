@@ -3,6 +3,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { safeParseJson } from './safe-json'
 
 // ============================================================================
 // ERROR HANDLING
@@ -55,15 +56,7 @@ export const ApiErrors = {
  * Safely parse JSON with fallback value
  * Handles null, undefined, and malformed JSON
  */
-export function safeParseJson<T>(json: string | null | undefined, fallback: T): T {
-  if (!json) return fallback
-  try {
-    return JSON.parse(json) as T
-  } catch {
-    console.error('[JSON Parse Error] Failed to parse:', json?.substring(0, 100))
-    return fallback
-  }
-}
+export { safeParseJson }
 
 // ============================================================================
 // INPUT SANITIZATION

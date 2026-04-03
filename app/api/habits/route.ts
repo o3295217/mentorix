@@ -6,11 +6,19 @@ import { parseDateParam } from '@/lib/dates'
 import { requireUserId } from '@/lib/get-user-id'
 
 const HabitSchema = z.object({
-  taskText: z.string().min(1),
+  taskText: z.string().trim().min(1).max(500),
   frequency: z.enum(['daily', 'weekdays', 'weekends', 'weekly', 'custom']).default('daily'),
-  daysOfWeek: z.array(z.number().min(1).max(7)).optional(), // 1=пн, 7=вс
-  interval: z.number().min(1).optional(),
+  daysOfWeek: z.array(z.number().int().min(1).max(7)).max(7).optional(), // 1=пн, 7=вс
+  interval: z.number().int().min(1).max(365).optional(),
   isActive: z.boolean().default(true),
+})
+
+const HabitUpdateSchema = HabitSchema.partial().extend({
+  id: z.coerce.number().int().positive(),
+  streak: z.coerce.number().int().min(0).max(100000).optional(),
+  bestStreak: z.coerce.number().int().min(0).max(100000).optional(),
+  totalDone: z.coerce.number().int().min(0).max(100000).optional(),
+  sortOrder: z.coerce.number().int().min(0).max(100000).optional(),
 })
 
 // GET - получить все активные привычки + какие нужны сегодня
@@ -111,12 +119,15 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { id, ...data } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    const validation = HabitUpdateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+
+    const { id, ...data } = validation.data
 
     // Проверяем, что привычка принадлежит пользователю
     const existing = await prisma.habit.findFirst({

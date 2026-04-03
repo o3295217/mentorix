@@ -22,7 +22,8 @@ cd "$LOCAL_PATH"
 if [[ -z $(git status --porcelain) ]]; then
     echo "Нет изменений для коммита"
 else
-    git add -A
+    git add --update
+    git add app components hooks lib prisma cloudflare-proxy docs public scripts middleware.ts next.config.js package.json eslint.config.mjs postcss.config.js tailwind.config.js tsconfig.json docker-entrypoint.sh docker-compose.production.yml Dockerfile README.md CHANGELOG.md CONTRIBUTING.md 2>/dev/null || true
     read -p "Сообщение коммита (или Enter для 'update'): " COMMIT_MSG
     COMMIT_MSG=${COMMIT_MSG:-"update"}
     git commit -m "$COMMIT_MSG"

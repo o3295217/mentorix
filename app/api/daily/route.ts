@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(entries)
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(entry)
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },

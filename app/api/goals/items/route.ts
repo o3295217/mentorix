@@ -5,6 +5,32 @@ import { parseDateParam } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { syncCompletedWorkForGoal, removeCompletedWorkForGoal } from '@/lib/completed-work'
+import { z } from 'zod'
+
+const GoalPrioritySchema = z.union([
+  z.number().int().min(0).max(2),
+  z.enum(['none', 'medium', 'high']),
+])
+
+const GoalCreateSchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  periodType: z.string().trim().min(1).max(32),
+  periodKey: z.string().trim().min(1).max(64),
+  deadline: z.string().trim().min(1).max(32).nullable().optional(),
+  priority: GoalPrioritySchema.optional(),
+  tags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
+})
+
+const GoalUpdateSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  text: z.string().trim().min(1).max(500).optional(),
+  completed: z.boolean().optional(),
+  deadline: z.string().trim().min(1).max(32).nullable().optional(),
+  priority: GoalPrioritySchema.optional(),
+  tags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
+  blockedBy: z.array(z.coerce.number().int().positive()).max(50).optional(),
+  sortOrder: z.coerce.number().int().min(0).max(100000).optional(),
+})
 
 // Конвертация числа приоритета в строку
 const priorityNumToStr = (num: number): string => {
@@ -49,7 +75,7 @@ export async function GET(request: NextRequest) {
       history: safeParseJson<Array<{ type: string; date: string }>>(g.historyJson, []),
     })))
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },
@@ -65,8 +91,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { text, periodType, periodKey, deadline, priority, tags } = body
+    const validation = GoalCreateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
+    }
+
+    const { text, periodType, periodKey, deadline, priority, tags } = validation.data
 
     // priority приходит как число (0-3), конвертируем в строку
     const priorityStr = typeof priority === 'number' ? priorityNumToStr(priority) : (priority || 'none')
@@ -95,7 +128,7 @@ export async function POST(request: NextRequest) {
       history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
     })
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },
@@ -111,8 +144,15 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { id, text, completed, deadline, priority, tags, blockedBy, sortOrder } = body
+    const validation = GoalUpdateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
+    }
+
+    const { id, text, completed, deadline, priority, tags, blockedBy, sortOrder } = validation.data
 
     const existingGoal = await prisma.goal.findFirst({ where: { id, userId } })
     if (!existingGoal) {
@@ -178,7 +218,7 @@ export async function PUT(request: NextRequest) {
       history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
     })
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },
@@ -222,7 +262,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },

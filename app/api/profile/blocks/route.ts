@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { z } from 'zod'
+
+const ProfileBlockCreateSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+})
+
+const ProfileBlockUpdateSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  title: z.string().trim().min(1).max(120).optional(),
+  order: z.coerce.number().int().min(0).max(100000).optional(),
+})
 
 // GET /api/profile/blocks - получить все блоки с категориями и пунктами
 export async function GET(request: NextRequest) {
@@ -36,12 +47,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { title } = body
-
-    if (!title || typeof title !== 'string' || title.trim() === '') {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    const validation = ProfileBlockCreateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+
+    const { title } = validation.data
 
     // Получаем максимальный order для нового блока
     const maxOrder = await prisma.profileBlock.aggregate({
@@ -98,21 +112,19 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { id, title, order } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    const validation = ProfileBlockUpdateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
 
-    const numericId = typeof id === 'number' ? id : parseInt(id)
-    if (isNaN(numericId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const { id: numericId, title, order } = validation.data
 
     const updateData: { title?: string; order?: number } = {}
-    if (title !== undefined) updateData.title = title.trim()
-    if (order !== undefined) updateData.order = parseInt(order)
+    if (title !== undefined) updateData.title = title
+    if (order !== undefined) updateData.order = order
 
     const block = await prisma.profileBlock.update({
       where: { id: numericId, userId },

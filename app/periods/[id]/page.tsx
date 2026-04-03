@@ -5,6 +5,19 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { safeParseJson } from '@/lib/safe-json'
+
+function toNumber(value: unknown, fallback: number = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function toStringValue(value: unknown, fallback: string = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
 
 interface PeriodEvaluation {
   id: number
@@ -74,14 +87,70 @@ export default function PeriodDetailPage() {
     )
   }
 
-  const professionalBlock = JSON.parse(evaluation.professionalBlock)
-  const personalBlock = JSON.parse(evaluation.personalBlock)
-  const socialBlock = JSON.parse(evaluation.socialBlock)
-  const balanceBlock = JSON.parse(evaluation.balanceBlock)
-  const patterns = JSON.parse(evaluation.patterns)
-  const trends = JSON.parse(evaluation.trends)
-  const goalsCompletion = JSON.parse(evaluation.goalsCompletion)
-  const blockers = evaluation.blockers ? JSON.parse(evaluation.blockers) : null
+  const professionalBlockRaw = safeParseJson<Record<string, unknown>>(evaluation.professionalBlock, {})
+  const personalBlockRaw = safeParseJson<Record<string, unknown>>(evaluation.personalBlock, {})
+  const socialBlockRaw = safeParseJson<Record<string, unknown>>(evaluation.socialBlock, {})
+  const balanceBlockRaw = safeParseJson<Record<string, unknown>>(evaluation.balanceBlock, {})
+  const patternsRaw = safeParseJson<Record<string, unknown>>(evaluation.patterns, {})
+  const trendsRaw = safeParseJson<Record<string, unknown>>(evaluation.trends, {})
+  const goalsCompletionRaw = safeParseJson<Record<string, unknown>>(evaluation.goalsCompletion, {})
+  const blockersRaw = safeParseJson<Record<string, unknown> | null>(evaluation.blockers, null)
+
+  const professionalBlock = {
+    strategyAvg: toNumber(professionalBlockRaw.strategyAvg ?? professionalBlockRaw.strategicFocusAvg),
+    operationsAvg: toNumber(professionalBlockRaw.operationsAvg ?? professionalBlockRaw.productivityAvg),
+    teamAvg: toNumber(professionalBlockRaw.teamAvg ?? professionalBlockRaw.disciplineAvg),
+    analysis: toStringValue(professionalBlockRaw.analysis),
+  }
+
+  const personalBlock = {
+    healthScore: toNumber(personalBlockRaw.healthScore),
+    familyScore: toNumber(personalBlockRaw.familyScore),
+    energyScore: toNumber(personalBlockRaw.energyScore),
+    analysis: toStringValue(personalBlockRaw.analysis),
+  }
+
+  const socialBlock = {
+    teamworkScore: toNumber(socialBlockRaw.teamworkScore ?? socialBlockRaw.supportScore),
+    analysis: toStringValue(socialBlockRaw.analysis),
+  }
+
+  const balanceBlock = {
+    workLifeBalance: toNumber(balanceBlockRaw.workLifeBalance),
+    riskOfBurnout: toStringValue(balanceBlockRaw.riskOfBurnout ?? balanceBlockRaw.riskLevel),
+    analysis: toStringValue(balanceBlockRaw.analysis),
+  }
+
+  const patterns = {
+    bestDays: toStringArray(patternsRaw.bestDays),
+    worstDays: toStringArray(patternsRaw.worstDays),
+    productivityPattern: toStringValue(patternsRaw.productivityPattern),
+    balanceIssues: toStringArray(patternsRaw.balanceIssues),
+  }
+
+  const trends = {
+    dreamProgressTrend: toStringValue(trendsRaw.dreamProgressTrend, 'стабильно'),
+    overallTrend: toStringValue(trendsRaw.overallTrend, 'стабильно'),
+    strategyTrend: toStringValue(trendsRaw.strategyTrend ?? trendsRaw.strategicFocusTrend, 'стабильно'),
+    description: toStringValue(trendsRaw.description),
+  }
+
+  const goalsCompletion = {
+    totalGoals: toNumber(goalsCompletionRaw.totalGoals),
+    completedGoals: toNumber(goalsCompletionRaw.completedGoals),
+    inProgressGoals: toNumber(goalsCompletionRaw.inProgressGoals),
+    notStartedGoals: toNumber(goalsCompletionRaw.notStartedGoals),
+    completionRate: toNumber(goalsCompletionRaw.completionRate),
+    analysis: toStringValue(goalsCompletionRaw.analysis),
+  }
+
+  const blockers = blockersRaw
+    ? {
+        strategic: toStringArray(blockersRaw.strategic),
+        operational: toStringArray(blockersRaw.operational),
+        personal: toStringArray(blockersRaw.personal),
+      }
+    : null
 
   const getPeriodLabel = (type: string) => {
     const labels: Record<string, string> = {

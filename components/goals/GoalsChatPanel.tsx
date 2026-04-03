@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import type { ParsedGoal } from '@/hooks/useGoalsChat'
 
 interface ChatMessage {
@@ -56,12 +56,12 @@ function splitMessageIntoSections(content: string, blocks: GoalBlock[]): Content
     }
 
     // Check if this line is a goal line belonging to current block
-    const isGoalLine = /^\s*(\d+[\.\)]\s|[-•]\s)/.test(line) && blockIndex < blocks.length
+    const isGoalLine = /^\s*(\d+[.)]\s|[-•]\s)/.test(line) && blockIndex < blocks.length
     if (isGoalLine) {
       // Accumulate goal lines — they'll be represented by the block
       // Check if we've accumulated all goals for this block
       const block = blocks[blockIndex]
-      const goalText = line.replace(/^\s*(\d+[\.\)]\s*|[-•]\s*)/, '').trim()
+      const goalText = line.replace(/^\s*(\d+[.)]\s*|[-•]\s*)/, '').trim()
       const isLastGoal = block.goals.some(
         (g, gi) => gi === block.goals.length - 1 && g.text === goalText
       )

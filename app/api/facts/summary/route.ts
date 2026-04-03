@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 
 export async function GET(request: NextRequest) {
@@ -8,8 +10,7 @@ export async function GET(request: NextRequest) {
     const periodType = request.nextUrl.searchParams.get('periodType') // week | month
     const limit = Math.min(Number(request.nextUrl.searchParams.get('limit') || '10'), 50)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = { userId }
+    const where: Prisma.WorkSummaryWhereInput = { userId }
     if (periodType) where.periodType = periodType
 
     const summaries = await prisma.workSummary.findMany({
@@ -20,11 +21,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(summaries.map(s => ({
       ...s,
-      keyAchievements: JSON.parse(s.keyAchievements),
-      topCategories: s.topCategoriesJson ? JSON.parse(s.topCategoriesJson) : {},
+      keyAchievements: safeParseJson<string[]>(s.keyAchievements, []),
+      topCategories: safeParseJson<Record<string, number>>(s.topCategoriesJson, {}),
     })))
   } catch (error) {
-    const statusCode = (error as any)?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },

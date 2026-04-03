@@ -18,15 +18,15 @@ import { getAnthropicClient } from '@/lib/anthropic'
 import { getWorkContextForAI } from '@/lib/completed-work'
 
 const ChatSchema = z.object({
-  date: z.string(),
-  currentTime: z.string().optional(), // HH:MM время пользователя
-  planTasks: z.array(z.string()),
-  completedTasks: z.array(z.string()),
+  date: z.string().trim().min(1).max(32),
+  currentTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), // HH:MM время пользователя
+  planTasks: z.array(z.string().trim().min(1).max(500)).max(50),
+  completedTasks: z.array(z.string().trim().min(1).max(500)).max(50),
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
-    content: z.string(),
-  })),
-  userMessage: z.string(), // Новое сообщение пользователя
+    content: z.string().max(4000),
+  })).max(40),
+  userMessage: z.string().trim().min(1).max(4000), // Новое сообщение пользователя
 })
 
 // День недели на русском
@@ -34,18 +34,6 @@ function getDayOfWeek(dateStr: string): string {
   const days = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
   const date = parseDateParam(dateStr)
   return days[date.getDay()]
-}
-
-// Номер недели в месяце
-function getWeekNumber(date: Date): number {
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-  const firstMonday = new Date(firstDay)
-  while (firstMonday.getDay() !== 1) firstMonday.setDate(firstMonday.getDate() + 1)
-  
-  if (date < firstMonday) return 1
-  
-  const diff = Math.floor((date.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000))
-  return diff + 1
 }
 
 // Дней до конца недели (воскресенья)
@@ -258,10 +246,13 @@ export async function POST(request: NextRequest) {
     const planKeywords = ['план', 'задач', 'посмотри', 'смотри', 'анализ', 'проверь', 'оцен', 'что сегодня', 'что делать', 'что у меня', 'покажи']
     const needPlan = messages.length === 0 || planKeywords.some(kw => userMessage.toLowerCase().includes(kw))
     
-    // Логирование для отладки
-    console.log(`[Plan Chat] Date: ${date}, Tasks: ${planTasks.length}, Completed: ${completedTasks.length}, History: ${messages.length}`)
-    console.log(`[Plan Chat] Task list: ${planTasks.join(' | ').substring(0, 200)}`)
-    console.log(`[Plan Chat] Need plan context: ${needPlan}, User message: "${userMessage.substring(0, 50)}"`)
+    console.log('[Plan Chat] Request summary:', {
+      date,
+      planTasks: planTasks.length,
+      completedTasks: completedTasks.length,
+      historyMessages: messages.length,
+      needPlan,
+    })
 
     // Собрать историю сообщений для Claude
     const claudeMessages: { role: 'user' | 'assistant'; content: string }[] = []

@@ -1,24 +1,26 @@
 import { NextResponse } from 'next/server';
 import { registerUser, createEmailVerificationToken, isEmailVerificationRequired } from '@/lib/auth';
+import { MIN_PASSWORD_LENGTH } from '@/lib/auth-constants'
 import { prisma } from '@/lib/prisma';
-import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { sendEmail, getEmailVerificationContent } from '@/lib/email';
 import { notifyTelegram } from '@/lib/telegram';
 
-// Rate limiter для регистрации - защита от спама
-const registerRateLimiter = {
-  limit: 3, // 3 попытки
-  windowMs: 60 * 60 * 1000, // 1 час
-  keyPrefix: 'register',
-};
+function verificationResponse() {
+  return NextResponse.json({
+    success: true,
+    requiresVerification: true,
+    message: 'Если email доступен для регистрации, проверьте почту для подтверждения.',
+  })
+}
 
 export async function POST(request: Request) {
   try {
     // Проверяем rate limit
     const clientId = getClientIdentifier(request);
-    const rateLimit = checkRateLimit(clientId, registerRateLimiter);
+    const rateLimit = checkRateLimit(clientId, rateLimiters.authRegistration);
     
     if (!rateLimit.success) {
       return NextResponse.json(
@@ -43,6 +45,13 @@ export async function POST(request: Request) {
         { error: 'Email и пароль обязательны' },
         { status: 400 }
       );
+    }
+
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `Пароль должен быть не менее ${MIN_PASSWORD_LENGTH} символов` },
+        { status: 400 }
+      )
     }
 
     // Валидация формата email
@@ -71,6 +80,7 @@ export async function POST(request: Request) {
     }
 
     const registrationMode = process.env.REGISTRATION_MODE || 'open';
+    const normalizedEmail = email.toLowerCase().trim()
     
     // Проверяем invite code для режима invite
     if (registrationMode === 'invite') {
@@ -89,12 +99,27 @@ export async function POST(request: Request) {
     }
 
     // Проверяем, существует ли пользователь (до проверки лимита)
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'Пользователь с таким email уже зарегистрирован', code: 'USER_EXISTS' },
-        { status: 409 }
-      );
+      const requiresVerification = isEmailVerificationRequired()
+
+      if (requiresVerification && !existingUser.emailVerified && existingUser.isActive) {
+        try {
+          const token = await createEmailVerificationToken(existingUser.id)
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+          const verifyUrl = `${appUrl}/verify-email?token=${token}`
+          const emailContent = getEmailVerificationContent(verifyUrl, existingUser.name || undefined)
+
+          await sendEmail({
+            to: normalizedEmail,
+            ...emailContent,
+          })
+        } catch (verificationError) {
+          console.error('Failed to resend verification email:', verificationError)
+        }
+      }
+
+      return verificationResponse()
     }
 
     // Проверяем лимит пользователей
@@ -116,7 +141,7 @@ export async function POST(request: Request) {
     const emailVerified = registrationMode === 'invite';
     
     // Регистрируем пользователя
-    const result = await registerUser(email, password, name, {
+    const result = await registerUser(normalizedEmail, password, name, {
       skipSession: requiresVerification && !emailVerified,
       emailVerified,
     });
@@ -136,7 +161,7 @@ export async function POST(request: Request) {
       
       const emailContent = getEmailVerificationContent(verifyUrl, name);
       const emailResult = await sendEmail({
-        to: email,
+        to: normalizedEmail,
         ...emailContent,
       });
 
@@ -145,13 +170,9 @@ export async function POST(request: Request) {
         // Не блокируем регистрацию, но логируем ошибку
       }
 
-      notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${email}`);
+      notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${normalizedEmail}`);
 
-      return NextResponse.json({
-        success: true,
-        requiresVerification: true,
-        message: 'Проверьте почту для подтверждения email',
-      });
+      return verificationResponse()
     }
 
     // Сессия создана — устанавливаем cookies
@@ -167,7 +188,7 @@ export async function POST(request: Request) {
       user: result.session.user,
     });
 
-    notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${email}`);
+    notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${normalizedEmail}`);
 
     // Устанавливаем cookie
     const useSecureCookie = process.env.COOKIE_SECURE === 'true';

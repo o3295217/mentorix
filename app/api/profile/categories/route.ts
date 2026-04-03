@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { z } from 'zod'
+
+const ProfileCategoryCreateSchema = z.object({
+  blockId: z.coerce.number().int().positive(),
+  title: z.string().trim().min(1).max(120),
+})
+
+const ProfileCategoryUpdateSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  title: z.string().trim().min(1).max(120).optional(),
+  order: z.coerce.number().int().min(0).max(100000).optional(),
+})
 
 // GET /api/profile/categories?blockId=123 - получить категории блока
 export async function GET(request: NextRequest) {
@@ -42,16 +54,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { blockId, title } = body
-
-    if (!blockId || !title || typeof title !== 'string' || title.trim() === '') {
-      return NextResponse.json({ error: 'Block ID and title are required' }, { status: 400 })
+    const validation = ProfileCategoryCreateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
+
+    const { blockId, title } = validation.data
 
     // Проверяем что блок принадлежит пользователю
     const block = await prisma.profileBlock.findFirst({
-      where: { id: parseInt(blockId), userId }
+      where: { id: blockId, userId }
     })
     if (!block) {
       return NextResponse.json({ error: 'Block not found' }, { status: 404 })
@@ -59,14 +74,14 @@ export async function POST(request: NextRequest) {
 
     // Получаем максимальный order для новой категории
     const maxOrder = await prisma.profileCategory.aggregate({
-      where: { blockId: parseInt(blockId) },
+      where: { blockId },
       _max: { order: true },
     })
 
     const category = await prisma.profileCategory.create({
       data: {
-        blockId: parseInt(blockId),
-        title: title.trim(),
+        blockId,
+        title,
         order: (maxOrder._max.order || 0) + 1,
       },
       include: {
@@ -121,17 +136,15 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const body = await request.json()
-    const { id, title, order } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    const validation = ProfileCategoryUpdateSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.format() },
+        { status: 400 }
+      )
     }
 
-    const numericId = typeof id === 'number' ? id : parseInt(id)
-    if (isNaN(numericId)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-    }
+    const { id: numericId, title, order } = validation.data
 
     // Проверяем что категория принадлежит блоку пользователя
     const existingCategory = await prisma.profileCategory.findFirst({
@@ -143,8 +156,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updateData: { title?: string; order?: number } = {}
-    if (title !== undefined) updateData.title = title.trim()
-    if (order !== undefined) updateData.order = parseInt(order)
+    if (title !== undefined) updateData.title = title
+    if (order !== undefined) updateData.order = order
 
     const category = await prisma.profileCategory.update({
       where: { id: numericId },
