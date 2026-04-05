@@ -34,13 +34,13 @@ const slides: Slide[] = [
     badgeColor: 'text-purple-400',
     title: (
       <>
-        От мечты —
+        Мечта становится
         <br />
-        <span className="onb-gradient-text">до задач на сегодня</span>
+        <span className="onb-gradient-text">понятным планом</span>
       </>
     ),
     subtitle:
-      'Каждый уровень логически вытекает из предыдущего. Вы всегда видите, зачем делаете то, что делаете.',
+      'Вы формулируете мечту и выбираете срок. Затем раскладываете её на год, полугодие, квартал, месяц и неделю — самостоятельно или с помощью ION. Так большая цель превращается в понятную траекторию, по которой уже можно планировать день.',
   },
   {
     id: 'rhythm',
@@ -48,13 +48,13 @@ const slides: Slide[] = [
     badgeColor: 'text-blue-400',
     title: (
       <>
-        Утром — план.
+        Утром — согласуйте день с ION.
         <br />
-        <span className="onb-gradient-text">Вечером — разбор.</span>
+        <span className="onb-gradient-text">Вечером — честный разбор.</span>
       </>
     ),
     subtitle:
-      'Каждый день вы формируете план, действуете, фиксируете результат. ИИ анализирует день по пяти критериям и даёт рекомендации.',
+      'Вы создаёте план на день, а ION помогает согласовать его с вашими целями, убрать перегруз и выделить главное. Вечером ION сравнивает план с реальностью и показывает, насколько день действительно приблизил вас к цели.',
   },
   {
     id: 'ai',
@@ -68,7 +68,7 @@ const slides: Slide[] = [
       </>
     ),
     subtitle:
-      'ION не говорит «молодец». Он показывает, где вы ускоряетесь, где буксуете, и что конкретно делать завтра.',
+      'ION помогает согласовать план с вашими целями, убрать лишнее и выбрать, что действительно продвинет день вперёд. Если день уходит в суету, ION возвращает фокус.',
   },
   {
     id: 'start',
@@ -90,11 +90,12 @@ const slides: Slide[] = [
 
 function PyramidVisual() {
   const levels = [
-    { label: 'Мечта', w: '38%', opacity: 'opacity-100' },
-    { label: 'Год', w: '50%', opacity: 'opacity-80' },
-    { label: 'Квартал', w: '62%', opacity: 'opacity-60' },
-    { label: 'Месяц', w: '74%', opacity: 'opacity-45' },
-    { label: 'Неделя', w: '86%', opacity: 'opacity-30' },
+    { label: 'Мечта', w: '34%', opacity: 'opacity-100' },
+    { label: 'Год', w: '44%', opacity: 'opacity-90' },
+    { label: 'Полугодие', w: '54%', opacity: 'opacity-75' },
+    { label: 'Квартал', w: '64%', opacity: 'opacity-60' },
+    { label: 'Месяц', w: '76%', opacity: 'opacity-45' },
+    { label: 'Неделя', w: '88%', opacity: 'opacity-30' },
     { label: 'День', w: '100%', opacity: 'opacity-20' },
   ]
   return (
@@ -115,10 +116,10 @@ function PyramidVisual() {
 
 function RhythmVisual() {
   const steps = [
-    { time: 'Утро', text: 'Создайте план дня', color: 'border-purple-400/40' },
-    { time: 'День', text: 'Действуйте и отмечайте', color: 'border-blue-400/40' },
-    { time: 'Вечер', text: 'Зафиксируйте результат', color: 'border-blue-400/40' },
-    { time: 'Оценка', text: 'Получите разбор от ИИ', color: 'border-green-400/40' },
+    { time: 'Утро', text: 'Создайте и согласуйте план с ION', color: 'border-purple-400/40' },
+    { time: 'День', text: 'Действуйте и отмечайте результат', color: 'border-blue-400/40' },
+    { time: 'Вечер', text: 'Зафиксируйте, как день прошёл на самом деле', color: 'border-blue-400/40' },
+    { time: 'Оценка', text: 'Получите разбор и следующий шаг', color: 'border-green-400/40' },
   ]
   return (
     <div className="w-full max-w-sm mx-auto space-y-3">
@@ -142,12 +143,12 @@ function AiVisual() {
     <div className="w-full max-w-sm mx-auto space-y-4">
       <div className="flex gap-3">
         <div className="bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm max-w-[80%]">
-          Какие задачи приблизят меня к цели на этой неделе?
+          Какие задачи в моём плане действительно двигают цель недели?
         </div>
       </div>
       <div className="flex gap-3 justify-end">
         <div className="bg-blue-600/20 border border-blue-500/30 text-blue-200 px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm max-w-[80%]">
-          Исходя из ваших целей на неделю, стоит сфокусироваться на трёх ключевых задачах...
+          Вот эти задачи работают на цель недели. Остальное полезно, но не должно съесть главный фокус дня.
         </div>
       </div>
     </div>

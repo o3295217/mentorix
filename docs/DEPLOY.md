@@ -146,6 +146,9 @@ sudo nano /etc/nginx/sites-available/ai-assistant
 ```
 
 ```nginx
+# Rate limiting (60 запросов/сек, burst 30)
+limit_req_zone $binary_remote_addr zone=general_limit:10m rate=60r/s;
+
 server {
     listen 80;
     server_name your-domain.com;
@@ -161,8 +164,21 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
+
+    # Rate limiting для API
+    location /api/ {
+        limit_req zone=general_limit burst=30 nodelay;
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
+
+> **Важно:** Не используйте слишком строгий rate limit (напр. 10r/m) для `/api/` — страницы загружают ~20 параллельных GET-запросов, что приведёт к массовым 503 ошибкам.
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/ai-assistant /etc/nginx/sites-enabled/

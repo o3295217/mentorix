@@ -49,24 +49,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Загружаем профиль планирования и профиль пользователя
-    const [planningProfile, userProfile, profileBlocks] = await Promise.all([
-      prisma.planningProfile.findUnique({ where: { userId } }),
-      prisma.userProfile.findFirst({ where: { userId } }),
-      prisma.profileBlock.findMany({
-        where: { userId },
-        include: {
-          categories: {
-            include: { items: { orderBy: { order: 'asc' } } },
-            orderBy: { order: 'asc' },
+    let planningProfile: Awaited<ReturnType<typeof prisma.planningProfile.findUnique>> = null
+    let userProfile: Awaited<ReturnType<typeof prisma.userProfile.findFirst>> = null
+    let profileBlocks: { title: string; categories: { title: string; items: { fieldName: string; fieldValue: string; content: string | null }[] }[]; items: { fieldName: string; fieldValue: string; content: string | null }[] }[] = []
+    try {
+      const [pp, up, pb] = await Promise.all([
+        prisma.planningProfile.findUnique({ where: { userId } }),
+        prisma.userProfile.findFirst({ where: { userId } }),
+        prisma.profileBlock.findMany({
+          where: { userId },
+          include: {
+            categories: {
+              include: { items: { orderBy: { order: 'asc' } } },
+              orderBy: { order: 'asc' },
+            },
+            items: {
+              where: { categoryId: null },
+              orderBy: { order: 'asc' },
+            },
           },
-          items: {
-            where: { categoryId: null },
-            orderBy: { order: 'asc' },
-          },
-        },
-        orderBy: { order: 'asc' },
-      }),
-    ])
+          orderBy: { order: 'asc' },
+        }),
+      ])
+      planningProfile = pp
+      userProfile = up
+      profileBlocks = pb
+    } catch (dbError) {
+      console.error('Failed to load profiles:', dbError)
+    }
 
     const systemPrompt = buildGoalsDecomposePrompt(context, planningProfile, userProfile, profileBlocks)
     const anthropic = getAnthropicClient()
@@ -121,8 +131,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    const statusCode = (error as { statusCode?: number })?.statusCode
+    const statusCode = (error as { statusCode?: number })?.statusCode ?? (error as { status?: number })?.status
     if (typeof statusCode === 'number') {
+      console.error('Goals decompose API error:', statusCode, (error as Error)?.message)
       return NextResponse.json(
         { error: (error as Error)?.message || 'Unauthorized' },
         { status: statusCode }

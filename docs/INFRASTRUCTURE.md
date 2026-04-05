@@ -32,6 +32,7 @@
 - **Nginx** — reverse proxy (порт 80/443 → localhost:3000)
 - **SSL:** Let's Encrypt (certbot, автопродление)
 - **Конфиг:** `/etc/nginx/sites-available/ai-assistant`
+- **Rate limiting:** `general_limit` — 60 запросов/сек, burst 30 (для всех `/api/` запросов). Ранее использовался `post_limit` (10 запросов/мин), который блокировал параллельные GET-запросы при загрузке страниц
 
 ## Быстрые команды
 
@@ -279,6 +280,7 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 - Prisma: используется `prisma db push` (не migrate) при старте контейнера
 - Docker Compose требует флаги `-f docker-compose.production.yml --env-file .env.production`
 - Nginx слушает порты 80 и 443, проксирует на localhost:3000
+- Nginx rate limit: `general_limit` 60r/s burst 30 для `/api/` (не хранить `.bak` файлы в sites-enabled!)
 - Порт 3000 привязан к 127.0.0.1 — недоступен извне
 - ufw включён: разрешены только 22/tcp, 80/tcp, 443/tcp
 - Контейнер app: read_only + tmpfs noexec + no-new-privileges

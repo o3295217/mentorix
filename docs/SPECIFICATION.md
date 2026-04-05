@@ -239,6 +239,7 @@ Claude API оценивает день по следующим критерия�
 | GET/POST/PUT/DELETE | `/api/goals/items` | CRUD трекинга целей (completed, priority, tags) |
 | POST | `/api/goals/move` | Перемещение целей между периодами |
 | GET/POST/DELETE | `/api/goals/tags` | Теги для целей (name, color) |
+| POST | `/api/goals/decompose` | ИИ-чат декомпозиции целей (Ion). Принимает messages, dream, yearGoals, periodGoals. Загружает UserProfile + ProfileBlocks для персонализации |
 
 ### 5.3. Ежедневные записи (`/api/daily/`)
 
@@ -616,7 +617,7 @@ Claude API оценивает день по следующим критерия�
 - API ключ Anthropic хранится в `.env.local` / `.env.production`
 - `AUTH_SECRET` — ключ для HMAC подписи сессий
 - НЕ коммитить секреты в git
-- Rate limiting на API endpoints
+- Rate limiting на API endpoints (nginx: `general_limit` 60r/s burst 30 для `/api/`)
 - Санитизация пользовательского ввода перед отправкой в Claude
 - Опциональный Cloudflare Worker прокси для обхода гео-блокировки Anthropic API
 

@@ -551,6 +551,7 @@ model ChatMessage {
 | `/api/goals/items` | GET, POST, PUT, DELETE | `app/api/goals/items/route.ts` | Tracked Goals |
 | `/api/goals/move` | POST | `app/api/goals/move/route.ts` | Перемещение целей |
 | `/api/goals/tags` | GET, POST, DELETE | `app/api/goals/tags/route.ts` | Теги |
+| `/api/goals/decompose` | POST | `app/api/goals/decompose/route.ts` | ИИ-чат декомпозиции целей (Ion). Загружает UserProfile + ProfileBlocks + PlanningProfile |
 | `/api/habits` | GET, POST, PUT, DELETE | `app/api/habits/route.ts` | Привычки |
 | `/api/habits/suggestions` | GET | `app/api/habits/suggestions/route.ts` | AI suggestions |
 | `/api/tasks/open` | GET | `app/api/tasks/open/route.ts` | Открытые задачи |
@@ -836,7 +837,7 @@ export async function getUserStatsForAI(): Promise<string>
 | `plan-chat.ts` | `PLAN_CHAT_SYSTEM_PROMPT`, `buildPlanChatContext()` |
 | `forecast.ts` | `buildForecastPrompt()` |
 | `period.ts` | `buildPeriodEvaluationPrompt()` |
-| `goals-decompose.ts` | `buildGoalsDecomposePrompt()` — декомпозиция целей через ИИ |
+| `goals-decompose.ts` | `buildGoalsDecomposePrompt(context, planningProfile?, userProfile?, profileBlocks?)` — декомпозиция целей через ИИ. Использует данные профиля пользователя (UserProfile + ProfileBlocks) для персонализации. Если профиль заполнен — задаёт меньше уточняющих вопросов |
 
 ---
 

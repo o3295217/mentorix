@@ -8,10 +8,12 @@ interface ProgressIndicatorProps {
   evaluatedDays: number
   currentStreak: number
   progressPercent: number
-  targetDays: number
+  targetDays: number | null
   currentSpeed?: number
   userName?: string
 }
+
+const MIN_EVALUATED_DAYS = 3
 
 export default function ProgressIndicator({
   effectiveDays,
@@ -22,12 +24,14 @@ export default function ProgressIndicator({
   currentSpeed = 0,
   userName = '',
 }: ProgressIndicatorProps) {
-  const targetYears = targetDays / 365
-  const remainingDays = Math.max(0, targetDays - effectiveDays)
+  const hasHorizon = targetDays != null && targetDays > 0
+  const isWarmingUp = evaluatedDays < MIN_EVALUATED_DAYS
+  const targetYears = hasHorizon ? targetDays / 365 : 0
+  const remainingDays = hasHorizon ? Math.max(0, targetDays - effectiveDays) : 0
   const regularity = elapsedDays > 0 ? evaluatedDays / elapsedDays : 0
   const quality = currentSpeed / 10
   const realRate = regularity * quality
-  const yearsToGoal = realRate > 0 ? (remainingDays / realRate) / 365 : Infinity
+  const yearsToGoal = hasHorizon && realRate > 0 ? (remainingDays / realRate) / 365 : Infinity
   const displayName = userName || 'Вы'
   const progressWidth = Math.min(100, progressPercent)
   const regularityPercent = Math.round(regularity * 100)
@@ -42,6 +46,24 @@ export default function ProgressIndicator({
   }
 
   const getStatus = () => {
+    if (!hasHorizon) {
+      return {
+        tone: 'Горизонт не задан',
+        hint: 'Укажите срок мечты, чтобы видеть прогноз.',
+        accent: 'text-indigo-300',
+        pill: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+        bar: 'from-indigo-500 via-purple-400 to-fuchsia-300',
+      }
+    }
+    if (isWarmingUp) {
+      return {
+        tone: 'Пока мало данных',
+        hint: `Оцените ещё ${MIN_EVALUATED_DAYS - evaluatedDays} дн. для расчёта прогноза.`,
+        accent: 'text-indigo-300',
+        pill: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+        bar: 'from-indigo-500 via-blue-400 to-cyan-300',
+      }
+    }
     if (yearsToGoal === Infinity) {
       return {
         tone: 'Нет устойчивого темпа',
@@ -81,6 +103,7 @@ export default function ProgressIndicator({
   const status = getStatus()
   const primaryLever = regularity < 0.6 ? 'регулярность' : 'качество дней'
   const pacePercent = (realRate * 100).toFixed(1)
+  const showForecast = hasHorizon && !isWarmingUp
 
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.35)]">
@@ -107,22 +130,32 @@ export default function ProgressIndicator({
 
         {/* Прогноз + Progress bar */}
         <div className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/35 p-4 space-y-3">
-          <div className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${status.pill}`}>
-            {primaryLever} — главный рычаг
-          </div>
+          {showForecast && (
+            <div className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${status.pill}`}>
+              {primaryLever} — главный рычаг
+            </div>
+          )}
           <p className="text-[15px] text-slate-300 leading-7">
-            При текущем темпе {displayName} придёт к цели через{' '}
-            <span className={`font-semibold ${status.accent}`}>{formatDuration(yearsToGoal)}</span>.
+            {!hasHorizon ? (
+              <>Укажите горизонт мечты на странице <a href="/goals" className="text-indigo-400 hover:text-indigo-300 font-medium">Цели</a>, чтобы видеть прогноз.</>
+            ) : isWarmingUp ? (
+              <>Оцените ещё <span className="font-semibold text-indigo-400">{MIN_EVALUATED_DAYS - evaluatedDays} дн.</span> для расчёта прогноза.</>
+            ) : (
+              <>При текущем темпе {displayName} придёт к цели через{' '}
+              <span className={`font-semibold ${status.accent}`}>{formatDuration(yearsToGoal)}</span>.</>
+            )}
           </p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">{effectiveDays.toFixed(1)} из {targetDays} эфф. дней</span>
-              <span className="font-medium text-slate-300">{progressPercent.toFixed(1)}%</span>
+          {showForecast && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">{effectiveDays.toFixed(1)} из {targetDays} эфф. дней</span>
+                <span className="font-medium text-slate-300">{progressPercent.toFixed(1)}%</span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
+                <div className={`h-full rounded-full bg-gradient-to-r ${status.bar} transition-all duration-500`} style={{ width: `${progressWidth}%` }} />
+              </div>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
-              <div className={`h-full rounded-full bg-gradient-to-r ${status.bar} transition-all duration-500`} style={{ width: `${progressWidth}%` }} />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* 3 метрики */}

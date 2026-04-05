@@ -80,7 +80,7 @@ export interface ProgressStats {
     '1000': boolean
   }
   progressPercent: number
-  targetDays: number
+  targetDays: number | null
   last30DaysData?: Array<{ date: string; score: number }>
   distribution: {
     excellent: number

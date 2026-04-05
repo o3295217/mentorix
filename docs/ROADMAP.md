@@ -24,9 +24,10 @@
   - Все данные успешно мигрированы из SQLite
 
 ### Безопасность
-- [ ] **Rate limiting на AI endpoints** — защита от abuse
-  - Файлы: `middleware.ts`, `lib/rate-limit.ts`
-  - Есть базовый, нужно усилить
+- [x] **Rate limiting на API endpoints** ✅ Настроено через nginx
+  - Nginx: `general_limit` 60r/s burst 30 для `/api/`
+  - Приложение: `lib/rate-limit.ts` — дополнительный app-level лимит
+  - Ранее: `post_limit` 10r/m вызывал 503 на GET-запросах (исправлено)
 
 - [ ] **CSRF protection** — для form submissions
   

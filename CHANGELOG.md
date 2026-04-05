@@ -7,6 +7,13 @@
 ## [Unreleased]
 
 ### 2026-04-03 — update
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 1 файлов (DreamBar)
+- 📚 Библиотеки: 1 файлов (goals-decompose)
+- 📝 Документация: 1 файлов
+
+
+### 2026-04-03 — update
 - 🔌 API: 28 файлов (route, route, route...)
 - 🧩 Компоненты: 6 файлов (AuthProvider, Landing, UncompletedTasksModal...)
 - 📄 Страницы: 7 файлов
