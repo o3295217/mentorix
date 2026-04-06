@@ -26,7 +26,7 @@ const slides: Slide[] = [
       </>
     ),
     subtitle:
-      'ION превращает амбициозные цели в понятные ежедневные действия. Никакой магии — только структура, дисциплина и честная обратная связь от ИИ.',
+      'ION помогает превратить большую цель в понятный план и каждый день держать фокус на главном.',
   },
   {
     id: 'pyramid',
@@ -40,7 +40,7 @@ const slides: Slide[] = [
       </>
     ),
     subtitle:
-      'Вы формулируете мечту и выбираете срок. Затем раскладываете её на год, полугодие, квартал, месяц и неделю — самостоятельно или с помощью ION. Так большая цель превращается в понятную траекторию, по которой уже можно планировать день.',
+      'С помощью ION или самостоятельно вы раскладываете мечту на понятные этапы — от года до недели. Так большая цель превращается в рабочий план.',
   },
   {
     id: 'rhythm',
@@ -48,27 +48,27 @@ const slides: Slide[] = [
     badgeColor: 'text-blue-400',
     title: (
       <>
-        Утром — согласуйте день с ION.
+        ION: ежедневное планирование
         <br />
-        <span className="onb-gradient-text">Вечером — честный разбор.</span>
+        <span className="onb-gradient-text">и оценка дня</span>
       </>
     ),
     subtitle:
-      'Вы создаёте план на день, а ION помогает согласовать его с вашими целями, убрать перегруз и выделить главное. Вечером ION сравнивает план с реальностью и показывает, насколько день действительно приблизил вас к цели.',
+      'ION помогает собрать и согласовать план с вашими целями, убрать перегруз и выделить главное. Оценка результата показывает, насколько этот день действительно приблизил вас к цели.',
   },
   {
-    id: 'ai',
-    badge: 'ИИ-ассистент',
+    id: 'profile',
+    badge: 'Профиль',
     badgeColor: 'text-purple-400',
     title: (
       <>
-        Не мотиватор,
+        ION точнее помогает,
         <br />
-        <span className="onb-gradient-text">а навигатор</span>
+        <span className="onb-gradient-text">когда знает вас</span>
       </>
     ),
     subtitle:
-      'ION помогает согласовать план с вашими целями, убрать лишнее и выбрать, что действительно продвинет день вперёд. Если день уходит в суету, ION возвращает фокус.',
+      'Профиль пользователя помогает учитывать ваш ритм жизни, интересы и то, что для вас важно.',
   },
   {
     id: 'start',
@@ -76,13 +76,13 @@ const slides: Slide[] = [
     badgeColor: 'text-green-400',
     title: (
       <>
-        Определите цель.
+        Сначала — профиль.
         <br />
-        <span className="onb-gradient-text">Остальное — наше дело.</span>
+        <span className="onb-gradient-text">Потом — мечта.</span>
       </>
     ),
     subtitle:
-      'Начните с одной главной цели. Разбейте её на шаги. Первый день — уже через минуту.',
+      'После кнопки Начать вы попадёте в профиль. Расскажите о себе, затем задайте мечту, и ION поможет превратить её в рабочий план по периодам.',
   },
 ]
 
@@ -94,9 +94,8 @@ function PyramidVisual() {
     { label: 'Год', w: '44%', opacity: 'opacity-90' },
     { label: 'Полугодие', w: '54%', opacity: 'opacity-75' },
     { label: 'Квартал', w: '64%', opacity: 'opacity-60' },
-    { label: 'Месяц', w: '76%', opacity: 'opacity-45' },
-    { label: 'Неделя', w: '88%', opacity: 'opacity-30' },
-    { label: 'День', w: '100%', opacity: 'opacity-20' },
+    { label: 'Месяц', w: '80%', opacity: 'opacity-45' },
+    { label: 'Неделя', w: '96%', opacity: 'opacity-30' },
   ]
   return (
     <div className="w-full max-w-md mx-auto space-y-2">
@@ -116,10 +115,10 @@ function PyramidVisual() {
 
 function RhythmVisual() {
   const steps = [
-    { time: 'Утро', text: 'Создайте и согласуйте план с ION', color: 'border-purple-400/40' },
-    { time: 'День', text: 'Действуйте и отмечайте результат', color: 'border-blue-400/40' },
-    { time: 'Вечер', text: 'Зафиксируйте, как день прошёл на самом деле', color: 'border-blue-400/40' },
-    { time: 'Оценка', text: 'Получите разбор и следующий шаг', color: 'border-green-400/40' },
+    { time: 'Начало', text: 'Создайте и согласуйте план с ION', color: 'border-purple-400/40' },
+    { time: 'В процессе', text: 'Выполняйте и отмечайте сделанное', color: 'border-blue-400/40' },
+    { time: 'Завершение', text: 'Запросите оценку дня', color: 'border-blue-400/40' },
+    { time: 'Разбор', text: 'Получите выводы и следующий шаг', color: 'border-green-400/40' },
   ]
   return (
     <div className="w-full max-w-sm mx-auto space-y-3">
@@ -128,29 +127,38 @@ function RhythmVisual() {
           key={s.time}
           className={`flex items-center gap-4 bg-gray-900/60 border ${s.color} rounded-xl px-5 py-3`}
         >
-          <span className="text-xs font-bold tracking-widest uppercase text-gray-500 w-16 flex-shrink-0">
+          <span className="text-xs font-bold tracking-widest uppercase text-gray-500 w-32 flex-shrink-0 text-center leading-tight">
             {s.time}
           </span>
-          <span className="text-gray-300 text-sm">{s.text}</span>
+          <span className="text-gray-300 text-sm flex-1">{s.text}</span>
         </div>
       ))}
     </div>
   )
 }
 
-function AiVisual() {
+function ProfileVisual() {
   return (
-    <div className="w-full max-w-sm mx-auto space-y-4">
-      <div className="flex gap-3">
-        <div className="bg-gray-800 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm max-w-[80%]">
-          Какие задачи в моём плане действительно двигают цель недели?
+    <div className="w-full max-w-sm mx-auto rounded-3xl border border-gray-800 bg-gray-900/60 p-5 space-y-3">
+      {[
+        'Чем вы занимаетесь',
+        'Что для вас важно',
+        'Ваш опыт и интересы',
+        'Ваш образ жизни',
+        'Ваш повседневный ритм',
+      ].map((item, index) => (
+        <div
+          key={item}
+          className={`rounded-2xl px-4 py-3 text-sm border ${
+            index === 0
+              ? 'bg-blue-500/10 border-blue-500/30 text-blue-200'
+              : 'bg-slate-900/80 border-slate-700 text-slate-300'
+          }`}
+        >
+          {item}
         </div>
-      </div>
-      <div className="flex gap-3 justify-end">
-        <div className="bg-blue-600/20 border border-blue-500/30 text-blue-200 px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm max-w-[80%]">
-          Вот эти задачи работают на цель недели. Остальное полезно, но не должно съесть главный фокус дня.
-        </div>
-      </div>
+      ))}
+      <p className="text-xs text-slate-500 pt-1">Профиль делает рекомендации более личными.</p>
     </div>
   )
 }
@@ -158,13 +166,15 @@ function AiVisual() {
 function StartVisual() {
   return (
     <div className="w-full max-w-xs mx-auto flex items-center justify-between">
-      {['Цель', 'Структура', 'Действие'].map((label, i) => (
+      {['Профиль', 'Мечта', 'План'].map((label, i) => (
         <div key={label} className="flex flex-col items-center gap-2">
           <div
             className={`w-3 h-3 rounded-full ${
-              i === 2
+              i === 0
+                ? 'bg-blue-400 ring-4 ring-blue-400/20'
+                : i === 2
                 ? 'bg-green-400 ring-4 ring-green-400/20'
-                : 'bg-blue-400 ring-4 ring-blue-400/20'
+                : 'bg-slate-500 ring-4 ring-slate-500/20'
             }`}
           />
           <span className="text-xs text-gray-500">{label}</span>
@@ -177,7 +187,7 @@ function StartVisual() {
 const slideVisuals: Record<string, React.ReactNode> = {
   pyramid: <PyramidVisual />,
   rhythm: <RhythmVisual />,
-  ai: <AiVisual />,
+  profile: <ProfileVisual />,
   start: <StartVisual />,
 }
 
@@ -213,12 +223,12 @@ export default function OnboardingPage() {
         credentials: 'include',
       })
       if (res.ok) {
-        window.location.href = '/goals'
+        window.location.href = '/profile'
       } else {
-        router.push('/goals')
+        router.push('/profile')
       }
     } catch {
-      router.push('/goals')
+      router.push('/profile')
     }
   }
 
