@@ -40,7 +40,7 @@ const slides: Slide[] = [
       </>
     ),
     subtitle:
-      'С помощью ION или самостоятельно вы раскладываете мечту на понятные этапы — от года до недели. Так большая цель превращается в рабочий план.',
+      'ION помогает разложить мечту на понятные этапы — от года до недели. Так большая цель превращается в рабочий план.',
   },
   {
     id: 'rhythm',
@@ -144,8 +144,8 @@ function ProfileVisual() {
         'Чем вы занимаетесь',
         'Что для вас важно',
         'Ваш опыт и интересы',
-        'Ваш образ жизни',
-        'Ваш повседневный ритм',
+        'Как вы живёте',
+        'Что влияет на ваш день',
       ].map((item, index) => (
         <div
           key={item}
@@ -158,7 +158,7 @@ function ProfileVisual() {
           {item}
         </div>
       ))}
-      <p className="text-xs text-slate-500 pt-1">Профиль делает рекомендации более личными.</p>
+      <p className="text-xs text-slate-500 pt-1">Так рекомендации учитывают не только цель, но и вас.</p>
     </div>
   )
 }
@@ -172,12 +172,18 @@ function StartVisual() {
             className={`w-3 h-3 rounded-full ${
               i === 0
                 ? 'bg-blue-400 ring-4 ring-blue-400/20'
-                : i === 2
-                ? 'bg-green-400 ring-4 ring-green-400/20'
-                : 'bg-slate-500 ring-4 ring-slate-500/20'
+                : i === 1
+                ? 'bg-violet-400 ring-4 ring-violet-400/20'
+                : 'bg-green-400 ring-4 ring-green-400/20'
             }`}
           />
-          <span className="text-xs text-gray-500">{label}</span>
+          <span
+            className={`text-xs ${
+              i === 0 ? 'text-blue-300' : i === 1 ? 'text-violet-300' : 'text-green-300'
+            }`}
+          >
+            {label}
+          </span>
         </div>
       ))}
     </div>
