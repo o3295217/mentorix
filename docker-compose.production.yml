@@ -73,6 +73,8 @@ services:
       # Telegram notifications
       - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
       - TG_CHAT_ID=${TG_CHAT_ID:-}
+      # Шифрование данных (AES-256-GCM)
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
     volumes:
       # Backup directory
       - ./backups:/app/backups
