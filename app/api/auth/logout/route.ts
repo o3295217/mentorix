@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server';
-import { logoutUser, getTokenFromRequest } from '@/lib/auth';
+import { logoutUser, getTokenFromRequest, getAuthUser } from '@/lib/auth';
 import { THEME_COOKIE_KEY } from '@/lib/theme'
 import { AUTH_SIG_COOKIE } from '@/lib/hmac'
+import { audit, getAuditContext } from '@/lib/audit'
 
 export async function POST(request: Request) {
   try {
     const token = getTokenFromRequest(request);
+    const user = await getAuthUser(request)
     
     if (token) {
       await logoutUser(token);
+    }
+
+    if (user) {
+      audit({ userId: user.id, action: 'logout', resource: 'User', ...getAuditContext(request) })
     }
 
     const response = NextResponse.json({ success: true });
@@ -17,7 +23,7 @@ export async function POST(request: Request) {
     response.cookies.set('auth_token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: new Date(0),
       path: '/',
     });
@@ -26,7 +32,7 @@ export async function POST(request: Request) {
     response.cookies.set(AUTH_SIG_COOKIE, '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: new Date(0),
       path: '/',
     });

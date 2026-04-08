@@ -147,3 +147,54 @@ export const rateLimiters = {
     keyPrefix: 'ai',
   },
 } as const
+
+// ==================== БЛОКИРОВКА АККАУНТА ====================
+
+const MAX_FAILED_LOGINS = 10
+const LOCKOUT_DURATION_MS = 30 * 60 * 1000 // 30 минут
+
+interface LockoutEntry {
+  failedAttempts: number
+  lockedUntil: number | null
+}
+
+const lockoutStore = new Map<string, LockoutEntry>()
+
+/**
+ * Фиксирует неудачную попытку входа для email.
+ * После MAX_FAILED_LOGINS блокирует аккаунт на LOCKOUT_DURATION_MS.
+ */
+export function recordFailedLogin(email: string): { locked: boolean } {
+  const key = email.toLowerCase()
+  const entry = lockoutStore.get(key) || { failedAttempts: 0, lockedUntil: null }
+  entry.failedAttempts++
+  if (entry.failedAttempts >= MAX_FAILED_LOGINS) {
+    entry.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
+    lockoutStore.set(key, entry)
+    return { locked: true }
+  }
+  lockoutStore.set(key, entry)
+  return { locked: false }
+}
+
+/**
+ * Проверяет, заблокирован ли аккаунт.
+ * Возвращает оставшееся время блокировки в секундах или 0.
+ */
+export function getAccountLockout(email: string): number {
+  const entry = lockoutStore.get(email.toLowerCase())
+  if (!entry?.lockedUntil) return 0
+  const remaining = entry.lockedUntil - Date.now()
+  if (remaining <= 0) {
+    lockoutStore.delete(email.toLowerCase())
+    return 0
+  }
+  return Math.ceil(remaining / 1000)
+}
+
+/**
+ * Сбрасывает счётчик при успешном входе.
+ */
+export function resetFailedLogins(email: string): void {
+  lockoutStore.delete(email.toLowerCase())
+}

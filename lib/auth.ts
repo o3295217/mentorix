@@ -6,6 +6,8 @@
 import bcrypt from 'bcrypt';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { prisma } from './prisma';
+import { setAuditContext } from './prisma-audit';
+import { getAuditContext } from './audit';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -176,6 +178,9 @@ export async function registerUser(
   }
 }
 
+import { recordFailedLogin, getAccountLockout, resetFailedLogins } from './rate-limit'
+import { notifyTelegram } from './telegram'
+
 // Вход пользователя
 export async function loginUser(
   email: string,
@@ -184,9 +189,19 @@ export async function loginUser(
   ipAddress?: string
 ): Promise<AuthResult & { emailNotVerified?: boolean }> {
   try {
+    // Проверяем блокировку аккаунта
+    const lockoutSeconds = getAccountLockout(email)
+    if (lockoutSeconds > 0) {
+      return { success: false, error: `Аккаунт временно заблокирован. Попробуйте через ${Math.ceil(lockoutSeconds / 60)} мин.` }
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
     
     if (!user) {
+      const { locked } = recordFailedLogin(email)
+      if (locked) {
+        notifyTelegram(`🔒 Аккаунт заблокирован (10 неудачных попыток)\n<b>${email}</b>\nIP: ${ipAddress || 'unknown'}`)
+      }
       return { success: false, error: 'Неверный email или пароль' };
     }
 
@@ -196,8 +211,15 @@ export async function loginUser(
 
     const isValid = await verifyPassword(password, user.passwordHash, user.id);
     if (!isValid) {
+      const { locked } = recordFailedLogin(email)
+      if (locked) {
+        notifyTelegram(`🔒 Аккаунт заблокирован (10 неудачных попыток)\n<b>${email}</b>\nIP: ${ipAddress || 'unknown'}`)
+      }
       return { success: false, error: 'Неверный email или пароль' };
     }
+
+    // Успешный вход — сбрасываем счётчик
+    resetFailedLogins(email)
 
     // Проверяем верификацию email (только если включена в настройках)
     if (isEmailVerificationRequired() && !user.emailVerified) {
@@ -408,6 +430,8 @@ export async function requireAuth(request: Request): Promise<AuthUser> {
   if (!user) {
     throw new AuthError('Unauthorized', 401);
   }
+  const { ipAddress, userAgent } = getAuditContext(request)
+  setAuditContext({ userId: user.id, ipAddress, userAgent })
   return user;
 }
 

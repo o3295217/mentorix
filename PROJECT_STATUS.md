@@ -116,7 +116,7 @@
 - `goals/WeekCard`
 - `goals/WeekStrip`
 
-## Модели БД (26)
+## Модели БД (27)
 
 ### User
 | Поле | Тип |
@@ -539,6 +539,19 @@
 | declined | `Boolean` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
+
+### AuditLog
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String?` |
+| action | `String` |
+| resource | `String?` |
+| resourceId | `String?` |
+| details | `String?` |
+| ipAddress | `String?` |
+| userAgent | `String?` |
+| createdAt | `DateTime` |
 
 
 ## Зависимости

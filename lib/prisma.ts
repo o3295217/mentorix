@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { encryptionMiddleware } from './prisma-encryption'
+import { auditMiddleware } from './prisma-audit'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -8,6 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(): PrismaClient {
   const client = new PrismaClient()
   client.$use(encryptionMiddleware)
+  client.$use(auditMiddleware)
   return client
 }
 

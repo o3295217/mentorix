@@ -7,6 +7,7 @@ import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { sendEmail, getEmailVerificationContent } from '@/lib/email';
 import { notifyTelegram } from '@/lib/telegram';
+import { audit, getAuditContext } from '@/lib/audit'
 
 function verificationResponse() {
   return NextResponse.json({
@@ -171,6 +172,7 @@ export async function POST(request: Request) {
       }
 
       notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${normalizedEmail}`);
+      audit({ userId: result.userId, action: 'register', resource: 'User', details: normalizedEmail, ...getAuditContext(request) })
 
       return verificationResponse()
     }
@@ -189,13 +191,14 @@ export async function POST(request: Request) {
     });
 
     notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${normalizedEmail}`);
+    audit({ userId: result.session.user.id, action: 'register', resource: 'User', details: normalizedEmail, ...getAuditContext(request) })
 
     // Устанавливаем cookie
     const useSecureCookie = process.env.COOKIE_SECURE === 'true';
     response.cookies.set('auth_token', result.session.token, {
       httpOnly: true,
       secure: useSecureCookie,
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: result.session.expiresAt,
       path: '/',
     });
@@ -214,7 +217,7 @@ export async function POST(request: Request) {
     response.cookies.set(AUTH_SIG_COOKIE, sig, {
       httpOnly: true,
       secure: useSecureCookie,
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: result.session.expiresAt,
       path: '/',
     });

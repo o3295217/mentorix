@@ -563,3 +563,22 @@ model PlanningProfile {
 
   @@map("planning_profiles")
 }
+
+// ==================== АУДИТ-ЛОГ ====================
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    String?
+  action    String   // login | logout | register | read | create | update | delete | password_change | lockout
+  resource  String?  // daily_entry | goal | evaluation | profile | etc.
+  resourceId String? // id записи
+  details   String?  // доп. информация
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

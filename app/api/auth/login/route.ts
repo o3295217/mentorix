@@ -3,6 +3,7 @@ import { loginUser } from '@/lib/auth';
 import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
+import { audit, getAuditContext } from '@/lib/audit'
 
 export async function POST(request: Request) {
   try {
@@ -40,9 +41,12 @@ export async function POST(request: Request) {
     const forwardedFor = request.headers.get('X-Forwarded-For');
     const ipAddress = forwardedFor?.split(',')[0].trim() || undefined;
 
+    const auditCtx = getAuditContext(request)
     const result = await loginUser(email, password, userAgent, ipAddress);
 
     if (!result.success || !result.session) {
+      audit({ action: 'login_failed', resource: 'User', details: email, ...auditCtx })
+
       // Email не подтверждён
       if (result.emailNotVerified) {
         return NextResponse.json(
@@ -60,6 +64,8 @@ export async function POST(request: Request) {
       );
     }
 
+    audit({ userId: result.session.user.id, action: 'login', resource: 'User', ...auditCtx })
+
     // Создаём ответ с cookie
     const response = NextResponse.json({
       success: true,
@@ -72,7 +78,7 @@ export async function POST(request: Request) {
     response.cookies.set('auth_token', result.session.token, {
       httpOnly: true,
       secure: useSecureCookie,
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: result.session.expiresAt,
       path: '/',
     });
@@ -91,7 +97,7 @@ export async function POST(request: Request) {
     response.cookies.set(AUTH_SIG_COOKIE, sig, {
       httpOnly: true,
       secure: useSecureCookie,
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: result.session.expiresAt,
       path: '/',
     });

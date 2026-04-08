@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     response.cookies.set('auth_token', session.token, {
       httpOnly: true,
       secure: useSecureCookie,
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: session.expiresAt,
       path: '/',
     });
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     response.cookies.set(AUTH_SIG_COOKIE, sig, {
       httpOnly: true,
       secure: useSecureCookie,
-      sameSite: 'lax',
+      sameSite: 'strict',
       expires: session.expiresAt,
       path: '/',
     });
