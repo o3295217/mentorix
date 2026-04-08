@@ -270,7 +270,49 @@ API_ENDPOINTS=$(docker logs "$CONTAINER" --since 30m 2>&1 | grep '\[AI Usage\]' 
 log "API endpoints breakdown: $API_ENDPOINTS"
 
 # -----------------------------------------------------------------------------
-# 12. Ротация логов (хранить 30 дней)
+# 12. Ежедневный аудит-дайджест (отправляется раз в сутки, в 08:00)
+# -----------------------------------------------------------------------------
+HOUR=$(date '+%H')
+MINUTE=$(date '+%M')
+DIGEST_SENT_FILE="$LOG_DIR/digest-sent-$DATE_TAG"
+
+if [ "$HOUR" = "08" ] && [ ! -f "$DIGEST_SENT_FILE" ]; then
+  YESTERDAY=$(date -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -v-1d '+%Y-%m-%d' 2>/dev/null || echo "")
+
+  if [ -n "$YESTERDAY" ]; then
+    AUDIT_DIGEST=$(docker exec "$CONTAINER" node -e "
+      const { PrismaClient } = require('@prisma/client');
+      const p = new PrismaClient();
+      const since = new Date('${YESTERDAY}T00:00:00Z');
+      const until = new Date('${DATE_TAG}T00:00:00Z');
+      Promise.all([
+        p.\$queryRawUnsafe(\"SELECT action, COUNT(*)::int as cnt FROM audit_logs WHERE \\\"createdAt\\\" >= '\"+since.toISOString()+\"' AND \\\"createdAt\\\" < '\"+until.toISOString()+\"' GROUP BY action ORDER BY cnt DESC\"),
+        p.\$queryRawUnsafe(\"SELECT DISTINCT \\\"ipAddress\\\" FROM audit_logs WHERE \\\"createdAt\\\" >= '\"+since.toISOString()+\"' AND \\\"createdAt\\\" < '\"+until.toISOString()+\"' AND \\\"ipAddress\\\" IS NOT NULL\"),
+        p.\$queryRawUnsafe(\"SELECT COUNT(*)::int as total FROM audit_logs WHERE \\\"createdAt\\\" >= '\"+since.toISOString()+\"' AND \\\"createdAt\\\" < '\"+until.toISOString()+\"'\")
+      ]).then(([actions, ips, [total]]) => {
+        const lines = [total.total + ' событий'];
+        actions.forEach(a => lines.push(a.action + ': ' + a.cnt));
+        lines.push('IP: ' + ips.map(i => i.ipAddress).join(', '));
+        console.log(lines.join('\\n'));
+        p.\$disconnect();
+      }).catch(e => { console.error(e.message); p.\$disconnect(); });
+    " 2>&1 || echo "Ошибка получения дайджеста")
+
+    if [ -n "$AUDIT_DIGEST" ]; then
+      tg_send "📊 <b>Аудит за $YESTERDAY</b>
+
+$AUDIT_DIGEST"
+      touch "$DIGEST_SENT_FILE"
+      log "Daily audit digest sent"
+    fi
+  fi
+fi
+
+# Ротация digest-sent маркеров (хранить 7 дней)
+find "$LOG_DIR" -name "digest-sent-*" -mtime +7 -delete 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
+# 13. Ротация логов (хранить 30 дней)
 # -----------------------------------------------------------------------------
 find "$LOG_DIR" -name "*.log" -mtime +30 -delete 2>/dev/null || true
 

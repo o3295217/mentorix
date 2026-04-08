@@ -164,17 +164,17 @@ const lockoutStore = new Map<string, LockoutEntry>()
  * Фиксирует неудачную попытку входа для email.
  * После MAX_FAILED_LOGINS блокирует аккаунт на LOCKOUT_DURATION_MS.
  */
-export function recordFailedLogin(email: string): { locked: boolean } {
+export function recordFailedLogin(email: string): { locked: boolean; attempts: number } {
   const key = email.toLowerCase()
   const entry = lockoutStore.get(key) || { failedAttempts: 0, lockedUntil: null }
   entry.failedAttempts++
   if (entry.failedAttempts >= MAX_FAILED_LOGINS) {
     entry.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
     lockoutStore.set(key, entry)
-    return { locked: true }
+    return { locked: true, attempts: entry.failedAttempts }
   }
   lockoutStore.set(key, entry)
-  return { locked: false }
+  return { locked: false, attempts: entry.failedAttempts }
 }
 
 /**

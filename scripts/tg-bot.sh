@@ -233,22 +233,68 @@ cmd_check() {
 
   NEW_ALERTS=$(grep "\[$(date '+%Y-%m-%d %H:%M')" "$LOG_DIR/alerts.log" 2>/dev/null | tail -5 || true)
 
+  # Собираем данные аудита из БД
+  AUDIT_DATA=$(docker exec "$CONTAINER" node -e "
+    const { PrismaClient } = require('@prisma/client');
+    const p = new PrismaClient();
+    const h24 = new Date(Date.now() - 24*60*60*1000).toISOString();
+    Promise.all([
+      p.\$queryRawUnsafe(\"SELECT action, COUNT(*)::int as cnt FROM audit_logs WHERE \\\"createdAt\\\" >= '\" + h24 + \"' GROUP BY action ORDER BY cnt DESC\"),
+      p.\$queryRawUnsafe(\"SELECT COUNT(DISTINCT \\\"ipAddress\\\")::int as cnt FROM audit_logs WHERE \\\"createdAt\\\" >= '\" + h24 + \"' AND \\\"ipAddress\\\" IS NOT NULL\"),
+      p.\$queryRawUnsafe(\"SELECT COUNT(*)::int as cnt FROM sessions WHERE \\\"expiresAt\\\" > NOW()\"),
+      p.\$queryRawUnsafe(\"SELECT \\\"ipAddress\\\", MAX(\\\"createdAt\\\") as t FROM audit_logs WHERE action='login' AND \\\"createdAt\\\" >= '\" + h24 + \"' GROUP BY \\\"ipAddress\\\"\"),
+    ]).then(([actions, [ips], [sessions], loginIps]) => {
+      const r = {};
+      r.actions = actions.map(a => a.action + ': ' + a.cnt).join(', ') || 'нет';
+      r.ips = ips.cnt;
+      r.sessions = sessions.cnt;
+      r.loginIps = loginIps.map(l => l.ipAddress).join(', ') || 'нет';
+      r.failedCount = (actions.find(a => a.action === 'login_failed') || {}).cnt || 0;
+      console.log(JSON.stringify(r));
+      p.\$disconnect();
+    }).catch(() => { console.log('{}'); });
+  " 2>&1 || echo "{}")
+
+  AUDIT_ACTIONS=$(echo "$AUDIT_DATA" | jq -r '.actions // "нет данных"' 2>/dev/null || echo "нет данных")
+  AUDIT_IPS=$(echo "$AUDIT_DATA" | jq -r '.ips // 0' 2>/dev/null || echo "?")
+  AUDIT_SESSIONS=$(echo "$AUDIT_DATA" | jq -r '.sessions // 0' 2>/dev/null || echo "?")
+  AUDIT_LOGIN_IPS=$(echo "$AUDIT_DATA" | jq -r '.loginIps // "нет"' 2>/dev/null || echo "нет")
+  AUDIT_FAILED=$(echo "$AUDIT_DATA" | jq -r '.failedCount // 0' 2>/dev/null || echo "0")
+
+  if [ "$AUDIT_FAILED" -gt 0 ] 2>/dev/null; then
+    FAILED_ICON="⚠️"
+  else
+    FAILED_ICON="✅"
+  fi
+
   if [ -z "$NEW_ALERTS" ]; then
     send_with_buttons "✅ <b>Проверка завершена</b>
 
-Все 12 проверок пройдены, проблем не обнаружено:
+<b>Инфраструктура:</b>
 • Процессы контейнера в норме
 • Подозрительных файлов нет
 • Сайт доступен
 • Нагрузка в пределах нормы
 • Файрвол активен
 • Порты защищены
-• SSH-входы только от владельца" "$MAIN_KEYBOARD"
+• SSH-входы только от владельца
+
+<b>Аудит (24ч):</b>
+$FAILED_ICON Неудачных входов: $AUDIT_FAILED
+🔑 Активных сессий: $AUDIT_SESSIONS
+🌐 Уник. IP: $AUDIT_IPS ($AUDIT_LOGIN_IPS)
+📋 События: $AUDIT_ACTIONS" "$MAIN_KEYBOARD"
   else
     FORMATTED=$(echo "$NEW_ALERTS" | sed 's/\[.*\] ALERT: /🚨 /')
     send_with_buttons "🚨 <b>Проверка завершена — найдены проблемы:</b>
 
-$FORMATTED" "$MAIN_KEYBOARD"
+$FORMATTED
+
+<b>Аудит (24ч):</b>
+$FAILED_ICON Неудачных входов: $AUDIT_FAILED
+🔑 Активных сессий: $AUDIT_SESSIONS
+🌐 Уник. IP: $AUDIT_IPS ($AUDIT_LOGIN_IPS)
+📋 События: $AUDIT_ACTIONS" "$MAIN_KEYBOARD"
   fi
 }
 

@@ -181,6 +181,24 @@ export async function registerUser(
 import { recordFailedLogin, getAccountLockout, resetFailedLogins } from './rate-limit'
 import { notifyTelegram } from './telegram'
 
+/**
+ * Проверяет, был ли ранее логин с этого IP.
+ * Если нет — шлёт алерт в Telegram (fire-and-forget).
+ */
+function checkNewLoginIp(userId: string, email: string, name: string | null, ipAddress: string) {
+  prisma.session.findFirst({
+    where: { userId, ipAddress },
+    select: { id: true },
+  }).then(existing => {
+    if (!existing) {
+      notifyTelegram(
+        `🌐 Вход с нового IP\n<b>${name || email}</b>\nIP: <code>${ipAddress}</code>`,
+        `new-ip:${userId}:${ipAddress}`
+      )
+    }
+  }).catch(() => {})
+}
+
 // Вход пользователя
 export async function loginUser(
   email: string,
@@ -198,9 +216,11 @@ export async function loginUser(
     const user = await prisma.user.findUnique({ where: { email } });
     
     if (!user) {
-      const { locked } = recordFailedLogin(email)
+      const { locked, attempts } = recordFailedLogin(email)
       if (locked) {
         notifyTelegram(`🔒 Аккаунт заблокирован (10 неудачных попыток)\n<b>${email}</b>\nIP: ${ipAddress || 'unknown'}`)
+      } else if (attempts === 3) {
+        notifyTelegram(`⚠️ 3 неудачных попытки входа\n<b>${email}</b>\nIP: ${ipAddress || 'unknown'}`, `failed-3:${email}`)
       }
       return { success: false, error: 'Неверный email или пароль' };
     }
@@ -211,9 +231,11 @@ export async function loginUser(
 
     const isValid = await verifyPassword(password, user.passwordHash, user.id);
     if (!isValid) {
-      const { locked } = recordFailedLogin(email)
+      const { locked, attempts } = recordFailedLogin(email)
       if (locked) {
         notifyTelegram(`🔒 Аккаунт заблокирован (10 неудачных попыток)\n<b>${email}</b>\nIP: ${ipAddress || 'unknown'}`)
+      } else if (attempts === 3) {
+        notifyTelegram(`⚠️ 3 неудачных попытки входа\n<b>${email}</b>\nIP: ${ipAddress || 'unknown'}`, `failed-3:${email}`)
       }
       return { success: false, error: 'Неверный email или пароль' };
     }
@@ -238,6 +260,11 @@ export async function loginUser(
 
     // Создаём сессию
     const session = await createSession(user.id, userAgent, ipAddress);
+
+    // Алерт при логине с нового IP
+    if (ipAddress) {
+      checkNewLoginIp(user.id, user.email, user.name, ipAddress)
+    }
     
     return {
       success: true,
