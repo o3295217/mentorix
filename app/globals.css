@@ -293,6 +293,52 @@
   .landing-reveal-delay-2 { transition-delay: 0.2s; }
   .landing-reveal-delay-3 { transition-delay: 0.3s; }
 
+  /* ===== Step 1 animation: ION absorbs tags ===== */
+
+  /* Tags: hexagonal orbit positions + sequential glow-in then suck toward ION center */
+  .ion-tag { will-change: translate, scale, opacity; }
+  .ion-tag-0 { animation: ion-tag-0 12s ease-in-out infinite; translate: -50% calc(-50% - 83px); opacity: 0; }
+  .ion-tag-1 { animation: ion-tag-1 12s ease-in-out infinite; translate: calc(-50% + 72px) calc(-50% - 36px); opacity: 0; }
+  .ion-tag-2 { animation: ion-tag-2 12s ease-in-out infinite; translate: calc(-50% + 72px) calc(-50% + 36px); opacity: 0; }
+  .ion-tag-3 { animation: ion-tag-3 12s ease-in-out infinite; translate: -50% calc(-50% + 83px); opacity: 0; }
+  .ion-tag-4 { animation: ion-tag-4 12s ease-in-out infinite; translate: calc(-50% - 72px) calc(-50% + 36px); opacity: 0; }
+  .ion-tag-5 { animation: ion-tag-5 12s ease-in-out infinite; translate: calc(-50% - 72px) calc(-50% - 36px); opacity: 0; }
+
+  /* ION sphere grows in steps, then flashes */
+  .ion-sphere {
+    will-change: transform, box-shadow;
+    animation: ion-sphere-grow 12s ease-in-out infinite;
+  }
+  .ion-sphere-glow {
+    animation: ion-sphere-glow-pulse 12s ease-in-out infinite;
+  }
+
+  /* Lightning bolt from ION to Мечта */
+  .ion-lightning {
+    will-change: transform, opacity;
+    animation: ion-lightning-bolt 12s ease-in-out infinite;
+  }
+
+  /* Мечта border ignition */
+  .ion-dream-glow {
+    will-change: box-shadow;
+    animation: ion-dream-ignite 12s ease-in-out infinite;
+  }
+
+  /* Goal bars: sequential flash after lightning */
+  .ion-bar-0 { will-change: box-shadow, filter; animation: ion-bar-flash-0 12s ease-in-out infinite; }
+  .ion-bar-1 { will-change: box-shadow, filter; animation: ion-bar-flash-1 12s ease-in-out infinite; }
+  .ion-bar-2 { will-change: box-shadow, filter; animation: ion-bar-flash-2 12s ease-in-out infinite; }
+  .ion-bar-3 { will-change: box-shadow, filter; animation: ion-bar-flash-3 12s ease-in-out infinite; }
+  .ion-bar-4 { will-change: box-shadow, filter; animation: ion-bar-flash-4 12s ease-in-out infinite; }
+
+  /* Goal text: sequential reveal synced with bar flash */
+  .ion-goal-text-0 { animation: ion-goal-text-0 12s ease-in-out infinite; }
+  .ion-goal-text-1 { animation: ion-goal-text-1 12s ease-in-out infinite; }
+  .ion-goal-text-2 { animation: ion-goal-text-2 12s ease-in-out infinite; }
+  .ion-goal-text-3 { animation: ion-goal-text-3 12s ease-in-out infinite; }
+  .ion-goal-text-4 { animation: ion-goal-text-4 12s ease-in-out infinite; }
+
   .landing-visible .landing-reveal,
   .landing-visible.landing-reveal {
     opacity: 1;
@@ -358,6 +404,19 @@
   .landing-orb {
     animation: none !important;
   }
+  .landing-flow-line {
+    animation: none !important;
+  }
+  .landing-flow-dot {
+    animation: none !important;
+  }
+  .ion-tag,
+  .ion-sphere,
+  .ion-sphere-glow,
+  .ion-lightning,
+  .ion-dream-glow {
+    animation: none !important;
+  }
   .aion-letter-a,
   .aion-letter-i,
   .aion-letters-on {
@@ -396,6 +455,263 @@
 @keyframes landing-shimmer {
   0% { background-position: 300% center; }
   100% { background-position: 0% center; }
+}
+
+@keyframes landing-flow-pulse {
+  0%, 100% { background-position: 0% 0%; opacity: 0.3; }
+  50% { background-position: 0% 100%; opacity: 1; }
+}
+
+@keyframes landing-dot-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+/*
+ * 12s cycle timeline:
+ * 0-17% (0-2s)       Tags visible, ION idle
+ * 17-23% (2-2.8s)    Tag 0 sucked
+ * 21-27% (2.5-3.2s)  Tag 1 sucked
+ * 25-31% (3-3.7s)    Tag 2 sucked
+ * 29-35% (3.5-4.2s)  Tag 3 sucked
+ * 33-39% (4-4.7s)    Tag 4 sucked
+ * 40-46% (4.8-5.5s)  ION flash
+ * 44-50% (5.3-6s)    Lightning
+ * 48-62% (5.8-7.4s)  Мечта glow
+ * 62-83% (7.4-10s)   Hold
+ * 83-100% (10-12s)   Reset
+ */
+
+/* --- Tag keyframes: orbit → wobble → directional suck into ION center → reappear on orbit --- */
+
+/* "Свободное время" — top (0, -90px) → suck down to center */
+/* "Профессия" — top (0, -95px): glow in at 4%, suck at 20% */
+@keyframes ion-tag-0 {
+  0%, 3%   { translate: -50% calc(-50% - 83px); scale: 0.6; opacity: 0; filter: blur(4px); }
+  5%       { translate: -50% calc(-50% - 83px); scale: 1.08; opacity: 1; filter: blur(0); box-shadow: 0 0 12px rgba(96,165,250,0.6); }
+  7%       { translate: -50% calc(-50% - 83px); scale: 1; opacity: 1; filter: blur(0); box-shadow: none; }
+  19%      { translate: -50% calc(-50% - 83px); scale: 1; opacity: 1; filter: blur(0); }
+  20%      { translate: calc(-50% + 2px) calc(-50% - 86px); scale: 1.03; opacity: 1; filter: blur(0); }
+  21%      { translate: calc(-50% - 2px) calc(-50% - 80px); scale: 0.97; opacity: 1; filter: blur(0); }
+  22.5%    { translate: -50% calc(-50% - 55px); scale: 0.8; opacity: 0.9; filter: blur(0.5px); }
+  24%      { translate: -50% calc(-50% - 14px); scale: 0.2; opacity: 0.3; filter: blur(4px); }
+  25%      { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(6px); }
+  25.5%, 88% { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(0); }
+  100%     { translate: -50% calc(-50% - 83px); scale: 0.6; opacity: 0; filter: blur(4px); }
+}
+
+/* "Ценности" — right-upper (82px, -48px): glow in at 6%, suck at 24% */
+@keyframes ion-tag-1 {
+  0%, 5%   { translate: calc(-50% + 72px) calc(-50% - 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+  7%       { translate: calc(-50% + 72px) calc(-50% - 36px); scale: 1.08; opacity: 1; filter: blur(0); box-shadow: 0 0 12px rgba(96,165,250,0.6); }
+  9%       { translate: calc(-50% + 72px) calc(-50% - 36px); scale: 1; opacity: 1; filter: blur(0); box-shadow: none; }
+  23%      { translate: calc(-50% + 72px) calc(-50% - 36px); scale: 1; opacity: 1; filter: blur(0); }
+  24%      { translate: calc(-50% + 75px) calc(-50% - 38px); scale: 1.03; opacity: 1; filter: blur(0); }
+  25%      { translate: calc(-50% + 69px) calc(-50% - 34px); scale: 0.97; opacity: 1; filter: blur(0); }
+  26.5%    { translate: calc(-50% + 48px) calc(-50% - 24px); scale: 0.8; opacity: 0.9; filter: blur(0.5px); }
+  28%      { translate: calc(-50% + 12px) calc(-50% - 6px); scale: 0.2; opacity: 0.3; filter: blur(4px); }
+  29%      { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(6px); }
+  29.5%, 88% { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(0); }
+  100%     { translate: calc(-50% + 72px) calc(-50% - 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+}
+
+/* "Интересы" — right-lower (82px, 48px): glow in at 8%, suck at 28% */
+@keyframes ion-tag-2 {
+  0%, 7%   { translate: calc(-50% + 72px) calc(-50% + 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+  9%       { translate: calc(-50% + 72px) calc(-50% + 36px); scale: 1.08; opacity: 1; filter: blur(0); box-shadow: 0 0 12px rgba(96,165,250,0.6); }
+  11%      { translate: calc(-50% + 72px) calc(-50% + 36px); scale: 1; opacity: 1; filter: blur(0); box-shadow: none; }
+  27%      { translate: calc(-50% + 72px) calc(-50% + 36px); scale: 1; opacity: 1; filter: blur(0); }
+  28%      { translate: calc(-50% + 75px) calc(-50% + 38px); scale: 1.03; opacity: 1; filter: blur(0); }
+  29%      { translate: calc(-50% + 69px) calc(-50% + 34px); scale: 0.97; opacity: 1; filter: blur(0); }
+  30.5%    { translate: calc(-50% + 48px) calc(-50% + 24px); scale: 0.8; opacity: 0.9; filter: blur(0.5px); }
+  32%      { translate: calc(-50% + 12px) calc(-50% + 6px); scale: 0.2; opacity: 0.3; filter: blur(4px); }
+  33%      { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(6px); }
+  33.5%, 88% { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(0); }
+  100%     { translate: calc(-50% + 72px) calc(-50% + 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+}
+
+/* "Вызовы" — bottom (0, 95px): glow in at 10%, suck at 32% */
+@keyframes ion-tag-3 {
+  0%, 9%   { translate: -50% calc(-50% + 83px); scale: 0.6; opacity: 0; filter: blur(4px); }
+  11%      { translate: -50% calc(-50% + 83px); scale: 1.08; opacity: 1; filter: blur(0); box-shadow: 0 0 12px rgba(96,165,250,0.6); }
+  13%      { translate: -50% calc(-50% + 83px); scale: 1; opacity: 1; filter: blur(0); box-shadow: none; }
+  31%      { translate: -50% calc(-50% + 83px); scale: 1; opacity: 1; filter: blur(0); }
+  32%      { translate: calc(-50% + 2px) calc(-50% + 86px); scale: 1.03; opacity: 1; filter: blur(0); }
+  33%      { translate: calc(-50% - 2px) calc(-50% + 80px); scale: 0.97; opacity: 1; filter: blur(0); }
+  34.5%    { translate: -50% calc(-50% + 55px); scale: 0.8; opacity: 0.9; filter: blur(0.5px); }
+  36%      { translate: -50% calc(-50% + 14px); scale: 0.2; opacity: 0.3; filter: blur(4px); }
+  37%      { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(6px); }
+  37.5%, 88% { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(0); }
+  100%     { translate: -50% calc(-50% + 83px); scale: 0.6; opacity: 0; filter: blur(4px); }
+}
+
+/* "Образ жизни" — left-lower (-82px, 48px): glow in at 12%, suck at 36% */
+@keyframes ion-tag-4 {
+  0%, 11%  { translate: calc(-50% - 72px) calc(-50% + 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+  13%      { translate: calc(-50% - 72px) calc(-50% + 36px); scale: 1.08; opacity: 1; filter: blur(0); box-shadow: 0 0 12px rgba(96,165,250,0.6); }
+  15%      { translate: calc(-50% - 72px) calc(-50% + 36px); scale: 1; opacity: 1; filter: blur(0); box-shadow: none; }
+  35%      { translate: calc(-50% - 72px) calc(-50% + 36px); scale: 1; opacity: 1; filter: blur(0); }
+  36%      { translate: calc(-50% - 75px) calc(-50% + 38px); scale: 1.03; opacity: 1; filter: blur(0); }
+  37%      { translate: calc(-50% - 69px) calc(-50% + 34px); scale: 0.97; opacity: 1; filter: blur(0); }
+  38.5%    { translate: calc(-50% - 48px) calc(-50% + 24px); scale: 0.8; opacity: 0.9; filter: blur(0.5px); }
+  40%      { translate: calc(-50% - 12px) calc(-50% + 6px); scale: 0.2; opacity: 0.3; filter: blur(4px); }
+  41%      { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(6px); }
+  41.5%, 88% { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(0); }
+  100%     { translate: calc(-50% - 72px) calc(-50% + 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+}
+
+/* "Образование" — left-upper (-82px, -48px): glow in at 14%, suck at 40% (before lightning at 49%) */
+@keyframes ion-tag-5 {
+  0%, 13%  { translate: calc(-50% - 72px) calc(-50% - 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+  15%      { translate: calc(-50% - 72px) calc(-50% - 36px); scale: 1.08; opacity: 1; filter: blur(0); box-shadow: 0 0 12px rgba(96,165,250,0.6); }
+  17%      { translate: calc(-50% - 72px) calc(-50% - 36px); scale: 1; opacity: 1; filter: blur(0); box-shadow: none; }
+  39%      { translate: calc(-50% - 72px) calc(-50% - 36px); scale: 1; opacity: 1; filter: blur(0); }
+  40%      { translate: calc(-50% - 75px) calc(-50% - 38px); scale: 1.03; opacity: 1; filter: blur(0); }
+  41%      { translate: calc(-50% - 69px) calc(-50% - 34px); scale: 0.97; opacity: 1; filter: blur(0); }
+  42.5%    { translate: calc(-50% - 48px) calc(-50% - 24px); scale: 0.8; opacity: 0.9; filter: blur(0.5px); }
+  44%      { translate: calc(-50% - 12px) calc(-50% - 6px); scale: 0.2; opacity: 0.3; filter: blur(4px); }
+  45%      { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(6px); }
+  45.5%, 88% { translate: -50% -50%; scale: 0; opacity: 0; filter: blur(0); }
+  100%     { translate: calc(-50% - 72px) calc(-50% - 36px); scale: 0.6; opacity: 0; filter: blur(4px); }
+}
+
+/* --- ION sphere: step-growth synced with 6 tag arrivals + flash --- */
+@keyframes ion-sphere-grow {
+  0%, 22% { transform: scale(1); box-shadow: 0 0 32px rgba(96,165,250,0.2); }
+  /* micro-pulse on each tag arrival */
+  25%  { transform: scale(1.06); box-shadow: 0 0 36px rgba(96,165,250,0.3); }
+  26.5% { transform: scale(1.03); box-shadow: 0 0 33px rgba(96,165,250,0.22); }
+  29%  { transform: scale(1.11); box-shadow: 0 0 38px rgba(96,165,250,0.35); }
+  30.5% { transform: scale(1.08); box-shadow: 0 0 35px rgba(96,165,250,0.28); }
+  33%  { transform: scale(1.16); box-shadow: 0 0 40px rgba(96,165,250,0.4); }
+  34.5% { transform: scale(1.13); box-shadow: 0 0 37px rgba(96,165,250,0.33); }
+  37%  { transform: scale(1.22); box-shadow: 0 0 44px rgba(96,165,250,0.45); }
+  38.5% { transform: scale(1.18); box-shadow: 0 0 40px rgba(96,165,250,0.38); }
+  41%  { transform: scale(1.28); box-shadow: 0 0 48px rgba(96,165,250,0.52); }
+  42.5% { transform: scale(1.24); box-shadow: 0 0 44px rgba(96,165,250,0.44); }
+  45%  { transform: scale(1.35); box-shadow: 0 0 52px rgba(96,165,250,0.6); }
+  46.5% { transform: scale(1.30); box-shadow: 0 0 48px rgba(96,165,250,0.5); }
+  /* Flash #1 — накопление перед молнией */
+  48% { transform: scale(1.5); box-shadow: 0 0 80px rgba(96,165,250,0.9), 0 0 160px rgba(96,165,250,0.4); }
+  49% { transform: scale(1.15); box-shadow: 0 0 40px rgba(96,165,250,0.4); }
+  /* Flash #2 — ЯРКАЯ ВСПЫШКА синхронно с молнией */
+  50% { transform: scale(1.6); box-shadow: inset 0 0 20px rgba(255,255,255,0.9), inset 0 0 40px rgba(147,197,253,0.7), 0 0 60px rgba(255,255,255,0.9), 0 0 120px rgba(147,197,253,1), 0 0 200px rgba(96,165,250,0.6); filter: brightness(1.8); }
+  51% { transform: scale(1.4); box-shadow: inset 0 0 14px rgba(200,220,255,0.7), inset 0 0 30px rgba(147,197,253,0.4), 0 0 40px rgba(200,220,255,0.8), 0 0 80px rgba(147,197,253,0.7), 0 0 140px rgba(96,165,250,0.4); filter: brightness(1.4); }
+  53% { transform: scale(1.15); box-shadow: inset 0 0 6px rgba(147,197,253,0.2), 0 0 20px rgba(147,197,253,0.4), 0 0 60px rgba(96,165,250,0.2); filter: brightness(1); }
+  56% { transform: scale(1); box-shadow: 0 0 32px rgba(96,165,250,0.2); filter: brightness(1); }
+  83% { transform: scale(1); box-shadow: 0 0 32px rgba(96,165,250,0.2); }
+  100% { transform: scale(1); box-shadow: 0 0 32px rgba(96,165,250,0.2); }
+}
+
+/* --- ION glow background synced --- */
+@keyframes ion-sphere-glow-pulse {
+  0%, 22% { opacity: 0.2; transform: scale(0.7); }
+  25% { opacity: 0.28; transform: scale(0.76); }
+  29% { opacity: 0.34; transform: scale(0.82); }
+  33% { opacity: 0.40; transform: scale(0.88); }
+  37% { opacity: 0.48; transform: scale(0.96); }
+  41% { opacity: 0.56; transform: scale(1.04); }
+  45% { opacity: 0.65; transform: scale(1.15); }
+  48% { opacity: 1; transform: scale(1.6); }
+  52% { opacity: 0.8; transform: scale(1.3); }
+  56% { opacity: 0.2; transform: scale(0.7); }
+  100% { opacity: 0.2; transform: scale(0.7); }
+}
+
+/* --- Lightning bolt synced --- */
+@keyframes ion-lightning-bolt {
+  0%, 49% { opacity: 0; transform: scaleY(0); }
+  51% { opacity: 1; transform: scaleY(1); filter: drop-shadow(0 0 8px rgba(147,197,253,0.8)) drop-shadow(0 0 16px rgba(96,165,250,0.4)); }
+  54% { opacity: 1; transform: scaleY(1); filter: drop-shadow(0 0 6px rgba(147,197,253,0.6)) drop-shadow(0 0 12px rgba(96,165,250,0.3)); }
+  57% { opacity: 0; transform: scaleY(1); filter: none; }
+  100% { opacity: 0; transform: scaleY(0); }
+}
+
+/* --- Мечта border ignition synced --- */
+@keyframes ion-dream-ignite {
+  0%, 48% { box-shadow: none; }
+  51% { box-shadow: 0 0 12px rgba(96,165,250,0.7), 0 0 24px rgba(96,165,250,0.4), inset 0 0 8px rgba(96,165,250,0.15); }
+  55% { box-shadow: 0 0 20px rgba(147,197,253,0.9), 0 0 40px rgba(96,165,250,0.5), inset 0 0 12px rgba(96,165,250,0.25); }
+  62% { box-shadow: 0 0 16px rgba(96,165,250,0.6), 0 0 32px rgba(96,165,250,0.3), inset 0 0 8px rgba(96,165,250,0.1); }
+  72% { box-shadow: 0 0 8px rgba(96,165,250,0.3), 0 0 16px rgba(96,165,250,0.15); }
+  80% { box-shadow: 0 0 4px rgba(96,165,250,0.15); }
+  83%, 100% { box-shadow: none; }
+}
+
+/* Goal bar flash: sequential cascade after lightning (51-54%) */
+/* Мечта flashes at 55%, Год at 58%, Квартал at 61%, Месяц at 64%, Неделя at 67% */
+
+@keyframes ion-bar-flash-0 {
+  0%, 54% { box-shadow: none; filter: brightness(1); }
+  55% { box-shadow: 0 0 16px rgba(96,165,250,0.8), 0 0 32px rgba(96,165,250,0.4); filter: brightness(1.4); }
+  58% { box-shadow: 0 0 8px rgba(96,165,250,0.3); filter: brightness(1.1); }
+  63% { box-shadow: none; filter: brightness(1); }
+  83%, 100% { box-shadow: none; filter: brightness(1); }
+}
+@keyframes ion-bar-flash-1 {
+  0%, 57% { box-shadow: none; filter: brightness(1); }
+  58% { box-shadow: 0 0 14px rgba(96,165,250,0.7), 0 0 28px rgba(96,165,250,0.35); filter: brightness(1.35); }
+  61% { box-shadow: 0 0 6px rgba(96,165,250,0.25); filter: brightness(1.08); }
+  66% { box-shadow: none; filter: brightness(1); }
+  83%, 100% { box-shadow: none; filter: brightness(1); }
+}
+@keyframes ion-bar-flash-2 {
+  0%, 60% { box-shadow: none; filter: brightness(1); }
+  61% { box-shadow: 0 0 12px rgba(96,165,250,0.6), 0 0 24px rgba(96,165,250,0.3); filter: brightness(1.3); }
+  64% { box-shadow: 0 0 5px rgba(96,165,250,0.2); filter: brightness(1.06); }
+  69% { box-shadow: none; filter: brightness(1); }
+  83%, 100% { box-shadow: none; filter: brightness(1); }
+}
+@keyframes ion-bar-flash-3 {
+  0%, 63% { box-shadow: none; filter: brightness(1); }
+  64% { box-shadow: 0 0 10px rgba(96,165,250,0.5), 0 0 20px rgba(96,165,250,0.25); filter: brightness(1.25); }
+  67% { box-shadow: 0 0 4px rgba(96,165,250,0.15); filter: brightness(1.05); }
+  72% { box-shadow: none; filter: brightness(1); }
+  83%, 100% { box-shadow: none; filter: brightness(1); }
+}
+@keyframes ion-bar-flash-4 {
+  0%, 66% { box-shadow: none; filter: brightness(1); }
+  67% { box-shadow: 0 0 8px rgba(96,165,250,0.4), 0 0 16px rgba(96,165,250,0.2); filter: brightness(1.2); }
+  70% { box-shadow: 0 0 3px rgba(96,165,250,0.1); filter: brightness(1.04); }
+  75% { box-shadow: none; filter: brightness(1); }
+  83%, 100% { box-shadow: none; filter: brightness(1); }
+}
+
+/* Goal text: fade in synced with its bar flash, fade out before reset */
+@keyframes ion-goal-text-0 {
+  0%, 54% { opacity: 0; }
+  56% { opacity: 1; }
+  80% { opacity: 1; }
+  86% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes ion-goal-text-1 {
+  0%, 57% { opacity: 0; }
+  59% { opacity: 1; }
+  80% { opacity: 1; }
+  86% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes ion-goal-text-2 {
+  0%, 60% { opacity: 0; }
+  62% { opacity: 1; }
+  80% { opacity: 1; }
+  86% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes ion-goal-text-3 {
+  0%, 63% { opacity: 0; }
+  65% { opacity: 1; }
+  80% { opacity: 1; }
+  86% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes ion-goal-text-4 {
+  0%, 66% { opacity: 0; }
+  68% { opacity: 1; }
+  80% { opacity: 1; }
+  86% { opacity: 0; }
+  100% { opacity: 0; }
 }
 
 /* AION: I — color + position + delayed flash on both arrivals */

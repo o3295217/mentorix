@@ -49,6 +49,21 @@ AUTH_SECRET="your-secret-key-min-32-chars"
 # Claude API
 ANTHROPIC_API_KEY="sk-ant-..."
 
+# Шифрование данных at rest (AES-256-GCM)
+# Генерация: openssl rand -hex 32
+ENCRYPTION_KEY="64-hex-characters-here"
+
+# Anthropic proxy (для production за блокировкой, опционально для dev)
+# ANTHROPIC_PROXY_URL="https://anthropic-proxy.example.workers.dev"
+# ANTHROPIC_PROXY_SECRET="your-proxy-secret"
+
+# Email (для верификации и сброса пароля)
+# SMTP_HOST=smtp.example.com
+# SMTP_PORT=587
+# SMTP_USER=...
+# SMTP_PASS=...
+# EMAIL_FROM=noreply@example.com
+
 # Опционально
 REGISTRATION_MODE=open
 COOKIE_SECURE=false
@@ -206,6 +221,69 @@ docker compose up -d
 ### Проверка изоляции данных
 1. Создать второго пользователя
 2. Убедиться что данные первого не видны
+
+---
+
+## Шифрование данных (SSE)
+
+Все чувствительные текстовые поля шифруются AES-256-GCM через Prisma middleware (`lib/prisma-encryption.ts`).
+
+### Настройка
+
+1. Сгенерировать ключ:
+```bash
+openssl rand -hex 32
+```
+
+2. Добавить в `.env.local`:
+```env
+ENCRYPTION_KEY="ваши-64-hex-символа"
+```
+
+3. Для шифрования существующих данных:
+```bash
+npx tsx scripts/encrypt-existing-data.ts
+```
+
+### Для production (Docker)
+Контейнер read-only, поэтому миграция запускается через:
+```bash
+docker exec ai-assistant-app node -e "$(cat scripts/encrypt-standalone.js)"
+```
+
+### Важно
+- **Prod и dev** используют **разные ключи** `ENCRYPTION_KEY`
+- Зашифрованные значения имеют префикс `enc_v1:` — middleware автоматически пропускает уже зашифрованные
+- При утрате ключа данные **невозможно** расшифровать
+
+---
+
+## Аудит-лог
+
+Все write-операции автоматически логируются через Prisma middleware (`lib/prisma-audit.ts`).
+
+- Auth events (login, logout, lockout) логируются вручную через `audit()` из `lib/audit.ts`
+- Логи хранятся в таблице `audit_logs`
+- Просмотр: `npx prisma studio` → AuditLog
+
+---
+
+## Аутентификация (детали)
+
+### HMAC-подпись токенов
+- При логине создаётся сессия + HMAC подпись токена (`lib/hmac.ts`)
+- `middleware.ts` проверяет подпись через `crypto.subtle` (Edge Runtime, без БД)
+- `AUTH_SECRET` — обязательная env-переменная (используется как HMAC ключ)
+
+### Хэширование паролей
+- bcrypt с 12 раундами (`lib/auth.ts`)
+- Transparent migration: старые SHA-256 хэши автоматически перехэшируются при успешном входе
+
+### Rate limiting
+- Login: 5 попыток за 15 минут
+- Register: 3 за 1 час
+- AI endpoints: 10 запросов в минуту
+- После 10 неудачных входов — lockout аккаунта на 30 минут
 
 ---
 

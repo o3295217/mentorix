@@ -209,6 +209,25 @@ Claude API оценивает день по следующим критерия�
 |--------|---------|----------|
 | `ChatMessage` | `chat_messages` | Сообщения чата с ИИ: date, role (user/assistant), content |
 
+### 4.9. Выполненная работа
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `CompletedWork` | `completed_work` | Выполненная работа: date, type (task/goal/habit/extra), text, category, goalLink (привязка к цели), sourceType, sourceId. Авто-синхронизируется из DailyEntry |
+| `WorkSummary` | `work_summaries` | Сводка по периодам: periodType (week/month/quarter), periodKey, summaryText, keyAchievements, tasksCompleted, goalsCompleted. Unique: userId+periodType+periodKey |
+
+### 4.10. Профиль планирования
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `PlanningProfile` | `planning_profiles` | Профиль планирования (заполняется из чата целей): hoursPerWeek, experienceLevel, hasBudget, currentWorkload, constraints, declined |
+
+### 4.11. Аудит-лог
+
+| Модель | Таблица | Описание |
+|--------|---------|----------|
+| `AuditLog` | `audit_logs` | Лог всех операций: action (login/logout/create/update/delete/lockout), resource, resourceId, details, ipAddress, userAgent |
+
 ---
 
 ## 5. API ENDPOINTS
@@ -316,7 +335,20 @@ Claude API оценивает день по следующим критерия�
 | GET | `/api/progress` | Прогресс движения к мечте (спидометр) |
 | GET/POST/DELETE | `/api/chat` | Общий чат с ИИ |
 
-### 5.12. Служебные
+### 5.12. Выполненная работа (`/api/facts/`)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/facts` | Выполненная работа (CompletedWork). Фильтры: period, type, goalLink |
+| GET | `/api/facts/summary` | Сводка по периодам (WorkSummary) |
+
+### 5.13. Профиль планирования
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET/POST | `/api/goals/planning-profile` | Профиль планирования (hoursPerWeek, experienceLevel, workload) |
+
+### 5.14. Служебные
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
@@ -478,7 +510,7 @@ Claude API оценивает день по следующим критерия�
 
 **Компоненты:**
 - План и факт дня
-- **6 карточек с оценками:** dream_progress, strategy, operations, team, efficiency, overall
+- **6 карточек с оценками:** dream_progress, strategic_focus, productivity, life_balance, discipline, overall
 - Цветовая индикация: зелёный >7, жёлтый 5-7, красный <5
 - **Флаги баланса:** здоровье / семья / энергия (с иконками и цветами)
 - **Визуализация alignment:**
@@ -561,7 +593,7 @@ Claude API оценивает день по следующим критерия�
 
 **Компоненты:**
 - Графики оценок (Recharts): dream_progress, overall, strategic_focus, productivity, life_balance, discipline
-- Выбор периода (30/60/90 дней)
+- Выбор периода (7/30/60/90 дней)
 - Средняя оценка, тренд (растёт/падает)
 - Статистика использования ИИ
 
@@ -570,10 +602,13 @@ Claude API оценивает день по следующим критерия�
 **URL:** `/progress`
 
 **Компоненты:**
-- **Спидометр (Speedometer)** — визуализация общего прогресса к мечте
+- **Спидометр (Speedometer)** — визуализация прогресса к мечте. Алгоритм: `realRate = frequency × quality` (регулярность × средний балл). Показывает 3 сценария «Что если»: каждый день / качество 7/10 / оба. Определяет рычаг (частота или качество). Шкала: 0-10
+- **ProgressIndicator** — 6 уровней состояния (мечта не задана → критическое отставание), метрики regularity%, quality score
 - **DreamProgress** — компонент отображения пути к мечте
 - Трекинг стриков (текущий, лучший)
-- Статистика: всего дней, среднее выполнение, оптимальное количество задач
+- Распределение дней: отличных (7-10) / средних (4-6) / слабых (1-3)
+- Система уровней: Новичок → Новичок+ → Практик → Эксперт → Мастер → Легенда
+- Вехи: 10, 30, 100, 365, 1000 эффективных дней
 
 ### 7.11. Периодические оценки
 
@@ -612,13 +647,16 @@ Claude API оценивает день по следующим критерия�
 - БД запросы: < 100мс
 
 ### 8.2. Безопасность
-- **Многопользовательская авторизация:** email + bcrypt-хеш пароля, cookie-сессии
+- **Многопользовательская авторизация:** email + bcrypt-хеш пароля (12 раундов), cookie-сессии
+- **HMAC-подпись токенов:** `auth_token` + `auth_token_sig` cookies, верификация в middleware через crypto.subtle (Edge Runtime, без обращения к БД)
 - **Верификация email** и **сброс пароля** через токены
+- **Шифрование данных at rest (SSE):** AES-256-GCM через Prisma middleware, ~100 текстовых полей в 19 моделях. Ключ: `ENCRYPTION_KEY` (env variable)
+- **Аудит-логирование:** автоматический лог всех write-операций (Prisma middleware) + ручной лог auth events
+- **Rate limiting:** 5 login/15мин, 3 register/1ч, 10 AI/мин. Блокировка аккаунта после 10 неудачных входов на 30 минут
 - API ключ Anthropic хранится в `.env.local` / `.env.production`
 - `AUTH_SECRET` — ключ для HMAC подписи сессий
 - НЕ коммитить секреты в git
-- Rate limiting на API endpoints (nginx: `general_limit` 60r/s burst 30 для `/api/`)
-- Санитизация пользовательского ввода перед отправкой в Claude
+- Санитизация пользовательского ввода перед отправкой в Claude (защита от prompt injection)
 - Опциональный Cloudflare Worker прокси для обхода гео-блокировки Anthropic API
 
 ### 8.3. Надежность

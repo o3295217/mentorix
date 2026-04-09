@@ -1,7 +1,34 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+const DAY_FLOW_STEPS = [
+  {
+    time: 'План',
+    title: 'Собери день',
+    desc: 'ION помогает собрать план из шагов, которые действительно ведут к цели.',
+    accent: 'purple',
+  },
+  {
+    time: 'Фокус',
+    title: 'Выдели главное',
+    desc: 'План остаётся реалистичным: важное попадает в день, лишнее не создаёт перегруз.',
+    accent: 'blue',
+  },
+  {
+    time: 'Результат',
+    title: 'Сверь план с реальностью',
+    desc: 'В конце дня вы фиксируете, что получилось на самом деле, а что осталось за рамками.',
+    accent: 'blue',
+  },
+  {
+    time: 'Разбор',
+    title: 'Получи следующий шаг',
+    desc: 'ION оценивает день и подсказывает, как двигаться дальше, чтобы не терять направление.',
+    accent: 'green',
+  },
+] as const
 
 // Хук для анимации появления при скролле
 function useScrollReveal() {
@@ -36,6 +63,20 @@ function useScrollReveal() {
 
 export default function Landing() {
   const revealRef = useScrollReveal()
+  const [activeDayStep, setActiveDayStep] = useState(0)
+  const [hoveredDayStep, setHoveredDayStep] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (hoveredDayStep !== null) return
+
+    const intervalId = window.setInterval(() => {
+      setActiveDayStep((prev) => (prev + 1) % DAY_FLOW_STEPS.length)
+    }, 1600)
+
+    return () => window.clearInterval(intervalId)
+  }, [hoveredDayStep])
+
+  const visibleDayStep = hoveredDayStep ?? activeDayStep
 
   return (
     <div
@@ -71,17 +112,15 @@ export default function Landing() {
 
           {/* Headline */}
           <h1 className="landing-fade-in landing-delay-1 text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-[1.1] tracking-tight">
-            Направь каждый день к&nbsp;мечте&nbsp;—
+            Сделай каждый день шагом к&nbsp;мечте&nbsp;—
             <br />
             <span className="landing-gradient-text">ИОН не&nbsp;даст сбиться с&nbsp;пути</span>
           </h1>
 
           {/* Sub */}
           <p className="landing-fade-in landing-delay-2 mt-8 max-w-2xl mx-auto text-lg sm:text-xl text-gray-400 leading-relaxed">
-            Опиши мечту&nbsp;— ИОН поможет выбрать срок, разложить путь
-            по&nbsp;периодам и&nbsp;спланировать каждый день. Он&nbsp;проверяет план,
-            предлагает правки и&nbsp;учится на&nbsp;твоём опыте&nbsp;—
-            с&nbsp;каждым днём точнее.
+            Опиши мечту или цель&nbsp;— ИОН построит для тебя понятный маршрут,
+            разложит его на&nbsp;шаги и&nbsp;будет ежедневно помогать двигаться вперёд.
           </p>
 
           {/* CTA */}
@@ -114,43 +153,97 @@ export default function Landing() {
                 Шаг первый
               </span>
               <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight">
-                Начни с&nbsp;мечты
+                Сначала — ваш
+                <br />
+                <span className="landing-gradient-text">контекст и цель</span>
               </h2>
               <p className="mt-6 text-lg text-gray-400 leading-relaxed">
-                У каждого она своя. Кто-то хочет запустить бизнес за&nbsp;год.
-                Кто-то&nbsp;— выучить язык за&nbsp;полгода. Кто-то строит карьеру на&nbsp;десятилетие вперёд.
+                Сначала вы заполняете профиль, чтобы ION понял ваш ритм жизни,
+                интересы и приоритеты. Это помогает строить не абстрактный,
+                а реалистичный путь к цели.
               </p>
               <p className="mt-4 text-lg text-gray-400 leading-relaxed">
-                Опиши свою цель и&nbsp;выбери свой срок&nbsp;— ION построит
-                структуру из&nbsp;годовых, квартальных, месячных и&nbsp;недельных задач.
-                Каждый уровень логически вытекает из&nbsp;предыдущего.
+                Потом вы описываете мечту или цель и&nbsp;выбираете срок&nbsp;— ION
+                раскладывает путь на&nbsp;годовые, квартальные, месячные и&nbsp;недельные
+                шаги, чтобы каждый день опирался на&nbsp;ваш реальный контекст.
               </p>
             </div>
 
-            {/* Visual: Goal hierarchy */}
+            {/* Visual: ИОН засасывает анкету → молния → Мечта загорается */}
             <div data-reveal className="landing-reveal landing-reveal-delay-1">
               <div className="relative">
-                {/* Decorative glow */}
                 <div className="absolute -inset-4 bg-blue-500/10 rounded-3xl blur-2xl" />
-                <div className="relative bg-gray-900/80 border border-gray-800 rounded-2xl p-8 backdrop-blur-sm">
-                  <div className="space-y-4">
-                    {[
-                      { level: 'Мечта', text: 'Твоя главная цель', color: 'from-blue-500 to-blue-400', width: '100%' },
-                      { level: 'Год', text: 'Что достичь за год?', color: 'from-blue-500/80 to-blue-400/80', width: '85%' },
-                      { level: 'Квартал', text: 'Конкретные результаты', color: 'from-blue-500/60 to-blue-400/60', width: '70%' },
-                      { level: 'Месяц', text: 'Ближайшие шаги', color: 'from-blue-500/40 to-blue-400/40', width: '55%' },
-                      { level: 'Неделя', text: 'Фокус прямо сейчас', color: 'from-blue-500/25 to-blue-400/25', width: '40%' },
-                    ].map((item) => (
-                      <div key={item.level} className="flex items-center gap-4">
-                        <div
-                          className={`h-10 rounded-lg bg-gradient-to-r ${item.color} flex items-center px-4 transition-all duration-500`}
-                          style={{ width: item.width }}
+                <div className="relative bg-gray-900/80 border border-gray-800 rounded-2xl px-6 py-3 sm:px-8 sm:py-4 backdrop-blur-sm">
+
+                  <div className="relative">
+                    {/* Orbit: теги вокруг ION сферы, засасываются к центру */}
+                    <div className="relative w-full" style={{ height: '210px' }}>
+                      {/* Теги на орбите */}
+                      {[
+                        { label: 'Профессия', cls: 'ion-tag-0' },
+                        { label: 'Ценности', cls: 'ion-tag-1' },
+                        { label: 'Интересы', cls: 'ion-tag-2' },
+                        { label: 'Вызовы', cls: 'ion-tag-3' },
+                        { label: 'Образ жизни', cls: 'ion-tag-4' },
+                        { label: 'Образование', cls: 'ion-tag-5' },
+                      ].map((tag) => (
+                        <span
+                          key={tag.label}
+                          className={`absolute top-1/2 left-1/2 ion-tag ${tag.cls} rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-300 whitespace-nowrap z-10`}
                         >
-                          <span className="text-white text-sm font-semibold whitespace-nowrap">{item.level}</span>
+                          {tag.label}
+                        </span>
+                      ))}
+
+                      {/* ION сфера в центре орбиты */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                        <div className="ion-sphere-glow absolute -inset-8 rounded-full bg-blue-500/20 blur-2xl" />
+                        <div className="ion-sphere relative flex h-14 w-14 items-center justify-center rounded-full border border-blue-400/40 bg-[radial-gradient(circle_at_30%_30%,rgba(96,165,250,0.5),rgba(59,130,246,0.15)_50%,rgba(15,23,42,0.9)_80%)] shadow-[0_0_32px_rgba(96,165,250,0.2)]">
+                          <div className="absolute inset-1.5 rounded-full border border-white/10" />
+                          <span className="text-[10px] font-bold tracking-[0.2em] text-blue-100">ION</span>
                         </div>
-                        <span className="text-gray-500 text-sm hidden sm:block">{item.text}</span>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Молния — absolute от низа сферы до баров, не влияет на layout */}
+                    <svg className="ion-lightning origin-top absolute z-10 pointer-events-none" style={{ top: '133px', left: '50%', marginLeft: '-16px' }} width="32" height="68" viewBox="0 0 32 68" fill="none">
+                      <defs>
+                        <filter id="lightning-glow" x="-100%" y="-20%" width="300%" height="140%">
+                          <feGaussianBlur stdDeviation="3" result="blur1" />
+                          <feGaussianBlur stdDeviation="7" in="SourceGraphic" result="blur2" />
+                          <feMerge>
+                            <feMergeNode in="blur2" />
+                            <feMergeNode in="blur1" />
+                            <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                        </filter>
+                      </defs>
+                      <path d="M16 0 L19 20 L9 25 L22 45 L16 68" stroke="rgba(96,165,250,0.25)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      <path d="M16 0 L19 20 L9 25 L22 45 L16 68" stroke="rgba(147,197,253,0.45)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      <path d="M16 0 L19 20 L9 25 L22 45 L16 68" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#lightning-glow)" />
+                      <path d="M9 25 L3 32" stroke="rgba(200,220,255,0.5)" strokeWidth="1" strokeLinecap="round" fill="none" />
+                      <path d="M22 45 L28 50" stroke="rgba(200,220,255,0.4)" strokeWidth="0.8" strokeLinecap="round" fill="none" />
+                    </svg>
+
+                    {/* Иерархия целей */}
+                    <div className="w-full mt-1 space-y-1.5">
+                      {[
+                        { level: 'Мечта', text: 'Запустить свой продукт', color: 'from-blue-500 to-blue-400', pct: 100, barCls: 'ion-bar-0', textCls: 'ion-goal-text-0' },
+                        { level: 'Год', text: 'MVP + первые клиенты', color: 'from-blue-500/75 to-blue-400/75', pct: 85, barCls: 'ion-bar-1', textCls: 'ion-goal-text-1' },
+                        { level: 'Квартал', text: 'Прототип и тесты', color: 'from-blue-500/55 to-blue-400/55', pct: 70, barCls: 'ion-bar-2', textCls: 'ion-goal-text-2' },
+                        { level: 'Месяц', text: 'Исследование рынка', color: 'from-blue-500/35 to-blue-400/35', pct: 58, barCls: 'ion-bar-3', textCls: 'ion-goal-text-3' },
+                        { level: 'Неделя', text: 'Описать идею и ЦА', color: 'from-blue-500/20 to-blue-400/20', pct: 48, barCls: 'ion-bar-4', textCls: 'ion-goal-text-4' },
+                      ].map((item) => (
+                        <div
+                          key={item.level}
+                          className={`h-9 rounded-lg bg-gradient-to-r ${item.color} flex items-center justify-between px-3 ${item.barCls}`}
+                          style={{ width: `${item.pct}%` }}
+                        >
+                          <span className="text-white text-xs font-semibold whitespace-nowrap">{item.level}</span>
+                          <span className={`${item.textCls} text-white/80 text-[11px] whitespace-nowrap ml-2`}>{item.text}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -170,65 +263,85 @@ export default function Landing() {
               Шаг второй
             </span>
             <h2 className="landing-reveal landing-reveal-delay-1 text-3xl sm:text-5xl font-bold text-white leading-tight">
-              Каждый день&nbsp;— маленькая победа
+              Каждый день
+              <br />
+              <span className="landing-gradient-text">работает на цель</span>
             </h2>
             <p className="landing-reveal landing-reveal-delay-2 mt-4 max-w-2xl mx-auto text-lg text-gray-400 leading-relaxed">
-              Утром ты формируешь план. Вечером фиксируешь, что получилось.
-              А&nbsp;дальше&nbsp;— ИОН разбирает твой день по&nbsp;косточкам.
+              ION помогает собрать день из того, что действительно двигает вас к цели,
+              выделить главное без перегруза и потом показать, насколько этот день
+              сработал на результат.
             </p>
           </div>
 
           {/* Day timeline */}
-          <div className="relative max-w-3xl mx-auto" data-reveal>
-            {/* Vertical line */}
-            <div className="absolute left-8 top-0 bottom-0 w-px bg-gradient-to-b from-purple-500/50 via-blue-500/50 to-transparent hidden md:block" />
+          <div className="relative max-w-3xl mx-auto space-y-4" data-reveal>
+            {DAY_FLOW_STEPS.map((item, i) => {
+              const isActive = visibleDayStep === i
+              const accentStyles = item.accent === 'purple'
+                ? {
+                    card: 'border-purple-400/45 bg-purple-500/10 shadow-[0_0_0_1px_rgba(168,85,247,0.08),0_18px_50px_rgba(76,29,149,0.18)]',
+                    number: 'text-purple-300/85 [text-shadow:0_0_26px_rgba(196,181,253,0.22)]',
+                    title: 'text-purple-100',
+                  }
+                : item.accent === 'green'
+                ? {
+                    card: 'border-emerald-400/45 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.08),0_18px_50px_rgba(6,95,70,0.18)]',
+                    number: 'text-emerald-300/85 [text-shadow:0_0_26px_rgba(167,243,208,0.2)]',
+                    title: 'text-emerald-100',
+                  }
+                : {
+                    card: 'border-blue-400/45 bg-blue-500/10 shadow-[0_0_0_1px_rgba(96,165,250,0.08),0_18px_50px_rgba(30,64,175,0.18)]',
+                    number: 'text-blue-300/85 [text-shadow:0_0_26px_rgba(147,197,253,0.22)]',
+                    title: 'text-blue-100',
+                  }
 
-            {[
-              {
-                time: 'Утро',
-                title: 'Создай план',
-                desc: 'Запиши задачи на день. Что приблизит тебя к цели? Какие привычки поддержать?',
-                accent: 'purple',
-              },
-              {
-                time: 'День',
-                title: 'Действуй',
-                desc: 'Отмечай выполненное по ходу дня. Система отслеживает незакрытые задачи и напоминает о них.',
-                accent: 'blue',
-              },
-              {
-                time: 'Вечер',
-                title: 'Зафиксируй результат',
-                desc: 'Опиши, что реально сделал. Добавь контекст: настроение, здоровье, обстоятельства.',
-                accent: 'blue',
-              },
-              {
-                time: 'Оценка',
-                title: 'Получи разбор от ИОН',
-                desc: 'Балл от 1 до 10, анализ по 5 критериям, флаги баланса жизни и персональные рекомендации.',
-                accent: 'blue',
-              },
-            ].map((item, i) => (
+              return (
               <div
                 key={item.time}
-                className={`landing-reveal landing-reveal-delay-${i} relative flex items-start gap-6 mb-6 last:mb-0 md:pl-20`}
+                className={`landing-reveal landing-reveal-delay-${i}`}
+                onMouseEnter={() => setHoveredDayStep(i)}
+                onMouseLeave={() => setHoveredDayStep(null)}
               >
-                {/* Dot on timeline */}
-                <div className={`hidden md:block absolute left-[26px] top-1 w-5 h-5 rounded-full border-2 ${
-                  item.accent === 'purple' ? 'border-purple-400 bg-purple-400/20' : 'border-blue-400 bg-blue-400/20'
-                }`} />
-
-                <div className="flex-1 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 hover:border-gray-700 transition-all duration-300">
-                  <span className={`text-xs font-bold tracking-widest uppercase ${
-                    item.accent === 'purple' ? 'text-purple-400' : 'text-blue-400'
-                  }`}>
-                    {item.time}
+                <div
+                  className={`relative flex-1 overflow-hidden rounded-2xl border p-5 pl-20 transition-all duration-500 ${
+                    isActive
+                      ? accentStyles.card
+                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-700'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute left-5 top-5 bottom-5 flex items-center text-[72px] font-extralight tracking-[-0.06em] leading-none transition-all duration-500 ${
+                      isActive
+                        ? accentStyles.number
+                        : 'text-slate-700/35'
+                    }`}
+                  >
+                    {i + 1}
                   </span>
-                  <h3 className="text-lg font-semibold text-white mt-1">{item.title}</h3>
-                  <p className="text-gray-400 mt-1 text-sm leading-relaxed">{item.desc}</p>
+
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`text-[13px] font-semibold tracking-[0.18em] uppercase transition-colors duration-500 ${
+                          isActive ? 'text-slate-300' : 'text-slate-400'
+                        }`}
+                      >
+                        {item.time}
+                      </span>
+                      <h3 className={`mt-2 text-lg font-semibold transition-colors duration-500 ${isActive ? accentStyles.title : 'text-white'}`}>
+                        {item.title}
+                      </h3>
+                      <p className={`mt-1 text-sm leading-relaxed transition-colors duration-500 ${isActive ? 'text-slate-200' : 'text-gray-400'}`}>
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>

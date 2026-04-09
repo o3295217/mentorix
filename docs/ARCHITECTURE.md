@@ -1,6 +1,6 @@
 # АРХИТЕКТУРА ПРОЕКТА: AI Effectiveness Assistant
 
-> Техническая документация для разработчиков. Актуальность: март 2026.
+> Техническая документация для разработчиков. Актуальность: апрель 2026.
 
 ---
 
@@ -96,19 +96,33 @@ ai-assistant-spec/
 │   ├── index.ts              # Реэкспорт хуков
 │   ├── useDaily.ts           # Логика дневного планирования (~1100 строк)
 │   ├── useGoals.ts           # Управление целями (~500 строк)
+│   ├── useGoalsChat.ts       # ИИ-чат декомпозиции целей (extractGoals, extractProfile, guided flow)
 │   ├── useGoalsCopy.ts       # Копирование целей между периодами
 │   ├── useInlineEdit.ts      # Хук inline-редактирования целей
 │   ├── useCopyDropdown.ts    # Хук dropdown копирования в период
 │   └── useForecast.ts        # Логика прогнозов (~224 строки)
 ├── lib/                      # Утилиты и конфигурация
 │   ├── prisma.ts             # Prisma Client singleton
+│   ├── prisma-encryption.ts  # Prisma middleware: прозрачное шифрование полей (AES-256-GCM)
+│   ├── prisma-audit.ts       # Prisma middleware: автоматический аудит-лог write-операций
 │   ├── anthropic.ts          # Claude API integration (~575 строк)
 │   ├── api-utils.ts          # API утилиты, безопасность
+│   ├── audit.ts              # Ручной аудит-лог (auth events и т.д.)
+│   ├── auth.ts               # Аутентификация (bcrypt 12 rounds, transparent migration)
+│   ├── auth-constants.ts     # Константы аутентификации (MIN_PASSWORD_LENGTH)
+│   ├── ai-usage.ts           # Трекинг использования AI
+│   ├── completed-work.ts     # Синхронизация CompletedWork из DailyEntry
 │   ├── dates.ts              # Работа с датами
+│   ├── encryption.ts         # AES-256-GCM шифрование/дешифрование текстовых полей
+│   ├── email.ts              # Отправка email
 │   ├── fact-utils.ts         # Утилиты для фактов
+│   ├── get-user-id.ts        # Безопасное извлечение userId (поддержка single-user mode)
 │   ├── goals-utils.ts        # Утилиты для целей (getPeriodKey — единый алгоритм ключей периодов)
-│   ├── rate-limit.ts         # Rate limiting для API
+│   ├── hmac.ts               # HMAC-SHA256 подпись/верификация токенов (Edge Runtime)
+│   ├── rate-limit.ts         # Rate limiting для API (fixed window + account lockout)
+│   ├── safe-json.ts          # Безопасный JSON.parse с fallback
 │   ├── task-match.ts         # Определение похожих задач
+│   ├── telegram.ts           # Уведомления в Telegram
 │   ├── types.ts              # TypeScript типы
 │   ├── user-stats.ts         # Накопительная статистика (~437 строк)
 │   └── prompts/              # AI промпты
@@ -118,6 +132,7 @@ ai-assistant-spec/
 │       ├── plan-chat.ts      # Промпт чата о плане
 │       ├── forecast.ts       # Промпт прогноза
 │       ├── period.ts         # Промпт оценки периода
+│       ├── goals-decompose.ts # Промпт ИИ-декомпозиции целей
 │       └── types.ts          # Типы для промптов
 ├── prisma/
 │   ├── schema.prisma         # Схема БД
@@ -177,6 +192,8 @@ model User {
   passwordHash    String
   role            String    @default("user")
   isActive        Boolean   @default(true)
+  emailVerified   Boolean   @default(false)
+  onboardingCompleted Boolean @default(false)
   themePreference ThemePreference @default(system)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -513,6 +530,65 @@ model ChatMessage {
   content   String
   createdAt DateTime @default(now())
 }
+
+// ==================== ВЫПОЛНЕННАЯ РАБОТА ====================
+
+model CompletedWork {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  date        DateTime
+  type        String   // task | goal | habit | extra
+  text        String
+  category    String?  // стратегические | операционные | привычки | созвоны
+  goalLink    String?  // periodKey цели (например week:2026-03-W3)
+  sourceType  String?  // dailyEntry | goal | habit
+  sourceId    Int?
+  createdAt   DateTime @default(now())
+}
+
+model WorkSummary {
+  id                Int      @id @default(autoincrement())
+  userId            String
+  periodType        String   // week | month | quarter
+  periodKey         String   // 2026-03-W3, 2026-03, 2026-Q1
+  summaryText       String
+  keyAchievements   String   @default("[]")
+  tasksCompleted    Int      @default(0)
+  goalsCompleted    Int      @default(0)
+  topCategoriesJson String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@unique([userId, periodType, periodKey])
+}
+
+// ==================== ПРОФИЛЬ ПЛАНИРОВАНИЯ ====================
+
+model PlanningProfile {
+  id               Int      @id @default(autoincrement())
+  userId           String   @unique
+  hoursPerWeek     Int?
+  experienceLevel  String?   // none | beginner | intermediate | expert
+  hasBudget        String?   // none | limited | available
+  currentWorkload  String?   // fulltime | parttime | freelance | free
+  constraints      String?
+  declined         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ==================== АУДИТ-ЛОГ ====================
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     String?
+  action     String   // login | logout | register | create | update | delete | password_change | lockout
+  resource   String?
+  resourceId String?
+  details    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
 ```
 
 **Важно:** Все модели (кроме Session/PasswordResetToken/ChatMessage) содержат `userId` и relation к `User` с `onDelete: Cascade`. Данные каждого пользователя изолированы.
@@ -529,6 +605,8 @@ model ChatMessage {
 - `PeriodEvaluation`: userId + periodType + periodStart
 - `Session`: userId, token
 - `ChatMessage`: userId + date
+- `CompletedWork`: userId + date, userId + type, userId + goalLink
+- `AuditLog`: userId, action, createdAt
 
 ---
 
@@ -556,10 +634,29 @@ model ChatMessage {
 | `/api/habits/suggestions` | GET | `app/api/habits/suggestions/route.ts` | AI suggestions |
 | `/api/tasks/open` | GET | `app/api/tasks/open/route.ts` | Открытые задачи |
 | `/api/tasks/[id]/close` | POST | `app/api/tasks/[id]/close/route.ts` | Закрыть задачу |
+| `/api/tasks/[id]/reopen` | POST | `app/api/tasks/[id]/reopen/route.ts` | Переоткрыть задачу |
+| `/api/tasks/[id]/delete` | DELETE | `app/api/tasks/[id]/delete/route.ts` | Удалить задачу |
+| `/api/tasks/add-suggested` | POST | `app/api/tasks/add-suggested/route.ts` | Добавить предложенную ИИ задачу |
+| `/api/tasks/process-uncompleted` | POST | `app/api/tasks/process-uncompleted/route.ts` | Обработка невыполненных задач |
+| `/api/tasks/closed` | GET | `app/api/tasks/closed/route.ts` | Закрытые задачи |
 | `/api/profile` | GET, POST | `app/api/profile/route.ts` | Профиль |
+| `/api/profile/blocks` | GET, POST, DELETE, PATCH | `app/api/profile/blocks/route.ts` | Блоки профиля |
+| `/api/profile/categories` | GET, POST, DELETE, PATCH | `app/api/profile/categories/route.ts` | Категории блоков |
+| `/api/profile/items` | POST, DELETE, PATCH | `app/api/profile/items/route.ts` | Элементы профиля |
 | `/api/profile/insights` | GET, PUT | `app/api/profile/insights/route.ts` | AI insights |
+| `/api/profile/theme` | GET, POST | `app/api/profile/theme/route.ts` | Тема оформления |
 | `/api/analytics/trend` | GET | `app/api/analytics/trend/route.ts` | Тренды |
-| `/api/progress` | GET | `app/api/progress/route.ts` | Статистика |
+| `/api/analytics/ai-usage` | GET | `app/api/analytics/ai-usage/route.ts` | Статистика использования ИИ |
+| `/api/progress` | GET | `app/api/progress/route.ts` | Статистика прогресса |
+| `/api/facts` | GET | `app/api/facts/route.ts` | Выполненная работа (CompletedWork) |
+| `/api/facts/summary` | GET | `app/api/facts/summary/route.ts` | Сводка по периодам (WorkSummary) |
+| `/api/goals/planning-profile` | GET, POST | `app/api/goals/planning-profile/route.ts` | Профиль планирования |
+| `/api/periods` | GET | `app/api/periods/route.ts` | Список оценок периодов |
+| `/api/periods/[id]` | GET | `app/api/periods/[id]/route.ts` | Детали оценки периода |
+| `/api/evaluate/batch` | GET, POST | `app/api/evaluate/batch/route.ts` | Массовая оценка пропущенных дней |
+| `/api/chat` | GET, POST, DELETE | `app/api/chat/route.ts` | Общий чат с ИИ |
+| `/api/daily/chat/messages` | GET, POST, DELETE | `app/api/daily/chat/messages/route.ts` | CRUD сообщений чата дня |
+| `/api/health` | GET | `app/api/health/route.ts` | Health check (без авторизации) |
 
 ### Паттерн API route
 
@@ -793,15 +890,78 @@ export function areTasksSimilar(aText: string, bText: string): boolean
 **Назначение:** Rate limiting для API (защита от злоупотреблений)
 
 ```typescript
-// Sliding window algorithm
+// Fixed window algorithm
 export function checkRateLimit(identifier: string, options: RateLimitOptions): RateLimitResult
 export function getClientIdentifier(request: Request): string
 
 // Предустановленные лимиты
 export const rateLimiters = {
-  ai: { limit: 20, windowMs: 60000 },      // 20 AI запросов в минуту
-  api: { limit: 100, windowMs: 60000 },    // 100 обычных запросов в минуту
+  auth: { limit: 5, windowMs: 15 * 60 * 1000 },           // 5 попыток входа за 15 минут
+  authRecovery: { limit: 3, windowMs: 15 * 60 * 1000 },   // 3 сброса пароля за 15 минут
+  authRegistration: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 регистрации в час
+  ai: { limit: 10, windowMs: 60 * 1000 },                  // 10 AI запросов в минуту
 }
+
+// Блокировка аккаунта
+const MAX_FAILED_LOGINS = 10     // 10 неудачных попыток → блокировка
+const LOCKOUT_DURATION_MS = 30 * 60 * 1000  // на 30 минут
+```
+
+### lib/hmac.ts
+
+**Назначение:** HMAC-SHA256 подпись и верификация токенов (Edge Runtime compatible)
+
+```typescript
+export async function signToken(token: string, secret: string): Promise<string>
+  // HMAC-SHA256 → hex строка подписи
+export async function verifyToken(token: string, expectedSig: string, secret: string): Promise<boolean>
+  // Constant-time comparison для защиты от timing attacks
+
+// Используется в middleware.ts для проверки auth_token без обращения к БД
+// Полная валидация сессии (экспирация) — в API routes через requireUserId
+```
+
+### lib/encryption.ts + lib/prisma-encryption.ts
+
+**Назначение:** Шифрование данных at rest (SSE — Server-Side Encryption)
+
+```typescript
+// lib/encryption.ts
+export function encrypt(plaintext: string): string       // AES-256-GCM → "enc_v1:iv:tag:data"
+export function decrypt(ciphertext: string): string       // автоматически детектит enc_v1: префикс
+export function isEncrypted(value: string): boolean
+
+// lib/prisma-encryption.ts — Prisma middleware
+// Автоматически шифрует write-операции и дешифрует read-операции
+// ~100 текстовых полей в 19 моделях (DailyEntry, Evaluation, Goal, UserProfile, ...)
+// Env: ENCRYPTION_KEY (64 hex chars, 32 bytes)
+// Скрипт миграции: scripts/encrypt-existing-data.ts
+```
+
+### lib/audit.ts + lib/prisma-audit.ts
+
+**Назначение:** Аудит-логирование всех операций
+
+```typescript
+// lib/audit.ts — ручной аудит-лог
+export function audit(options: AuditOptions): void  // fire-and-forget, не блокирует основной flow
+export function getAuditContext(request: Request): { ipAddress, userAgent }
+// Вызывается для auth events (login, logout, register, lockout, password_change)
+
+// lib/prisma-audit.ts — Prisma middleware
+// Автоматически логирует все create/update/delete операции на 19 моделях
+// Использует userId из AsyncLocalStorage контекста
+```
+
+### lib/completed-work.ts
+
+**Назначение:** Синхронизация CompletedWork из DailyEntry
+
+```typescript
+export async function syncCompletedWork(userId: string, date: Date, entry: DailyEntry): Promise<void>
+// Авто-создаёт записи CompletedWork из selectedTasksJson и extraTasksJson
+// Категоризирует: стратегические / операционные / привычки
+// Связывает с целями через goalLink
 ```
 
 ### lib/user-stats.ts
@@ -1107,11 +1267,13 @@ week:      "2025-01-W1", "2025-01-W2", ..., "2025-01-W5"
 ### Аутентификация и защита роутов
 
 ```
-middleware.ts                 # Server-side защита роутов
-├── Проверяет auth_token cookie
-├── Публичные пути: /login, /register, /forgot-password, /reset-password, /api/auth/*, /api/health
-├── API: возвращает 401 без токена
-└── Страницы: редирект на /login
+middleware.ts                 # Server-side защита роутов (Edge Runtime)
+├── Проверяет auth_token + auth_token_sig cookies
+├── Верифицирует HMAC-SHA256 подпись токена (без обращения к БД)
+├── Публичные пути: /login, /register, /forgot-password, /reset-password, /verify-email, /api/auth/*, /api/health
+├── API: возвращает 401 без токена или при невалидной подписи
+├── Страницы: редирект на /login
+└── Невалидные cookies удаляются автоматически
 
 components/AuthGuard.tsx      # Client-side защита
 ├── Проверяет /api/auth/me
@@ -1126,9 +1288,44 @@ components/Navigation.tsx     # Дополнительная защита
 ```
 
 **Поток аутентификации:**
-1. `middleware.ts` — первая линия защиты (server)
+1. `middleware.ts` — первая линия защиты (server, HMAC verification)
 2. `AuthGuard` — вторая линия (client, для SPA-навигации)
 3. `Navigation` — третья линия (обработка истечения сессии)
+4. API routes — полная валидация сессии в БД (экспирация, активность пользователя)
+
+### HMAC-подпись токенов
+
+При логине сервер генерирует сессионный токен и подписывает его HMAC-SHA256:
+- Cookie `auth_token` — сам токен (cuid)
+- Cookie `auth_token_sig` — HMAC подпись
+- `middleware.ts` верифицирует подпись через `crypto.subtle` (Edge Runtime)
+- Не требует обращения к БД → быстрая проверка на каждый запрос
+- Полная валидация (экспирация, isActive) — в API routes
+
+### Шифрование данных at rest (SSE)
+
+Все чувствительные текстовые поля шифруются AES-256-GCM через Prisma middleware:
+
+- **Алгоритм:** AES-256-GCM (12-byte IV, 16-byte auth tag)
+- **Формат:** `enc_v1:base64(iv):base64(tag):base64(ciphertext)`
+- **Покрытие:** ~100 полей в 19 моделях (planText, factText, feedbackText, goalText, ...)
+- **Прозрачность:** шифрование/дешифрование автоматическое через Prisma middleware
+- **Ключ:** `ENCRYPTION_KEY` (64 hex chars, env variable)
+- **Миграция:** `scripts/encrypt-existing-data.ts` (шифрует существующие данные)
+
+### Rate Limiting и блокировка аккаунтов
+
+- **Auth:** 5 попыток за 15 минут (login), 3 за 1 час (register)
+- **AI endpoints:** 10 запросов в минуту
+- **Блокировка:** 10 неудачных входов → lockout на 30 минут
+- **IP extraction:** X-Real-IP (от reverse proxy), fallback X-Forwarded-For (последний IP)
+
+### Аудит-логирование
+
+- **Автоматический аудит** (Prisma middleware): все create/update/delete на 19 моделях
+- **Ручной аудит** (`lib/audit.ts`): auth events (login, logout, register, lockout, password_change)
+- **Fire-and-forget:** ошибки логирования не блокируют основной flow
+- **Данные:** userId, action, resource, resourceId, IP, userAgent, timestamp
 
 ### Защита от Prompt Injection
 
