@@ -30,6 +30,234 @@ const DAY_FLOW_STEPS = [
   },
 ] as const
 
+const EVALUATION_CRITERIA = [
+  { name: 'Движение к мечте', value: 8 },
+  { name: 'Стратег. фокус', value: 7 },
+  { name: 'Продуктивность', value: 9 },
+  { name: 'Баланс жизни', value: 7.5 },
+  { name: 'Дисциплина', value: 7 },
+] as const
+
+const BALANCE_FLAGS = [
+  { label: 'Здоровье', ok: true },
+  { label: 'Семья', ok: true },
+  { label: 'Энергия', ok: false },
+] as const
+
+const PAIN_CARDS = [
+  {
+    title: 'День прошёл, а к мечте как будто не приблизился',
+    desc: 'Вроде весь день что-то делал, решал, закрывал. А вечером ловишь себя на мысли: сил ушло много, но к тому, что по-настоящему важно, так и не подошёл.',
+    signal: 'Столько движения, а внутри пусто.',
+    accent: 'rose',
+  },
+  {
+    title: 'Цель вроде есть, но живёт где-то отдельно от жизни',
+    desc: 'Когда-то она вдохновляла и казалась важной. А потом осталась в заметках, а дни снова заполнились срочным, привычным и чужими задачами.',
+    signal: 'Мечта есть. Связи с сегодняшним днём нет.',
+    accent: 'amber',
+  },
+  {
+    title: 'Непонятно, движешься вперёд или просто крутишься на месте',
+    desc: 'Нет ясного взгляда со стороны, нет метрик, нет ощущения опоры. Только смутное чувство, что что-то важное всё время ускользает.',
+    signal: 'Чувство тревоги есть. Ясности нет.',
+    accent: 'slate',
+  },
+] as const
+
+const TOOL_CARDS = [
+  {
+    title: 'Прогноз достижения',
+    desc: 'Показывает, куда ведёт текущий темп и сколько времени займёт путь к цели.',
+    accent: 'purple',
+    badge: 'Прогноз',
+    metric: '2.4 года',
+    visual: 'forecast',
+  },
+  {
+    title: 'Спидометр прогресса',
+    desc: 'Показывает, ускоряетесь вы или теряете темп, чтобы вовремя вернуть движение к цели.',
+    accent: 'blue',
+    badge: 'Темп',
+    metric: '68%',
+    visual: 'speed',
+  },
+  {
+    title: 'Периодические ретро',
+    desc: 'Разбор недели, месяца, квартала и года помогает увидеть тренды, а не жить только одним днём.',
+    accent: 'orange',
+    badge: 'Ретро',
+    metric: '4 уровня',
+    visual: 'retro',
+  },
+  {
+    title: 'Аналитика и графики',
+    desc: 'Данные помогают понять, что реально работает на цель, а где вы только чувствуете движение.',
+    accent: 'cyan',
+    badge: 'Данные',
+    metric: '24/7',
+    visual: 'analytics',
+  },
+] as const
+
+const TRUST_PILLARS = [
+  {
+    title: 'Приватный контур',
+    desc: 'Ваши цели, записи и разборы дня не публикуются. Чувствительные тексты шифруются в базе.',
+    accent: 'emerald',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-1.5 0h12a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4.5 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Защищённый доступ',
+    desc: 'Авторизация защищена серверной подписью сессий. Пространство остаётся персональным.',
+    accent: 'blue',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M12 3l7.5 3v5.25c0 4.047-2.866 7.66-6.75 8.436C8.866 18.91 6 15.297 6 11.25V6L12 3Z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Без публичного шума',
+    desc: 'ИОН не лента и не витрина. Это спокойное личное пространство для целей, планов и честного разбора дня.',
+    accent: 'amber',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h9m-9 4.5h6m-6 4.5h9M5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 17.25V6.75A2.25 2.25 0 0 1 5.25 4.5Z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Понятная роль ИОН',
+    desc: 'AION — умный ассистент ИОН. Он не решает за вас, а помогает держать связь между целью, днём и обратной связью.',
+    accent: 'violet',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6.75 6.75 0 0 0 6.75-6.75V6.963a48.32 48.32 0 0 0-13.5 0V12A6.75 6.75 0 0 0 12 18.75Zm0 0v2.25m-3.75 0h7.5" />
+      </svg>
+    ),
+  },
+] as const
+
+function ToolVisual({ visual, accent }: { visual: (typeof TOOL_CARDS)[number]['visual']; accent: (typeof TOOL_CARDS)[number]['accent'] }) {
+  const lineClass =
+    accent === 'purple'
+      ? 'from-purple-400 to-fuchsia-300'
+      : accent === 'orange'
+      ? 'from-orange-400 to-amber-300'
+      : accent === 'cyan'
+      ? 'from-cyan-400 to-sky-300'
+      : 'from-blue-400 to-indigo-300'
+
+  if (visual === 'forecast') {
+    return (
+      <div className="relative h-20 overflow-hidden">
+        <div className="absolute inset-x-4 bottom-4 h-px bg-slate-800" />
+        <div className="absolute inset-x-4 top-4 h-px bg-slate-900/60" />
+        <div className="absolute left-4 top-4 bottom-4 w-px bg-slate-900/60" />
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 220 80" fill="none">
+          <path d="M18 58 C52 56, 70 50, 100 44 S150 28, 202 18" stroke="url(#forecastGlow)" strokeWidth="10" strokeLinecap="round" opacity="0.22" />
+          <path d="M18 58 C52 56, 70 50, 100 44 S150 28, 202 18" fill="url(#forecastArea)" opacity="0.28" />
+          <path d="M18 58 C52 56, 70 50, 100 44 S150 28, 202 18" className="stroke-[3] drop-shadow-[0_0_8px_rgba(255,255,255,0.12)]" stroke="url(#forecastGradient)" strokeLinecap="round" />
+          <circle cx="18" cy="58" r="3.5" fill="#cbd5e1" opacity="0.65" />
+          <circle cx="202" cy="18" r="5" fill="white" />
+          <defs>
+            <linearGradient id="forecastGradient" x1="18" y1="58" x2="202" y2="18" gradientUnits="userSpaceOnUse">
+              <stop stopColor={accent === 'purple' ? '#a78bfa' : '#60a5fa'} />
+              <stop offset="1" stopColor={accent === 'purple' ? '#f0abfc' : '#93c5fd'} />
+            </linearGradient>
+            <linearGradient id="forecastGlow" x1="18" y1="58" x2="202" y2="18" gradientUnits="userSpaceOnUse">
+              <stop stopColor={accent === 'purple' ? '#7c3aed' : '#2563eb'} />
+              <stop offset="1" stopColor={accent === 'purple' ? '#e879f9' : '#7dd3fc'} />
+            </linearGradient>
+            <linearGradient id="forecastArea" x1="110" y1="18" x2="110" y2="64" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stopColor={accent === 'purple' ? '#c084fc' : '#93c5fd'} stopOpacity="0.22" />
+              <stop offset="1" stopColor={accent === 'purple' ? '#c084fc' : '#93c5fd'} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <div className="absolute left-4 bottom-1 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-600">Сейчас</div>
+        <div className="absolute right-4 top-1 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">Цель</div>
+      </div>
+    )
+  }
+
+  if (visual === 'speed') {
+    return (
+      <div className="relative h-20 overflow-hidden">
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 260 110" fill="none">
+          <path
+            d="M54 82 A76 76 0 0 1 206 82"
+            stroke="#243247"
+            strokeWidth="7"
+            strokeLinecap="round"
+            opacity="0.9"
+          />
+          <path
+            d="M54 82 A76 76 0 0 1 206 82"
+            stroke="url(#speedGradient)"
+            strokeWidth="7"
+            strokeLinecap="round"
+          />
+          <path
+            d="M130 82 L172 44"
+            stroke="rgba(255,255,255,0.92)"
+            strokeWidth="2.25"
+            strokeLinecap="round"
+          />
+          <circle cx="130" cy="82" r="4.5" fill="#f8fafc" />
+          <circle cx="130" cy="82" r="8" fill="rgba(255,255,255,0.08)" />
+          <defs>
+            <linearGradient id="speedGradient" x1="54" y1="82" x2="206" y2="82" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#fb7185" />
+              <stop offset="0.52" stopColor="#fcd34d" />
+              <stop offset="1" stopColor="#4ade80" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    )
+  }
+
+  if (visual === 'retro') {
+    return (
+      <div className="grid h-20 grid-cols-4 gap-2 py-1">
+        {['Нед', 'Мес', 'Кв', 'Год'].map((label, index) => (
+          <div
+            key={label}
+            className={`flex flex-col items-center justify-center rounded-xl border text-[10px] font-semibold uppercase tracking-[0.14em] ${
+              index === 0
+                ? 'border-orange-400/35 bg-orange-500/10 text-orange-200'
+                : index === 1
+                ? 'border-orange-300/20 bg-orange-500/5 text-orange-100/80'
+                : 'border-slate-800 bg-slate-900/70 text-slate-500'
+            }`}
+          >
+            {label}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-20 items-end gap-2 px-1 pb-1">
+      {[28, 46, 22, 60, 38, 72].map((height, index) => (
+        <div key={height} className="flex h-full flex-1 items-end rounded-t-lg bg-slate-800 overflow-hidden">
+          <div
+            className={`w-full rounded-t-lg bg-gradient-to-t ${lineClass}`}
+            style={{ height: `${height}%`, opacity: index >= 4 ? 1 : 0.75 }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // Хук для анимации появления при скролле
 function useScrollReveal() {
   const ref = useRef<HTMLDivElement>(null)
@@ -63,8 +291,11 @@ function useScrollReveal() {
 
 export default function Landing() {
   const revealRef = useScrollReveal()
+  const evaluationSectionRef = useRef<HTMLDivElement>(null)
   const [activeDayStep, setActiveDayStep] = useState(0)
   const [hoveredDayStep, setHoveredDayStep] = useState<number | null>(null)
+  const [evaluationStage, setEvaluationStage] = useState(0)
+  const [evaluationActivated, setEvaluationActivated] = useState(false)
 
   useEffect(() => {
     if (hoveredDayStep !== null) return
@@ -75,6 +306,41 @@ export default function Landing() {
 
     return () => window.clearInterval(intervalId)
   }, [hoveredDayStep])
+
+  useEffect(() => {
+    const el = evaluationSectionRef.current
+    if (!el || evaluationActivated) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setEvaluationActivated(true)
+            observer.disconnect()
+          }
+        })
+      },
+      { threshold: 0.35 }
+    )
+
+    observer.observe(el)
+
+    return () => observer.disconnect()
+  }, [evaluationActivated])
+
+  useEffect(() => {
+    if (!evaluationActivated) return
+
+    const timeouts = [
+      window.setTimeout(() => setEvaluationStage(1), 700),
+      window.setTimeout(() => setEvaluationStage(2), 1450),
+      window.setTimeout(() => setEvaluationStage(3), 2200),
+    ]
+
+    return () => {
+      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId))
+    }
+  }, [evaluationActivated])
 
   const visibleDayStep = hoveredDayStep ?? activeDayStep
 
@@ -131,7 +397,7 @@ export default function Landing() {
             >
               <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500 group-hover:from-blue-500 group-hover:to-blue-400 transition-all" />
               <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent_70%)]" />
-              <span className="relative">Начать бесплатно</span>
+              <span className="relative">Начать</span>
             </Link>
             <Link
               href="/login"
@@ -142,6 +408,71 @@ export default function Landing() {
           </div>
         </div>
 
+      </section>
+
+      {/* ====== SECTION: БОЛИ ====== */}
+      <section className="relative py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto" data-reveal>
+          <div className="landing-reveal max-w-3xl">
+            <h2 className="text-4xl sm:text-6xl font-bold text-white leading-[0.98] tracking-tight">
+              Узнаёте себя?
+            </h2>
+            <p className="mt-5 max-w-xl text-lg text-slate-400 leading-relaxed">
+              Иногда это не выглядит как проблема. Просто день проходит, а главное снова остаётся в стороне.
+            </p>
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {PAIN_CARDS.map((pain, i) => {
+              const tone =
+                pain.accent === 'rose'
+                  ? {
+                      hover: 'hover:border-rose-500/35 hover:shadow-[0_20px_60px_rgba(244,63,94,0.10)]',
+                      line: 'from-rose-400 via-rose-300/80 to-transparent',
+                      glow: 'bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.18),transparent_48%)]',
+                      signal: 'text-rose-100/90',
+                    }
+                  : pain.accent === 'amber'
+                  ? {
+                      hover: 'hover:border-amber-500/35 hover:shadow-[0_20px_60px_rgba(245,158,11,0.10)]',
+                      line: 'from-amber-300 via-amber-200/80 to-transparent',
+                      glow: 'bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.16),transparent_50%)]',
+                      signal: 'text-amber-50/90',
+                    }
+                  : {
+                      hover: 'hover:border-sky-400/25 hover:shadow-[0_20px_60px_rgba(148,163,184,0.10)]',
+                      line: 'from-slate-300/80 via-slate-200/60 to-transparent',
+                      glow: 'bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.14),transparent_52%)]',
+                      signal: 'text-slate-100/85',
+                    }
+
+              return (
+              <div
+                key={pain.title}
+                className={`landing-reveal landing-reveal-delay-${i + 1} group relative overflow-hidden rounded-[28px] border border-slate-800 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.96))] p-6 sm:p-7 transition-all duration-300 hover:-translate-y-1 ${tone.hover}`}
+              >
+                <div className={`absolute inset-0 ${tone.glow} opacity-70 transition-opacity duration-300 group-hover:opacity-100`} />
+                <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${tone.line}`} />
+
+                <div className="relative">
+                  <h3 className="text-[22px] font-semibold text-white leading-[1.2] tracking-tight">
+                    {pain.title}
+                  </h3>
+                  <p className="mt-4 text-[15px] text-slate-300/85 leading-7">
+                    {pain.desc}
+                  </p>
+
+                  <div className="mt-6 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                    <p className={`text-sm font-medium tracking-[0.01em] ${tone.signal}`}>
+                      {pain.signal}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              )
+            })}
+          </div>
+        </div>
       </section>
 
       {/* ====== SECTION: МЕЧТА ====== */}
@@ -172,8 +503,8 @@ export default function Landing() {
             {/* Visual: ИОН засасывает анкету → молния → Мечта загорается */}
             <div data-reveal className="landing-reveal landing-reveal-delay-1">
               <div className="relative">
-                <div className="absolute -inset-4 bg-blue-500/10 rounded-3xl blur-2xl" />
-                <div className="relative bg-gray-900/80 border border-gray-800 rounded-2xl px-6 py-3 sm:px-8 sm:py-4 backdrop-blur-sm">
+                <div className="absolute -inset-5 rounded-[30px] bg-blue-500/8 blur-3xl" />
+                <div className="relative rounded-2xl border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.42),rgba(15,23,42,0.18))] px-6 py-3 backdrop-blur-md sm:px-8 sm:py-4">
 
                   <div className="relative">
                     {/* Orbit: теги вокруг ION сферы, засасываются к центру */}
@@ -350,16 +681,18 @@ export default function Landing() {
       <section className="relative py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
         <div className="absolute top-1/2 right-0 -translate-y-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-[160px] pointer-events-none" />
 
-        <div className="max-w-6xl mx-auto">
+        <div ref={evaluationSectionRef} className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             {/* Mock AI evaluation card */}
             <div data-reveal className="landing-reveal order-2 lg:order-1">
               <div className="relative">
-                <div className="absolute -inset-4 bg-blue-500/5 rounded-3xl blur-2xl" />
-                <div className="relative bg-gray-900/80 border border-gray-800 rounded-2xl p-8 backdrop-blur-sm space-y-6">
+                <div className="absolute -inset-5 rounded-[30px] bg-blue-500/6 blur-3xl" />
+                <div className="relative rounded-2xl border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.42),rgba(15,23,42,0.18))] p-8 backdrop-blur-md space-y-6">
                   {/* Score */}
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center transition-all duration-700 ${
+                      evaluationStage === 0 ? 'shadow-[0_0_30px_rgba(59,130,246,0.35)] scale-[1.03]' : 'shadow-none scale-100'
+                    }`}>
                       <span className="text-2xl font-bold text-white">7.8</span>
                     </div>
                     <div>
@@ -370,22 +703,16 @@ export default function Landing() {
 
                   {/* Criteria bars */}
                   <div className="space-y-3">
-                    {[
-                      { name: 'Движение к мечте', value: 8 },
-                      { name: 'Стратег. фокус', value: 7 },
-                      { name: 'Продуктивность', value: 9 },
-                      { name: 'Баланс жизни', value: 7.5 },
-                      { name: 'Дисциплина', value: 7 },
-                    ].map((c) => (
+                    {EVALUATION_CRITERIA.map((c) => (
                       <div key={c.name}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-400">{c.name}</span>
-                          <span className="text-gray-500">{c.value}/10</span>
+                          <span className={`transition-colors duration-700 ${evaluationStage >= 1 ? 'text-gray-300' : 'text-gray-500'}`}>{c.name}</span>
+                          <span className={`transition-colors duration-700 ${evaluationStage >= 1 ? 'text-gray-400' : 'text-gray-600'}`}>{c.value}/10</span>
                         </div>
                         <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-1000"
-                            style={{ width: `${c.value * 10}%` }}
+                            style={{ width: evaluationStage >= 1 ? `${c.value * 10}%` : '0%' }}
                           />
                         </div>
                       </div>
@@ -394,14 +721,10 @@ export default function Landing() {
 
                   {/* Balance flags */}
                   <div className="flex gap-3">
-                    {[
-                      { label: 'Здоровье', ok: true },
-                      { label: 'Семья', ok: true },
-                      { label: 'Энергия', ok: false },
-                    ].map((f) => (
+                    {BALANCE_FLAGS.map((f) => (
                       <span
                         key={f.label}
-                        className={`text-xs px-3 py-1 rounded-full ${
+                        className={`text-xs px-3 py-1 rounded-full transition-all duration-700 ${evaluationStage >= 2 ? 'opacity-100 translate-y-0' : 'opacity-35 translate-y-1'} ${
                           f.ok
                             ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                             : 'bg-red-500/10 text-red-400 border border-red-500/20'
@@ -410,6 +733,11 @@ export default function Landing() {
                         {f.ok ? '✓' : '—'} {f.label}
                       </span>
                     ))}
+                  </div>
+
+                  <div className={`rounded-2xl border border-blue-500/15 bg-blue-500/5 px-4 py-3 transition-all duration-700 ${evaluationStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-300/80">Следующий шаг</div>
+                    <div className="mt-1 text-sm text-slate-200">Сохранить фокус на главной задаче и убрать лишнее из следующего дня.</div>
                   </div>
                 </div>
               </div>
@@ -420,20 +748,21 @@ export default function Landing() {
                 Шаг третий
               </span>
               <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight">
-                ИОН, который
+                ИОН показывает,
                 <br />
-                <span className="landing-gradient-text">видит картину целиком</span>
+                <span className="landing-gradient-text">ведёт ли день к цели</span>
               </h2>
               <p className="mt-6 text-lg text-gray-400 leading-relaxed">
-                Не просто «молодец» или «плохо». ИОН оценивает день по&nbsp;пяти критериям,
-                следит за&nbsp;балансом жизни и&nbsp;даёт конкретные рекомендации.
+                ИОН не просто ставит оценку за день. Он помогает понять,
+                что действительно двигало вас к цели, где теряется фокус
+                и какой следующий шаг даст лучший результат.
               </p>
               <ul className="mt-6 space-y-3">
                 {[
-                  'Балл от 1 до 10 с развёрнутым объяснением',
-                  'Анализ: движение к мечте, стратег. фокус, продуктивность, баланс жизни, дисциплина',
-                  'Флаги баланса: здоровье, семья, энергия',
-                  'Персональные рекомендации на завтра',
+                  'Показывает, что в дне работало на цель, а что было просто занятостью',
+                  'Разбирает день по ключевым критериям: движение к цели, фокус, продуктивность, баланс и дисциплина',
+                  'Подсвечивает сигналы баланса: здоровье, семья, энергия',
+                  'Даёт следующий шаг, чтобы сохранить направление',
                 ].map((text) => (
                   <li key={text} className="flex items-start gap-3 text-gray-300">
                     <svg className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -451,72 +780,57 @@ export default function Landing() {
       {/* ====== SECTION: ФИЧИ ====== */}
       <section className="relative py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12" data-reveal>
+          <div className="max-w-3xl mx-auto text-center mb-12" data-reveal>
             <h2 className="landing-reveal text-3xl sm:text-5xl font-bold text-white">
-              Что внутри
+              Держите путь
+              <br />
+              <span className="landing-gradient-text">под контролем</span>
             </h2>
-            <p className="landing-reveal landing-reveal-delay-1 mt-4 text-lg text-gray-400">
-              Всё, чтобы двигаться к цели осознанно
+            <p className="landing-reveal landing-reveal-delay-1 mt-4 max-w-2xl mx-auto text-lg text-gray-400">
+              ИОН показывает темп, прогноз и сигналы отклонения, чтобы вы замечали их раньше, чем потеряете направление.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-reveal>
-            {[
-              {
-                title: 'Спидометр прогресса',
-                desc: 'Видишь скорость движения к мечте в реальном времени. Если замедляешься — сразу понятно.',
-                accent: 'blue',
-              },
-              {
-                title: 'Прогноз достижения',
-                desc: 'ИОН считает, когда ты доберёшься до цели при текущем темпе. Ускоряешься — дата приближается.',
-                accent: 'purple',
-              },
-              {
-                title: 'Умные привычки',
-                desc: 'Система замечает повторяющиеся задачи и предлагает оформить их как привычки — автоматически.',
-                accent: 'green',
-              },
-              {
-                title: 'Периодические ретро',
-                desc: 'Развёрнутый анализ недели, месяца, квартала, года. Видишь тренды, а не только отдельные дни.',
-                accent: 'orange',
-              },
-              {
-                title: 'Дорожная карта',
-                desc: 'Вехи пути: 10, 30, 100, 365 дней. Уровни от Новичка до Легенды. Каждый шаг — прогресс.',
-                accent: 'pink',
-              },
-              {
-                title: 'Аналитика и графики',
-                desc: 'Динамика оценок, средние показатели, лучшие и худшие дни. Данные, а не ощущения.',
-                accent: 'cyan',
-              },
-            ].map((feature, i) => {
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-reveal>
+            {TOOL_CARDS.map((feature, i) => {
               const colors: Record<string, string> = {
-                blue: 'hover:border-blue-500/40 hover:shadow-blue-500/5',
-                purple: 'hover:border-purple-500/40 hover:shadow-purple-500/5',
-                green: 'hover:border-green-500/40 hover:shadow-green-500/5',
-                orange: 'hover:border-orange-500/40 hover:shadow-orange-500/5',
-                pink: 'hover:border-pink-500/40 hover:shadow-pink-500/5',
-                cyan: 'hover:border-cyan-500/40 hover:shadow-cyan-500/5',
+                blue: 'hover:border-blue-500/40 hover:shadow-[0_20px_60px_rgba(37,99,235,0.10)]',
+                purple: 'hover:border-purple-500/40 hover:shadow-[0_20px_60px_rgba(147,51,234,0.10)]',
+                green: 'hover:border-green-500/40 hover:shadow-[0_20px_60px_rgba(22,163,74,0.10)]',
+                orange: 'hover:border-orange-500/40 hover:shadow-[0_20px_60px_rgba(234,88,12,0.10)]',
+                pink: 'hover:border-pink-500/40 hover:shadow-[0_20px_60px_rgba(219,39,119,0.10)]',
+                cyan: 'hover:border-cyan-500/40 hover:shadow-[0_20px_60px_rgba(6,182,212,0.10)]',
               }
               const dotColors: Record<string, string> = {
-                blue: 'bg-blue-400',
-                purple: 'bg-purple-400',
-                green: 'bg-green-400',
-                orange: 'bg-orange-400',
-                pink: 'bg-pink-400',
-                cyan: 'bg-cyan-400',
+                blue: 'text-blue-300 border-blue-400/25 bg-blue-500/10',
+                purple: 'text-purple-300 border-purple-400/25 bg-purple-500/10',
+                green: 'text-green-300 border-green-400/25 bg-green-500/10',
+                orange: 'text-orange-300 border-orange-400/25 bg-orange-500/10',
+                pink: 'text-pink-300 border-pink-400/25 bg-pink-500/10',
+                cyan: 'text-cyan-300 border-cyan-400/25 bg-cyan-500/10',
               }
               return (
                 <div
                   key={feature.title}
-                  className={`landing-reveal landing-reveal-delay-${Math.min(i, 3)} group p-6 rounded-2xl bg-gray-900/60 border border-gray-800 transition-all duration-300 hover:shadow-xl ${colors[feature.accent]}`}
+                  className={`landing-reveal landing-reveal-delay-${Math.min(i, 3)} group rounded-[24px] border border-gray-800 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.98))] p-5 sm:p-6 transition-all duration-300 hover:-translate-y-1 ${colors[feature.accent]}`}
                 >
-                  <div className={`w-2 h-2 rounded-full ${dotColors[feature.accent]} mb-4`} />
-                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
+                  <div className="flex flex-col gap-5 md:grid md:grid-cols-[180px_minmax(0,1fr)] md:items-center md:gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
+                    <div className="min-w-0 rounded-[20px] border border-slate-800/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.015))] p-4">
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${dotColors[feature.accent]}`}>
+                          {feature.badge}
+                        </span>
+                        <span className="text-sm font-medium text-slate-500">{feature.metric}</span>
+                      </div>
+
+                      <ToolVisual visual={feature.visual} accent={feature.accent} />
+                    </div>
+
+                    <div className="min-w-0 md:self-stretch md:flex md:flex-col md:justify-center">
+                      <h3 className="text-lg font-semibold text-white mb-2 tracking-tight">{feature.title}</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
+                    </div>
+                  </div>
                 </div>
               )
             })}
@@ -524,72 +838,90 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ====== SECTION: КАК ВЫГЛЯДИТ ПУТЬ ====== */}
+      {/* ====== SECTION: ДОВЕРИЕ ====== */}
       <section className="relative py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-950/20 to-transparent pointer-events-none" />
-        <div className="max-w-4xl mx-auto text-center" data-reveal>
-          <h2 className="landing-reveal text-3xl sm:text-5xl font-bold text-white leading-tight">
-            Не просто трекер задач.
-            <br />
-            <span className="text-gray-500">Это навигатор к цели.</span>
-          </h2>
-          <p className="landing-reveal landing-reveal-delay-1 mt-4 text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto">
-            ION соединяет стратегию и&nbsp;тактику. Твоя мечта декомпозируется до&nbsp;конкретных
-            задач на&nbsp;сегодня, а&nbsp;ИОН каждый вечер проверяет: ты&nbsp;ближе к&nbsp;цели
-            или топчешься на&nbsp;месте.
-          </p>
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/6 blur-[160px]" />
+        </div>
 
-          {/* Visual journey line */}
-          <div className="landing-reveal landing-reveal-delay-2 mt-10 max-w-2xl mx-auto relative">
-            {/* Connecting line behind dots */}
-            <div className="absolute top-1.5 left-4 right-4 h-px bg-gradient-to-r from-blue-400 via-gray-700 to-green-400" />
-            <div className="relative flex items-start justify-between">
-              {['Мечта', 'Цели', 'План дня', 'Действие', 'Оценка', 'Рост'].map((label, i) => (
-                <div key={label} className="flex flex-col items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${
-                    i === 0 ? 'bg-blue-400 ring-4 ring-blue-400/20' :
-                    i === 5 ? 'bg-green-400 ring-4 ring-green-400/20' :
-                    'bg-gray-600'
-                  }`} />
-                  <span className="text-xs text-gray-500">{label}</span>
+        <div className="relative max-w-6xl mx-auto">
+          <div className="max-w-3xl mx-auto text-center" data-reveal>
+            <h2 className="landing-reveal landing-reveal-delay-1 text-3xl sm:text-5xl font-bold text-white leading-tight tracking-tight">
+              Почему ИОНу можно
+              <br />
+              <span className="landing-gradient-text">доверить важное</span>
+            </h2>
+            <p className="landing-reveal landing-reveal-delay-2 mt-4 max-w-2xl mx-auto text-lg text-slate-400 leading-relaxed">
+              ИОН работает с личными целями и ежедневной рефлексией. Поэтому здесь важны не только польза, но и ощущение защищённого личного пространства.
+            </p>
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6" data-reveal>
+            {TRUST_PILLARS.map((item, i) => {
+              const accentStyles =
+                item.accent === 'emerald'
+                  ? 'text-emerald-200 border-emerald-400/18 bg-emerald-500/8 shadow-[0_20px_50px_rgba(16,185,129,0.06)]'
+                  : item.accent === 'amber'
+                  ? 'text-amber-100 border-amber-300/18 bg-amber-500/8 shadow-[0_20px_50px_rgba(245,158,11,0.06)]'
+                  : item.accent === 'violet'
+                  ? 'text-violet-100 border-violet-400/18 bg-violet-500/8 shadow-[0_20px_50px_rgba(139,92,246,0.06)]'
+                  : 'text-blue-100 border-blue-400/18 bg-blue-500/8 shadow-[0_20px_50px_rgba(59,130,246,0.06)]'
+
+              return (
+                <div
+                  key={item.title}
+                  className={`landing-reveal landing-reveal-delay-${Math.min(i + 1, 3)} rounded-[26px] border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.52),rgba(15,23,42,0.22))] p-6 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-slate-700/80 ${item.accent === 'emerald' ? 'hover:shadow-[0_20px_60px_rgba(16,185,129,0.08)]' : item.accent === 'amber' ? 'hover:shadow-[0_20px_60px_rgba(245,158,11,0.08)]' : item.accent === 'violet' ? 'hover:shadow-[0_20px_60px_rgba(139,92,246,0.08)]' : 'hover:shadow-[0_20px_60px_rgba(59,130,246,0.08)]'}`}
+                >
+                  <div className={`inline-flex rounded-[18px] border p-3 ${accentStyles}`}>
+                    {item.icon}
+                  </div>
+                  <h3 className="mt-5 text-xl font-semibold text-white tracking-tight">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 text-base leading-7 text-slate-300/85">
+                    {item.desc}
+                  </p>
                 </div>
-              ))}
-            </div>
+              )
+            })}
           </div>
         </div>
       </section>
 
       {/* ====== FINAL CTA ====== */}
-      <section className="relative py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[200px]" />
         </div>
 
         <div className="relative max-w-3xl mx-auto text-center" data-reveal>
-          <h2 className="landing-reveal text-3xl sm:text-5xl font-bold text-white leading-tight">
+          <p className="landing-reveal text-lg sm:text-xl text-slate-400 font-medium mb-4">
+            ИОН помогает связывать цель с каждым днём.
+          </p>
+          <h2 className="landing-reveal text-4xl sm:text-6xl font-bold text-white leading-tight tracking-tight">
             Путь к&nbsp;мечте начинается
             <br />
             <span className="landing-gradient-text">с&nbsp;одного дня</span>
           </h2>
-          <p className="landing-reveal landing-reveal-delay-1 mt-6 text-xl text-gray-400 max-w-xl mx-auto">
-            Бесплатно. Без ограничений. Просто опиши свою цель и&nbsp;начни.
+          <p className="landing-reveal landing-reveal-delay-1 mt-6 text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+            Опишите цель и начните проживать дни так, чтобы они вели к важному.
           </p>
           <div className="landing-reveal landing-reveal-delay-2 mt-10">
             <Link
               href="/register"
-              className="group relative inline-block px-10 py-4 text-xl font-semibold text-white rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.03] active:scale-[0.98]"
+              className="group relative inline-block px-12 py-4.5 text-xl font-semibold text-white rounded-2xl overflow-hidden shadow-[0_18px_50px_rgba(37,99,235,0.18)] transition-all duration-300 hover:scale-[1.03] active:scale-[0.98]"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500 group-hover:from-blue-500 group-hover:to-blue-400 transition-all" />
               <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent_70%)]" />
-              <span className="relative">Создать аккаунт</span>
+              <span className="relative">Начать путь</span>
             </Link>
           </div>
         </div>
       </section>
 
       {/* ====== FOOTER ====== */}
-      <footer className="border-t border-gray-800/50 py-8 px-4">
-        <div className="max-w-7xl mx-auto text-center text-gray-600 text-sm">
+      <footer className="border-t border-gray-800/40 py-10 px-4">
+        <div className="max-w-7xl mx-auto text-center text-gray-700 text-sm">
           © {new Date().getFullYear()} ION. Персональный ИИ-ассистент для достижения целей.
         </div>
       </footer>

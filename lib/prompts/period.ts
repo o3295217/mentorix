@@ -2,7 +2,7 @@ import {
   PeriodEvaluationRequest,
   DayData,
 } from './types'
-import { formatUserProfile } from './core'
+import { formatUserProfile, getDreamHorizonLabel } from './core'
 
 // Определение типа периода на основе длительности
 export function determinePeriodTemplate(
@@ -56,7 +56,7 @@ export function buildPeriodEvaluationPrompt(
 
 ${userProfileSection}
 
-🌟 МЕЧТА ПОЛЬЗОВАТЕЛЯ (5 лет):
+🌟 МЕЧТА ПОЛЬЗОВАТЕЛЯ (${getDreamHorizonLabel(request.goals)}):
 ${request.goals.dreamGoal}
 
 ЦЕЛИ ПО ПЕРИОДАМ:

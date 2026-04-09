@@ -71,12 +71,15 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 - **Проверка таблиц:** `\dt` внутри psql
 
 ### Бэкап
+
+Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних).
+
 ```bash
 # Ручной бэкап
-./scripts/backup-db.sh
+docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
 
-# Автоматический (cron)
-0 3 * * * cd /home/ubuntu/ai-assistant-spec && ./scripts/backup-db.sh
+# Проверка лога
+cat backups/backup.log
 ```
 
 ### Проверка алертов мониторинга (с мака)

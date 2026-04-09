@@ -5,6 +5,7 @@ import {
 import {
   formatUserProfile,
   formatDailyContext,
+  getDreamHorizonLabel,
   NO_DREAM_RESPONSE,
 } from './core'
 
@@ -264,8 +265,10 @@ export function buildUserDataPrompt(request: DailyEvaluationRequest): string {
     ? request.goals.weekGoals.join(', ') 
     : 'Не указаны'
 
+  const horizonLabel = getDreamHorizonLabel(request.goals)
+
   return `${userProfileSection}
-🎯 МЕЧТА ПОЛЬЗОВАТЕЛЯ (5 лет):
+🎯 МЕЧТА ПОЛЬЗОВАТЕЛЯ (${horizonLabel}):
 ${request.goals.dreamGoal}
 
 📊 ИЕРАРХИЯ ЦЕЛЕЙ:

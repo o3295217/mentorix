@@ -279,10 +279,10 @@
   ```
 - **Оценка:** 20 мин
 
-### 22. Исправить hardcoded «5 лет» в промптах
+### 22. ~~Исправить hardcoded «5 лет» в промптах~~ ✅
 - **Что:** В промптах написано «МЕЧТА ПОЛЬЗОВАТЕЛЯ (5 лет)» вместо реального горизонта.
-- **Где:** `lib/prompts/daily.ts:268`, `lib/prompts/period.ts:59`
-- **Как исправить:** Передать `dreamMonths` в контекст промпта и использовать `Math.ceil(dreamMonths / 12)`.
+- **Где:** `lib/prompts/daily.ts`, `lib/prompts/period.ts`, `lib/prompts/core.ts`
+- **Исправлено:** Добавлен `getDreamHorizonLabel()` в `core.ts`, используется в daily/period промптах. Хардкод убран из документации (README, SPECIFICATION, USER_GUIDE).
 - **Оценка:** 15 мин
 
 ### 23. Исправить `NO_DREAM_RESPONSE` — score 0 и ложные флаги

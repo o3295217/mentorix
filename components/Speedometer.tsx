@@ -205,11 +205,12 @@ export default function Speedometer({
               <span className="text-sm text-gray-400">Регулярность</span>
               <span className="text-2xl font-bold font-mono text-cyan-400">{regularityPercent}%</span>
             </div>
-            <div className="relative h-4 rounded-full overflow-hidden bg-gray-700/60">
+            <div className="relative h-4 rounded-full overflow-hidden">
+              <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to right, #dc2626, #f59e0b 50%, #22c55e)' }} />
               <div 
-                className="h-full rounded-full bg-gradient-to-r from-cyan-600 to-cyan-400"
+                className="absolute top-0 right-0 h-full bg-gray-700/80 rounded-r-full"
                 style={{ 
-                  width: animated ? `${frequency * 100}%` : '0%',
+                  width: animated ? `${100 - frequency * 100}%` : '100%',
                   transition: 'width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
                 }}
               />
@@ -224,11 +225,12 @@ export default function Speedometer({
               <span className="text-sm text-gray-400">Качество рабочих дней</span>
               <span className="text-2xl font-bold font-mono text-amber-400">{qualityScore}<span className="text-sm text-gray-500">/10</span></span>
             </div>
-            <div className="relative h-4 rounded-full overflow-hidden bg-gray-700/60">
+            <div className="relative h-4 rounded-full overflow-hidden">
+              <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to right, #dc2626, #f59e0b 50%, #22c55e)' }} />
               <div 
-                className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400"
+                className="absolute top-0 right-0 h-full bg-gray-700/80 rounded-r-full"
                 style={{ 
-                  width: animated ? `${quality * 100}%` : '0%',
+                  width: animated ? `${100 - quality * 100}%` : '100%',
                   transition: 'width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
                 }}
               />

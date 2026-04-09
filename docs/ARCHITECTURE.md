@@ -36,7 +36,7 @@ ai-assistant-spec/
 │   │   ├── evaluate-period/  # Оценка периодов
 │   │   ├── forecast/         # AI прогноз достижения мечты
 │   │   ├── goals/            # Управление целями
-│   │   │   ├── dream/        # Мечта (5 лет)
+│   │   │   ├── dream/        # Мечта
 │   │   │   ├── year/         # Годовые цели
 │   │   │   ├── period/       # Периодические цели (legacy)
 │   │   │   ├── items/        # Tracked Goals (новая модель)

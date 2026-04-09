@@ -217,8 +217,8 @@ docker compose --env-file .env.production -f docker-compose.production.yml down
 # Логи
 docker logs -f ai-assistant-production
 
-# Бэкап БД (PostgreSQL)
-./scripts/backup-db.sh
+# Бэкап БД (автоматический через Docker-контейнер ai-assistant-backup)
+docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
 
 # Обновление (с мака)
 ./deploy-vk.sh
@@ -393,14 +393,18 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 
 ## Бекапы
 
-### Автоматический бекап (cron)
-```bash
-crontab -e
-```
+Бэкапы работают автоматически через Docker-контейнер `ai-assistant-backup` (описан в `docker-compose.production.yml`).
+Ежедневно в 03:00 делается `pg_dump + gzip`, хранятся последние 30 бэкапов в `./backups/`.
 
-Добавьте:
-```
-0 3 * * * cd /home/ubuntu/ai-assistant-spec && ./scripts/backup-db.sh
+```bash
+# Ручной бэкап
+docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
+
+# Проверка лога
+cat backups/backup.log
+
+# Восстановление из бэкапа
+gunzip -c backups/pg_YYYY-MM-DD_HH-MM-SS.sql.gz | docker exec -i ai-assistant-db psql -U ai_assistant
 ```
 
 ---

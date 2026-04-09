@@ -32,10 +32,15 @@ ${details.join('\n')}
 `
 }
 
+// Получить текстовый горизонт мечты из GoalsHierarchy
+export function getDreamHorizonLabel(goals: GoalsHierarchy): string {
+  const horizonMonths = goals.dreamMonths || (goals.dreamYears ? goals.dreamYears * 12 : 0)
+  return horizonMonths ? formatHorizon(horizonMonths) : 'срок не указан'
+}
+
 // Форматирование иерархии целей
 export function formatGoalsHierarchy(goals: GoalsHierarchy): string {
-  const horizonMonths = goals.dreamMonths || (goals.dreamYears ? goals.dreamYears * 12 : 0)
-  const horizonLabel = horizonMonths ? formatHorizon(horizonMonths) : 'срок не указан'
+  const horizonLabel = getDreamHorizonLabel(goals)
   return `
 🎯 МЕЧТА (${horizonLabel}):
 ${goals.dreamGoal}
@@ -107,7 +112,7 @@ export const NO_DREAM_RESPONSE: DailyEvaluationResponse = {
   feedback: {
     conclusion: 'Невозможно оценить день без мечты. Ты не знаешь куда идёшь.',
     worked: '',
-    blocks: 'Нет мечты — нет направления. Зайди в раздел «Цели» и заполни мечту на 5 лет.',
+    blocks: 'Нет мечты — нет направления. Зайди в раздел «Цели» и заполни мечту.',
   },
   recommendations: 'Зайди в раздел «Цели» и заполни мечту. Прямо сейчас.',
 }

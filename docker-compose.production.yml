@@ -118,6 +118,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ---- Ежедневный бэкап PostgreSQL (03:00, хранит 30 последних) ----
+  backup:
+    image: postgres:16-alpine
+    container_name: ai-assistant-backup
+    environment:
+      - PGHOST=postgres
+      - PGUSER=${POSTGRES_USER:-ai_assistant}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - PGDATABASE=${POSTGRES_DB:-ai_assistant}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/prod-backup.sh:/usr/local/bin/prod-backup.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        env | grep '^PG' > /run/pg.env
+        /usr/local/bin/prod-backup.sh
+        echo "0 3 * * * /usr/local/bin/prod-backup.sh" | crontab -
+        exec crond -f -l 8
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   # Опционально: автоматический HTTPS с Caddy
   # Раскомментируйте если нужен HTTPS
   #
