@@ -334,7 +334,7 @@
 
 ### 29. Шифрование бэкапов
 - **Что:** Бэкапы gzip без шифрования. Доступ к директории = все данные.
-- **Где:** `scripts/backup-db.sh`
+- **Где:** `scripts/prod-backup.sh`
 - **Как исправить:** Добавить gpg-шифрование:
   ```bash
   pg_dump ... | gzip | gpg --symmetric --cipher-algo AES256 --passphrase-file /home/ubuntu/.backup-key > "$BACKUP_FILE.gpg"

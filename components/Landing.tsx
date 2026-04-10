@@ -428,21 +428,15 @@ export default function Landing() {
                 pain.accent === 'rose'
                   ? {
                       hover: 'hover:border-rose-500/35 hover:shadow-[0_20px_60px_rgba(244,63,94,0.10)]',
-                      line: 'from-rose-400 via-rose-300/80 to-transparent',
-                      glow: 'bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.18),transparent_48%)]',
                       signal: 'text-rose-100/90',
                     }
                   : pain.accent === 'amber'
                   ? {
                       hover: 'hover:border-amber-500/35 hover:shadow-[0_20px_60px_rgba(245,158,11,0.10)]',
-                      line: 'from-amber-300 via-amber-200/80 to-transparent',
-                      glow: 'bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.16),transparent_50%)]',
                       signal: 'text-amber-50/90',
                     }
                   : {
                       hover: 'hover:border-sky-400/25 hover:shadow-[0_20px_60px_rgba(148,163,184,0.10)]',
-                      line: 'from-slate-300/80 via-slate-200/60 to-transparent',
-                      glow: 'bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.14),transparent_52%)]',
                       signal: 'text-slate-100/85',
                     }
 
@@ -451,9 +445,6 @@ export default function Landing() {
                 key={pain.title}
                 className={`landing-reveal landing-reveal-delay-${i + 1} group relative overflow-hidden rounded-[28px] border border-slate-800 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.96))] p-6 sm:p-7 transition-all duration-300 hover:-translate-y-1 ${tone.hover}`}
               >
-                <div className={`absolute inset-0 ${tone.glow} opacity-70 transition-opacity duration-300 group-hover:opacity-100`} />
-                <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${tone.line}`} />
-
                 <div className="relative">
                   <h3 className="text-[22px] font-semibold text-white leading-[1.2] tracking-tight">
                     {pain.title}
@@ -828,7 +819,7 @@ export default function Landing() {
 
                     <div className="min-w-0 md:self-stretch md:flex md:flex-col md:justify-center">
                       <h3 className="text-lg font-semibold text-white mb-2 tracking-tight">{feature.title}</h3>
-                      <p className="text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
+                      <p className="text-slate-400 text-[15px] sm:text-base leading-relaxed">{feature.desc}</p>
                     </div>
                   </div>
                 </div>
@@ -901,19 +892,23 @@ export default function Landing() {
           <h2 className="landing-reveal text-4xl sm:text-6xl font-bold text-white leading-tight tracking-tight">
             Путь к&nbsp;мечте начинается
             <br />
-            <span className="landing-gradient-text">с&nbsp;одного дня</span>
+            <span className="landing-gradient-text">прямо сейчас</span>
           </h2>
           <p className="landing-reveal landing-reveal-delay-1 mt-6 text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-            Опишите цель и начните проживать дни так, чтобы они вели к важному.
+            Попробуйте магию ИОН: расскажите о себе и своей цели. Вы даже не подозреваете, что ждёт вас впереди.
           </p>
           <div className="landing-reveal landing-reveal-delay-2 mt-10">
             <Link
               href="/register"
-              className="group relative inline-block px-12 py-4.5 text-xl font-semibold text-white rounded-2xl overflow-hidden shadow-[0_18px_50px_rgba(37,99,235,0.18)] transition-all duration-300 hover:scale-[1.03] active:scale-[0.98]"
+              className="group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full border border-blue-300/20 px-14 py-[18px] text-[22px] font-semibold text-white shadow-[0_20px_60px_rgba(37,99,235,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_28px_80px_rgba(59,130,246,0.30)] active:translate-y-0"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-500 group-hover:from-blue-500 group-hover:to-blue-400 transition-all" />
-              <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent_70%)]" />
+              <span className="absolute inset-0 rounded-full bg-[linear-gradient(135deg,#2563eb_0%,#3b82f6_45%,#6366f1_100%)] transition-all duration-300 group-hover:brightness-110" />
+              <span className="absolute inset-[1px] rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.03)_22%,rgba(15,23,42,0.04)_100%)]" />
+              <span className="absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-white/20 opacity-0 blur-xl transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100" />
               <span className="relative">Начать путь</span>
+              <svg className="relative h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m0 0-6-6m6 6-6 6" />
+              </svg>
             </Link>
           </div>
         </div>

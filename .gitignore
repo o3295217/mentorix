@@ -39,7 +39,3 @@ next-env.d.ts
 /data
 /prisma/dev.db
 /prisma/dev.db-journal
-
-# backups (launchd logs)
-/backups/launchd.log
-/backups/launchd-error.log
