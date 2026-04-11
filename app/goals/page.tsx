@@ -27,6 +27,7 @@ export default function GoalsPage() {
     loadPeriodGoalsWithKey,
     loadAllWeeksForMonth,
     addPeriodGoal,
+    addPeriodGoalBatch,
     removePeriodGoal,
     editPeriodGoal,
     goals,
@@ -205,122 +206,110 @@ export default function GoalsPage() {
     // Определяем, есть ли иерархическая нумерация (1.1., 1.1.1.)
     const hasHierarchy = goals.some(g => g.hierarchyNumber && g.hierarchyNumber.includes('.'))
 
+    // ===== ФАЗА 1: Группируем period goals по ключу, сохраняем batch-ом =====
+    const periodBatches = new Map<string, { periodType: 'week' | 'month' | 'quarter' | 'half_year' | 'year'; date: Date; label: string; texts: string[] }>()
+
     for (const goal of goals) {
       if (goal.periodType === 'year') {
-        // Годовые цели: periodKey = "2026"
         const year = parseInt(goal.periodKey, 10)
         if (!isNaN(year)) {
           addYearGoal(year, goal.text)
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const tracked = await createTrackedGoal(goal.periodKey, goal.text, 0, [], null)
-            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
-          }
           yearCount++
         }
-      } else if (goal.periodType === 'quarter') {
-        // Квартальные: periodKey = "2026-Q1"
-        const match = goal.periodKey.match(/^(\d{4})-Q([1-4])$/)
-        if (match) {
-          const year = parseInt(match[1], 10)
-          const quarter = parseInt(match[2], 10)
-          const quarterDate = new Date(year, (quarter - 1) * 3, 1)
-          const key = getPeriodKey('quarter', quarterDate)
-
-          // Ищем parentId по иерархической нумерации
-          let parentId: number | null = null
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
-            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
-          }
-
-          addPeriodGoal(key, 'quarter', quarterDate, `Q${quarter} ${year}`, goal.text)
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
-            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
-          }
-          periodCount++
-        }
-      } else if (goal.periodType === 'half_year') {
-        // Полугодовые: periodKey = "2026-H1"
-        const match = goal.periodKey.match(/^(\d{4})-H([12])$/)
-        if (match) {
-          const year = parseInt(match[1], 10)
-          const half = parseInt(match[2], 10)
-          const halfDate = new Date(year, (half - 1) * 6, 1)
-          const key = getPeriodKey('half_year', halfDate)
-
-          let parentId: number | null = null
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
-            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
-          }
-
-          addPeriodGoal(key, 'half_year', halfDate, `H${half} ${year}`, goal.text)
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
-            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
-          }
-          periodCount++
-        }
-      } else if (goal.periodType === 'month') {
-        // Месячные: periodKey = "2026-03"
-        const match = goal.periodKey.match(/^(\d{4})-(\d{2})$/)
-        if (match) {
-          const year = parseInt(match[1], 10)
-          const month = parseInt(match[2], 10) - 1 // 0-indexed
-          const mDate = new Date(year, month, 1)
-          const key = getPeriodKey('month', mDate)
-
-          let parentId: number | null = null
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
-            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
-          }
-
-          addPeriodGoal(key, 'month', mDate, monthNames[month], goal.text)
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
-            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
-          }
-          periodCount++
-        }
-      } else if (goal.periodType === 'week') {
-        // Недельные: periodKey = "2026-03-W1"
-        const match = goal.periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
-        if (match) {
-          const year = parseInt(match[1], 10)
-          const month = parseInt(match[2], 10) - 1
-          const weekNum = parseInt(match[3], 10)
-          // Вычисляем дату начала недели
-          const firstDay = new Date(year, month, 1)
-          const weekStart = new Date(firstDay)
-          // Находим первый понедельник
-          while (weekStart.getDay() !== 1) weekStart.setDate(weekStart.getDate() + 1)
-          // Сдвигаемся на нужную неделю
-          weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7)
-          const key = `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
-
-          let parentId: number | null = null
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
-            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
-          }
-
-          addPeriodGoal(key, 'week', weekStart, `Неделя ${weekNum}`, goal.text)
-          if (hasHierarchy && goal.hierarchyNumber) {
-            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
-            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
-          }
-          periodCount++
-        }
+        continue
       }
+
+      let key = '', periodType: 'week' | 'month' | 'quarter' | 'half_year' | 'year' = 'week', date: Date = new Date(), label = ''
+
+      if (goal.periodType === 'quarter') {
+        const match = goal.periodKey.match(/^(\d{4})-Q([1-4])$/)
+        if (!match) continue
+        const y = parseInt(match[1], 10), q = parseInt(match[2], 10)
+        date = new Date(y, (q - 1) * 3, 1)
+        key = getPeriodKey('quarter', date)
+        periodType = 'quarter'
+        label = `Q${q} ${y}`
+      } else if (goal.periodType === 'half_year') {
+        const match = goal.periodKey.match(/^(\d{4})-H([12])$/)
+        if (!match) continue
+        const y = parseInt(match[1], 10), h = parseInt(match[2], 10)
+        date = new Date(y, (h - 1) * 6, 1)
+        key = getPeriodKey('half_year', date)
+        periodType = 'half_year'
+        label = `H${h} ${y}`
+      } else if (goal.periodType === 'month') {
+        const match = goal.periodKey.match(/^(\d{4})-(\d{2})$/)
+        if (!match) continue
+        const y = parseInt(match[1], 10), m = parseInt(match[2], 10) - 1
+        date = new Date(y, m, 1)
+        key = getPeriodKey('month', date)
+        periodType = 'month'
+        label = monthNames[m]
+      } else if (goal.periodType === 'week') {
+        const match = goal.periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
+        if (!match) continue
+        const y = parseInt(match[1], 10), m = parseInt(match[2], 10) - 1, w = parseInt(match[3], 10)
+        const firstDay = new Date(y, m, 1)
+        date = new Date(firstDay)
+        while (date.getDay() !== 1) date.setDate(date.getDate() + 1)
+        date.setDate(date.getDate() + (w - 1) * 7)
+        key = `${y}-${String(m + 1).padStart(2, '0')}-W${w}`
+        periodType = 'week'
+        label = `Неделя ${w}`
+      }
+
+      if (!key) continue
+
+      const batch = periodBatches.get(key)
+      if (batch) {
+        batch.texts.push(goal.text)
+      } else {
+        periodBatches.set(key, { periodType, date, label, texts: [goal.text] })
+      }
+      periodCount++
+    }
+
+    // Один save на каждый period key — без race condition
+    for (const [key, batch] of periodBatches) {
+      addPeriodGoalBatch(key, batch.periodType, batch.date, batch.label, batch.texts)
     }
 
     const parts: string[] = []
     if (yearCount > 0) parts.push(`${yearCount} годовых`)
     if (periodCount > 0) parts.push(`${periodCount} по периодам`)
     showMessage(`Добавлено: ${parts.join(', ')} (всего ${goals.length})`)
-  }, [addYearGoal, addPeriodGoal, createTrackedGoal, showMessage])
+
+    // ===== ФАЗА 2: Создать tracked goals с parentId (последовательно) =====
+    if (hasHierarchy) {
+      for (const goal of goals) {
+        if (!goal.hierarchyNumber) continue
+        let periodKey = ''
+        if (goal.periodType === 'year') {
+          periodKey = goal.periodKey
+        } else if (goal.periodType === 'half_year') {
+          const match = goal.periodKey.match(/^(\d{4})-H([12])$/)
+          if (match) periodKey = getPeriodKey('half_year', new Date(parseInt(match[1], 10), (parseInt(match[2], 10) - 1) * 6, 1))
+        } else if (goal.periodType === 'quarter') {
+          const match = goal.periodKey.match(/^(\d{4})-Q([1-4])$/)
+          if (match) periodKey = getPeriodKey('quarter', new Date(parseInt(match[1], 10), (parseInt(match[2], 10) - 1) * 3, 1))
+        } else if (goal.periodType === 'month') {
+          const match = goal.periodKey.match(/^(\d{4})-(\d{2})$/)
+          if (match) periodKey = getPeriodKey('month', new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, 1))
+        } else if (goal.periodType === 'week') {
+          const match = goal.periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
+          if (match) periodKey = `${match[1]}-${match[2]}-W${match[3]}`
+        }
+        if (!periodKey) continue
+
+        let parentId: number | null = null
+        const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
+        if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
+
+        const tracked = await createTrackedGoal(periodKey, goal.text, 0, [], parentId)
+        if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
+      }
+    }
+  }, [addYearGoal, addPeriodGoalBatch, createTrackedGoal, showMessage])
 
   // Автосохранение профиля планирования при обнаружении маркера [PROFILE:] в последнем сообщении
   const lastSavedProfileRef = useRef('')

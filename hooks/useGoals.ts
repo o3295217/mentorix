@@ -280,6 +280,22 @@ export function useGoals(): UseGoalsReturn {
     })
   }, [savePeriodGoals, showMessage])
 
+  // Batch-добавление нескольких целей в один period key за один save
+  const addPeriodGoalBatch = useCallback((periodKey: string, periodType: PeriodType, date: Date, label: string, texts: string[]) => {
+    const trimmed = texts.map(t => t.trim()).filter(t => t.length > 0)
+    if (trimmed.length === 0) return
+    setPeriodGoals(prev => {
+      const currentGoals = prev.get(periodKey) || []
+      const newGoals = trimmed.filter(text =>
+        !currentGoals.some(g => g.trim().toLowerCase() === text.toLowerCase())
+      )
+      if (newGoals.length === 0) return prev
+      const updatedGoals = [...currentGoals, ...newGoals]
+      savePeriodGoals(periodType, date, updatedGoals, label)
+      return new Map(prev).set(periodKey, updatedGoals)
+    })
+  }, [savePeriodGoals])
+
   const removePeriodGoal = useCallback((periodKey: string, index: number, periodType: PeriodType, date: Date, label: string) => {
     setPeriodGoals(prev => {
       const currentGoals = prev.get(periodKey) || []
@@ -365,7 +381,9 @@ export function useGoals(): UseGoalsReturn {
 
     try {
       let periodType = 'week'
-      if (periodKey.includes('-Q')) periodType = 'quarter'
+      if (periodKey.match(/^\d{4}$/)) periodType = 'year'
+      else if (periodKey.includes('-H')) periodType = 'half_year'
+      else if (periodKey.includes('-Q')) periodType = 'quarter'
       else if (periodKey.match(/^\d{4}-\d{2}$/)) periodType = 'month'
       else if (periodKey.includes('-W')) periodType = 'week'
 
@@ -570,6 +588,7 @@ export function useGoals(): UseGoalsReturn {
     loadAllWeeksForMonth,
     savePeriodGoals,
     addPeriodGoal,
+    addPeriodGoalBatch,
     removePeriodGoal,
     editPeriodGoal,
     goals,
