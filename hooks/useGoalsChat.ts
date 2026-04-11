@@ -12,6 +12,7 @@ export interface ParsedGoal {
   text: string
   periodType: 'year' | 'half_year' | 'quarter' | 'month' | 'week'
   periodKey: string // e.g. "2026", "2026-H1", "2026-Q1", "2026-03", "2026-03-W1"
+  hierarchyNumber?: string // e.g. "1", "1.1", "1.1.1" — shows parent-child chain
 }
 
 export interface ParsedProfile {
@@ -216,11 +217,22 @@ export function useGoalsChat(
         continue
       }
       
-      // Match numbered or bullet-point lines: "1. ...", "- ...", "• ...", "1) ..."
-      const match = trimmed.match(/^(?:\d+[.)]\s*|[-–—•]\s+)(.+)/)
-      if (match && match[1].length > 3 && match[1].length < 200) {
+      // Match hierarchical numbered lines: "1.1.1. ...", "1. ...", or bullet-point lines: "- ...", "• ...", "1) ..."
+      const hierarchyMatch = trimmed.match(/^(\d+(?:\.\d+)*)[.)]\s+(.+)/)
+      if (hierarchyMatch && hierarchyMatch[2].length > 3 && hierarchyMatch[2].length < 200) {
         goals.push({
-          text: match[1].trim(),
+          text: hierarchyMatch[2].trim(),
+          periodType: currentPeriodType,
+          periodKey: currentPeriodKey,
+          hierarchyNumber: hierarchyMatch[1],
+        })
+        continue
+      }
+      // Match bullet-point lines: "- ...", "• ...", "– ..."
+      const bulletMatch = trimmed.match(/^[-–—•]\s+(.+)/)
+      if (bulletMatch && bulletMatch[1].length > 3 && bulletMatch[1].length < 200) {
+        goals.push({
+          text: bulletMatch[1].trim(),
           periodType: currentPeriodType,
           periodKey: currentPeriodKey,
         })

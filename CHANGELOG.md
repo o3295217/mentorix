@@ -6,6 +6,22 @@
 
 ## [Unreleased]
 
+### 2026-04-11 — feat: hierarchical goals system (parentId, HalfYearView, top-down decomposition)
+- 🗄️ БД: миграция `20260411_add_goal_parent_hierarchy` — добавлен `parentId`, self-relation `GoalHierarchy`, индекс
+- 🧩 Компоненты: новый `HalfYearView.tsx` (полугодия H1/H2 с прогресс-барами), обновлены `WeekCard`, `MonthSection` (визуальные связи ↑ родитель), `GoalsChatPanel` (async accept)
+- 🪝 Хуки: `useGoals` — `createTrackedGoal` с parentId, автозавершение родителя; `useGoalsChat` — парсинг иерархической нумерации (1.1.1.)
+- 📚 Промпт: `goals-decompose.ts` — декомпозиция сверху вниз, иерархическая нумерация, top-down примеры
+- 🔌 API: `POST /api/goals/items` — валидация parentId
+- 📄 Страница: `app/goals/page.tsx` — интеграция HalfYearView, async handleAcceptGoals с parentId
+- 📝 Документация: USER_GUIDE, ARCHITECTURE, SPECIFICATION обновлены
+
+### 2026-04-11 — update
+- 🧩 Компоненты: 1 файлов (GoalsChatPanel)
+- 📚 Библиотеки: 1 файлов (goals-decompose)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-04-11 — docs: refresh architecture documentation
 - 📝 Документация: 1 файлов
 

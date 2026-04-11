@@ -237,7 +237,17 @@ export default function MonthSection({
                         autoFocus
                       />
                     ) : (
-                      <span className={`flex-1 ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>{goal}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className={`${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>{goal}</span>
+                        {tracked?.parentId && (() => {
+                          const parentGoal = trackedGoals.find(g => g.id === tracked.parentId)
+                          return parentGoal ? (
+                            <div className="text-[10px] text-slate-500 truncate" title={parentGoal.text}>
+                              ↑ {parentGoal.text.length > 35 ? parentGoal.text.slice(0, 35) + '…' : parentGoal.text}
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
                     )}
                     <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
                       {weeksInMonth.length > 0 && (
@@ -399,9 +409,19 @@ export default function MonthSection({
                                 autoFocus
                               />
                             ) : (
-                              <span className={`flex-1 text-sm leading-tight ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>
-                                {goal}
-                              </span>
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-sm leading-tight ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>
+                                  {goal}
+                                </span>
+                                {tracked?.parentId && (() => {
+                                  const parentGoal = trackedGoals.find(g => g.id === tracked.parentId)
+                                  return parentGoal ? (
+                                    <div className="text-[10px] text-slate-500 truncate" title={parentGoal.text}>
+                                      ↑ {parentGoal.text.length > 35 ? parentGoal.text.slice(0, 35) + '…' : parentGoal.text}
+                                    </div>
+                                  ) : null
+                                })()}
+                              </div>
                             )}
 
                             <div className="flex items-center gap-0.5 opacity-0 group-hover/wg:opacity-100 transition-opacity flex-shrink-0">

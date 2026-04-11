@@ -153,6 +153,8 @@ export interface Goal {
   blockedBy: number[]
   history: { action: string; date: string; from?: string; to?: string }[]
   sortOrder: number
+  parentId: number | null
+  children?: Goal[]
   createdAt: string
   updatedAt: string
 }

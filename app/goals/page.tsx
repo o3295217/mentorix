@@ -8,6 +8,7 @@ import DreamBar from '@/components/goals/DreamBar'
 import HorizonsCard from '@/components/goals/HorizonsCard'
 import StrategyCards from '@/components/goals/StrategyCards'
 import QuarterView from '@/components/goals/QuarterView'
+import HalfYearView from '@/components/goals/HalfYearView'
 import MonthTimeline from '@/components/goals/MonthTimeline'
 import MonthSection from '@/components/goals/MonthSection'
 import GoalsChatTrigger from '@/components/goals/GoalsChatTrigger'
@@ -33,6 +34,7 @@ export default function GoalsPage() {
     setGoalPriority,
     setGoalCompleted,
     setGoalTags,
+    createTrackedGoal,
     tags,
     createTag: createTagApi,
     calculatePeriodProgress,
@@ -108,6 +110,9 @@ export default function GoalsPage() {
   // Загрузка данных для выбранного года
   useEffect(() => {
     if (!dreamGoal || pageState < 2) return
+    for (let h = 1; h <= 2; h++) {
+      loadPeriodGoalsWithKey('half_year', new Date(selectedYear, (h - 1) * 6, 1))
+    }
     for (let q = 1; q <= 4; q++) {
       loadPeriodGoalsWithKey('quarter', new Date(selectedYear, (q - 1) * 3, 1))
     }
@@ -191,8 +196,14 @@ export default function GoalsPage() {
   }, [dreamGoal, pageState, periodGoals])
 
   // Принять план — разложить цели из ИИ по правильным периодам
-  const handleAcceptGoals = useCallback((goals: ParsedGoal[]) => {
+  const handleAcceptGoals = useCallback(async (goals: ParsedGoal[]) => {
     let yearCount = 0, periodCount = 0
+
+    // Маппинг hierarchyNumber → tracked goal ID (для установки parentId)
+    const hierarchyIdMap = new Map<string, number>()
+
+    // Определяем, есть ли иерархическая нумерация (1.1., 1.1.1.)
+    const hasHierarchy = goals.some(g => g.hierarchyNumber && g.hierarchyNumber.includes('.'))
 
     for (const goal of goals) {
       if (goal.periodType === 'year') {
@@ -200,6 +211,10 @@ export default function GoalsPage() {
         const year = parseInt(goal.periodKey, 10)
         if (!isNaN(year)) {
           addYearGoal(year, goal.text)
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const tracked = await createTrackedGoal(goal.periodKey, goal.text, 0, [], null)
+            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
+          }
           yearCount++
         }
       } else if (goal.periodType === 'quarter') {
@@ -210,7 +225,19 @@ export default function GoalsPage() {
           const quarter = parseInt(match[2], 10)
           const quarterDate = new Date(year, (quarter - 1) * 3, 1)
           const key = getPeriodKey('quarter', quarterDate)
+
+          // Ищем parentId по иерархической нумерации
+          let parentId: number | null = null
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
+            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
+          }
+
           addPeriodGoal(key, 'quarter', quarterDate, `Q${quarter} ${year}`, goal.text)
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
+            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
+          }
           periodCount++
         }
       } else if (goal.periodType === 'half_year') {
@@ -221,7 +248,18 @@ export default function GoalsPage() {
           const half = parseInt(match[2], 10)
           const halfDate = new Date(year, (half - 1) * 6, 1)
           const key = getPeriodKey('half_year', halfDate)
+
+          let parentId: number | null = null
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
+            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
+          }
+
           addPeriodGoal(key, 'half_year', halfDate, `H${half} ${year}`, goal.text)
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
+            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
+          }
           periodCount++
         }
       } else if (goal.periodType === 'month') {
@@ -232,7 +270,18 @@ export default function GoalsPage() {
           const month = parseInt(match[2], 10) - 1 // 0-indexed
           const mDate = new Date(year, month, 1)
           const key = getPeriodKey('month', mDate)
+
+          let parentId: number | null = null
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
+            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
+          }
+
           addPeriodGoal(key, 'month', mDate, monthNames[month], goal.text)
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
+            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
+          }
           periodCount++
         }
       } else if (goal.periodType === 'week') {
@@ -250,7 +299,18 @@ export default function GoalsPage() {
           // Сдвигаемся на нужную неделю
           weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7)
           const key = `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
+
+          let parentId: number | null = null
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
+            if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
+          }
+
           addPeriodGoal(key, 'week', weekStart, `Неделя ${weekNum}`, goal.text)
+          if (hasHierarchy && goal.hierarchyNumber) {
+            const tracked = await createTrackedGoal(key, goal.text, 0, [], parentId)
+            if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
+          }
           periodCount++
         }
       }
@@ -260,7 +320,7 @@ export default function GoalsPage() {
     if (yearCount > 0) parts.push(`${yearCount} годовых`)
     if (periodCount > 0) parts.push(`${periodCount} по периодам`)
     showMessage(`Добавлено: ${parts.join(', ')} (всего ${goals.length})`)
-  }, [addYearGoal, addPeriodGoal, showMessage])
+  }, [addYearGoal, addPeriodGoal, createTrackedGoal, showMessage])
 
   // Автосохранение профиля планирования при обнаружении маркера [PROFILE:] в последнем сообщении
   const lastSavedProfileRef = useRef('')
@@ -350,6 +410,29 @@ export default function GoalsPage() {
               onAddYearGoal={addYearGoal}
               onRemoveYearGoal={removeYearGoal}
               onEditYearGoal={editYearGoal}
+            />
+
+            {/* Полугодия */}
+            <HalfYearView
+              year={selectedYear}
+              periodGoals={periodGoals}
+              trackedGoals={goals}
+              currentYear={currentYear}
+              onAddPeriodGoal={(key, text) => {
+                const h = parseInt(key.split('-H')[1])
+                const hDate = new Date(selectedYear, (h - 1) * 6, 1)
+                addPeriodGoal(key, 'half_year', hDate, `H${h} ${selectedYear}`, text)
+              }}
+              onRemovePeriodGoal={(key, index) => {
+                const h = parseInt(key.split('-H')[1])
+                const hDate = new Date(selectedYear, (h - 1) * 6, 1)
+                removePeriodGoal(key, index, 'half_year', hDate, `H${h} ${selectedYear}`)
+              }}
+              onEditPeriodGoal={(key, index, text) => {
+                const h = parseInt(key.split('-H')[1])
+                const hDate = new Date(selectedYear, (h - 1) * 6, 1)
+                saveEditPeriodGoal(key, index, 'half_year', hDate, `H${h} ${selectedYear}`, text)
+              }}
             />
 
             {/* Кварталы */}

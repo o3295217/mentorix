@@ -324,6 +324,14 @@ export default function WeekCard({
                       >
                         {goal}
                       </div>
+                      {trackedGoal?.parentId && (() => {
+                        const parentGoal = trackedGoals.find(g => g.id === trackedGoal.parentId)
+                        return parentGoal ? (
+                          <div className="text-[10px] text-slate-500 mt-0.5 truncate" title={parentGoal.text}>
+                            ↑ {parentGoal.text.length > 35 ? parentGoal.text.slice(0, 35) + '…' : parentGoal.text}
+                          </div>
+                        ) : null
+                      })()}
                       {goalDeadline && (
                         <div className={`text-xs mt-0.5 ${isDeadlineOverdue ? 'text-red-400 font-medium' : 'text-slate-500'}`}>
                           ⏰ {parseDateParam(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}

@@ -37,6 +37,7 @@ interface UseGoalsReturn {
   setGoalPriority: (periodKey: string, text: string, priority: number) => Promise<void>
   setGoalCompleted: (periodKey: string, text: string, completed: boolean) => Promise<void>
   setGoalTags: (periodKey: string, text: string, tags: string[]) => Promise<void>
+  createTrackedGoal: (periodKey: string, text: string, priority?: number, tags?: string[], parentId?: number | null) => Promise<Goal | null>
   processingGoals: Set<string>
   
   // Tags
@@ -346,7 +347,7 @@ export function useGoals(): UseGoalsReturn {
     }
   }, [showMessage])
 
-  const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0, tags: string[] = []): Promise<Goal | null> => {
+  const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0, tags: string[] = [], parentId: number | null = null): Promise<Goal | null> => {
     const lockKey = `${periodKey}-${text}`
 
     // Use ref-based lock to prevent race conditions across renders
@@ -371,7 +372,7 @@ export function useGoals(): UseGoalsReturn {
       const res = await fetch('/api/goals/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, periodType, periodKey, priority, tags }),
+        body: JSON.stringify({ text, periodType, periodKey, priority, tags, parentId }),
       })
       const newGoal = await res.json()
       if (newGoal.id) {
@@ -454,7 +455,25 @@ export function useGoals(): UseGoalsReturn {
     }
 
     await loadTrackedGoals()
-  }, [goals, toggleGoalCompleted, createTrackedGoal, loadTrackedGoals])
+
+    // Автозавершение: если все дочерние цели родителя завершены — завершить родителя
+    if (completed) {
+      const resolvedGoal = trackedGoal || goals.find(g => g.periodKey === periodKey && g.text === text)
+      if (resolvedGoal?.parentId) {
+        const freshGoals = goals // используем текущее состояние, loadTrackedGoals выше обновит при следующем рендере
+        const siblings = freshGoals.filter(g => g.parentId === resolvedGoal.parentId)
+        const allSiblingsCompleted = siblings.length > 0 && siblings.every(g => g.id === resolvedGoal.id ? completed : g.completed)
+        if (allSiblingsCompleted) {
+          const parent = freshGoals.find(g => g.id === resolvedGoal.parentId)
+          if (parent && !parent.completed) {
+            await toggleGoalCompleted(parent.id, true)
+            showMessage(`✅ Все подцели выполнены — родительская цель "${parent.text.slice(0, 40)}${parent.text.length > 40 ? '…' : ''}" тоже завершена`)
+            await loadTrackedGoals()
+          }
+        }
+      }
+    }
+  }, [goals, periodGoals, toggleGoalCompleted, createTrackedGoal, loadTrackedGoals, showMessage])
 
   const setGoalTags = useCallback(async (periodKey: string, text: string, newTags: string[]) => {
     const trackedGoal = goals.find(g => g.periodKey === periodKey && g.text === text)
@@ -560,6 +579,7 @@ export function useGoals(): UseGoalsReturn {
     setGoalPriority,
     setGoalCompleted,
     setGoalTags,
+    createTrackedGoal,
     processingGoals,
     tags,
     createTag,

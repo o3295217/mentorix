@@ -88,7 +88,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (36)
+## Компоненты (37)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -108,6 +108,7 @@
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
+- `goals/HalfYearView`
 - `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
@@ -231,6 +232,9 @@
 | blockedByJson | `String` |
 | historyJson | `String` |
 | sortOrder | `Int` |
+| parentId | `Int?` |
+| parent | `Goal?` |
+| children | `Goal[]` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 

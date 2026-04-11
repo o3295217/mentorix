@@ -146,7 +146,7 @@ interface GoalsChatPanelProps {
   isLoading: boolean
   contextLabel: string
   extractGoals?: (text: string) => ParsedGoal[]
-  onAcceptGoals?: (goals: ParsedGoal[]) => void
+  onAcceptGoals?: (goals: ParsedGoal[]) => void | Promise<void>
 }
 
 export default function GoalsChatPanel({

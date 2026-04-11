@@ -75,6 +75,7 @@ ai-assistant-spec/
 │   ├── goals/                # Компоненты целей
 │   │   │   ├── DreamBar.tsx        # Компактная мечта: текст (click to expand) + горизонт + edit
 │   │   ├── HorizonsCard.tsx   # Rolling Wave визуализация (3 колонки: Детально/Укрупнённо/Направление)
+│   │   ├── HalfYearView.tsx   # Полугодия H1/H2: цели с прогресс-барами, редактирование, collapse
 │   │   ├── StrategyCards.tsx  # Горизонтальные карточки целей по годам с прогрессом
 │   │   ├── QuarterView.tsx    # Квартальные цели (2x2 grid, Q1-Q4, прогресс-бары)
 │   │   ├── MonthTimeline.tsx  # Горизонтальная шкала 12 месяцев (sticky) с pill-превью задач
@@ -110,8 +111,8 @@ ai-assistant-spec/
 ├── hooks/                    # React Custom Hooks
 │   ├── index.ts              # Реэкспорт хуков
 │   ├── useDaily.ts           # Логика дневного планирования (~1100 строк)
-│   ├── useGoals.ts           # Управление целями (~500 строк)
-│   ├── useGoalsChat.ts       # ИИ-чат целей: guided flow, retry, extractGoals
+│   ├── useGoals.ts           # Управление целями (~550 строк, parentId, автозавершение)
+│   ├── useGoalsChat.ts       # ИИ-чат целей: guided flow, retry, extractGoals (с иерархической нумерацией)
 │   ├── useGoalsCopy.ts       # Копирование целей между периодами
 │   ├── useInlineEdit.ts      # Хук inline-редактирования целей
 │   ├── useCopyDropdown.ts    # Хук dropdown копирования в период
@@ -282,8 +283,12 @@ model Goal {
   blockedByJson String    @default("[]")
   historyJson   String    @default("[]")
   sortOrder     Int       @default(0)
+  parentId      Int?      // Родительская цель (иерархия: Год → Полугодие → Квартал → Месяц → Неделя)
+  parent        Goal?     @relation("GoalHierarchy", fields: [parentId], references: [id])
+  children      Goal[]    @relation("GoalHierarchy")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  @@index([parentId])
 }
 
 model GoalTag {
@@ -759,7 +764,7 @@ const [isLoading, setIsLoading] = useState(true)
 - `/api/daily/chat` — чат
 - `/api/daily/check-plan` — проверка плана
 
-### useGoals.ts (~500 строк)
+### useGoals.ts (~550 строк)
 
 **Назначение:** Управление целями всех уровней
 
@@ -768,7 +773,7 @@ const [isLoading, setIsLoading] = useState(true)
 const [dreamGoal, setDreamGoal] = useState<DreamGoal | null>(null)
 const [yearGoals, setYearGoals] = useState<Map<number, string[]>>(new Map())
 const [periodGoals, setPeriodGoals] = useState<Map<string, string[]>>(new Map())
-const [goals, setGoals] = useState<Goal[]>([])  // Tracked goals
+const [goals, setGoals] = useState<Goal[]>([])  // Tracked goals (с parentId для иерархии)
 const [processingGoals, setProcessingGoals] = useState<Set<string>>(new Set())
 ```
 
@@ -780,10 +785,14 @@ const [processingGoals, setProcessingGoals] = useState<Set<string>>(new Set())
 - `loadPeriodGoals()` — загрузка периодических целей
 - `savePeriodGoals()` — сохранение периодических целей
 - `loadTrackedGoals()` — загрузка tracked goals
-- `createTrackedGoal()` — создание tracked goal
+- `createTrackedGoal(periodKey, text, priority?, tags?, parentId?)` — создание tracked goal (экспортирован для использования в page.tsx)
+- `setGoalCompleted()` — завершение цели + автозавершение родителя при 100% дочерних
 - `updateGoal()` — обновление цели
 - `deleteGoal()` — удаление цели
 - `moveGoal()` — перемещение цели
+
+**Автозавершение иерархии:**
+При выполнении цели проверяются все siblings с тем же `parentId`. Если все выполнены — родитель автоматически отмечается как выполненный с toast-уведомлением.
 
 **Lock механизм:**
 ```typescript
@@ -1019,7 +1028,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (15 основных + 10 для целей)
+### Список компонентов (15 основных + 11 для целей)
 
 **Основные:**
 - `AuthGuard`
@@ -1042,6 +1051,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
+- `goals/HalfYearView`
 - `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
@@ -1472,6 +1482,18 @@ if (!validation.success) {
 - **`lib/prompts/goals-decompose.ts`** — добавлено усечение profile fields и ограничение объёма goals map в промпте
 - **`useGoalsChat.ts`** — клиент теперь показывает текст ошибки API, а не только голый статус
 
+### 11 апреля 2026 — Иерархическая система целей
+- **`prisma/schema.prisma`** — Модель `Goal` расширена: добавлены `parentId Int?`, self-relation `GoalHierarchy` (parent/children), индекс `@@index([parentId])`. Миграция: `20260411_add_goal_parent_hierarchy`
+- **`lib/types.ts`** — интерфейс `Goal` расширен полями `parentId: number | null` и `children?: Goal[]`
+- **`app/api/goals/items/route.ts`** — POST принимает `parentId`, валидирует принадлежность родительской цели пользователю
+- **Новый компонент `components/goals/HalfYearView.tsx`** — отображение целей полугодий H1/H2 с прогресс-барами, inline-редактированием, collapse прошедших периодов, sky-blue/rose цветовая схема
+- **`app/goals/page.tsx`** — интеграция `HalfYearView` между StrategyCards и QuarterView, загрузка half_year данных, `handleAcceptGoals` стал async и создаёт tracked goals с `parentId` при иерархической нумерации
+- **`lib/prompts/goals-decompose.ts`** — промпт переработан: декомпозиция СВЕРХУ ВНИЗ (Год → Полугодие → Квартал → Месяц → Неделя), иерархическая нумерация (1. → 1.1. → 1.1.1.), примеры в top-down порядке, правило 15 про иерархическую нумерацию
+- **`hooks/useGoalsChat.ts`** — `ParsedGoal` расширен полем `hierarchyNumber`, парсер `extractGoals` распознаёт вложенную нумерацию `(\d+(\.\d+)*)`
+- **`hooks/useGoals.ts`** — `createTrackedGoal` принимает `parentId`, экспортирован в интерфейс `UseGoalsReturn`; `setGoalCompleted` проверяет автозавершение родителя при 100% выполнении дочерних
+- **`components/goals/WeekCard.tsx`** и **`MonthSection.tsx`** — визуальные связи: под текстом дочерней цели отображается «↑ Родительская цель» (10px, slate-500, truncate 35 символов)
+- **`components/goals/GoalsChatPanel.tsx`** — тип `onAcceptGoals` обновлён на `void | Promise<void>`
+
 ### Март 2026
 - **Добавлен `Landing.tsx`** — публичный лендинг для неавторизованных пользователей (тёмная тема, scroll-reveal анимации через IntersectionObserver, 3 шага, features grid, journey line)
 - **Позже лендинг декомпозирован** на отдельные секции (`HeroSection`, `PainSection`, `DreamSection`, `DayFlowSection`, `EvaluationSection`, `ToolsSection`, `TrustSection`, `CtaSection`, `FooterSection`) без изменения внешнего UX
@@ -1510,4 +1532,4 @@ if (!validation.success) {
 
 ---
 
-*Последнее обновление: 6 марта 2026*
+*Последнее обновление: 11 апреля 2026*

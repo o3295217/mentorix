@@ -19,6 +19,7 @@ const GoalCreateSchema = z.object({
   deadline: z.string().trim().min(1).max(32).nullable().optional(),
   priority: GoalPrioritySchema.optional(),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
+  parentId: z.coerce.number().int().positive().nullable().optional(),
 })
 
 const GoalUpdateSchema = z.object({
@@ -99,7 +100,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { text, periodType, periodKey, deadline, priority, tags } = validation.data
+    const { text, periodType, periodKey, deadline, priority, tags, parentId } = validation.data
+
+    // Проверяем parentId принадлежит тому же пользователю
+    if (parentId) {
+      const parentGoal = await prisma.goal.findFirst({ where: { id: parentId, userId } })
+      if (!parentGoal) {
+        return NextResponse.json({ error: 'Parent goal not found' }, { status: 404 })
+      }
+    }
 
     // priority приходит как число (0-3), конвертируем в строку
     const priorityStr = typeof priority === 'number' ? priorityNumToStr(priority) : (priority || 'none')
@@ -117,6 +126,7 @@ export async function POST(request: NextRequest) {
           type: 'created',
           date: new Date().toISOString(),
         }]),
+        parentId: parentId || null,
       },
     })
 
