@@ -101,14 +101,23 @@ export function useGoalsChat(
             }),
           })
           if (res.ok) break
+          let apiError = `API error: ${res.status}`
+          try {
+            const errorPayload = await res.json()
+            if (typeof errorPayload?.error === 'string') {
+              apiError = errorPayload.error
+            }
+          } catch {
+            // Ignore non-JSON error bodies
+          }
           // Don't retry client errors (4xx)
-          if (res.status >= 400 && res.status < 500) throw new Error(`API error: ${res.status}`)
+          if (res.status >= 400 && res.status < 500) throw new Error(apiError)
           // Retry server errors (5xx)
           if (attempt < maxRetries) {
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
             continue
           }
-          throw new Error(`API error: ${res.status}`)
+          throw new Error(apiError)
         } catch (fetchError) {
           if (attempt < maxRetries && !(fetchError instanceof Error && fetchError.message.startsWith('API error: 4'))) {
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))

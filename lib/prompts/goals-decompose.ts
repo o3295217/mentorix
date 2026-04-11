@@ -67,15 +67,40 @@ const WORKLOAD_LABELS: Record<string, string> = {
   free: 'свободен',
 }
 
+const MAX_PROMPT_FIELD_LENGTH = 220
+const MAX_GOALS_PER_PERIOD_IN_PROMPT = 8
+const MAX_PERIODS_IN_PROMPT = 24
+
+function truncateText(value: string | null | undefined, maxLength: number = MAX_PROMPT_FIELD_LENGTH): string {
+  if (!value) return ''
+  const normalized = value.trim().replace(/\s+/g, ' ')
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, maxLength - 1).trim()}…`
+}
+
+function formatGoalList(goals: string[], done: string[] = []): string {
+  const limitedGoals = goals.slice(0, MAX_GOALS_PER_PERIOD_IN_PROMPT)
+  const annotated = limitedGoals.map((goal) => {
+    const truncated = truncateText(goal)
+    return done.includes(goal) ? `[DONE] ${truncated}` : truncated
+  })
+
+  if (goals.length > limitedGoals.length) {
+    annotated.push(`…ещё ${goals.length - limitedGoals.length}`)
+  }
+
+  return annotated.join('; ')
+}
+
 function formatProfileSection(profile: PlanningProfileData | null): string {
   if (!profile) return ''
 
   const lines: string[] = []
   if (profile.hoursPerWeek != null) lines.push(`  Свободное время: ${profile.hoursPerWeek} ч/нед`)
-  if (profile.experienceLevel) lines.push(`  Опыт в области мечты: ${EXPERIENCE_LABELS[profile.experienceLevel] || profile.experienceLevel}`)
-  if (profile.hasBudget) lines.push(`  Бюджет: ${BUDGET_LABELS[profile.hasBudget] || profile.hasBudget}`)
-  if (profile.currentWorkload) lines.push(`  Загрузка: ${WORKLOAD_LABELS[profile.currentWorkload] || profile.currentWorkload}`)
-  if (profile.constraints) lines.push(`  Ограничения: ${profile.constraints}`)
+  if (profile.experienceLevel) lines.push(`  Опыт в области мечты: ${truncateText(EXPERIENCE_LABELS[profile.experienceLevel] || profile.experienceLevel)}`)
+  if (profile.hasBudget) lines.push(`  Бюджет: ${truncateText(BUDGET_LABELS[profile.hasBudget] || profile.hasBudget)}`)
+  if (profile.currentWorkload) lines.push(`  Загрузка: ${truncateText(WORKLOAD_LABELS[profile.currentWorkload] || profile.currentWorkload)}`)
+  if (profile.constraints) lines.push(`  Ограничения: ${truncateText(profile.constraints, 320)}`)
 
   return lines.length > 0 ? `ПАРАМЕТРЫ ПЛАНИРОВАНИЯ:\n${lines.join('\n')}` : ''
 }
@@ -84,36 +109,36 @@ function formatUserProfile(userProfile: UserProfileData | null, profileBlocks: P
   const lines: string[] = []
 
   if (userProfile) {
-    if (userProfile.name) lines.push(`  Имя: ${userProfile.name}`)
+    if (userProfile.name) lines.push(`  Имя: ${truncateText(userProfile.name, 120)}`)
     if (userProfile.age) lines.push(`  Возраст: ${userProfile.age}`)
-    if (userProfile.location) lines.push(`  Локация: ${userProfile.location}`)
-    if (userProfile.occupation) lines.push(`  Занятость: ${userProfile.occupation}`)
-    if (userProfile.industry) lines.push(`  Отрасль: ${userProfile.industry}`)
-    if (userProfile.education) lines.push(`  Образование: ${userProfile.education}`)
-    if (userProfile.workExperience) lines.push(`  Опыт работы: ${userProfile.workExperience}`)
+    if (userProfile.location) lines.push(`  Локация: ${truncateText(userProfile.location)}`)
+    if (userProfile.occupation) lines.push(`  Занятость: ${truncateText(userProfile.occupation)}`)
+    if (userProfile.industry) lines.push(`  Отрасль: ${truncateText(userProfile.industry)}`)
+    if (userProfile.education) lines.push(`  Образование: ${truncateText(userProfile.education)}`)
+    if (userProfile.workExperience) lines.push(`  Опыт работы: ${truncateText(userProfile.workExperience)}`)
     if (userProfile.teamSize) lines.push(`  Размер команды: ${userProfile.teamSize}`)
-    if (userProfile.hobbies) lines.push(`  Хобби: ${userProfile.hobbies}`)
-    if (userProfile.sports) lines.push(`  Спорт: ${userProfile.sports}`)
-    if (userProfile.values) lines.push(`  Ценности: ${userProfile.values}`)
-    if (userProfile.challenges) lines.push(`  Вызовы: ${userProfile.challenges}`)
-    if (userProfile.other) lines.push(`  Дополнительно: ${userProfile.other}`)
+    if (userProfile.hobbies) lines.push(`  Хобби: ${truncateText(userProfile.hobbies, 320)}`)
+    if (userProfile.sports) lines.push(`  Спорт: ${truncateText(userProfile.sports, 320)}`)
+    if (userProfile.values) lines.push(`  Ценности: ${truncateText(userProfile.values, 320)}`)
+    if (userProfile.challenges) lines.push(`  Вызовы: ${truncateText(userProfile.challenges, 320)}`)
+    if (userProfile.other) lines.push(`  Дополнительно: ${truncateText(userProfile.other, 320)}`)
   }
 
-  for (const block of profileBlocks) {
+  for (const block of profileBlocks.slice(0, 8)) {
     const blockLines: string[] = []
-    for (const item of block.items) {
-      blockLines.push(`    ${item.fieldName}: ${item.fieldValue}${item.content ? ` — ${item.content}` : ''}`)
+    for (const item of block.items.slice(0, 8)) {
+      blockLines.push(`    ${truncateText(item.fieldName, 80)}: ${truncateText(item.fieldValue, 160)}${item.content ? ` — ${truncateText(item.content, 160)}` : ''}`)
     }
-    for (const cat of block.categories) {
+    for (const cat of block.categories.slice(0, 6)) {
       if (cat.items.length > 0) {
-        blockLines.push(`    ${cat.title}:`)
-        for (const item of cat.items) {
-          blockLines.push(`      ${item.fieldName}: ${item.fieldValue}${item.content ? ` — ${item.content}` : ''}`)
+        blockLines.push(`    ${truncateText(cat.title, 100)}:`)
+        for (const item of cat.items.slice(0, 6)) {
+          blockLines.push(`      ${truncateText(item.fieldName, 80)}: ${truncateText(item.fieldValue, 160)}${item.content ? ` — ${truncateText(item.content, 160)}` : ''}`)
         }
       }
     }
     if (blockLines.length > 0) {
-      lines.push(`  [${block.title}]`)
+      lines.push(`  [${truncateText(block.title, 100)}]`)
       lines.push(...blockLines)
     }
   }
@@ -131,15 +156,16 @@ export function buildGoalsDecomposePrompt(context: GoalsContext, planningProfile
 
   const yearGoalsSummary = Object.entries(yearGoals || {})
     .filter(([, goals]) => Array.isArray(goals) && goals.length > 0)
-    .map(([year, goals]) => `  ${year}: ${goals.join('; ')}`)
+    .slice(0, MAX_PERIODS_IN_PROMPT)
+    .map(([year, goals]) => `  ${year}: ${formatGoalList(goals)}`)
     .join('\n')
 
   const periodGoalsSummary = Object.entries(periodGoals || {})
     .filter(([, goals]) => Array.isArray(goals) && goals.length > 0)
+    .slice(0, MAX_PERIODS_IN_PROMPT)
     .map(([period, goals]) => {
       const done = (completedGoals || {})[period] || []
-      const annotated = goals.map(g => done.includes(g) ? `[DONE] ${g}` : g)
-      return `  ${period}: ${annotated.join('; ')}`
+      return `  ${period}: ${formatGoalList(goals, done)}`
     })
     .join('\n')
 
@@ -232,7 +258,7 @@ ${hasUserProfile ? `ПРОФИЛЬ ЗАПОЛНЕН — пользователь
 - Финансовая цель (дом, накопления): расчёт суммы → план доходов/расходов → ежемесячные цели по накоплению → промежуточные контрольные точки.
 - Здоровье/спорт: медобследование → программа тренировок → еженедельные цели → квартальные замеры прогресса.
 
-МЕЧТА ПОЛЬЗОВАТЕЛЯ: "${dream}"
+МЕЧТА ПОЛЬЗОВАТЕЛЯ: "${truncateText(dream, 600)}"
 ГОРИЗОНТ ПЛАНИРОВАНИЯ: ${dreamMonths ? formatHorizon(dreamMonths) : 'не указан'}
 ТЕКУЩИЙ ФОКУС: ${MONTH_NAMES[selectedMonth]} ${selectedYear}
 ТЕКУЩИЙ ГОД: ${selectedYear}

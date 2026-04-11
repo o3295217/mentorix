@@ -6,22 +6,63 @@ import { prisma } from '@/lib/prisma'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { z } from 'zod'
 
+const MAX_MESSAGE_LENGTH = 2000
+const MAX_DREAM_LENGTH = 2000
+const MAX_GOAL_LENGTH = 1000
+const MAX_HISTORY_LENGTH = 4000
+const MAX_GOALS_PER_PERIOD = 50
+
 const GoalsDecomposeSchema = z.object({
-  message: z.string().trim().min(1).max(2000),
+  message: z.string().trim().min(1).max(8000),
   context: z.object({
-    dream: z.string().trim().max(500),
+    dream: z.string().trim().max(8000),
     dreamMonths: z.number().int().min(1).max(600).optional(),
-    yearGoals: z.record(z.string(), z.array(z.string().trim().max(500)).max(50)),
-    periodGoals: z.record(z.string(), z.array(z.string().trim().max(500)).max(50)),
-    completedGoals: z.record(z.string(), z.array(z.string().trim().max(500)).max(50)).optional(),
+    yearGoals: z.record(z.string(), z.array(z.string()).max(MAX_GOALS_PER_PERIOD)),
+    periodGoals: z.record(z.string(), z.array(z.string()).max(MAX_GOALS_PER_PERIOD)),
+    completedGoals: z.record(z.string(), z.array(z.string()).max(MAX_GOALS_PER_PERIOD)).optional(),
     selectedYear: z.number().int().min(2000).max(2100),
     selectedMonth: z.number().int().min(0).max(11),
   }),
   history: z.array(z.object({
     role: z.enum(['user', 'assistant']),
-    content: z.string().max(4000),
+    content: z.string().max(12000),
   })).max(20).optional(),
 })
+
+function clampText(value: string, maxLength: number): string {
+  const normalized = value.trim().replace(/\s+/g, ' ')
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, maxLength - 1).trim()}…`
+}
+
+function sanitizeGoalMap(goalMap: Record<string, string[]> | undefined): Record<string, string[]> {
+  if (!goalMap) return {}
+
+  return Object.fromEntries(
+    Object.entries(goalMap).map(([periodKey, goals]) => [
+      periodKey,
+      goals
+        .filter((goal): goal is string => typeof goal === 'string')
+        .map((goal) => clampText(goal, MAX_GOAL_LENGTH))
+        .filter(Boolean)
+        .slice(0, MAX_GOALS_PER_PERIOD),
+    ])
+  )
+}
+
+function sanitizeHistory(
+  history: Array<{ role: 'user' | 'assistant'; content: string }> | undefined
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  if (!Array.isArray(history)) return []
+
+  return history
+    .filter((message) => (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
+    .slice(-20)
+    .map((message) => ({
+      role: message.role,
+      content: clampText(message.content, MAX_HISTORY_LENGTH),
+    }))
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,8 +84,17 @@ export async function POST(request: NextRequest) {
     }
 
     const { message, context, history } = validation.data
+    const sanitizedMessage = clampText(message, MAX_MESSAGE_LENGTH)
+    const sanitizedContext = {
+      ...context,
+      dream: clampText(context.dream, MAX_DREAM_LENGTH),
+      yearGoals: sanitizeGoalMap(context.yearGoals),
+      periodGoals: sanitizeGoalMap(context.periodGoals),
+      completedGoals: sanitizeGoalMap(context.completedGoals),
+    }
+    const sanitizedHistory = sanitizeHistory(history)
 
-    if (!message) {
+    if (!sanitizedMessage) {
       return NextResponse.json({ error: 'Invalid message' }, { status: 400 })
     }
 
@@ -78,26 +128,12 @@ export async function POST(request: NextRequest) {
       console.error('Failed to load profiles:', dbError)
     }
 
-    const systemPrompt = buildGoalsDecomposePrompt(context, planningProfile, userProfile, profileBlocks)
+    const systemPrompt = buildGoalsDecomposePrompt(sanitizedContext, planningProfile, userProfile, profileBlocks)
     const anthropic = getAnthropicClient()
 
-    const chatHistory = Array.isArray(history)
-      ? history
-          .filter((h: unknown) => {
-            if (typeof h !== 'object' || h === null) return false
-            const msg = h as Record<string, unknown>
-            return (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string'
-          })
-          .slice(-20) // limit history to last 20 messages
-          .map((h: { role: string; content: string }) => ({
-            role: h.role as 'user' | 'assistant',
-            content: h.content.slice(0, 4000), // limit per-message length
-          }))
-      : []
-
     const messages = [
-      ...chatHistory,
-      { role: 'user' as const, content: message },
+      ...sanitizedHistory,
+      { role: 'user' as const, content: sanitizedMessage },
     ]
 
     const stream = await anthropic.messages.stream({
