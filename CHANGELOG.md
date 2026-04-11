@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-04-11 — docs: refresh changelog after goals AI fix
+- 📝 Документация: 1 файлов
+
+
 ### 2026-04-11 — fix: stabilize goals AI chat for long context
 - 🔌 API: 1 файлов (route)
 - 📚 Библиотеки: 1 файлов (goals-decompose)

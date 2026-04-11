@@ -82,7 +82,7 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-2 rounded-md text-base font-medium transition-colors whitespace-nowrap ${
+                className={`nav-menu-link px-3 py-2 rounded-md transition-colors whitespace-nowrap ${
                   isActive(item.href)
                     ? 'bg-blue-500/15 text-blue-400'
                     : 'text-gray-400 hover:text-blue-400 hover:bg-gray-800'
@@ -96,13 +96,13 @@ export default function Navigation() {
         <div className="flex items-center space-x-3">
           {userName && (
             <div className="hidden sm:flex items-center space-x-2">
-              <span className="text-base text-gray-400">
+              <span className="nav-user-text text-gray-400">
                 {userName}
               </span>
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="px-3 py-1.5 text-base font-medium text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
+                className="nav-user-action px-3 py-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
               >
                 {isLoggingOut ? '...' : 'Выход'}
               </button>
@@ -135,7 +135,7 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                className={`nav-menu-link px-3 py-2 rounded-md transition-colors ${
                   isActive(item.href)
                     ? 'bg-blue-500/15 text-blue-400'
                     : 'text-gray-400 hover:text-blue-400 hover:bg-gray-800'
@@ -147,13 +147,13 @@ export default function Navigation() {
           </div>
           {userName && (
             <div className="sm:hidden border-t border-gray-800 mt-2 pt-2 px-3 flex items-center justify-between">
-              <span className="text-base text-gray-400">
+              <span className="nav-user-text text-gray-400">
                 {userName}
               </span>
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="px-3 py-1.5 text-base font-medium text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
+                className="nav-user-action px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
               >
                 {isLoggingOut ? '...' : 'Выход'}
               </button>

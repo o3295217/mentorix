@@ -212,6 +212,27 @@
     animation: logo-text-first 5s ease-in-out 21s forwards, logo-text-loop 60s ease-in-out 26s infinite;
   }
 
+  .nav-menu-link {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+  }
+
+  .nav-user-text {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.96rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .nav-user-action {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
   /* ====== LANDING ANIMATIONS ====== */
 
   /* Gradient animated text (shared with onboarding) */
