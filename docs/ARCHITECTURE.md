@@ -68,6 +68,8 @@ ai-assistant-spec/
 │   ├── tasks/                # Открытые задачи
 │   ├── onboarding/           # Онбординг (5 слайдов, тёмная тема)
 │   ├── layout.tsx            # Root layout
+│   ├── opengraph-image.tsx   # OG preview image для шаринга
+│   ├── twitter-image.tsx     # Twitter/X preview image
 │   └── page.tsx              # Dashboard / Landing
 ├── components/               # React компоненты
 │   ├── goals/                # Компоненты целей
@@ -81,11 +83,24 @@ ai-assistant-spec/
 │   │   ├── WeekCard.tsx       # Раскрытая неделя: цели, checkbox, priority, drag
 │   │   ├── GoalsChatTrigger.tsx # Вертикальная кнопка ИИ-помощника
 │   │   └── GoalsChatPanel.tsx  # Выезжающая ИИ-панель декомпозиции
+│   ├── landing/              # Модульные секции публичного лендинга
+│   │   ├── HeroSection.tsx    # Hero + above-the-fold оффер
+│   │   ├── PainSection.tsx    # Проблемы и триггеры
+│   │   ├── DreamSection.tsx   # Образ результата и контекст мечты
+│   │   ├── DayFlowSection.tsx # Ритм дня с авто-переключением шагов
+│   │   ├── EvaluationSection.tsx # Демонстрация AI-оценки дня
+│   │   ├── ToolsSection.tsx   # Витрина инструментов системы
+│   │   ├── TrustSection.tsx   # Доверие, privacy, локальное хранение
+│   │   ├── CtaSection.tsx     # Финальный CTA-блок
+│   │   ├── FooterSection.tsx  # Футер лендинга
+│   │   ├── ToolVisual.tsx     # Визуализация карточек инструментов
+│   │   ├── data.tsx           # Константы и данные лендинга
+│   │   └── useScrollReveal.ts # IntersectionObserver для reveal-анимаций
 │   ├── DatePickerWithIndicators.tsx
 │   ├── Speedometer.tsx       # Прогресс к мечте
 │   ├── BalanceFlags.tsx      # Флаги баланса
 │   ├── DreamProgress.tsx
-│   ├── Landing.tsx           # Публичный лендинг (тёмная тема, scroll-reveal)
+│   ├── Landing.tsx           # Оркестратор публичного лендинга
 │   ├── LayoutFooter.tsx      # Футер (скрывается на landing/auth/onboarding)
 │   ├── ProgressIndicator.tsx # Индикатор прогресса на Dashboard
 │   ├── Navigation.tsx        # Навигация, содержит <header>
@@ -96,7 +111,7 @@ ai-assistant-spec/
 │   ├── index.ts              # Реэкспорт хуков
 │   ├── useDaily.ts           # Логика дневного планирования (~1100 строк)
 │   ├── useGoals.ts           # Управление целями (~500 строк)
-│   ├── useGoalsChat.ts       # ИИ-чат декомпозиции целей (extractGoals, extractProfile, guided flow)
+│   ├── useGoalsChat.ts       # ИИ-чат целей: guided flow, retry, extractGoals
 │   ├── useGoalsCopy.ts       # Копирование целей между периодами
 │   ├── useInlineEdit.ts      # Хук inline-редактирования целей
 │   ├── useCopyDropdown.ts    # Хук dropdown копирования в период
@@ -132,7 +147,7 @@ ai-assistant-spec/
 │       ├── plan-chat.ts      # Промпт чата о плане
 │       ├── forecast.ts       # Промпт прогноза
 │       ├── period.ts         # Промпт оценки периода
-│       ├── goals-decompose.ts # Промпт ИИ-декомпозиции целей
+│       ├── goals-decompose.ts # Промпт ИИ-декомпозиции целей с ограничением контекста
 │       └── types.ts          # Типы для промптов
 ├── prisma/
 │   ├── schema.prisma         # Схема БД
@@ -170,6 +185,7 @@ ai-assistant-spec/
 | Прогноз | `claude-sonnet-4-5-20250929` | Важные выводы |
 | Чат о плане | `claude-sonnet-4-20250514` | Качество коучинга |
 | Проверка плана | `claude-sonnet-4-20250514` | Качество анализа |
+| Декомпозиция целей | `claude-sonnet-4-20250514` | Guided flow |
 | Update Insights | `claude-sonnet-4-20250514` | Качество наблюдений |
 
 ---
@@ -226,7 +242,7 @@ model DreamGoal {
   id        Int      @id @default(autoincrement())
   userId    String
   goalText  String
-  years     Int      @default(5)
+  months    Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -629,7 +645,7 @@ model AuditLog {
 | `/api/goals/items` | GET, POST, PUT, DELETE | `app/api/goals/items/route.ts` | Tracked Goals |
 | `/api/goals/move` | POST | `app/api/goals/move/route.ts` | Перемещение целей |
 | `/api/goals/tags` | GET, POST, DELETE | `app/api/goals/tags/route.ts` | Теги |
-| `/api/goals/decompose` | POST | `app/api/goals/decompose/route.ts` | ИИ-чат декомпозиции целей (Ion). Загружает UserProfile + ProfileBlocks + PlanningProfile |
+| `/api/goals/decompose` | POST | `app/api/goals/decompose/route.ts` | ИИ-чат целей: sanitize + Claude stream |
 | `/api/habits` | GET, POST, PUT, DELETE | `app/api/habits/route.ts` | Привычки |
 | `/api/habits/suggestions` | GET | `app/api/habits/suggestions/route.ts` | AI suggestions |
 | `/api/tasks/open` | GET | `app/api/tasks/open/route.ts` | Открытые задачи |
@@ -997,15 +1013,15 @@ export async function getUserStatsForAI(): Promise<string>
 | `plan-chat.ts` | `PLAN_CHAT_SYSTEM_PROMPT`, `buildPlanChatContext()` |
 | `forecast.ts` | `buildForecastPrompt()` |
 | `period.ts` | `buildPeriodEvaluationPrompt()` |
-| `goals-decompose.ts` | `buildGoalsDecomposePrompt(context, planningProfile?, userProfile?, profileBlocks?)` — декомпозиция целей через ИИ. Использует данные профиля пользователя (UserProfile + ProfileBlocks) для персонализации. Если профиль заполнен — задаёт меньше уточняющих вопросов |
+| `goals-decompose.ts` | `buildGoalsDecomposePrompt(context, planningProfile?, userProfile?, profileBlocks?)` — промпт декомпозиции целей с персонализацией по профилю и ограничением длинного контекста |
 
 ---
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (15 основных + 10 для целей)
+### Список компонентов
 
-**Основные:**
+**Корневые компоненты (15):**
 - `AuthGuard`
 - `AuthProvider`
 - `BalanceFlags`
@@ -1022,7 +1038,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `ThemeToggle`
 - `UncompletedTasksModal`
 
-**Компоненты целей (goals/):**
+**Компоненты целей (goals/, 10):**
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
@@ -1034,18 +1050,34 @@ export async function getUserStatsForAI(): Promise<string>
 - `goals/WeekCard`
 - `goals/WeekStrip`
 
+**Лендинг (landing/, 9 секций + 3 вспомогательных модуля):**
+- `landing/HeroSection`
+- `landing/PainSection`
+- `landing/DreamSection`
+- `landing/DayFlowSection`
+- `landing/EvaluationSection`
+- `landing/ToolsSection`
+- `landing/TrustSection`
+- `landing/CtaSection`
+- `landing/FooterSection`
+- `landing/ToolVisual`
+- `landing/data`
+- `landing/useScrollReveal`
+
 ### Иерархия компонентов целей
 
 ```
 app/goals/page.tsx
-├── DreamSection.tsx         # Мечта
-├── YearSection.tsx          # Годовые цели (для каждого года до мечты)
-│   └── [копирование в Q/M/W]
-├── HalfYearSection.tsx      # Полугодия (H1/H2)
-├── QuarterSection.tsx       # Кварталы (Q1-Q4)
-│   └── [копирование в M/W]
-└── MonthSection.tsx         # Месяцы
-    └── [копирование в W, показ недель]
+├── DreamBar.tsx             # Мечта + горизонт в месяцах
+├── HorizonsCard.tsx         # Rolling Wave: детально / укрупнённо / направление
+├── StrategyCards.tsx        # Годовые цели по годам от даты создания мечты
+├── QuarterView.tsx          # Квартальные цели с прогрессом
+├── MonthTimeline.tsx        # Навигация по месяцам
+├── MonthSection.tsx         # Цели месяца и недели
+│   ├── WeekStrip.tsx        # Быстрый обзор недель
+│   └── WeekCard.tsx         # Детализация недели
+├── GoalsChatTrigger.tsx     # Вход в ИИ-декомпозицию
+└── GoalsChatPanel.tsx       # Guided flow и приём предложенных целей
 ```
 
 ### Компоненты страницы Daily
@@ -1062,10 +1094,13 @@ app/daily/page.tsx
 
 ```
 app/page.tsx
-├── Speedometer              # Прогресс к мечте
-├── DreamProgress            # Детали прогресса
-├── BalanceFlags             # Здоровье, семья, энергия
-└── [график оценок]          # Recharts LineChart
+├── Landing                  # Неавторизованный пользователь
+└── [авторизованный Dashboard]
+  ├── DreamProgress        # Мечта и горизонт
+  ├── ProgressIndicator    # Прогресс недели
+  ├── [карточка дня]       # Быстрый вход в daily
+  ├── [рабочие зоны]       # Ссылки на daily/goals/periods/forecast/analytics/tasks
+  └── [сводка недели]      # Фокус недели и ритм
 ```
 
 ---
@@ -1115,7 +1150,14 @@ VK Cloud (РФ) → Cloudflare Worker (PoP) → Durable Object (US, wnam) → An
    ├── Вызываем Claude Sonnet через getAnthropicClient()
    └── Возвращаем ответ
 
-4. Прогноз (GET /api/forecast)
+4. Декомпозиция целей (POST /api/goals/decompose)
+  ├── Собираем: мечту, goals map, историю чата, PlanningProfile, UserProfile, ProfileBlocks
+  ├── Санитизируем длинные поля (dream/message/goals/history), чтобы не падать на уже сохранённом контексте
+  ├── Формируем промпт (buildGoalsDecomposePrompt) с усечением длинных profile fields и списков целей
+  ├── Вызываем Claude Sonnet через getAnthropicClient() в streaming-режиме
+  └── Возвращаем текстовый ответ; клиент сам извлекает цели, профиль и горизонт
+
+5. Прогноз (GET /api/forecast)
    ├── Собираем: мечту, историю оценок, текущий темп
    ├── Формируем промпт (buildForecastPrompt)
    ├── Вызываем Claude Sonnet через getAnthropicClient()
@@ -1442,8 +1484,16 @@ if (!validation.success) {
 - Убраны функции `saveFact()` и `transferCompletedTasks()`
 - Обновлён UI кнопки "Сохранить план" с индикатором ⚠️
 
+### Апрель 2026
+- **Лендинг разложен на `components/landing/*`** — `Landing.tsx` стал тонким orchestrator-компонентом, секции и локальные анимации вынесены в отдельные файлы без изменения пользовательского поведения
+- **Добавлены `app/opengraph-image.tsx` и `app/twitter-image.tsx`** — серверный preview для шаринга проекта
+- **Стабилизирован `/api/goals/decompose`** — длинный сохранённый контекст теперь санитизируется перед валидацией/промптом, чтобы чат не падал с `400` на длинной мечте или уже сохранённых целях
+- **`lib/prompts/goals-decompose.ts`** — добавлено усечение profile fields и ограничение объёма goals map в промпте
+- **`useGoalsChat.ts`** — клиент теперь показывает текст ошибки API, а не только голый статус
+
 ### Март 2026
 - **Добавлен `Landing.tsx`** — публичный лендинг для неавторизованных пользователей (тёмная тема, scroll-reveal анимации через IntersectionObserver, 3 шага, features grid, journey line)
+- **Позже лендинг декомпозирован** на отдельные секции (`HeroSection`, `PainSection`, `DreamSection`, `DayFlowSection`, `EvaluationSection`, `ToolsSection`, `TrustSection`, `CtaSection`, `FooterSection`) без изменения внешнего UX
 - **Добавлен `LayoutFooter.tsx`** — футер приложения с условным рендерингом (скрывается на landing, auth, onboarding)
 - **`Navigation.tsx`** — `<header>` перенесён внутрь компонента, скрывается на landing/auth/onboarding
 - **`app/layout.tsx`** — реструктуризация: OG meta-теги, `overflow-x-hidden`, убраны обёртки header/footer
