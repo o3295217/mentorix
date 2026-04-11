@@ -26,17 +26,23 @@ interface ContentSection {
   block?: GoalBlock // for 'goals' sections
 }
 
-/** Split assistant message into alternating text and goals sections */
-function splitMessageIntoSections(content: string, blocks: GoalBlock[]): ContentSection[] {
-  if (blocks.length === 0) {
-    return [{ type: 'text', text: content }]
-  }
-
-  const cleaned = content
+/** Strip internal AI markers from message text */
+function stripInternalMarkers(text: string): string {
+  return text
     .replace(/\[PROFILE:[^\]]*\]/g, '')
     .replace(/\[PROFILE_DECLINED\]/g, '')
     .replace(/\[HORIZON:\d+\]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+/** Split assistant message into alternating text and goals sections */
+function splitMessageIntoSections(content: string, blocks: GoalBlock[]): ContentSection[] {
+  const cleaned = stripInternalMarkers(content)
+
+  if (blocks.length === 0) {
+    return [{ type: 'text', text: cleaned }]
+  }
 
   const lines = cleaned.split('\n')
   const sections: ContentSection[] = []

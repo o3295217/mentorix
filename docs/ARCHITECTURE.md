@@ -1019,9 +1019,9 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов
+### Список компонентов (15 основных + 10 для целей)
 
-**Корневые компоненты (15):**
+**Основные:**
 - `AuthGuard`
 - `AuthProvider`
 - `BalanceFlags`
@@ -1038,7 +1038,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `ThemeToggle`
 - `UncompletedTasksModal`
 
-**Компоненты целей (goals/, 10):**
+**Компоненты целей (goals/):**
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
@@ -1050,34 +1050,18 @@ export async function getUserStatsForAI(): Promise<string>
 - `goals/WeekCard`
 - `goals/WeekStrip`
 
-**Лендинг (landing/, 9 секций + 3 вспомогательных модуля):**
-- `landing/HeroSection`
-- `landing/PainSection`
-- `landing/DreamSection`
-- `landing/DayFlowSection`
-- `landing/EvaluationSection`
-- `landing/ToolsSection`
-- `landing/TrustSection`
-- `landing/CtaSection`
-- `landing/FooterSection`
-- `landing/ToolVisual`
-- `landing/data`
-- `landing/useScrollReveal`
-
 ### Иерархия компонентов целей
 
 ```
 app/goals/page.tsx
-├── DreamBar.tsx             # Мечта + горизонт в месяцах
-├── HorizonsCard.tsx         # Rolling Wave: детально / укрупнённо / направление
-├── StrategyCards.tsx        # Годовые цели по годам от даты создания мечты
-├── QuarterView.tsx          # Квартальные цели с прогрессом
-├── MonthTimeline.tsx        # Навигация по месяцам
-├── MonthSection.tsx         # Цели месяца и недели
-│   ├── WeekStrip.tsx        # Быстрый обзор недель
-│   └── WeekCard.tsx         # Детализация недели
-├── GoalsChatTrigger.tsx     # Вход в ИИ-декомпозицию
-└── GoalsChatPanel.tsx       # Guided flow и приём предложенных целей
+├── DreamSection.tsx         # Мечта
+├── YearSection.tsx          # Годовые цели (для каждого года до мечты)
+│   └── [копирование в Q/M/W]
+├── HalfYearSection.tsx      # Полугодия (H1/H2)
+├── QuarterSection.tsx       # Кварталы (Q1-Q4)
+│   └── [копирование в M/W]
+└── MonthSection.tsx         # Месяцы
+    └── [копирование в W, показ недель]
 ```
 
 ### Компоненты страницы Daily
@@ -1094,13 +1078,10 @@ app/daily/page.tsx
 
 ```
 app/page.tsx
-├── Landing                  # Неавторизованный пользователь
-└── [авторизованный Dashboard]
-  ├── DreamProgress        # Мечта и горизонт
-  ├── ProgressIndicator    # Прогресс недели
-  ├── [карточка дня]       # Быстрый вход в daily
-  ├── [рабочие зоны]       # Ссылки на daily/goals/periods/forecast/analytics/tasks
-  └── [сводка недели]      # Фокус недели и ритм
+├── Speedometer              # Прогресс к мечте
+├── DreamProgress            # Детали прогресса
+├── BalanceFlags             # Здоровье, семья, энергия
+└── [график оценок]          # Recharts LineChart
 ```
 
 ---
