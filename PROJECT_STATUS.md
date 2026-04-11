@@ -88,7 +88,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (25)
+## Компоненты (36)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -115,6 +115,17 @@
 - `goals/StrategyCards`
 - `goals/WeekCard`
 - `goals/WeekStrip`
+- `landing/CtaSection`
+- `landing/DayFlowSection`
+- `landing/DreamSection`
+- `landing/EvaluationSection`
+- `landing/FooterSection`
+- `landing/HeroSection`
+- `landing/PainSection`
+- `landing/ToolVisual`
+- `landing/ToolsSection`
+- `landing/TrustSection`
+- `landing/data`
 
 ## Модели БД (27)
 

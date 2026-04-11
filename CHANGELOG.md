@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-04-11 — feat: OG preview images, landing fixes, deploy & monitoring improvements
+- 🧩 Компоненты: 2 файлов (Landing, LayoutFooter)
+- 📝 Документация: 4 файлов
+- 📦 Другое: 6 файлов
+
+
 ### 2026-04-10 — update
 - 🧩 Компоненты: 1 файлов (Landing)
 - 📝 Документация: 3 файлов
