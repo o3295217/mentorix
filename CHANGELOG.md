@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-04-11 — docs: refresh architecture documentation
+- 📝 Документация: 1 файлов
+
+
 ### 2026-04-11 — docs: refresh changelog after goals AI fix
 - 📝 Документация: 1 файлов
 
