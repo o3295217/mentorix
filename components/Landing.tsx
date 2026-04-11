@@ -917,7 +917,7 @@ export default function Landing() {
       {/* ====== FOOTER ====== */}
       <footer className="border-t border-gray-800/40 py-10 px-4">
         <div className="max-w-7xl mx-auto text-center text-gray-700 text-sm">
-          © {new Date().getFullYear()} ION. Персональный ИИ-ассистент для достижения целей.
+          © {new Date().getFullYear()} ION AI Lab.
         </div>
       </footer>
     </div>

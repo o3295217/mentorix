@@ -246,6 +246,8 @@ sudo systemctl restart tg-bot
 sudo journalctl -u tg-bot --no-pager -n 50
 ```
 
+> **Важно:** При деплое (`deploy-vk.sh`) бот перезапускается автоматически. Это необходимо, потому что при пересоздании Docker-контейнера бот может зависнуть на `docker exec`.
+
 **После ротации Telegram-токена:**
 ```bash
 sudo systemctl daemon-reload

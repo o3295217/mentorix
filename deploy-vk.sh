@@ -55,7 +55,11 @@ ssh "$SERVER" "cd $REMOTE_PATH && docker compose --env-file .env.production -f d
 echo -e "\n${GREEN}5. Перезапуск контейнера...${NC}"
 ssh "$SERVER" "cd $REMOTE_PATH && docker compose --env-file .env.production -f docker-compose.production.yml up -d"
 
-# 5. Проверка статуса
+# 5.1. Перезапуск Telegram-бота (зависает при пересоздании контейнера)
+echo -e "\n${GREEN}5.1. Перезапуск Telegram-бота...${NC}"
+ssh "$SERVER" "sudo systemctl restart tg-bot 2>/dev/null && echo 'tg-bot restarted' || echo 'tg-bot service not found, skipping'"
+
+# 6. Проверка статуса
 echo -e "\n${GREEN}6. Проверка статуса...${NC}"
 sleep 5
 ssh "$SERVER" "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep ai-assistant"

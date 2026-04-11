@@ -122,6 +122,9 @@ cd ~/ai-assistant-spec
 docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache
 docker compose --env-file .env.production -f docker-compose.production.yml up -d
 
+# Перезапуск Telegram-бота (зависает при пересоздании контейнера)
+sudo systemctl restart tg-bot
+
 # Проверяем логи
 docker logs -f ai-assistant-production
 

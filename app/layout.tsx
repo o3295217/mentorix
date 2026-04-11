@@ -6,6 +6,7 @@ import AuthGuard from '@/components/AuthGuard'
 import { Providers } from '@/components/Providers'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://assist.labaiion.ru'),
   title: 'AION',
   description: 'Личный ИИ-ассистент для управления эффективностью. Превращаем мечту в ежедневное действие.',
   openGraph: {
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
     siteName: 'AION',
     locale: 'ru_RU',
     type: 'website',
+    url: 'https://assist.labaiion.ru',
   },
   twitter: {
     card: 'summary_large_image',

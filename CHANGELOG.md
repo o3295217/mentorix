@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-04-10 — update
+- 🧩 Компоненты: 1 файлов (Landing)
+- 📝 Документация: 3 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-04-09 — update
 - 🧩 Компоненты: 2 файлов (Landing, Speedometer)
 - 📚 Библиотеки: 4 файлов (core, daily, goals-decompose...)
