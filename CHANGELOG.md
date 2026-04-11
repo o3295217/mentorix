@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-04-11 — fix: stabilize goals AI chat for long context
+- 🔌 API: 1 файлов (route)
+- 📚 Библиотеки: 1 файлов (goals-decompose)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-04-11 — update
 - 🧩 Компоненты: 14 файлов (Landing, LayoutFooter, CtaSection...)
 - 📝 Документация: 2 файлов
