@@ -7,6 +7,13 @@
 ## [Unreleased]
 
 ### 2026-04-11 — update
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 1 файлов (goals-decompose)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
+### 2026-04-11 — update
 - 🔌 API: 1 файлов (route)
 - 🧩 Компоненты: 4 файлов (GoalsChatPanel, HalfYearView, MonthSection...)
 - 📄 Страницы: 1 файлов
