@@ -1,11 +1,383 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { format, addDays } from 'date-fns'
+import { type ReactNode, useEffect, useState } from 'react'
+import { addDays, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { OpenTask } from '@/lib/types'
 import { parseDateParam } from '@/lib/dates'
 import { areTasksSimilar } from '@/lib/task-match'
+
+type TaskType = OpenTask['taskType']
+
+interface TaskTone {
+  eyebrow: string
+  title: string
+  description: string
+  sectionCountClass: string
+  itemClass: string
+  badgeClass: string
+  accentButtonClass: string
+}
+
+const TASK_TONES: Record<TaskType, TaskTone> = {
+  strategic: {
+    eyebrow: 'Стратегический слой',
+    title: 'Стратегические задачи',
+    description: 'Длинные ходы и обязательства, которые держат траекторию.',
+    sectionCountClass: 'border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-200',
+    itemClass: 'border-fuchsia-500/15 bg-fuchsia-500/[0.05]',
+    badgeClass: 'border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-200',
+    accentButtonClass: 'text-fuchsia-300 hover:bg-fuchsia-500/10 hover:text-fuchsia-200',
+  },
+  operational: {
+    eyebrow: 'Операционный слой',
+    title: 'Операционные задачи',
+    description: 'Текущие рабочие дела, договорённости и обязательные хвосты.',
+    sectionCountClass: 'border-sky-500/20 bg-sky-500/10 text-sky-200',
+    itemClass: 'border-sky-500/15 bg-sky-500/[0.05]',
+    badgeClass: 'border-sky-500/20 bg-sky-500/10 text-sky-200',
+    accentButtonClass: 'text-sky-300 hover:bg-sky-500/10 hover:text-sky-200',
+  },
+  personal: {
+    eyebrow: 'Входящий список',
+    title: 'Входящие задачи',
+    description: 'Всё, что ещё не разобрано: личное, рабочее, бытовое и любые хвосты.',
+    sectionCountClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200',
+    itemClass: 'border-emerald-500/15 bg-emerald-500/[0.05]',
+    badgeClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200',
+    accentButtonClass: 'text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200',
+  },
+}
+
+function formatTaskDate(date: string) {
+  return format(parseDateParam(date), 'd MMM yyyy', { locale: ru })
+}
+
+function formatPlanStatus(planDate: string, today: string) {
+  return planDate === today
+    ? 'В плане сегодня'
+    : `В плане ${format(parseDateParam(planDate), 'd MMM', { locale: ru })}`
+}
+
+function formatTaskWord(count: number) {
+  const mod10 = count % 10
+  const mod100 = count % 100
+
+  if (mod10 === 1 && mod100 !== 11) return 'задача'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'задачи'
+  return 'задач'
+}
+
+function getArchiveStatusMeta(status?: OpenTask['archiveStatus']) {
+  if (status === 'paused') {
+    return {
+      cardClass: 'bg-amber-500/[0.05] border-amber-400/15',
+      buttonClass: 'text-gray-200 hover:text-white',
+      indicatorClass: 'text-amber-200/80',
+      lineClass: 'bg-amber-300/25',
+      iconClass: 'border-amber-300/30 bg-amber-400/10 text-amber-200',
+      label: 'На паузе',
+    }
+  }
+
+  return {
+    cardClass: 'bg-emerald-500/[0.06] border-emerald-400/15',
+    buttonClass: 'text-gray-500 hover:text-gray-300',
+    indicatorClass: 'text-emerald-200/80',
+    lineClass: 'bg-emerald-300/25',
+    iconClass: 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200',
+    label: 'Выполнено',
+  }
+}
+
+function SummaryPill({ label, value, className }: { label: string; value: string | number; className?: string }) {
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm backdrop-blur-md ${className || 'border-white/10 bg-white/[0.04] text-gray-200'}`}>
+      <span className="font-semibold text-white">{value}</span>
+      <span className="text-gray-400">{label}</span>
+    </div>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/8 bg-white/[0.02] px-4 py-4 text-sm text-gray-600">
+      {text}
+    </div>
+  )
+}
+
+function TaskCard({
+  task,
+  today,
+  inPlanDate,
+  tone,
+  closeRequested,
+  deleteRequested,
+  onAddToPlan,
+  onRequestClose,
+  onCancelClose,
+  onConfirmClose,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  task: OpenTask
+  today: string
+  inPlanDate?: string
+  tone: TaskTone
+  closeRequested: boolean
+  deleteRequested: boolean
+  onAddToPlan: (task: OpenTask) => void
+  onRequestClose: (taskId: number) => void
+  onCancelClose: () => void
+  onConfirmClose: (taskId: number) => void
+  onRequestDelete: (taskId: number) => void
+  onCancelDelete: () => void
+  onConfirmDelete: (taskId: number) => void
+}) {
+  return (
+    <div className={`rounded-2xl border p-4 ${tone.itemClass}`}>
+      <div className="flex flex-col gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {inPlanDate && (
+              <span className="inline-flex items-center rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-[11px] font-medium text-green-200">
+                {formatPlanStatus(inPlanDate, today)}
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 text-[15px] leading-6 text-gray-100">{task.taskText}</p>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500">{formatTaskDate(task.originDate)}</p>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {!inPlanDate && (
+              <button
+                onClick={() => onAddToPlan(task)}
+                className="rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-300 transition hover:bg-green-500/20 hover:text-green-200"
+              >
+                В план
+              </button>
+            )}
+
+            {closeRequested ? (
+              <div className="flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-xs">
+                <span className="text-green-200">Закрыть?</span>
+                <button
+                  onClick={() => onConfirmClose(task.id)}
+                  className="rounded-full bg-green-600 px-2.5 py-0.5 text-[11px] font-medium text-white transition hover:bg-green-500"
+                >
+                  Да
+                </button>
+                <button
+                  onClick={onCancelClose}
+                  className="rounded-full px-2 py-0.5 text-[11px] font-medium text-gray-300 transition hover:bg-white/5"
+                >
+                  Нет
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => onRequestClose(task.id)}
+                className="text-sm font-medium text-gray-300 transition hover:text-white"
+              >
+                Закрыть
+              </button>
+            )}
+
+            {deleteRequested ? (
+              <div className="flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs">
+                <span className="text-red-200">Удалить?</span>
+                <button
+                  onClick={() => onConfirmDelete(task.id)}
+                  className="rounded-full bg-red-600 px-2.5 py-0.5 text-[11px] font-medium text-white transition hover:bg-red-500"
+                >
+                  Да
+                </button>
+                <button
+                  onClick={onCancelDelete}
+                  className="rounded-full px-2 py-0.5 text-[11px] font-medium text-gray-300 transition hover:bg-white/5"
+                >
+                  Нет
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => onRequestDelete(task.id)}
+                className="text-sm font-medium text-red-300 transition hover:text-red-200"
+              >
+                Удалить
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TaskSection({
+  type,
+  tasks,
+  totalCount,
+  today,
+  tasksInPlan,
+  hideInPlan,
+  confirmCloseId,
+  confirmDeleteId,
+  onAddToPlan,
+  onRequestClose,
+  onCancelClose,
+  onConfirmClose,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+  headerContent,
+}: {
+  type: TaskType
+  tasks: OpenTask[]
+  totalCount: number
+  today: string
+  tasksInPlan: Record<number, string>
+  hideInPlan: boolean
+  confirmCloseId: number | null
+  confirmDeleteId: number | null
+  onAddToPlan: (task: OpenTask) => void
+  onRequestClose: (taskId: number) => void
+  onCancelClose: () => void
+  onConfirmClose: (taskId: number) => void
+  onRequestDelete: (taskId: number) => void
+  onCancelDelete: () => void
+  onConfirmDelete: (taskId: number) => void
+  headerContent?: ReactNode
+}) {
+  const tone = TASK_TONES[type]
+  const hiddenCount = Math.max(totalCount - tasks.length, 0)
+
+  return (
+    <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.52),rgba(15,23,42,0.22))] p-5 backdrop-blur-md">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-[0.18em] text-gray-500">{tone.eyebrow}</div>
+        </div>
+        <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${tone.sectionCountClass}`}>
+          {totalCount} {formatTaskWord(totalCount)}
+        </div>
+      </div>
+
+      <h2 className="mt-2 text-xl font-semibold text-white">{tone.title}</h2>
+      <p className="mt-1 text-sm leading-6 text-gray-400">{tone.description}</p>
+
+      {hideInPlan && hiddenCount > 0 && (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-500">
+          {hiddenCount} {hiddenCount === 1 ? 'уже стоит' : 'уже стоят'} в плане на сегодня и временно скрыт{hiddenCount === 1 ? '' : 'ы'}.
+        </div>
+      )}
+
+      {headerContent && <div className="mt-4">{headerContent}</div>}
+
+      <div className="mt-5 space-y-3">
+        {tasks.length === 0 ? (
+          <EmptyState
+            text={
+              totalCount > 0 && hideInPlan
+                ? 'В этом разделе сейчас всё уже раскидано в сегодняшний план.'
+                : 'Пока пусто.'
+            }
+          />
+        ) : (
+          tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              today={today}
+              inPlanDate={tasksInPlan[task.id]}
+              tone={tone}
+              closeRequested={confirmCloseId === task.id}
+              deleteRequested={confirmDeleteId === task.id}
+              onAddToPlan={onAddToPlan}
+              onRequestClose={onRequestClose}
+              onCancelClose={onCancelClose}
+              onConfirmClose={onConfirmClose}
+              onRequestDelete={onRequestDelete}
+              onCancelDelete={onCancelDelete}
+              onConfirmDelete={onConfirmDelete}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ClosedTaskCard({ task, onReopen }: { task: OpenTask; onReopen: (taskId: number) => void }) {
+  const statusMeta = getArchiveStatusMeta(task.archiveStatus)
+  const isPaused = task.archiveStatus === 'paused'
+
+  return (
+    <div className={`rounded-2xl border p-4 ${statusMeta.cardClass}`}>
+      <p className="text-[15px] leading-6 text-gray-300">{task.taskText}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-gray-500">
+          {task.closedAt ? format(new Date(task.closedAt), 'd MMM yyyy', { locale: ru }) : ''}
+        </span>
+        <div className={`flex min-w-[112px] flex-1 items-center justify-center gap-1.5 text-[9px] font-normal uppercase tracking-[0.12em] ${statusMeta.indicatorClass}`}>
+          <span className={`hidden h-px flex-1 rounded-full sm:block ${statusMeta.lineClass}`} />
+          <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${statusMeta.iconClass}`}>
+            {isPaused ? (
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
+                <rect x="4" y="3" width="3" height="10" rx="1" />
+                <rect x="9" y="3" width="3" height="10" rx="1" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" aria-hidden="true">
+                <path d="M3.5 8.5 6.5 11.5 12.5 4.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          <span className="text-sm font-normal normal-case tracking-normal leading-none">{statusMeta.label}</span>
+          <span className={`hidden h-px flex-1 rounded-full sm:block ${statusMeta.lineClass}`} />
+        </div>
+        <button
+          onClick={() => onReopen(task.id)}
+          className={`ml-auto text-sm font-medium transition ${statusMeta.buttonClass}`}
+        >
+          Вернуть
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ClosedTaskSection({ type, tasks, onReopen }: { type: TaskType; tasks: OpenTask[]; onReopen: (taskId: number) => void }) {
+  const tone = TASK_TONES[type]
+
+  return (
+    <section className="rounded-[24px] bg-[linear-gradient(180deg,rgba(15,23,42,0.18),rgba(15,23,42,0.06))] p-5 backdrop-blur-md">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-[0.18em] text-gray-600">Архив</div>
+          <h3 className="mt-2 text-base font-semibold text-gray-200">{tone.title}</h3>
+        </div>
+        <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium opacity-75 ${tone.sectionCountClass}`}>
+          {tasks.length}
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {tasks.length === 0 ? (
+          <EmptyState text="Архив пуст." />
+        ) : (
+          tasks.map((task) => <ClosedTaskCard key={task.id} task={task} onReopen={onReopen} />)
+        )}
+      </div>
+    </section>
+  )
+}
 
 export default function TasksPage() {
   const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
@@ -13,23 +385,14 @@ export default function TasksPage() {
   const [showClosed, setShowClosed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
-  
-  // Отслеживание задач в плане: { taskId: date }
   const [tasksInPlan, setTasksInPlan] = useState<Record<number, string>>({})
-  
-  // Скрывать задачи которые уже в плане на сегодня
   const [hideInPlan, setHideInPlan] = useState(true)
-  
-  // Модальное окно выбора даты
   const [showDateModal, setShowDateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<OpenTask | null>(null)
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  
-  // Inline-подтверждение удаления
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
-  
-  // Inline-подтверждение закрытия
   const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
+  const [newPersonalTask, setNewPersonalTask] = useState('')
 
   useEffect(() => {
     loadTasks()
@@ -38,7 +401,7 @@ export default function TasksPage() {
   const loadTasks = async () => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
-      
+
       const [openRes, closedRes, dailyRes] = await Promise.all([
         fetch('/api/tasks/open'),
         fetch('/api/tasks/closed'),
@@ -56,12 +419,11 @@ export default function TasksPage() {
         setClosedTasks(closedData)
       }
 
-      // Проверяем какие задачи уже в плане на сегодня
       if (dailyRes.ok && openData.length > 0) {
         const daily = await dailyRes.json()
         const planText = daily?.planText || ''
-        const planTasks = planText.split('\n').filter((t: string) => t.trim())
-        
+        const planTasks = planText.split('\n').filter((task: string) => task.trim())
+
         let extraTasks: string[] = []
         if (daily?.extraTasksJson) {
           try {
@@ -70,19 +432,17 @@ export default function TasksPage() {
             extraTasks = []
           }
         }
-        
+
         const allPlanTasks = [...planTasks, ...extraTasks]
-        
-        // Находим задачи которые уже в плане
         const inPlanMap: Record<number, string> = {}
+
         for (const task of openData) {
-          const isInPlan = allPlanTasks.some((planTask: string) => 
-            areTasksSimilar(task.taskText, planTask)
-          )
+          const isInPlan = allPlanTasks.some((planTask: string) => areTasksSimilar(task.taskText, planTask))
           if (isInPlan) {
             inPlanMap[task.id] = today
           }
         }
+
         setTasksInPlan(inPlanMap)
       }
     } catch (error) {
@@ -97,16 +457,17 @@ export default function TasksPage() {
       const res = await fetch(`/api/tasks/${taskId}/close`, { method: 'POST' })
       if (!res.ok) return
 
-      const closedTask = openTasks.find((t) => t.id === taskId)
+      const closedTask = openTasks.find((task) => task.id === taskId)
       if (closedTask) {
-        setOpenTasks(openTasks.filter((t) => t.id !== taskId))
-        setClosedTasks([{ ...closedTask, isClosed: true, closedAt: new Date().toISOString() }, ...closedTasks])
-        // Убираем из "в плане"
-        setTasksInPlan(prev => {
+        setOpenTasks((prev) => prev.filter((task) => task.id !== taskId))
+        setClosedTasks((prev) => [{ ...closedTask, isClosed: true, archiveStatus: 'completed', closedAt: new Date().toISOString() }, ...prev])
+        setTasksInPlan((prev) => {
           const updated = { ...prev }
           delete updated[taskId]
           return updated
         })
+        setMessage('Задача закрыта')
+        setTimeout(() => setMessage(''), 3000)
       }
     } catch (error) {
       console.error('Error closing task:', error)
@@ -118,33 +479,35 @@ export default function TasksPage() {
       const res = await fetch(`/api/tasks/${taskId}/reopen`, { method: 'POST' })
       if (!res.ok) return
 
-      const reopenedTask = closedTasks.find((t) => t.id === taskId)
+      const reopenedTask = closedTasks.find((task) => task.id === taskId)
       if (reopenedTask) {
-        setClosedTasks(closedTasks.filter((t) => t.id !== taskId))
-        setOpenTasks([{ ...reopenedTask, isClosed: false, closedAt: undefined }, ...openTasks])
+        setClosedTasks((prev) => prev.filter((task) => task.id !== taskId))
+        setOpenTasks((prev) => [{ ...reopenedTask, isClosed: false, archiveStatus: null, closedAt: undefined }, ...prev])
+        setMessage('Задача возвращена')
+        setTimeout(() => setMessage(''), 3000)
       }
     } catch (error) {
       console.error('Error reopening task:', error)
     }
   }
 
-  // Удалить задачу полностью
   const deleteTask = async (taskId: number, isClosed: boolean = false) => {
     try {
       const res = await fetch(`/api/tasks/${taskId}/delete`, { method: 'DELETE' })
       if (!res.ok) return
 
       if (isClosed) {
-        setClosedTasks(closedTasks.filter((t) => t.id !== taskId))
+        setClosedTasks((prev) => prev.filter((task) => task.id !== taskId))
       } else {
-        setOpenTasks(openTasks.filter((t) => t.id !== taskId))
+        setOpenTasks((prev) => prev.filter((task) => task.id !== taskId))
       }
-      // Убираем из "в плане"
-      setTasksInPlan(prev => {
+
+      setTasksInPlan((prev) => {
         const updated = { ...prev }
         delete updated[taskId]
         return updated
       })
+
       setMessage('Задача удалена')
       setTimeout(() => setMessage(''), 3000)
     } catch (error) {
@@ -152,27 +515,21 @@ export default function TasksPage() {
     }
   }
 
-  // Открыть модальное окно выбора даты
   const openDateModal = (task: OpenTask) => {
     setSelectedTask(task)
     setSelectedDate(format(new Date(), 'yyyy-MM-dd'))
     setShowDateModal(true)
   }
 
-  // Добавить задачу в план на выбранную дату
   const addToPlan = async () => {
     if (!selectedTask) return
-    
+
     try {
-      // Получаем текущий план на выбранную дату
       const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
       const daily = dailyRes.ok ? await dailyRes.json() : null
-      
-      // Получаем текущие задачи из planText
       const currentPlan = daily?.planText || ''
-      const planTasks = currentPlan ? currentPlan.split('\n').filter((t: string) => t.trim()) : []
-      
-      // Получаем extraTasks для проверки дубликатов
+      const planTasks = currentPlan ? currentPlan.split('\n').filter((task: string) => task.trim()) : []
+
       let currentExtraTasks: string[] = []
       if (daily?.extraTasksJson) {
         try {
@@ -181,26 +538,19 @@ export default function TasksPage() {
           currentExtraTasks = []
         }
       }
-      
-      // Проверяем planText на похожие задачи
-      const existsInPlan = planTasks.some((t: string) => areTasksSimilar(t, selectedTask.taskText))
-      
-      // Проверяем extraTasks на похожие задачи
-      const existsInExtra = currentExtraTasks.some(t => areTasksSimilar(t, selectedTask.taskText))
-      
+
+      const existsInPlan = planTasks.some((task: string) => areTasksSimilar(task, selectedTask.taskText))
+      const existsInExtra = currentExtraTasks.some((task) => areTasksSimilar(task, selectedTask.taskText))
+
       if (existsInPlan || existsInExtra) {
         setMessage('Похожая задача уже есть в плане на этот день')
         setTimeout(() => setMessage(''), 3000)
         setShowDateModal(false)
         return
       }
-      
-      // Добавляем задачу в основной план (planText)
-      const newPlanText = currentPlan 
-        ? `${currentPlan}\n${selectedTask.taskText}` 
-        : selectedTask.taskText
-      
-      // Сохраняем обновленный план
+
+      const newPlanText = currentPlan ? `${currentPlan}\n${selectedTask.taskText}` : selectedTask.taskText
+
       const saveRes = await fetch('/api/daily', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,15 +559,14 @@ export default function TasksPage() {
           planText: newPlanText,
         }),
       })
-      
+
       if (saveRes.ok) {
-        // Добавляем в отслеживание
-        setTasksInPlan(prev => ({ ...prev, [selectedTask.id]: selectedDate }))
-        
-        const dateLabel = selectedDate === format(new Date(), 'yyyy-MM-dd') 
-          ? 'сегодня' 
+        setTasksInPlan((prev) => ({ ...prev, [selectedTask.id]: selectedDate }))
+
+        const dateLabel = selectedDate === format(new Date(), 'yyyy-MM-dd')
+          ? 'сегодня'
           : format(parseDateParam(selectedDate), 'd MMM', { locale: ru })
-        
+
         setMessage(`Добавлено в план на ${dateLabel}`)
         setTimeout(() => setMessage(''), 3000)
         setShowDateModal(false)
@@ -229,386 +578,312 @@ export default function TasksPage() {
     }
   }
 
+  const addIncomingTask = async () => {
+    const text = newPersonalTask.trim()
+    if (!text) return
+
+    try {
+      const res = await fetch('/api/tasks/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskText: text,
+          taskType: 'personal',
+          originDate: format(new Date(), 'yyyy-MM-dd'),
+        }),
+      })
+
+      if (!res.ok) {
+        setMessage('Не удалось добавить задачу')
+        setTimeout(() => setMessage(''), 3000)
+        return
+      }
+
+      const newTask = await res.json()
+      setOpenTasks((prev) => [newTask, ...prev])
+      setNewPersonalTask('')
+      setMessage('Задача добавлена')
+      setTimeout(() => setMessage(''), 3000)
+    } catch (error) {
+      console.error('Error adding task:', error)
+      setMessage('Ошибка при добавлении задачи')
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+
   const today = format(new Date(), 'yyyy-MM-dd')
-  const inPlanTodayCount = Object.values(tasksInPlan).filter(d => d === today).length
-  
-  // Фильтруем задачи которые в плане на сегодня (если включено скрытие)
-  const filteredOpen = hideInPlan 
-    ? openTasks.filter(t => tasksInPlan[t.id] !== today)
-    : openTasks
-  
-  const strategicOpen = filteredOpen.filter((t) => t.taskType === 'strategic')
-  const operationalOpen = filteredOpen.filter((t) => t.taskType === 'operational')
-  const strategicClosed = closedTasks.filter((t) => t.taskType === 'strategic')
-  const operationalClosed = closedTasks.filter((t) => t.taskType === 'operational')
+  const inPlanTodayCount = Object.values(tasksInPlan).filter((date) => date === today).length
+  const filteredOpen = hideInPlan ? openTasks.filter((task) => tasksInPlan[task.id] !== today) : openTasks
+
+  const strategicTotal = openTasks.filter((task) => task.taskType === 'strategic')
+  const operationalTotal = openTasks.filter((task) => task.taskType === 'operational')
+  const personalTotal = openTasks.filter((task) => task.taskType === 'personal')
+
+  const strategicOpen = filteredOpen.filter((task) => task.taskType === 'strategic')
+  const operationalOpen = filteredOpen.filter((task) => task.taskType === 'operational')
+  const personalOpen = filteredOpen.filter((task) => task.taskType === 'personal')
+
+  const strategicClosed = closedTasks.filter((task) => task.taskType === 'strategic')
+  const operationalClosed = closedTasks.filter((task) => task.taskType === 'operational')
+  const personalClosed = closedTasks.filter((task) => task.taskType === 'personal')
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-lg text-gray-400">Загрузка...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Незакрытые задачи</h1>
-        {inPlanTodayCount > 0 && (
-          <button
-            onClick={() => setHideInPlan(!hideInPlan)}
-            className="px-3 py-1.5 rounded-lg transition bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
-          >
-            {hideInPlan 
-              ? `Показать в плане (${inPlanTodayCount})` 
-              : `Скрыть в плане (${inPlanTodayCount})`}
-          </button>
-        )}
+    <div className="relative isolate overflow-hidden rounded-[32px]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="landing-orb landing-orb-1 opacity-40" />
+        <div className="landing-orb landing-orb-2 opacity-35" />
+        <div className="landing-orb landing-orb-3 opacity-30" />
+        <div className="absolute inset-0 landing-grid opacity-[0.03]" />
       </div>
 
-      {openTasks.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-400">Все задачи закрыты!</p>
-        </div>
-      ) : filteredOpen.length === 0 && hideInPlan ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-400">
-            Все задачи добавлены в план на сегодня
+      <div className="relative z-10 space-y-5">
+        <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.58),rgba(15,23,42,0.22))] p-5 backdrop-blur-md sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-[0.22em] text-gray-500">Контур задач</div>
+              <div className="mt-2 flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Задачи</h1>
+                <div className="flex flex-wrap gap-2">
+                  <SummaryPill label="открыто" value={openTasks.length} />
+                  <SummaryPill label="стратегических" value={strategicTotal.length} className="border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-200" />
+                  <SummaryPill label="операционных" value={operationalTotal.length} className="border-sky-500/20 bg-sky-500/10 text-sky-200" />
+                  <SummaryPill label="входящих" value={personalTotal.length} className="border-emerald-500/20 bg-emerald-500/10 text-emerald-200" />
+                  {inPlanTodayCount > 0 && (
+                    <button
+                      onClick={() => setHideInPlan((prev) => !prev)}
+                      className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1.5 text-sm text-sky-200 transition hover:bg-sky-500/20"
+                    >
+                      {hideInPlan ? `в плане ${inPlanTodayCount}` : `показаны ${inPlanTodayCount} из плана`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {closedTasks.length > 0 && (
+                <button
+                  onClick={() => setShowClosed((prev) => !prev)}
+                  className="text-sm font-medium text-gray-400 transition hover:text-white"
+                >
+                  {showClosed ? `Скрыть архив (${closedTasks.length})` : `Показать архив (${closedTasks.length})`}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-3 text-sm leading-6 text-gray-400">
+            Здесь держится весь незакрытый контур: входящие задачи, стратегические обязательства и операционные хвосты, пока они не разложены по дням или не закрыты.
           </p>
-          <button
-            onClick={() => setHideInPlan(false)}
-            className="mt-3 text-sm text-blue-400 hover:underline"
-          >
-            Показать {inPlanTodayCount} задач в плане
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Strategic Tasks */}
-          <div className="card">
-            <h2 className="text-xl font-bold mb-4 text-purple-400">Стратегические задачи</h2>
-            {strategicOpen.length === 0 ? (
-              <p className="text-gray-400 text-sm">Нет стратегических задач</p>
-            ) : (
-              <div className="space-y-3">
-                {strategicOpen.map((task) => (
-                  <div key={task.id} className="p-4 bg-purple-900/30 rounded-lg border border-purple-700">
-                    <p className="text-gray-200 mb-2">{task.taskText}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">
-                        {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
-                      </span>
-                      <div className="flex gap-2 items-center flex-wrap justify-end">
-                        {tasksInPlan[task.id] ? (
-                          <span className="text-green-400 font-medium text-sm px-3 py-1 rounded bg-green-900/50">
-                             в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
-                              ? '' 
-                              : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => openDateModal(task)}
-                            className="text-sm text-green-400 font-medium hover:text-green-300 px-3 py-1 rounded hover:bg-green-900/30 transition"
-                          >
-                            + В план
-                          </button>
-                        )}
-                        {confirmCloseId === task.id ? (
-                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-green-900/50 border border-green-700/50">
-                            <span className="text-sm text-green-300">Выполнена?</span>
-                            <button
-                              onClick={() => {
-                                closeTask(task.id)
-                                setConfirmCloseId(null)
-                              }}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
-                            >
-                              Да
-                            </button>
-                            <button
-                              onClick={() => setConfirmCloseId(null)}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
-                            >
-                              Нет
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmCloseId(task.id)}
-                            className="text-sm text-purple-400 font-medium hover:text-purple-300 px-3 py-1 rounded hover:bg-purple-900/30 transition"
-                          >
-                            Закрыть
-                          </button>
-                        )}
-                        {confirmDeleteId === task.id ? (
-                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-red-900/50 border border-red-700/50">
-                            <span className="text-sm text-red-300">Удалить?</span>
-                            <button
-                              onClick={() => {
-                                deleteTask(task.id)
-                                setConfirmDeleteId(null)
-                              }}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
-                            >
-                              Да
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
-                            >
-                              Нет
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteId(task.id)}
-                            className="text-sm text-red-500 hover:text-red-400 font-medium px-3 py-1 rounded hover:bg-red-900/30 transition"
-                          >
-                            Удалить
-                          </button>
-                        )}
-                      </div>
-                    </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-4 items-start lg:grid-cols-[0.8fr_1fr_1.35fr]">
+            <TaskSection
+              type="personal"
+              tasks={personalOpen}
+              totalCount={personalTotal.length}
+              today={today}
+              tasksInPlan={tasksInPlan}
+              hideInPlan={hideInPlan}
+              confirmCloseId={confirmCloseId}
+              confirmDeleteId={confirmDeleteId}
+              onAddToPlan={openDateModal}
+              onRequestClose={setConfirmCloseId}
+              onCancelClose={() => setConfirmCloseId(null)}
+              onConfirmClose={(taskId) => {
+                closeTask(taskId)
+                setConfirmCloseId(null)
+              }}
+              onRequestDelete={setConfirmDeleteId}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={(taskId) => {
+                deleteTask(taskId)
+                setConfirmDeleteId(null)
+              }}
+              headerContent={
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="text"
+                      value={newPersonalTask}
+                      onChange={(event) => setNewPersonalTask(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && addIncomingTask()}
+                      placeholder="Что нужно не забыть?"
+                      className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      onClick={addIncomingTask}
+                      disabled={!newPersonalTask.trim()}
+                      className="self-start rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Добавить
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              }
+            />
 
-          {/* Operational Tasks */}
-          <div className="card">
-            <h2 className="text-xl font-bold mb-4 text-blue-400">Операционные задачи</h2>
-            {operationalOpen.length === 0 ? (
-              <p className="text-gray-400 text-sm">Нет операционных задач</p>
-            ) : (
-              <div className="space-y-3">
-                {operationalOpen.map((task) => (
-                  <div key={task.id} className="p-4 bg-blue-900/30 rounded-lg border border-blue-700">
-                    <p className="text-gray-200 mb-2">{task.taskText}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">
-                        {format(parseDateParam(task.originDate), 'd MMM yyyy', { locale: ru })}
-                      </span>
-                      <div className="flex gap-2 items-center flex-wrap justify-end">
-                        {tasksInPlan[task.id] ? (
-                          <span className="text-green-400 font-medium text-sm px-3 py-1 rounded bg-green-900/50">
-                             в плане {tasksInPlan[task.id] === format(new Date(), 'yyyy-MM-dd') 
-                              ? '' 
-                              : `(${format(parseDateParam(tasksInPlan[task.id]), 'd MMM', { locale: ru })})`}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => openDateModal(task)}
-                            className="text-sm text-green-400 font-medium hover:text-green-300 px-3 py-1 rounded hover:bg-green-900/30 transition"
-                          >
-                            + В план
-                          </button>
-                        )}
-                        {confirmCloseId === task.id ? (
-                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-green-900/50 border border-green-700/50">
-                            <span className="text-sm text-green-300">Выполнена?</span>
-                            <button
-                              onClick={() => {
-                                closeTask(task.id)
-                                setConfirmCloseId(null)
-                              }}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
-                            >
-                              Да
-                            </button>
-                            <button
-                              onClick={() => setConfirmCloseId(null)}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
-                            >
-                              Нет
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmCloseId(task.id)}
-                            className="text-sm text-blue-400 font-medium hover:text-blue-300 px-3 py-1 rounded hover:bg-blue-900/30 transition"
-                          >
-                            Закрыть
-                          </button>
-                        )}
-                        {confirmDeleteId === task.id ? (
-                          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-red-900/50 border border-red-700/50">
-                            <span className="text-sm text-red-300">Удалить?</span>
-                            <button
-                              onClick={() => {
-                                deleteTask(task.id)
-                                setConfirmDeleteId(null)
-                              }}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-green-400 font-medium rounded-md bg-green-800/50 hover:bg-green-700 transition"
-                            >
-                              Да
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="px-3 py-1 flex items-center justify-center text-sm text-gray-400 font-medium rounded-md hover:bg-gray-700 transition"
-                            >
-                              Нет
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteId(task.id)}
-                            className="text-sm text-red-500 hover:text-red-400 font-medium px-3 py-1 rounded hover:bg-red-900/30 transition"
-                          >
-                            Удалить
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            <TaskSection
+              type="strategic"
+              tasks={strategicOpen}
+              totalCount={strategicTotal.length}
+              today={today}
+              tasksInPlan={tasksInPlan}
+              hideInPlan={hideInPlan}
+              confirmCloseId={confirmCloseId}
+              confirmDeleteId={confirmDeleteId}
+              onAddToPlan={openDateModal}
+              onRequestClose={setConfirmCloseId}
+              onCancelClose={() => setConfirmCloseId(null)}
+              onConfirmClose={(taskId) => {
+                closeTask(taskId)
+                setConfirmCloseId(null)
+              }}
+              onRequestDelete={setConfirmDeleteId}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={(taskId) => {
+                deleteTask(taskId)
+                setConfirmDeleteId(null)
+              }}
+            />
+
+            <TaskSection
+              type="operational"
+              tasks={operationalOpen}
+              totalCount={operationalTotal.length}
+              today={today}
+              tasksInPlan={tasksInPlan}
+              hideInPlan={hideInPlan}
+              confirmCloseId={confirmCloseId}
+              confirmDeleteId={confirmDeleteId}
+              onAddToPlan={openDateModal}
+              onRequestClose={setConfirmCloseId}
+              onCancelClose={() => setConfirmCloseId(null)}
+              onConfirmClose={(taskId) => {
+                closeTask(taskId)
+                setConfirmCloseId(null)
+              }}
+              onRequestDelete={setConfirmDeleteId}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={(taskId) => {
+                deleteTask(taskId)
+                setConfirmDeleteId(null)
+              }}
+            />
         </div>
-      )}
 
-      {/* Closed Tasks Section */}
-      {closedTasks.length > 0 && (
-        <div className="mt-8">
-          <button
-            onClick={() => setShowClosed(!showClosed)}
-            className="flex items-center gap-2 text-gray-400 font-medium hover:text-gray-200"
-          >
-            
-            Закрытые задачи ({closedTasks.length})
-          </button>
+        {filteredOpen.length === 0 && openTasks.length > 0 && hideInPlan && (
+          <section className="rounded-[26px] border border-sky-500/15 bg-sky-500/[0.05] px-5 py-6 text-sm text-sky-100 backdrop-blur-md">
+            Все открытые задачи уже стоят в плане на сегодня. Можно временно показать их кнопкой в хедере.
+          </section>
+        )}
 
-          {showClosed && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Closed Strategic */}
-              <div className="card bg-gray-900/80">
-                <h2 className="text-xl font-bold mb-4 text-gray-400">Стратегические (закрытые)</h2>
-                {strategicClosed.length === 0 ? (
-                  <p className="text-gray-400 text-sm">Нет закрытых стратегических задач</p>
-                ) : (
-                  <div className="space-y-3">
-                    {strategicClosed.map((task) => (
-                      <div key={task.id} className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
-                        <p className="text-gray-400 line-through mb-2">{task.taskText}</p>
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-400">
-                            {task.closedAt && format(new Date(task.closedAt), 'd MMM yyyy', { locale: ru })}
-                          </div>
-                          <button
-                            onClick={() => reopenTask(task.id)}
-                            className="text-green-400 hover:text-green-300 font-medium"
-                          >
-                            ↩ Вернуть
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+        {closedTasks.length > 0 && showClosed && (
+          <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.32),rgba(15,23,42,0.12))] p-5 backdrop-blur-md sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-gray-600">Архив</div>
+                <h2 className="mt-2 text-xl font-semibold text-gray-200">Закрытые задачи</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-500">Здесь лежат закрытые задачи. Выполненные подсвечены мягким зелёным, и любую можно вернуть обратно в активный контур.</p>
               </div>
-
-              {/* Closed Operational */}
-              <div className="card bg-gray-900/80">
-                <h2 className="text-xl font-bold mb-4 text-gray-400">Операционные (закрытые)</h2>
-                {operationalClosed.length === 0 ? (
-                  <p className="text-gray-400 text-sm">Нет закрытых операционных задач</p>
-                ) : (
-                  <div className="space-y-3">
-                    {operationalClosed.map((task) => (
-                      <div key={task.id} className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
-                        <p className="text-gray-400 line-through mb-2">{task.taskText}</p>
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-400">
-                            {task.closedAt && format(new Date(task.closedAt), 'd MMM yyyy', { locale: ru })}
-                          </div>
-                          <button
-                            onClick={() => reopenTask(task.id)}
-                            className="text-green-400 hover:text-green-300 font-medium"
-                          >
-                            ↩ Вернуть
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {message && (
-        <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
-          <p className="font-medium text-gray-100">{message}</p>
-        </div>
-      )}
-
-      {/* Модальное окно выбора даты */}
-      {showDateModal && selectedTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-900/80 rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-            <h3 className="text-xl font-bold mb-4 text-gray-100"> Добавить в план</h3>
-            
-            <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-              {selectedTask.taskText}
-            </p>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">На какой день?</label>
-              
-              {/* Быстрые кнопки */}
-              <div className="flex gap-2 mb-3">
+              <div className="flex flex-col items-end gap-2">
+                <div className="inline-flex items-center rounded-full bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-300">
+                  {closedTasks.length} в архиве
+                </div>
                 <button
-                  onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    selectedDate === format(new Date(), 'yyyy-MM-dd')
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                  onClick={() => setShowClosed(false)}
+                  className="text-sm font-medium text-gray-500 transition hover:text-white"
                 >
-                  Сегодня
-                </button>
-                <button
-                  onClick={() => setSelectedDate(format(addDays(new Date(), 1), 'yyyy-MM-dd'))}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    selectedDate === format(addDays(new Date(), 1), 'yyyy-MM-dd')
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Завтра
+                  Скрыть архив
                 </button>
               </div>
-
-              {/* Календарь */}
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={format(new Date(), 'yyyy-MM-dd')}
-                className="w-full px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-100 bg-gray-700"
-              />
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowDateModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-700 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={addToPlan}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Добавить
-              </button>
+            <div className="mt-5 grid grid-cols-1 gap-4 items-start xl:grid-cols-3">
+              <ClosedTaskSection type="strategic" tasks={strategicClosed} onReopen={reopenTask} />
+              <ClosedTaskSection type="operational" tasks={operationalClosed} onReopen={reopenTask} />
+              <ClosedTaskSection type="personal" tasks={personalClosed} onReopen={reopenTask} />
+            </div>
+          </section>
+        )}
+
+        {message && (
+          <div className="fixed bottom-4 right-4 z-50 rounded-2xl border border-gray-700 bg-gray-900/90 p-4 shadow-lg backdrop-blur-sm">
+            <p className="font-medium text-gray-100">{message}</p>
+          </div>
+        )}
+
+        {showDateModal && selectedTask && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="w-full max-w-sm rounded-[28px] border border-gray-800 bg-gray-900/95 p-6 shadow-2xl">
+              <div className="text-xs uppercase tracking-[0.18em] text-gray-500">Планирование</div>
+              <h3 className="mt-2 text-xl font-semibold text-white">Добавить в план</h3>
+
+              <p className="mt-4 line-clamp-3 text-sm leading-6 text-gray-400">
+                {selectedTask.taskText}
+              </p>
+
+              <div className="mt-5">
+                <label className="mb-2 block text-sm font-medium text-gray-300">На какой день?</label>
+
+                <div className="mb-3 flex gap-2">
+                  <button
+                    onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                    className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      selectedDate === format(new Date(), 'yyyy-MM-dd')
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Сегодня
+                  </button>
+                  <button
+                    onClick={() => setSelectedDate(format(addDays(new Date(), 1), 'yyyy-MM-dd'))}
+                    className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      selectedDate === format(addDays(new Date(), 1), 'yyyy-MM-dd')
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Завтра
+                  </button>
+                </div>
+
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                  className="w-full rounded-xl border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div className="mt-6 flex gap-2">
+                <button
+                  onClick={() => setShowDateModal(false)}
+                  className="flex-1 rounded-xl border border-gray-700 px-4 py-2 text-gray-300 transition hover:bg-gray-800"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={addToPlan}
+                  className="flex-1 rounded-xl bg-green-600 px-4 py-2 text-white transition hover:bg-green-500"
+                >
+                  Добавить
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

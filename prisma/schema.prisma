@@ -247,6 +247,7 @@ model OpenTask {
   taskType   String
   originDate DateTime
   isClosed   Boolean   @default(false)
+  archiveStatus String?
   closedAt   DateTime?
   createdAt  DateTime  @default(now())
 

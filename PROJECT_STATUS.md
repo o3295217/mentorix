@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-04-13**
+> Последнее обновление: **2026-04-14**
 
 ## Общая информация
 
@@ -312,6 +312,7 @@
 | taskType | `String` |
 | originDate | `DateTime` |
 | isClosed | `Boolean` |
+| archiveStatus | `String?` |
 | closedAt | `DateTime?` |
 | createdAt | `DateTime` |
 

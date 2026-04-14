@@ -104,9 +104,10 @@ export interface Task {
 export interface OpenTask {
   id: number
   taskText: string
-  taskType: 'strategic' | 'operational'
+  taskType: 'strategic' | 'operational' | 'personal'
   originDate: string
   isClosed: boolean
+  archiveStatus?: 'completed' | 'paused' | null
   closedAt?: string
   createdAt: string
 }

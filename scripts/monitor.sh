@@ -67,7 +67,7 @@ tg_send_action() {
 alert() {
   echo "[$TIMESTAMP] ALERT: $1" >> "$ALERT_FILE"
   echo "[$TIMESTAMP] ALERT: $1" >> "$LOG_FILE"
-  tg_send "🚨 <b>AI Assistant Alert</b>
+  tg_send "🚨 <b>Мониторинг ИОН</b>
 $1
 <i>$TIMESTAMP</i>"
 }
@@ -80,7 +80,7 @@ alert_action() {
   echo "[$TIMESTAMP] ALERT: $MSG" >> "$ALERT_FILE"
   echo "[$TIMESTAMP] ALERT: $MSG" >> "$LOG_FILE"
   KEYBOARD="{\"inline_keyboard\":[[{\"text\":\"$BTN_TEXT\",\"callback_data\":\"$CALLBACK\"},{\"text\":\"❌ Игнорировать\",\"callback_data\":\"dismiss\"}]]}"
-  tg_send_action "🚨 <b>AI Assistant Alert</b>
+  tg_send_action "🚨 <b>Мониторинг ИОН</b>
 
 $MSG
 
@@ -103,14 +103,14 @@ if echo "$PROC_LIST" | grep -q "CONTAINER_DOWN"; then
   alert_action "❌ Контейнер <b>$CONTAINER</b> не запущен!" "act_restart" "🔄 Перезапустить контейнер"
 elif [ "$PROC_COUNT" -gt 4 ]; then
   # Ожидаем: header + next-server + ps aux = 3 строки. 4 — с запасом.
-  alert "Suspicious process count in container: $PROC_COUNT (expected <=4)"
-  alert "Processes: $(echo "$PROC_LIST" | tail -n +2)"
+  alert "Подозрительное число процессов в контейнере: $PROC_COUNT (ожидается <=4)"
+  alert "Процессы: $(echo "$PROC_LIST" | tail -n +2)"
 fi
 
 # Проверка на известные имена майнеров
 if echo "$PROC_LIST" | grep -qiE 'xmrig|javae|kworker.*nextjs|kdevtmpfsi|cryptonight|minergate|stratum|pool\.|crypto'; then
   alert_action "☠️ КРИПТОМАЙНЕР обнаружен в контейнере!" "act_kill" "🛑 Остановить и пересобрать"
-  alert "Processes: $PROC_LIST"
+  alert "Процессы: $PROC_LIST"
 fi
 
 log "Container processes: $PROC_COUNT lines"
@@ -123,7 +123,7 @@ TMP_COUNT=$(echo "$TMP_FILES" | grep -c '[^ ]' 2>/dev/null || true)
 TMP_COUNT=${TMP_COUNT:-0}
 
 if [ "$TMP_COUNT" -gt 0 ] 2>/dev/null && [ -n "$TMP_FILES" ]; then
-  alert "Files found in container /tmp/ ($TMP_COUNT files): $TMP_FILES"
+  alert "Файлы в /tmp/ контейнера ($TMP_COUNT шт.): $TMP_FILES"
 fi
 
 log "Container /tmp/ files: $TMP_COUNT"
@@ -174,14 +174,15 @@ log "Host: CPU=$HOST_CPU% | MEM=$HOST_MEM | DISK=$HOST_DISK"
 SUSPICIOUS=$(ps aux 2>/dev/null | grep -iE 'xmrig|cryptonight|stratum|minergate|kdevtmpfsi' | grep -v grep || true)
 
 if [ -n "$SUSPICIOUS" ]; then
-  alert "SUSPICIOUS PROCESSES ON HOST: $SUSPICIOUS"
+  alert "⚠️ Подозрительные процессы на хосте: $SUSPICIOUS"
 fi
 
 # Процессы с аномально высоким CPU (>50%), исключая Docker, системные, healthcheck и саму команду ps
 HOST_HIGH_CPU=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1 && $3>50 && $11!~/docker|containerd|sshd|systemd|telegraf|nginx|postgres|node|ps|awk|sort|grep|monitor/' | head -5 || true)
 
 if [ -n "$HOST_HIGH_CPU" ]; then
-  alert "High CPU processes on host: $HOST_HIGH_CPU"
+  alert "⚡ Высокая нагрузка CPU на хосте:
+$HOST_HIGH_CPU"
 fi
 
 # -----------------------------------------------------------------------------
@@ -190,7 +191,7 @@ fi
 UFW_STATUS=$(sudo ufw status 2>/dev/null | head -1 || echo "unknown")
 
 if ! echo "$UFW_STATUS" | grep -q "active"; then
-  alert "FIREWALL IS NOT ACTIVE: $UFW_STATUS"
+  alert "🛡 Файрвол НЕ АКТИВЕН: $UFW_STATUS"
 fi
 
 log "Firewall: $UFW_STATUS"
@@ -201,7 +202,7 @@ log "Firewall: $UFW_STATUS"
 PORT_3000=$(ss -tlnp 2>/dev/null | grep ':3000' || echo "not listening")
 
 if echo "$PORT_3000" | grep -q '0.0.0.0:3000'; then
-  alert "Port 3000 is exposed on 0.0.0.0! Should be 127.0.0.1 only"
+  alert "🌐 Порт 3000 открыт на 0.0.0.0! Должен быть только 127.0.0.1"
 fi
 
 log "Port 3000: $PORT_3000"
@@ -213,7 +214,7 @@ READONLY=$(docker inspect "$CONTAINER" --format='{{.HostConfig.ReadonlyRootfs}}'
 SECOPT=$(docker inspect "$CONTAINER" --format='{{.HostConfig.SecurityOpt}}' 2>/dev/null || echo "unknown")
 
 if [ "$READONLY" != "true" ]; then
-  alert "Container filesystem is NOT read-only: $READONLY"
+  alert "📂 Файловая система контейнера НЕ в режиме read-only: $READONLY"
 fi
 
 log "Docker security: ReadOnly=$READONLY SecurityOpt=$SECOPT"
@@ -236,7 +237,7 @@ if [ -n "$SSH_LOGINS" ]; then
   # Входы с ЧУЖИМ ключом — алерт
   FOREIGN_KEY_SSH=$(echo "$SSH_LOGINS" | grep -v "$OWNER_KEY" | tail -5 || true)
   if [ -n "$FOREIGN_KEY_SSH" ]; then
-    alert "SSH login with UNKNOWN KEY: $FOREIGN_KEY_SSH"
+    alert "🔑 SSH-вход с НЕИЗВЕСТНЫМ ключом: $FOREIGN_KEY_SSH"
   fi
 
   # Входы с нашим ключом — собираем новые IP
@@ -267,7 +268,7 @@ API_CALLS_30M=${API_CALLS_30M:-0}
 log "Anthropic API calls (last 30min): $API_CALLS_30M"
 
 if [ "${API_CALLS_30M:-0}" -gt 100 ] 2>/dev/null; then
-  alert "Anomalous Anthropic API usage: $API_CALLS_30M calls in 30 minutes"
+  alert "📊 Аномальное использование Anthropic API: $API_CALLS_30M вызовов за 30 минут"
 fi
 
 # Уникальные endpoints

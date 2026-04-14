@@ -5,7 +5,6 @@ import { monthNames, parseWeekKey, getPeriodKey } from '@/lib/goals-utils'
 import { useGoals } from '@/hooks'
 import { useGoalsChat, ParsedGoal } from '@/hooks/useGoalsChat'
 import DreamBar from '@/components/goals/DreamBar'
-import HorizonsCard from '@/components/goals/HorizonsCard'
 import StrategyCards from '@/components/goals/StrategyCards'
 import QuarterView from '@/components/goals/QuarterView'
 import HalfYearView from '@/components/goals/HalfYearView'
@@ -80,11 +79,25 @@ export default function GoalsPage() {
   const dreamYearsCount = dreamGoal?.months ? Math.ceil(dreamGoal.months / 12) : 0
   const years = dreamGoal ? Array.from({ length: dreamYearsCount }, (_, i) => dreamStartYear + i) : []
 
-  const dreamProgress = useMemo(() => {
-    const total = goals.length
-    const completed = goals.filter(g => g.completed).length
-    return { total, completed, percent: total > 0 ? Math.round((completed / total) * 100) : 0 }
-  }, [goals])
+  // Прогресс к мечте — из API, основан на dreamProgressScore ежедневных оценок AI
+  const [dreamProgress, setDreamProgress] = useState({ total: 0, completed: 0, percent: 0 })
+
+  useEffect(() => {
+    if (!dreamGoal) return
+    fetch('/api/progress')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data.progressPercent === 'number') {
+          const pct = Math.round(data.progressPercent)
+          setDreamProgress({
+            total: data.targetDays || 1,
+            completed: Math.round(data.effectiveDays || 0),
+            percent: pct,
+          })
+        }
+      })
+      .catch(() => {})
+  }, [dreamGoal])
 
   // Определение: есть ли уже заполненные цели?
   const hasAnyGoals = useMemo(() => {
@@ -377,17 +390,6 @@ export default function GoalsPage() {
         {/* Состояние 2: Полная карта планирования */}
         {pageState === 2 && (
           <>
-            {/* Горизонты планирования */}
-            {dreamGoal && (
-              <HorizonsCard
-                dreamMonths={dreamGoal.months}
-                currentYear={currentYear}
-                periodGoals={periodGoals}
-                yearGoals={yearGoals}
-                selectedYear={selectedYear}
-              />
-            )}
-
             {/* Карточки по годам */}
             <StrategyCards
               years={years}

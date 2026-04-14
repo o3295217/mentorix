@@ -7,7 +7,7 @@ import { areTasksSimilar } from '@/lib/task-match'
 
 const OpenTaskSchema = z.object({
   taskText: z.string().min(1, "Task text is required"),
-  taskType: z.enum(['strategic', 'operational']),
+  taskType: z.enum(['strategic', 'operational', 'personal']),
   originDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Invalid date format",
   }),

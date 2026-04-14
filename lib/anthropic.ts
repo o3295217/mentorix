@@ -341,7 +341,7 @@ export async function evaluateDayNewWithUsage(
   // Вызов Claude API с Prompt Caching и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       system: [
         {
@@ -387,7 +387,7 @@ export async function evaluateDayNewWithUsage(
   return {
     result,
     usage: {
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       inputTokens: message.usage.input_tokens,
       outputTokens: message.usage.output_tokens,
       durationMs,
@@ -431,7 +431,7 @@ export async function evaluatePeriod(
   // Вызов Claude API с кэшированием и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-20250514', // Sonnet для периодических оценок
+      model: 'claude-sonnet-4-6', // Sonnet для периодических оценок
       max_tokens: 8192,
       messages: [
         {
@@ -478,7 +478,7 @@ export async function generateForecast(
   // Вызов Claude API с кэшированием и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8192,
       messages: [
         {
@@ -669,7 +669,7 @@ export async function updateUserInsights(
   // Используем Haiku с retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       messages: [
         {

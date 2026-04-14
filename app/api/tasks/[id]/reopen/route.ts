@@ -24,6 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id: numericId },
       data: {
         isClosed: false,
+        archiveStatus: null,
         closedAt: null,
       },
     })
