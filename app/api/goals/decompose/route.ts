@@ -11,6 +11,7 @@ const MAX_DREAM_LENGTH = 2000
 const MAX_GOAL_LENGTH = 1000
 const MAX_HISTORY_LENGTH = 4000
 const MAX_GOALS_PER_PERIOD = 50
+const MAX_OUTPUT_TOKENS = 3200
 
 const GoalsDecomposeSchema = z.object({
   message: z.string().trim().min(1).max(8000),
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     const stream = await anthropic.messages.stream({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: MAX_OUTPUT_TOKENS,
       system: systemPrompt,
       messages,
     })
@@ -146,6 +147,7 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
+        let streamFailed = false
         try {
           for await (const event of stream) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
@@ -153,9 +155,13 @@ export async function POST(request: NextRequest) {
             }
           }
         } catch (err) {
+          streamFailed = true
           console.error('Stream error:', err)
+          controller.error(err instanceof Error ? err : new Error('Goals chat stream failed'))
         } finally {
-          controller.close()
+          if (!streamFailed) {
+            controller.close()
+          }
         }
       },
     })

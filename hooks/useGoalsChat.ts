@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { DreamGoal, Goal } from '@/lib/types'
+import { MONTH_NAMES } from '@/lib/goals-utils'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -35,8 +36,6 @@ interface UseGoalsChatReturn {
   extractProfileDeclined: (text: string) => boolean
   startGuidedFlow: () => void
 }
-
-const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
 export function useGoalsChat(
   dreamGoal: DreamGoal | null,
@@ -148,13 +147,30 @@ export function useGoalsChat(
           })
         }
       }
+
+      if (!assistantContent.trim()) {
+        throw new Error('Пустой ответ от ИИ')
+      }
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error)
       console.error('Goals chat error:', errMsg, error)
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ Произошла ошибка при обращении к ИИ. Попробуй снова.\n(${errMsg})`,
-      }])
+      setMessages(prev => {
+        const fallbackMessage: ChatMessage = {
+          role: 'assistant',
+          content: `❌ Произошла ошибка при обращении к ИИ. Попробуй снова.\n(${errMsg})`,
+        }
+
+        if (prev.length > 0) {
+          const updated = [...prev]
+          const lastMessage = updated[updated.length - 1]
+          if (lastMessage.role === 'assistant' && !lastMessage.content.trim()) {
+            updated[updated.length - 1] = fallbackMessage
+            return updated
+          }
+        }
+
+        return [...prev, fallbackMessage]
+      })
     } finally {
       isLoadingRef.current = false
       setIsLoading(false)
@@ -173,13 +189,17 @@ export function useGoalsChat(
 
   // Extract goal-like lines from AI response with period markers
   const extractGoals = useCallback((text: string): ParsedGoal[] => {
+    // Only extract goals when explicit period markers are present.
+    // Without markers, numbered lines are just discussion text, not actionable goals.
+    const hasPeriodMarker = /\[(YEAR|HALF_YEAR|QUARTER|MONTH|WEEK):[^\]]+\]/.test(text)
+    if (!hasPeriodMarker) return []
+
     const lines = text.split('\n')
     const goals: ParsedGoal[] = []
     
-    // Default to current month if no marker found
-    const defaultKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`
+    let markerFound = false
     let currentPeriodType: 'year' | 'half_year' | 'quarter' | 'month' | 'week' = 'month'
-    let currentPeriodKey = defaultKey
+    let currentPeriodKey = ''
     
     for (const line of lines) {
       const trimmed = line.trim()
@@ -194,28 +214,36 @@ export function useGoalsChat(
       if (yearMatch) {
         currentPeriodType = 'year'
         currentPeriodKey = yearMatch[1]
+        markerFound = true
         continue
       }
       if (halfYearMatch) {
         currentPeriodType = 'half_year'
         currentPeriodKey = halfYearMatch[1]
+        markerFound = true
         continue
       }
       if (quarterMatch) {
         currentPeriodType = 'quarter'
         currentPeriodKey = quarterMatch[1]
+        markerFound = true
         continue
       }
       if (monthMatch) {
         currentPeriodType = 'month'
         currentPeriodKey = monthMatch[1]
+        markerFound = true
         continue
       }
       if (weekMatch) {
         currentPeriodType = 'week'
         currentPeriodKey = weekMatch[1]
+        markerFound = true
         continue
       }
+      
+      // Only collect goals AFTER a period marker has been encountered
+      if (!markerFound) continue
       
       // Match hierarchical numbered lines: "1.1.1. ...", "1. ...", or bullet-point lines: "- ...", "• ...", "1) ..."
       const hierarchyMatch = trimmed.match(/^(\d+(?:\.\d+)*)[.)]\s+(.+)/)
@@ -239,7 +267,7 @@ export function useGoalsChat(
       }
     }
     return goals
-  }, [selectedYear, selectedMonth])
+  }, [])
 
   // Extract [HORIZON:N] marker from AI response
   const extractHorizon = useCallback((text: string): number | null => {

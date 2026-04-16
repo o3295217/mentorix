@@ -2,77 +2,131 @@
 
 import { useState, useMemo } from 'react'
 import { Goal } from '@/lib/types'
+import { resolvePeriodMeta } from '@/lib/goals-utils'
+import type { PeriodType } from '@/lib/goals-utils'
 
-interface QuarterViewProps {
+interface PeriodViewProps {
+  variant: 'quarter' | 'half_year'
   year: number
   periodGoals: Map<string, string[]>
   trackedGoals: Goal[]
-  onAddPeriodGoal: (key: string, text: string) => void
-  onRemovePeriodGoal: (key: string, index: number) => void
-  onEditPeriodGoal: (key: string, index: number, text: string) => void
+  addPeriodGoal: (key: string, periodType: PeriodType, date: Date, label: string, text: string) => void
+  removePeriodGoal: (key: string, index: number, periodType: PeriodType, date: Date, label: string) => void
+  editPeriodGoal: (key: string, index: number, periodType: PeriodType, date: Date, label: string, text: string) => void
   currentYear?: number
 }
 
-const Q_COLORS = [
+type ColorDef = { accent: string; bg: string; border: string; text: string; dot: string }
+
+const Q_COLORS: ColorDef[] = [
   { accent: 'from-cyan-500 to-blue-500', bg: 'bg-cyan-400/10', border: 'border-cyan-400/30', text: 'text-cyan-300', dot: 'bg-cyan-400' },
   { accent: 'from-violet-500 to-fuchsia-500', bg: 'bg-violet-400/10', border: 'border-violet-400/30', text: 'text-violet-300', dot: 'bg-violet-400' },
   { accent: 'from-amber-500 to-orange-500', bg: 'bg-amber-400/10', border: 'border-amber-400/30', text: 'text-amber-300', dot: 'bg-amber-400' },
   { accent: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-400/10', border: 'border-emerald-400/30', text: 'text-emerald-300', dot: 'bg-emerald-400' },
 ]
 
-const Q_MONTHS = [
-  ['Янв', 'Фев', 'Мар'],
-  ['Апр', 'Май', 'Июн'],
-  ['Июл', 'Авг', 'Сен'],
-  ['Окт', 'Ноя', 'Дек'],
+const H_COLORS: ColorDef[] = [
+  { accent: 'from-sky-500 to-indigo-500', bg: 'bg-sky-400/10', border: 'border-sky-400/30', text: 'text-sky-300', dot: 'bg-sky-400' },
+  { accent: 'from-rose-500 to-pink-500', bg: 'bg-rose-400/10', border: 'border-rose-400/30', text: 'text-rose-300', dot: 'bg-rose-400' },
 ]
 
-export default function QuarterView({
+const CONFIGS = {
+  quarter: {
+    count: 4,
+    colors: Q_COLORS,
+    title: 'Кварталы',
+    gridCols: 'grid-cols-2 md:grid-cols-4',
+    emptyHint: 'Разбейте годовые цели по кварталам',
+    keyPrefix: 'Q',
+    label: (i: number) => `Q${i}`,
+    subtitle: (i: number) => {
+      const months = [['Янв', 'Фев', 'Мар'], ['Апр', 'Май', 'Июн'], ['Июл', 'Авг', 'Сен'], ['Окт', 'Ноя', 'Дек']]
+      return months[i - 1].join(' · ')
+    },
+    getKey: (year: number, i: number) => `${year}-Q${i}`,
+    isPast: (i: number, year: number, nowYear: number, now: Date) =>
+      year < nowYear || (year === nowYear && i < Math.floor(now.getMonth() / 3) + 1),
+  },
+  half_year: {
+    count: 2,
+    colors: H_COLORS,
+    title: 'Полугодия',
+    gridCols: 'grid-cols-1 md:grid-cols-2',
+    emptyHint: 'Разбейте годовые цели по полугодиям',
+    keyPrefix: 'H',
+    label: (i: number) => `H${i}`,
+    subtitle: (i: number) => {
+      const data = [
+        { months: 'Янв — Июн', quarters: 'Q1, Q2' },
+        { months: 'Июл — Дек', quarters: 'Q3, Q4' },
+      ]
+      const d = data[i - 1]
+      return `${d.months} · ${d.quarters}`
+    },
+    getKey: (year: number, i: number) => `${year}-H${i}`,
+    isPast: (i: number, year: number, nowYear: number, now: Date) =>
+      year < nowYear || (year === nowYear && i < (now.getMonth() < 6 ? 1 : 2)),
+  },
+} as const
+
+export default function PeriodView({
+  variant,
   year,
   periodGoals,
   trackedGoals,
-  onAddPeriodGoal,
-  onRemovePeriodGoal,
-  onEditPeriodGoal,
+  addPeriodGoal,
+  removePeriodGoal,
+  editPeriodGoal,
   currentYear,
-}: QuarterViewProps) {
+}: PeriodViewProps) {
+  const cfg = CONFIGS[variant]
   const now = new Date()
   const nowYear = currentYear ?? now.getFullYear()
-  const nowQuarter = Math.floor(now.getMonth() / 3) + 1
-  const quarters = useMemo(() => {
-    return [1, 2, 3, 4].map(q => {
-      const key = `${year}-Q${q}`
+
+  const items = useMemo(() => {
+    return Array.from({ length: cfg.count }, (_, idx) => {
+      const i = idx + 1
+      const key = cfg.getKey(year, i)
       const goals = periodGoals.get(key) || []
       const total = goals.length
       const completed = goals.filter(g =>
         trackedGoals.find(t => t.periodKey === key && t.text === g && t.completed)
       ).length
       const percent = total > 0 ? Math.round((completed / total) * 100) : 0
-      return { q, key, goals, total, completed, percent }
+      return { i, key, goals, total, completed, percent }
     })
-  }, [year, periodGoals, trackedGoals])
+  }, [year, periodGoals, trackedGoals, cfg])
 
   return (
     <div>
       <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500 mb-3">
-        Кварталы {year}
+        {cfg.title} {year}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {quarters.map((qd, i) => (
-          <QuarterCard
-            key={qd.q}
-            quarter={qd.q}
-            periodKey={qd.key}
-            goals={qd.goals}
-            total={qd.total}
-            completed={qd.completed}
-            percent={qd.percent}
-            color={Q_COLORS[i]}
-            months={Q_MONTHS[i]}
-            isPast={year < nowYear || (year === nowYear && qd.q < nowQuarter)}
-            onAdd={(text) => onAddPeriodGoal(qd.key, text)}
-            onRemove={(index) => onRemovePeriodGoal(qd.key, index)}
-            onEdit={(index, text) => onEditPeriodGoal(qd.key, index, text)}
+      <div className={`grid ${cfg.gridCols} gap-3`}>
+        {items.map((item, idx) => (
+          <PeriodCard
+            key={item.i}
+            label={cfg.label(item.i)}
+            subtitle={cfg.subtitle(item.i)}
+            goals={item.goals}
+            total={item.total}
+            completed={item.completed}
+            percent={item.percent}
+            color={cfg.colors[idx]}
+            emptyHint={cfg.emptyHint}
+            isPast={cfg.isPast(item.i, year, nowYear, now)}
+            onAdd={(text) => {
+              const m = resolvePeriodMeta(item.key)
+              if (m) addPeriodGoal(item.key, m.periodType, m.date, m.label, text)
+            }}
+            onRemove={(index) => {
+              const m = resolvePeriodMeta(item.key)
+              if (m) removePeriodGoal(item.key, index, m.periodType, m.date, m.label)
+            }}
+            onEdit={(index, text) => {
+              const m = resolvePeriodMeta(item.key)
+              if (m) editPeriodGoal(item.key, index, m.periodType, m.date, m.label, text)
+            }}
           />
         ))}
       </div>
@@ -80,28 +134,28 @@ export default function QuarterView({
   )
 }
 
-function QuarterCard({
-  quarter,
-  periodKey: _periodKey,
+function PeriodCard({
+  label,
+  subtitle,
   goals,
   total,
   completed,
   percent,
   color,
-  months,
+  emptyHint,
   isPast,
   onAdd,
   onRemove,
   onEdit,
 }: {
-  quarter: number
-  periodKey: string
+  label: string
+  subtitle: string
   goals: string[]
   total: number
   completed: number
   percent: number
-  color: typeof Q_COLORS[number]
-  months: string[]
+  color: ColorDef
+  emptyHint: string
   isPast: boolean
   onAdd: (text: string) => void
   onRemove: (index: number) => void
@@ -141,8 +195,8 @@ function QuarterCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${color.accent}`} />
-            <span className="text-sm font-bold text-slate-500">Q{quarter}</span>
-            <span className="text-xs text-slate-600">{months.join(' · ')}</span>
+            <span className="text-sm font-bold text-slate-500">{label}</span>
+            <span className="text-xs text-slate-600">{subtitle}</span>
           </div>
           <span className="text-[10px] text-slate-600">развернуть</span>
         </div>
@@ -160,9 +214,9 @@ function QuarterCard({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full bg-gradient-to-r ${color.accent}`} />
-          <span className="text-sm font-bold text-white">Q{quarter}</span>
+          <span className="text-sm font-bold text-white">{label}</span>
         </div>
-        <span className="text-xs text-slate-500">{months.join(' · ')}</span>
+        <span className="text-xs text-slate-500">{subtitle}</span>
       </div>
 
       {/* Progress bar */}
@@ -182,13 +236,13 @@ function QuarterCard({
 
       {/* Empty state hint */}
       {goals.length === 0 && (
-        <p className="text-[11px] text-slate-600 italic mb-1">Разбейте годовые цели по кварталам</p>
+        <p className="text-[11px] text-slate-600 italic mb-1">{emptyHint}</p>
       )}
 
       {/* Goals list */}
       <div className="space-y-1 mb-2 max-h-28 overflow-y-auto chat-scrollbar">
         {goals.map((goal, index) => (
-          <div key={index} className="group/qg flex items-start gap-1.5 text-xs">
+          <div key={index} className="group/pg flex items-start gap-1.5 text-xs">
             {editingIndex === index ? (
               <textarea
                 value={editingText}
@@ -214,7 +268,7 @@ function QuarterCard({
                 </span>
                 <button
                   onClick={() => onRemove(index)}
-                  className="text-slate-700 hover:text-red-400 opacity-0 group-hover/qg:opacity-100 transition-opacity flex-shrink-0"
+                  className="text-slate-700 hover:text-red-400 opacity-0 group-hover/pg:opacity-100 transition-opacity flex-shrink-0"
                 >
                   ×
                 </button>
@@ -229,7 +283,7 @@ function QuarterCard({
         value={newGoal}
         onChange={(e) => { setNewGoal(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }}
-        placeholder={`+ цель Q${quarter}`}
+        placeholder={`+ цель ${label}`}
         rows={1}
         className="w-full bg-slate-950/30 border border-slate-800 rounded-xl px-2.5 py-1 text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors resize-none overflow-hidden"
       />

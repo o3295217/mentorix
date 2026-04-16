@@ -587,3 +587,21 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+model AIUsage {
+  id           Int      @id @default(autoincrement())
+  userId       String
+  endpoint     String   // goals/chat | evaluate | daily/chat | daily/check-plan
+  model        String   // claude-sonnet-4-20250514 etc.
+  inputTokens  Int
+  outputTokens Int
+  durationMs   Int?
+  success      Boolean  @default(true)
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@map("ai_usage")
+}

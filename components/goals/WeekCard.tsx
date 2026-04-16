@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Goal, GoalTag } from '@/lib/types'
 import { parseDateParam, toDateKey } from '@/lib/dates'
+import { fuzzyMatchGoal } from '@/lib/goals-utils'
 import { WeekData } from './WeekStrip'
 
 interface WeekCardProps {
@@ -17,6 +18,7 @@ interface WeekCardProps {
   // Drag
   draggedGoal: { weekKey: string; index: number; goal: string } | null
   setDraggedGoal: (goal: { weekKey: string; index: number; goal: string } | null) => void
+  dragOverWeek?: string | null
   setDragOverWeek: (weekKey: string | null) => void
   onMoveGoal: (fromWeekKey: string, toWeekKey: string, index: number, goal: string) => void
   // CRUD
@@ -34,6 +36,11 @@ interface WeekCardProps {
   filterStatus: 'all' | 'active' | 'completed'
   filterPriority: number | null
   filterTag: string | null
+  // Layout variant: 'card' = standalone card, 'grid' = cell inside MonthSection grid
+  variant?: 'card' | 'grid'
+  // Controlled input (for grid variant)
+  newGoalValue?: string
+  onNewGoalChange?: (value: string) => void
 }
 
 const isOverdue = (deadline: string | null): boolean => {
@@ -51,6 +58,7 @@ export default function WeekCard({
   onSetGoalTags,
   draggedGoal,
   setDraggedGoal,
+  dragOverWeek,
   setDragOverWeek,
   onMoveGoal,
   onAddWeekGoal,
@@ -65,8 +73,13 @@ export default function WeekCard({
   filterStatus,
   filterPriority,
   filterTag,
+  variant = 'card',
+  newGoalValue,
+  onNewGoalChange,
 }: WeekCardProps) {
   const weekKey = week.key
+  const isGrid = variant === 'grid'
+  const isDragOver = dragOverWeek === weekKey
   const [editingWeekGoal, setEditingWeekGoal] = useState<{ weekKey: string; index: number } | null>(null)
   const [editingWeekText, setEditingWeekText] = useState('')
   // Tag selection for new goal
@@ -80,11 +93,14 @@ export default function WeekCard({
   return (
     <div
       id={`week-${weekKey}`}
-      className={`rounded-2xl p-3 border transition-all ${
-        isCurrentWeek
-          ? 'border-blue-500/30 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.06),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]'
-          : 'border-slate-700 bg-slate-800/20'
-      }`}
+      className={isGrid
+        ? `bg-slate-950/60 p-3 flex flex-col ${isDragOver ? 'ring-1 ring-blue-500/50 bg-blue-500/5' : ''}`
+        : `rounded-2xl p-3 border transition-all ${
+            isCurrentWeek
+              ? 'border-blue-500/30 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.06),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]'
+              : 'border-slate-700 bg-slate-800/20'
+          } ${isDragOver ? 'ring-1 ring-blue-500/50' : ''}`
+      }
       onDragOver={(e) => {
         e.preventDefault()
         if (draggedGoal && draggedGoal.weekKey !== weekKey) setDragOverWeek(weekKey)
@@ -99,44 +115,65 @@ export default function WeekCard({
         setDragOverWeek(null)
       }}
     >
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
-          Неделя {week.num}: {week.start.getDate()}-{week.end.getDate()}
-        </span>
-        {isCurrentWeek && <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">сейчас</span>}
-      </div>
+      {/* Заголовок */}
+      {isGrid ? (
+        <div className="mb-2 pb-2 border-b border-slate-800/60 flex items-baseline gap-2">
+          <div className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
+            Неделя {week.num}
+          </div>
+          <div className={`text-[11px] ${isCurrentWeek ? 'text-blue-400/60' : 'text-slate-600'}`}>
+            {week.start.getDate()}-{week.end.getDate()}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
+            Неделя {week.num}: {week.start.getDate()}-{week.end.getDate()}
+          </span>
+          {isCurrentWeek && <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">сейчас</span>}
+        </div>
+      )}
 
       {/* Добавление цели в неделю */}
       <div className="mb-2">
         <div className="flex gap-1">
           <input
             type="text"
+            value={onNewGoalChange ? (newGoalValue || '') : undefined}
+            onChange={onNewGoalChange ? (e) => onNewGoalChange(e.target.value) : undefined}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 const target = e.target as HTMLInputElement
                 if (target.value.trim()) {
                   onAddWeekGoal(weekKey, target.value, selectedTags.length > 0 ? selectedTags : undefined)
-                  target.value = ''
+                  if (onNewGoalChange) onNewGoalChange('')
+                  else target.value = ''
                   setSelectedTags([])
                 }
               }
             }}
-            placeholder="Цель на неделю..."
-            className="flex-1 px-2 py-1 text-xs border border-slate-700 rounded-xl bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600"
+            placeholder={isGrid ? '+ задача' : 'Цель на неделю...'}
+            className={isGrid
+              ? 'flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700'
+              : 'flex-1 px-2 py-1 text-xs border border-slate-700 rounded-xl bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600'
+            }
           />
-          <button
-            onClick={(e) => {
-              const input = e.currentTarget.parentElement?.querySelector('input[type="text"]') as HTMLInputElement
-              if (input?.value.trim()) {
-                onAddWeekGoal(weekKey, input.value, selectedTags.length > 0 ? selectedTags : undefined)
-                input.value = ''
-                setSelectedTags([])
-              }
-            }}
-            className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-lg transition-colors"
-          >
-            +
-          </button>
+          {!isGrid && (
+            <button
+              onClick={(e) => {
+                const input = e.currentTarget.parentElement?.querySelector('input[type="text"]') as HTMLInputElement
+                if (input?.value.trim()) {
+                  onAddWeekGoal(weekKey, input.value, selectedTags.length > 0 ? selectedTags : undefined)
+                  if (onNewGoalChange) onNewGoalChange('')
+                  else input.value = ''
+                  setSelectedTags([])
+                }
+              }}
+              className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-lg transition-colors"
+            >
+              +
+            </button>
+          )}
         </div>
         {/* Теги для новой цели */}
         {tags.length > 0 && (
@@ -216,8 +253,7 @@ export default function WeekCard({
           const filtered = weekGoals.filter((goal) => {
             if (searchQuery && !goal.toLowerCase().includes(searchQuery.toLowerCase())) return false
             const tracked = trackedGoals.find(g =>
-              g.periodKey === weekKey &&
-              (g.text === goal || g.text.startsWith(goal.slice(0, 30)) || goal.startsWith(g.text.slice(0, 30)))
+              g.periodKey === weekKey && fuzzyMatchGoal(g.text, goal)
             )
             if (filterStatus === 'completed' && !tracked?.completed) return false
             if (filterStatus === 'active' && tracked?.completed) return false
@@ -237,8 +273,7 @@ export default function WeekCard({
             const isDragging = draggedGoal?.weekKey === weekKey && draggedGoal?.index === index
 
             const trackedGoal = trackedGoals.find(g =>
-              g.periodKey === weekKey &&
-              (g.text === goal || g.text.startsWith(goal.slice(0, 30)) || goal.startsWith(g.text.slice(0, 30)))
+              g.periodKey === weekKey && fuzzyMatchGoal(g.text, goal)
             )
             const isCompleted = trackedGoal?.completed || false
             const goalDeadline = trackedGoal?.deadline

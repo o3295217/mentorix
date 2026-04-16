@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-04-14**
+> Последнее обновление: **2026-04-16**
 
 ## Общая информация
 
@@ -88,7 +88,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (37)
+## Компоненты (36)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -108,11 +108,10 @@
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
-- `goals/HalfYearView`
 - `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
-- `goals/QuarterView`
+- `goals/PeriodView`
 - `goals/StrategyCards`
 - `goals/WeekCard`
 - `goals/WeekStrip`
@@ -128,7 +127,7 @@
 - `landing/TrustSection`
 - `landing/data`
 
-## Модели БД (27)
+## Модели БД (28)
 
 ### User
 | Поле | Тип |
@@ -567,6 +566,20 @@
 | details | `String?` |
 | ipAddress | `String?` |
 | userAgent | `String?` |
+| createdAt | `DateTime` |
+
+### AIUsage
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| userId | `String` |
+| endpoint | `String` |
+| model | `String` |
+| inputTokens | `Int` |
+| outputTokens | `Int` |
+| durationMs | `Int?` |
+| success | `Boolean` |
+| errorMessage | `String?` |
 | createdAt | `DateTime` |
 
 

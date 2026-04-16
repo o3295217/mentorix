@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import type { ParsedGoal } from '@/hooks/useGoalsChat'
+import { MONTH_NAMES, formatPeriodLabel } from '@/lib/goals-utils'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -15,8 +16,6 @@ interface GoalBlock {
   goals: ParsedGoal[]
 }
 
-const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
-
 // Regex matching any period marker line
 const PERIOD_MARKER_RE = /^\[(YEAR|HALF_YEAR|QUARTER|MONTH|WEEK):[^\]]+\]\s*$/
 
@@ -26,12 +25,15 @@ interface ContentSection {
   block?: GoalBlock // for 'goals' sections
 }
 
-/** Strip internal AI markers from message text */
+/** Strip internal AI markers and markdown formatting from message text */
 function stripInternalMarkers(text: string): string {
   return text
     .replace(/\[PROFILE:[^\]]*\]/g, '')
     .replace(/\[PROFILE_DECLINED\]/g, '')
     .replace(/\[HORIZON:\d+\]/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -62,12 +64,13 @@ function splitMessageIntoSections(content: string, blocks: GoalBlock[]): Content
     }
 
     // Check if this line is a goal line belonging to current block
-    const isGoalLine = /^\s*(\d+[.)]\s|[-•]\s)/.test(line) && blockIndex < blocks.length
+    // Matches: "1. ", "1.1. ", "1.2.2.1. ", "1) ", "- ", "• "
+    const isGoalLine = /^\s*(\d+(?:\.\d+)*[.)]\s|[-•]\s)/.test(line) && blockIndex < blocks.length
     if (isGoalLine) {
       // Accumulate goal lines — they'll be represented by the block
       // Check if we've accumulated all goals for this block
       const block = blocks[blockIndex]
-      const goalText = line.replace(/^\s*(\d+[.)]\s*|[-•]\s*)/, '').trim()
+      const goalText = line.replace(/^\s*(\d+(?:\.\d+)*[.)]\s*|[-•]\s*)/, '').trim()
       const isLastGoal = block.goals.some(
         (g, gi) => gi === block.goals.length - 1 && g.text === goalText
       )
@@ -100,42 +103,13 @@ function groupGoalsByBlock(goals: ParsedGoal[]): GoalBlock[] {
   let current: GoalBlock | null = null
   for (const goal of goals) {
     if (!current || current.periodKey !== goal.periodKey || current.periodType !== goal.periodType) {
-      const label = formatBlockLabel(goal.periodType, goal.periodKey)
+      const label = formatPeriodLabel(goal.periodKey)
       current = { periodType: goal.periodType, periodKey: goal.periodKey, label, goals: [] }
       blocks.push(current)
     }
     current.goals.push(goal)
   }
   return blocks
-}
-
-function formatBlockLabel(periodType: string, periodKey: string): string {
-  if (periodType === 'year') return `${periodKey} год`
-  if (periodType === 'half_year') {
-    const m = periodKey.match(/^(\d{4})-H([12])$/)
-    return m ? `H${m[2]} ${m[1]}` : periodKey
-  }
-  if (periodType === 'quarter') {
-    const m = periodKey.match(/^(\d{4})-Q([1-4])$/)
-    return m ? `Q${m[2]} ${m[1]}` : periodKey
-  }
-  if (periodType === 'month') {
-    const m = periodKey.match(/^(\d{4})-(\d{2})$/)
-    if (m) {
-      const idx = parseInt(m[2], 10) - 1
-      return `${MONTH_NAMES[idx] || m[2]} ${m[1]}`
-    }
-    return periodKey
-  }
-  if (periodType === 'week') {
-    const m = periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
-    if (m) {
-      const idx = parseInt(m[2], 10) - 1
-      return `Неделя ${m[3]}, ${MONTH_NAMES[idx] || m[2]} ${m[1]}`
-    }
-    return periodKey
-  }
-  return periodKey
 }
 
 interface GoalsChatPanelProps {

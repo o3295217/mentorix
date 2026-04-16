@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { monthNames, parseWeekKey, getPeriodKey } from '@/lib/goals-utils'
+import { useState, useEffect, useMemo } from 'react'
+import { monthNames, parseWeekKey } from '@/lib/goals-utils'
 import { useGoals } from '@/hooks'
-import { useGoalsChat, ParsedGoal } from '@/hooks/useGoalsChat'
+import { useGoalsChat } from '@/hooks/useGoalsChat'
+import { useAcceptGoals } from '@/hooks/useAcceptGoals'
+import { useAutoSaveProfile } from '@/hooks/useAutoSaveProfile'
 import DreamBar from '@/components/goals/DreamBar'
 import StrategyCards from '@/components/goals/StrategyCards'
-import QuarterView from '@/components/goals/QuarterView'
-import HalfYearView from '@/components/goals/HalfYearView'
+import PeriodView from '@/components/goals/PeriodView'
 import MonthTimeline from '@/components/goals/MonthTimeline'
 import MonthSection from '@/components/goals/MonthSection'
 import GoalsChatTrigger from '@/components/goals/GoalsChatTrigger'
@@ -19,12 +20,14 @@ export default function GoalsPage() {
     saveDream,
     yearGoals,
     loadYearGoals,
+    saveYearGoals,
     addYearGoal,
     removeYearGoal,
     editYearGoal,
     periodGoals,
     loadPeriodGoalsWithKey,
     loadAllWeeksForMonth,
+    savePeriodGoals,
     addPeriodGoal,
     addPeriodGoalBatch,
     removePeriodGoal,
@@ -35,6 +38,7 @@ export default function GoalsPage() {
     setGoalCompleted,
     setGoalTags,
     createTrackedGoal,
+    deleteGoal,
     tags,
     createTag: createTagApi,
     calculatePeriodProgress,
@@ -42,6 +46,19 @@ export default function GoalsPage() {
     message,
     currentYear,
   } = useGoals()
+
+  const handleAcceptGoals = useAcceptGoals({
+    yearGoals,
+    periodGoals,
+    goals,
+    saveYearGoals,
+    savePeriodGoals,
+    addYearGoal,
+    addPeriodGoalBatch,
+    createTrackedGoal,
+    deleteGoal,
+    showMessage,
+  })
 
   // Навигация
   const currentMonth = new Date().getMonth()
@@ -160,10 +177,6 @@ export default function GoalsPage() {
     showMessage(`Задача перемещена в W${toParsed.weekNum}`)
   }
 
-  const saveEditPeriodGoal = (periodKey: string, index: number, periodType: 'quarter' | 'month' | 'week' | 'half_year', date: Date, label: string, text: string) => {
-    editPeriodGoal(periodKey, index, periodType, date, label, text)
-  }
-
   // Данные текущего месяца
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`
   const monthGoals = periodGoals.get(monthKey) || []
@@ -209,167 +222,17 @@ export default function GoalsPage() {
     }
   }, [dreamGoal, pageState, periodGoals])
 
-  // Принять план — разложить цели из ИИ по правильным периодам
-  const handleAcceptGoals = useCallback(async (goals: ParsedGoal[]) => {
-    let yearCount = 0, periodCount = 0
-
-    // Маппинг hierarchyNumber → tracked goal ID (для установки parentId)
-    const hierarchyIdMap = new Map<string, number>()
-
-    // Определяем, есть ли иерархическая нумерация (1.1., 1.1.1.)
-    const hasHierarchy = goals.some(g => g.hierarchyNumber && g.hierarchyNumber.includes('.'))
-
-    // ===== ФАЗА 1: Группируем period goals по ключу, сохраняем batch-ом =====
-    const periodBatches = new Map<string, { periodType: 'week' | 'month' | 'quarter' | 'half_year' | 'year'; date: Date; label: string; texts: string[] }>()
-
-    for (const goal of goals) {
-      if (goal.periodType === 'year') {
-        const year = parseInt(goal.periodKey, 10)
-        if (!isNaN(year)) {
-          addYearGoal(year, goal.text)
-          yearCount++
-        }
-        continue
-      }
-
-      let key = '', periodType: 'week' | 'month' | 'quarter' | 'half_year' | 'year' = 'week', date: Date = new Date(), label = ''
-
-      if (goal.periodType === 'quarter') {
-        const match = goal.periodKey.match(/^(\d{4})-Q([1-4])$/)
-        if (!match) continue
-        const y = parseInt(match[1], 10), q = parseInt(match[2], 10)
-        date = new Date(y, (q - 1) * 3, 1)
-        key = getPeriodKey('quarter', date)
-        periodType = 'quarter'
-        label = `Q${q} ${y}`
-      } else if (goal.periodType === 'half_year') {
-        const match = goal.periodKey.match(/^(\d{4})-H([12])$/)
-        if (!match) continue
-        const y = parseInt(match[1], 10), h = parseInt(match[2], 10)
-        date = new Date(y, (h - 1) * 6, 1)
-        key = getPeriodKey('half_year', date)
-        periodType = 'half_year'
-        label = `H${h} ${y}`
-      } else if (goal.periodType === 'month') {
-        const match = goal.periodKey.match(/^(\d{4})-(\d{2})$/)
-        if (!match) continue
-        const y = parseInt(match[1], 10), m = parseInt(match[2], 10) - 1
-        date = new Date(y, m, 1)
-        key = getPeriodKey('month', date)
-        periodType = 'month'
-        label = monthNames[m]
-      } else if (goal.periodType === 'week') {
-        const match = goal.periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
-        if (!match) continue
-        const y = parseInt(match[1], 10), m = parseInt(match[2], 10) - 1, w = parseInt(match[3], 10)
-        const firstDay = new Date(y, m, 1)
-        date = new Date(firstDay)
-        while (date.getDay() !== 1) date.setDate(date.getDate() + 1)
-        date.setDate(date.getDate() + (w - 1) * 7)
-        key = `${y}-${String(m + 1).padStart(2, '0')}-W${w}`
-        periodType = 'week'
-        label = `Неделя ${w}`
-      }
-
-      if (!key) continue
-
-      const batch = periodBatches.get(key)
-      if (batch) {
-        batch.texts.push(goal.text)
-      } else {
-        periodBatches.set(key, { periodType, date, label, texts: [goal.text] })
-      }
-      periodCount++
-    }
-
-    // Один save на каждый period key — без race condition
-    for (const [key, batch] of periodBatches) {
-      addPeriodGoalBatch(key, batch.periodType, batch.date, batch.label, batch.texts)
-    }
-
-    const parts: string[] = []
-    if (yearCount > 0) parts.push(`${yearCount} годовых`)
-    if (periodCount > 0) parts.push(`${periodCount} по периодам`)
-    showMessage(`Добавлено: ${parts.join(', ')} (всего ${goals.length})`)
-
-    // ===== ФАЗА 2: Создать tracked goals с parentId (последовательно) =====
-    if (hasHierarchy) {
-      for (const goal of goals) {
-        if (!goal.hierarchyNumber) continue
-        let periodKey = ''
-        if (goal.periodType === 'year') {
-          periodKey = goal.periodKey
-        } else if (goal.periodType === 'half_year') {
-          const match = goal.periodKey.match(/^(\d{4})-H([12])$/)
-          if (match) periodKey = getPeriodKey('half_year', new Date(parseInt(match[1], 10), (parseInt(match[2], 10) - 1) * 6, 1))
-        } else if (goal.periodType === 'quarter') {
-          const match = goal.periodKey.match(/^(\d{4})-Q([1-4])$/)
-          if (match) periodKey = getPeriodKey('quarter', new Date(parseInt(match[1], 10), (parseInt(match[2], 10) - 1) * 3, 1))
-        } else if (goal.periodType === 'month') {
-          const match = goal.periodKey.match(/^(\d{4})-(\d{2})$/)
-          if (match) periodKey = getPeriodKey('month', new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, 1))
-        } else if (goal.periodType === 'week') {
-          const match = goal.periodKey.match(/^(\d{4})-(\d{2})-W(\d+)$/)
-          if (match) periodKey = `${match[1]}-${match[2]}-W${match[3]}`
-        }
-        if (!periodKey) continue
-
-        let parentId: number | null = null
-        const parentNum = goal.hierarchyNumber.split('.').slice(0, -1).join('.')
-        if (parentNum) parentId = hierarchyIdMap.get(parentNum) || null
-
-        const tracked = await createTrackedGoal(periodKey, goal.text, 0, [], parentId)
-        if (tracked) hierarchyIdMap.set(goal.hierarchyNumber, tracked.id)
-      }
-    }
-  }, [addYearGoal, addPeriodGoalBatch, createTrackedGoal, showMessage])
-
-  // Автосохранение профиля планирования при обнаружении маркера [PROFILE:] в последнем сообщении
-  const lastSavedProfileRef = useRef('')
-  const lastSavedHorizonRef = useRef(0)
-  const profileDeclineSavedRef = useRef(false)
-  useEffect(() => {
-    if (chatLoading || chatMessages.length === 0) return
-    const lastMsg = chatMessages[chatMessages.length - 1]
-    if (lastMsg.role !== 'assistant') return
-
-    // Сохранение профиля
-    const profile = extractProfile(lastMsg.content)
-    if (profile) {
-      const profileKey = JSON.stringify(profile)
-      if (profileKey !== lastSavedProfileRef.current) {
-        lastSavedProfileRef.current = profileKey
-        fetch('/api/goals/planning-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...profile, declined: false }),
-        }).then(() => {
-          showMessage('Профиль планирования сохранён')
-        }).catch(() => {
-          lastSavedProfileRef.current = ''
-        })
-      }
-    }
-
-    // Сохранение отказа от профиля
-    if (!profileDeclineSavedRef.current && extractProfileDeclined(lastMsg.content)) {
-      profileDeclineSavedRef.current = true
-      fetch('/api/goals/planning-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ declined: true }),
-      }).catch(() => {
-        profileDeclineSavedRef.current = false
-      })
-    }
-
-    // Сохранение горизонта
-    const horizon = extractHorizon(lastMsg.content)
-    if (horizon && horizon !== lastSavedHorizonRef.current && dreamGoal) {
-      lastSavedHorizonRef.current = horizon
-      saveDream(dreamGoal.goalText, horizon)
-    }
-  }, [chatMessages, chatLoading, extractProfile, extractHorizon, extractProfileDeclined, showMessage, dreamGoal, saveDream])
+  // Автосохранение профиля/горизонта из чата
+  useAutoSaveProfile({
+    chatMessages,
+    chatLoading,
+    extractProfile,
+    extractHorizon,
+    extractProfileDeclined,
+    showMessage,
+    dreamGoal,
+    saveDream,
+  })
 
   return (
     <div>
@@ -404,49 +267,27 @@ export default function GoalsPage() {
             />
 
             {/* Полугодия */}
-            <HalfYearView
+            <PeriodView
+              variant="half_year"
               year={selectedYear}
               periodGoals={periodGoals}
               trackedGoals={goals}
               currentYear={currentYear}
-              onAddPeriodGoal={(key, text) => {
-                const h = parseInt(key.split('-H')[1])
-                const hDate = new Date(selectedYear, (h - 1) * 6, 1)
-                addPeriodGoal(key, 'half_year', hDate, `H${h} ${selectedYear}`, text)
-              }}
-              onRemovePeriodGoal={(key, index) => {
-                const h = parseInt(key.split('-H')[1])
-                const hDate = new Date(selectedYear, (h - 1) * 6, 1)
-                removePeriodGoal(key, index, 'half_year', hDate, `H${h} ${selectedYear}`)
-              }}
-              onEditPeriodGoal={(key, index, text) => {
-                const h = parseInt(key.split('-H')[1])
-                const hDate = new Date(selectedYear, (h - 1) * 6, 1)
-                saveEditPeriodGoal(key, index, 'half_year', hDate, `H${h} ${selectedYear}`, text)
-              }}
+              addPeriodGoal={addPeriodGoal}
+              removePeriodGoal={removePeriodGoal}
+              editPeriodGoal={editPeriodGoal}
             />
 
             {/* Кварталы */}
-            <QuarterView
+            <PeriodView
+              variant="quarter"
               year={selectedYear}
               periodGoals={periodGoals}
               trackedGoals={goals}
               currentYear={currentYear}
-              onAddPeriodGoal={(key, text) => {
-                const q = parseInt(key.split('-Q')[1])
-                const qDate = new Date(selectedYear, (q - 1) * 3, 1)
-                addPeriodGoal(key, 'quarter', qDate, `Q${q}`, text)
-              }}
-              onRemovePeriodGoal={(key, index) => {
-                const q = parseInt(key.split('-Q')[1])
-                const qDate = new Date(selectedYear, (q - 1) * 3, 1)
-                removePeriodGoal(key, index, 'quarter', qDate, `Q${q}`)
-              }}
-              onEditPeriodGoal={(key, index, text) => {
-                const q = parseInt(key.split('-Q')[1])
-                const qDate = new Date(selectedYear, (q - 1) * 3, 1)
-                editPeriodGoal(key, index, 'quarter', qDate, `Q${q}`, text)
-              }}
+              addPeriodGoal={addPeriodGoal}
+              removePeriodGoal={removePeriodGoal}
+              editPeriodGoal={editPeriodGoal}
             />
 
             {/* Шкала 12 месяцев */}
@@ -510,7 +351,7 @@ export default function GoalsPage() {
               progress={monthProgress}
               onAddGoal={(text) => addPeriodGoal(monthKey, 'month', monthDate, monthNames[selectedMonth], text)}
               onRemoveGoal={(index) => removePeriodGoal(monthKey, index, 'month', monthDate, monthNames[selectedMonth])}
-              onEditGoal={(index, text) => saveEditPeriodGoal(monthKey, index, 'month', monthDate, monthNames[selectedMonth], text)}
+              onEditGoal={(index, text) => editPeriodGoal(monthKey, index, 'month', monthDate, monthNames[selectedMonth], text)}
               periodGoals={periodGoals}
               trackedGoals={goals}
               onCopyGoal={(goal, _targetType, targetKey) => {
@@ -540,7 +381,7 @@ export default function GoalsPage() {
               }}
               onEditWeekGoal={(weekKey, index, text) => {
                 const parsed = parseWeekKey(weekKey)
-                saveEditPeriodGoal(weekKey, index, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, text)
+                editPeriodGoal(weekKey, index, 'week', parsed.weekStart, `Неделя ${parsed.weekNum}`, text)
               }}
               processingGoals={processingGoals}
               expandedGoals={expandedGoals}

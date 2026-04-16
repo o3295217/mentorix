@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Goal, GoalTag } from '@/lib/types'
-import { monthNames } from '@/lib/goals-utils'
+import { monthNames, fuzzyMatchGoal } from '@/lib/goals-utils'
 import { useInlineEdit } from '@/hooks/useInlineEdit'
 import { useCopyDropdown } from '@/hooks/useCopyDropdown'
+import WeekCard from './WeekCard'
 
 interface MonthSectionProps {
   month: number // 0-11
@@ -67,8 +68,13 @@ export default function MonthSection({
   onRemoveWeekGoal,
   onEditWeekGoal,
   processingGoals,
+  expandedGoals,
+  setExpandedGoals,
   onToggleGoalCompletion,
+  onSetGoalPriority,
   tags: _tags = [],
+  onCreateTag,
+  onSetGoalTags,
   searchQuery = '',
   filterStatus = 'all',
   filterPriority = null,
@@ -78,8 +84,6 @@ export default function MonthSection({
   const [newWeekGoals, setNewWeekGoals] = useState<Record<string, string>>({})
   const { editingIndex, editingText, setEditingText, startEdit, cancelEdit, saveEdit } = useInlineEdit(onEditGoal)
   const { copyDropdownIndex, dropdownRef, toggleDropdown, closeDropdown } = useCopyDropdown()
-  const [editingWeekGoal, setEditingWeekGoal] = useState<{ weekKey: string; index: number } | null>(null)
-  const [editingWeekText, setEditingWeekText] = useState('')
 
   const isPast = !isCurrent && new Date(year, month + 1, 0) < new Date()
 
@@ -112,14 +116,6 @@ export default function MonthSection({
 
   const handleAdd = () => {
     if (newGoal.trim()) { onAddGoal(newGoal); setNewGoal('') }
-  }
-
-  const handleAddWeekGoal = (weekKey: string) => {
-    const text = newWeekGoals[weekKey]?.trim()
-    if (text) {
-      onAddWeekGoal(weekKey, text)
-      setNewWeekGoals(prev => ({ ...prev, [weekKey]: '' }))
-    }
   }
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
@@ -200,11 +196,10 @@ export default function MonthSection({
             <div className="space-y-0">
               {unassignedGoals.map(({ text: goal, idx: originalIndex }) => {
                 const tracked = trackedGoals.find(g =>
-                  g.periodKey === monthKey &&
-                  (g.text === goal || g.text.startsWith(goal.slice(0, 30)) || goal.startsWith(g.text.slice(0, 30)))
+                  g.periodKey === monthKey && fuzzyMatchGoal(g.text, goal)
                 )
                 const isCompleted = tracked?.completed || false
-                const isProcessing = processingGoals.has(`${monthKey}:${goal}`)
+                const isProcessing = processingGoals.has(`${monthKey}-${goal}`)
                 return (
                   <div
                     key={originalIndex}
@@ -298,153 +293,40 @@ export default function MonthSection({
               style={{ gridTemplateColumns: `repeat(${weeksInMonth.length}, minmax(0, 1fr))` }}
             >
               {weeksInMonth.map(week => {
-                const weekGoals = periodGoals.get(week.key) || []
                 const today = new Date()
                 const isCurrentWeek = today >= week.start && today <= week.end
-                const isDragOver = dragOverWeek === week.key
-
-                // Фильтрация
-                const filtered = weekGoals.filter(goal => {
-                  if (searchQuery && !goal.toLowerCase().includes(searchQuery.toLowerCase())) return false
-                  const tracked = trackedGoals.find(g =>
-                    g.periodKey === week.key &&
-                    (g.text === goal || g.text.startsWith(goal.slice(0, 30)) || goal.startsWith(g.text.slice(0, 30)))
-                  )
-                  if (filterStatus === 'completed' && !tracked?.completed) return false
-                  if (filterStatus === 'active' && tracked?.completed) return false
-                  if (filterPriority !== null && (tracked?.priority || 0) !== filterPriority) return false
-                  if (filterTag && !(tracked?.tags || []).includes(filterTag)) return false
-                  return true
-                })
 
                 return (
-                  <div
+                  <WeekCard
                     key={week.key}
-                    className={`bg-slate-950/60 p-3 flex flex-col ${isDragOver ? 'ring-1 ring-blue-500/50 bg-blue-500/5' : ''}`}
-                    onDragOver={(e) => { e.preventDefault(); if (draggedGoal && draggedGoal.weekKey !== week.key) setDragOverWeek(week.key) }}
-                    onDragLeave={() => setDragOverWeek(null)}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      if (draggedGoal && draggedGoal.weekKey !== week.key) onMoveGoal(draggedGoal.weekKey, week.key, draggedGoal.index, draggedGoal.goal)
-                      setDraggedGoal(null); setDragOverWeek(null)
-                    }}
-                  >
-                    {/* Заголовок недели */}
-                    <div className="mb-2 pb-2 border-b border-slate-800/60 flex items-baseline gap-2">
-                      <div className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
-                        Неделя {week.num}
-                      </div>
-                      <div className={`text-[11px] ${isCurrentWeek ? 'text-blue-400/60' : 'text-slate-600'}`}>
-                        {week.start.getDate()}-{week.end.getDate()} {monthNames[week.end.getMonth()]?.slice(0, 3)}
-                      </div>
-                    </div>
-
-                    {/* Добавить задачу в неделю */}
-                    <div className="mb-2">
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          value={newWeekGoals[week.key] || ''}
-                          onChange={(e) => setNewWeekGoals(prev => ({ ...prev, [week.key]: e.target.value }))}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleAddWeekGoal(week.key) }}
-                          placeholder="+ задача"
-                          className="flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Задачи недели */}
-                    <div className="flex-1 space-y-1">
-                      {filtered.map(goal => {
-                        const index = weekGoals.indexOf(goal)
-                        const tracked = trackedGoals.find(g =>
-                          g.periodKey === week.key &&
-                          (g.text === goal || g.text.startsWith(goal.slice(0, 30)) || goal.startsWith(g.text.slice(0, 30)))
-                        )
-                        const isCompleted = tracked?.completed || false
-                        const isProcessing = processingGoals.has(`${week.key}-${goal}`)
-                        const isDragging = draggedGoal?.weekKey === week.key && draggedGoal?.index === index
-
-                        return (
-                          <div
-                            key={index}
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.effectAllowed = 'move'
-                              setDraggedGoal({ weekKey: week.key, index, goal })
-                            }}
-                            onDragEnd={() => { setDraggedGoal(null); setDragOverWeek(null) }}
-                            className={`flex items-start gap-2 py-1.5 px-1 rounded-lg group/wg transition-colors cursor-grab active:cursor-grabbing ${
-                              isDragging ? 'opacity-40' : ''
-                            } ${isCompleted ? 'bg-green-500/5' : 'hover:bg-slate-800/40'}`}
-                          >
-                            <button
-                              disabled={isProcessing}
-                              draggable={false}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); if (!isProcessing) onToggleGoalCompletion(week.key, goal, !isCompleted) }}
-                              className={`flex-shrink-0 flex items-center justify-center rounded-md border transition-all mt-0.5 ${
-                                isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-600 hover:border-slate-400 bg-transparent'
-                              } ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                              style={{ width: '16px', height: '16px', minWidth: '16px' }}
-                            >
-                              {isCompleted && (
-                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </button>
-
-                            {editingWeekGoal?.weekKey === week.key && editingWeekGoal?.index === index ? (
-                              <input
-                                type="text"
-                                value={editingWeekText}
-                                onChange={(e) => setEditingWeekText(e.target.value)}
-                                onBlur={() => { if (editingWeekText.trim()) onEditWeekGoal(week.key, index, editingWeekText); setEditingWeekGoal(null) }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') { if (editingWeekText.trim()) onEditWeekGoal(week.key, index, editingWeekText); setEditingWeekGoal(null) }
-                                  if (e.key === 'Escape') setEditingWeekGoal(null)
-                                }}
-                                className="flex-1 px-1.5 py-0.5 text-xs border border-slate-700 rounded bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                                autoFocus
-                              />
-                            ) : (
-                              <div className="flex-1 min-w-0">
-                                <span className={`text-sm leading-tight ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>
-                                  {goal}
-                                </span>
-                                {tracked?.parentId && (() => {
-                                  const parentGoal = trackedGoals.find(g => g.id === tracked.parentId)
-                                  return parentGoal ? (
-                                    <div className="text-[10px] text-slate-500 truncate" title={parentGoal.text}>
-                                      ↑ {parentGoal.text.length > 35 ? parentGoal.text.slice(0, 35) + '…' : parentGoal.text}
-                                    </div>
-                                  ) : null
-                                })()}
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-0.5 opacity-0 group-hover/wg:opacity-100 transition-opacity flex-shrink-0">
-                              <button
-                                draggable={false}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={() => { setEditingWeekGoal({ weekKey: week.key, index }); setEditingWeekText(goal) }}
-                                className="text-slate-600 hover:text-slate-300 p-0.5 rounded transition-colors text-xs"
-                              >✎</button>
-                              <button
-                                draggable={false}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={() => onRemoveWeekGoal(week.key, index)}
-                                className="text-slate-600 hover:text-red-400 p-0.5 rounded transition-colors text-xs"
-                              >✕</button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-
-                  </div>
+                    week={week}
+                    weekGoals={periodGoals.get(week.key) || []}
+                    isCurrentWeek={isCurrentWeek}
+                    trackedGoals={trackedGoals}
+                    tags={_tags}
+                    onCreateTag={onCreateTag || (() => {})}
+                    onSetGoalTags={onSetGoalTags || (() => {})}
+                    draggedGoal={draggedGoal}
+                    setDraggedGoal={setDraggedGoal}
+                    dragOverWeek={dragOverWeek}
+                    setDragOverWeek={setDragOverWeek}
+                    onMoveGoal={onMoveGoal}
+                    onAddWeekGoal={onAddWeekGoal}
+                    onRemoveWeekGoal={onRemoveWeekGoal}
+                    onEditWeekGoal={onEditWeekGoal}
+                    processingGoals={processingGoals}
+                    expandedGoals={expandedGoals}
+                    setExpandedGoals={setExpandedGoals}
+                    onToggleGoalCompletion={onToggleGoalCompletion}
+                    onSetGoalPriority={onSetGoalPriority}
+                    searchQuery={searchQuery}
+                    filterStatus={filterStatus}
+                    filterPriority={filterPriority}
+                    filterTag={filterTag}
+                    variant="grid"
+                    newGoalValue={newWeekGoals[week.key] || ''}
+                    onNewGoalChange={(val) => setNewWeekGoals(prev => ({ ...prev, [week.key]: val }))}
+                  />
                 )
               })}
             </div>
@@ -455,4 +337,3 @@ export default function MonthSection({
     </div>
   )
 }
-
