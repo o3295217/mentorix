@@ -2,31 +2,51 @@
 
 import { useState, useCallback } from 'react'
 import { PeriodType, getPeriodDates } from '@/lib/dates'
+import type { YearGoalItem } from '@/lib/types'
 
 export function usePeriodGoals(showMessage: (text: string) => void) {
-  const [yearGoals, setYearGoals] = useState<Map<number, string[]>>(new Map())
+  const [yearGoals, setYearGoals] = useState<Map<number, YearGoalItem[]>>(new Map())
   const [periodGoals, setPeriodGoals] = useState<Map<string, string[]>>(new Map())
+
+  const loadYearGoalYears = useCallback(async (): Promise<number[]> => {
+    try {
+      const res = await fetch('/api/goals/year')
+      const data = await res.json()
+      return Array.isArray(data?.years) ? data.years : []
+    } catch (error) {
+      console.error('Error loading year goal years:', error)
+      showMessage('❌ Ошибка загрузки истории по годам')
+      return []
+    }
+  }, [showMessage])
 
   // Year goals operations
   const loadYearGoals = useCallback(async (year: number) => {
     try {
       const res = await fetch(`/api/goals/year?year=${year}`)
       const data = await res.json()
-      setYearGoals(prev => new Map(prev).set(year, data.goals || []))
+      const goals: YearGoalItem[] = (data.goals || []).map((g: string | YearGoalItem) =>
+        typeof g === 'string' ? { id: `yg_legacy_${Math.random().toString(36).slice(2, 8)}`, text: g } : g
+      )
+      setYearGoals(prev => new Map(prev).set(year, goals))
     } catch (error) {
       console.error(`Error loading goals for ${year}:`, error)
       showMessage(`❌ Ошибка загрузки целей на ${year} год`)
     }
   }, [showMessage])
 
-  const saveYearGoals = useCallback(async (year: number, goals: string[]) => {
+  const saveYearGoals = useCallback(async (year: number, goals: YearGoalItem[]) => {
     try {
-      await fetch('/api/goals/year', {
+      const res = await fetch('/api/goals/year', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ year, goals }),
       })
-      setYearGoals(prev => new Map(prev).set(year, goals))
+      const data = await res.json()
+      const saved: YearGoalItem[] = (data.goals || goals).map((g: string | YearGoalItem) =>
+        typeof g === 'string' ? { id: `yg_${Math.random().toString(36).slice(2, 8)}`, text: g } : g
+      )
+      setYearGoals(prev => new Map(prev).set(year, saved))
       showMessage(`✅ Цели на ${year} год сохранены!`)
     } catch (error) {
       console.error(`Error saving goals for ${year}:`, error)
@@ -39,11 +59,12 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
     setYearGoals(prev => {
       const currentGoals = prev.get(year) || []
       const normalized = text.trim().toLowerCase()
-      if (currentGoals.some(g => g.trim().toLowerCase() === normalized)) {
+      if (currentGoals.some(g => g.text.trim().toLowerCase() === normalized)) {
         showMessage('Такая цель уже есть')
         return prev
       }
-      const updatedGoals = [...currentGoals, text.trim()]
+      const newItem: YearGoalItem = { id: `yg_${Math.random().toString(36).slice(2, 8)}`, text: text.trim() }
+      const updatedGoals = [...currentGoals, newItem]
       saveYearGoals(year, updatedGoals)
       return new Map(prev).set(year, updatedGoals)
     })
@@ -66,7 +87,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
     setYearGoals(prev => {
       const currentGoals = prev.get(year) || []
       const updatedGoals = [...currentGoals]
-      updatedGoals[index] = text.trim()
+      updatedGoals[index] = { ...updatedGoals[index], text: text.trim() }
       saveYearGoals(year, updatedGoals)
       return new Map(prev).set(year, updatedGoals)
     })
@@ -231,6 +252,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
 
   return {
     yearGoals,
+    loadYearGoalYears,
     loadYearGoals,
     saveYearGoals,
     addYearGoal,

@@ -89,6 +89,12 @@ export interface ProgressStats {
   }
 }
 
+// === ЭЛЕМЕНТ ГОДОВОЙ ЦЕЛИ ===
+export interface YearGoalItem {
+  id: string
+  text: string
+}
+
 // === ЦЕЛИ НА ПЕРИОД ===
 export interface PeriodGoals {
   goals: string[]
@@ -154,6 +160,8 @@ export interface Goal {
   blockedBy: number[]
   history: { action: string; date: string; from?: string; to?: string }[]
   sortOrder: number
+  scope: string | null
+  rootYearGoalId: string | null
   parentId: number | null
   children?: Goal[]
   createdAt: string

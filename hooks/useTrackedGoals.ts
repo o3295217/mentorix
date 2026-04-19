@@ -61,7 +61,7 @@ export function useTrackedGoals(
     }
   }, [showMessage])
 
-  const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0, tags: string[] = [], parentId: number | null = null): Promise<Goal | null> => {
+  const createTrackedGoal = useCallback(async (periodKey: string, text: string, priority: number = 0, tags: string[] = [], parentId: number | null = null, scope: string | null = 'dream', rootYearGoalId: string | null = null): Promise<Goal | null> => {
     const lockKey = `${periodKey}-${text}`
 
     if (processingLockRef.current.has(lockKey)) {
@@ -80,7 +80,7 @@ export function useTrackedGoals(
       const res = await fetch('/api/goals/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, periodType, periodKey, priority, tags, parentId }),
+        body: JSON.stringify({ text, periodType, periodKey, priority, tags, parentId, scope, rootYearGoalId }),
       })
       const newGoal = await res.json()
       if (newGoal.id) {

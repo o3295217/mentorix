@@ -157,7 +157,7 @@ export default function MonthSection({
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
           <h2 className={`text-lg font-semibold tracking-tight ${collapsed ? 'text-slate-500' : 'text-white'}`}>
-            {monthNames[month]} {year} — детализация по неделям
+            {monthNames[month]} {year}
           </h2>
           {isCurrent && (
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">сейчас</span>

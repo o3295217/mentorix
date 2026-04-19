@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { monthNames, parseWeekKey } from '@/lib/goals-utils'
+import { monthNames, parseWeekKey, parsePeriodKey } from '@/lib/goals-utils'
+import { formatHorizon } from '@/lib/dates'
 import { useGoals } from '@/hooks'
 import { useGoalsChat } from '@/hooks/useGoalsChat'
 import { useAcceptGoals } from '@/hooks/useAcceptGoals'
@@ -19,6 +20,7 @@ export default function GoalsPage() {
     dreamGoal,
     saveDream,
     yearGoals,
+    loadYearGoalYears,
     loadYearGoals,
     saveYearGoals,
     addYearGoal,
@@ -66,6 +68,7 @@ export default function GoalsPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [chatOpen, setChatOpen] = useState(false)
   const [setupComplete, setSetupComplete] = useState(false)
+  const [archivedYearGoalYears, setArchivedYearGoalYears] = useState<number[]>([])
 
   // UI-состояния для недель
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set())
@@ -91,10 +94,33 @@ export default function GoalsPage() {
     startGuidedFlow,
   } = useGoalsChat(dreamGoal, yearGoals, periodGoals, selectedYear, selectedMonth, goals)
 
-  // Вычисляемые значения — годы отсчитываются от года создания мечты, а не от текущего
-  const dreamStartYear = dreamGoal ? new Date(dreamGoal.createdAt).getFullYear() : currentYear
-  const dreamYearsCount = dreamGoal?.months ? Math.ceil(dreamGoal.months / 12) : 0
-  const years = dreamGoal ? Array.from({ length: dreamYearsCount }, (_, i) => dreamStartYear + i) : []
+  const activeYears = useMemo(() => {
+    if (!dreamGoal?.months) return []
+
+    const now = new Date()
+    const endYear = dreamGoal.months > 12
+      ? new Date(now.getFullYear(), now.getMonth() + dreamGoal.months, 1).getFullYear()
+      : currentYear + 1
+
+    return Array.from({ length: endYear - currentYear + 1 }, (_, i) => currentYear + i)
+  }, [dreamGoal, currentYear])
+
+  const archiveYears = useMemo(() => {
+    const yearsWithHistory = new Set<number>(archivedYearGoalYears.filter((year) => year < currentYear))
+
+    for (const [year] of yearGoals) {
+      if (year < currentYear && (yearGoals.get(year)?.length ?? 0) > 0) yearsWithHistory.add(year)
+    }
+
+    for (const goal of goals) {
+      const parsed = parsePeriodKey(goal.periodKey)
+      if (parsed && parsed.year < currentYear) yearsWithHistory.add(parsed.year)
+    }
+
+    return Array.from(yearsWithHistory).sort((a, b) => a - b)
+  }, [archivedYearGoalYears, currentYear, yearGoals, goals])
+
+  const years = useMemo(() => [...archiveYears, ...activeYears], [archiveYears, activeYears])
 
   // Прогресс к мечте — из API, основан на dreamProgressScore ежедневных оценок AI
   const [dreamProgress, setDreamProgress] = useState({ total: 0, completed: 0, percent: 0 })
@@ -116,6 +142,17 @@ export default function GoalsPage() {
       .catch(() => {})
   }, [dreamGoal])
 
+  // Средние оценки dreamProgressScore по годам (для учёта в прогрессе стратегических карточек)
+  const [yearEvaluations, setYearEvaluations] = useState<Record<number, { avg: number; count: number }>>({})
+
+  useEffect(() => {
+    if (!dreamGoal) return
+    fetch('/api/goals/year-evaluations')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setYearEvaluations(data) })
+      .catch(() => {})
+  }, [dreamGoal])
+
   // Определение: есть ли уже заполненные цели?
   const hasAnyGoals = useMemo(() => {
     const hasYearGoals = Array.from(yearGoals.values()).some(g => g.length > 0)
@@ -130,13 +167,35 @@ export default function GoalsPage() {
   // Состояние страницы: 0=нет мечты, 1=мечта без целей, 2=полная карта
   const pageState = !dreamGoal ? 0 : !setupComplete ? 1 : 2
 
+  useEffect(() => {
+    if (!dreamGoal) return
+
+    let cancelled = false
+
+    loadYearGoalYears().then((years) => {
+      if (cancelled) return
+      const pastYears = years.filter((year) => year < currentYear)
+      setArchivedYearGoalYears(pastYears)
+      for (const year of pastYears) loadYearGoals(year)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [dreamGoal, currentYear, loadYearGoalYears, loadYearGoals])
+
+  useEffect(() => {
+    if (years.length === 0) return
+    if (!years.includes(selectedYear)) {
+      setSelectedYear(activeYears[0] ?? years[0])
+    }
+  }, [years, activeYears, selectedYear])
+
   // Загрузка годовых целей
   useEffect(() => {
-    if (dreamGoal) {
-      const allYears = Array.from({ length: dreamYearsCount }, (_, i) => currentYear + i)
-      allYears.forEach(year => loadYearGoals(year))
-    }
-  }, [dreamGoal, currentYear, loadYearGoals])
+    if (activeYears.length === 0) return
+    for (const year of activeYears) loadYearGoals(year)
+  }, [activeYears, loadYearGoals])
 
   // Загрузка данных для выбранного года
   useEffect(() => {
@@ -256,11 +315,14 @@ export default function GoalsPage() {
             {/* Карточки по годам */}
             <StrategyCards
               years={years}
+              horizonLabel={dreamGoal?.months ? formatHorizon(dreamGoal.months) : null}
+              hasArchive={archiveYears.length > 0}
               selectedYear={selectedYear}
               onSelectYear={setSelectedYear}
               currentYear={currentYear}
               yearGoals={yearGoals}
               trackedGoals={goals}
+              yearEvaluations={yearEvaluations}
               onAddYearGoal={addYearGoal}
               onRemoveYearGoal={removeYearGoal}
               onEditYearGoal={editYearGoal}

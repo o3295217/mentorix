@@ -161,9 +161,49 @@ export async function GET(request: NextRequest) {
       '1000': totalDays >= 1000,
     }
 
-    // Процент прогресса к мечте
+    // Процент прогресса к мечте: комбинация задач (70%) + оценок дня (30%)
     const targetDays = dreamMonths ? Math.round(dreamMonths * 30.44) : null
-    const progressPercent = targetDays ? Math.min(100, (effectiveDays / targetDays) * 100) : 0
+    const evalPercent = targetDays ? Math.min(100, (effectiveDays / targetDays) * 100) : 0
+
+    // Задачи привязанные к годовым целям (через rootYearGoalId)
+    const PERIOD_WEIGHT: Record<string, number> = {
+      half_year: 8,
+      quarter: 4,
+      month: 2,
+      week: 1,
+    }
+    const dreamTasks = await prisma.goal.findMany({
+      where: {
+        userId,
+        rootYearGoalId: { not: null },
+      },
+      select: {
+        completed: true,
+        periodType: true,
+      },
+    })
+
+    let taskPercent = 0
+    if (dreamTasks.length > 0) {
+      let totalWeight = 0
+      let completedWeight = 0
+      for (const t of dreamTasks) {
+        const w = PERIOD_WEIGHT[t.periodType] ?? 1
+        totalWeight += w
+        if (t.completed) completedWeight += w
+      }
+      taskPercent = totalWeight > 0 ? (completedWeight / totalWeight) * 100 : 0
+    }
+
+    // Комбинирование: задачи × 0.7 + оценки × 0.3
+    let progressPercent: number
+    if (dreamTasks.length > 0 && evaluations.length > 0) {
+      progressPercent = taskPercent * 0.7 + evalPercent * 0.3
+    } else if (evaluations.length > 0) {
+      progressPercent = evalPercent
+    } else {
+      progressPercent = taskPercent
+    }
 
     // Данные для графика последних 30 дней
     const last30DaysData = last30Days.map((e) => ({

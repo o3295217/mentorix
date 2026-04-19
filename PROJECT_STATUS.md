@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-04-16**
+> Последнее обновление: **2026-04-19**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (50)
+## API Endpoints (51)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -68,6 +68,7 @@
 | `/api/goals/planning-profile` | GET, POST |
 | `/api/goals/tags` | GET, POST, DELETE |
 | `/api/goals/year` | GET, POST |
+| `/api/goals/year-evaluations` | GET |
 | `/api/habits` | GET, POST, PUT, DELETE |
 | `/api/habits/suggestions` | GET |
 | `/api/health` | GET |
@@ -231,6 +232,8 @@
 | blockedByJson | `String` |
 | historyJson | `String` |
 | sortOrder | `Int` |
+| scope | `String?` |
+| rootYearGoalId | `String?` |
 | parentId | `Int?` |
 | parent | `Goal?` |
 | children | `Goal[]` |

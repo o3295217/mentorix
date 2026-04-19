@@ -20,6 +20,8 @@ const GoalCreateSchema = z.object({
   priority: GoalPrioritySchema.optional(),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
   parentId: z.coerce.number().int().positive().nullable().optional(),
+  scope: z.string().trim().min(1).max(32).nullable().optional(),
+  rootYearGoalId: z.string().trim().min(1).max(64).nullable().optional(),
 })
 
 const GoalUpdateSchema = z.object({
@@ -74,6 +76,8 @@ export async function GET(request: NextRequest) {
       tags: safeParseJson<string[]>(g.tagsJson, []),
       blockedBy: safeParseJson<number[]>(g.blockedByJson, []),
       history: safeParseJson<Array<{ type: string; date: string }>>(g.historyJson, []),
+      scope: g.scope || 'dream',
+      rootYearGoalId: g.rootYearGoalId || null,
     })))
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { text, periodType, periodKey, deadline, priority, tags, parentId } = validation.data
+    const { text, periodType, periodKey, deadline, priority, tags, parentId, scope, rootYearGoalId } = validation.data
 
     // Проверяем parentId принадлежит тому же пользователю
     if (parentId) {
@@ -127,6 +131,8 @@ export async function POST(request: NextRequest) {
           date: new Date().toISOString(),
         }]),
         parentId: parentId || null,
+        scope: scope || 'dream',
+        rootYearGoalId: rootYearGoalId || null,
       },
     })
 
@@ -136,6 +142,8 @@ export async function POST(request: NextRequest) {
       tags: safeParseJson<string[]>(goal.tagsJson, []),
       blockedBy: safeParseJson<number[]>(goal.blockedByJson, []),
       history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
+      scope: goal.scope || 'dream',
+      rootYearGoalId: goal.rootYearGoalId || null,
     })
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode
@@ -226,6 +234,8 @@ export async function PUT(request: NextRequest) {
       tags: safeParseJson<string[]>(goal.tagsJson, []),
       blockedBy: safeParseJson<number[]>(goal.blockedByJson, []),
       history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
+      scope: goal.scope || 'dream',
+      rootYearGoalId: goal.rootYearGoalId || null,
     })
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode

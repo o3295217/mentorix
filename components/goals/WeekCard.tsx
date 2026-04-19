@@ -6,6 +6,15 @@ import { parseDateParam, toDateKey } from '@/lib/dates'
 import { fuzzyMatchGoal } from '@/lib/goals-utils'
 import { WeekData } from './WeekStrip'
 
+const TAG_COLOR_PRESETS = [
+  '#3B82F6',
+  '#8B5CF6',
+  '#10B981',
+  '#F59E0B',
+  '#EF4444',
+  '#6B7280',
+]
+
 interface WeekCardProps {
   week: WeekData
   weekGoals: string[]
@@ -86,7 +95,7 @@ export default function WeekCard({
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [showNewTagInput, setShowNewTagInput] = useState(false)
   const [newTagName, setNewTagName] = useState('')
-  const [newTagColor, setNewTagColor] = useState('#6B7280')
+  const [newTagColor, setNewTagColor] = useState(TAG_COLOR_PRESETS[5])
   // Tag editing for existing goal
   const [editingTagsGoal, setEditingTagsGoal] = useState<string | null>(null)
 
@@ -208,7 +217,7 @@ export default function WeekCard({
           </div>
         )}
         {(showNewTagInput || tags.length === 0) && (
-          <div className="flex items-center gap-1 mt-1">
+          <div className="mt-1 space-y-1.5">
             <input
               type="text"
               value={newTagName}
@@ -223,24 +232,33 @@ export default function WeekCard({
               placeholder="Новый тег..."
               className="px-1.5 py-0.5 text-[10px] border border-slate-700 rounded w-20 bg-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600"
             />
-            <input
-              type="color"
-              value={newTagColor}
-              onChange={(e) => setNewTagColor(e.target.value)}
-              className="w-4 h-4 rounded cursor-pointer border-0"
-            />
-            {newTagName.trim() && (
-              <button
-                onClick={() => {
-                  onCreateTag(newTagName.trim(), newTagColor)
-                  setNewTagName('')
-                  setShowNewTagInput(false)
-                }}
-                className="px-1 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              >
-                +
-              </button>
-            )}
+            <div className="flex items-center gap-1 flex-wrap">
+              {TAG_COLOR_PRESETS.map((preset) => {
+                const isSelected = preset === newTagColor
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setNewTagColor(preset)}
+                    className={`h-4 w-4 rounded-full border transition-all ${isSelected ? 'ring-1 ring-offset-1 ring-offset-slate-950 border-white/60' : 'border-slate-700 hover:border-slate-500'}`}
+                    style={{ backgroundColor: preset }}
+                    aria-label={`Выбрать цвет ${preset}`}
+                  />
+                )
+              })}
+              {newTagName.trim() && (
+                <button
+                  onClick={() => {
+                    onCreateTag(newTagName.trim(), newTagColor)
+                    setNewTagName('')
+                    setShowNewTagInput(false)
+                  }}
+                  className="px-1 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  +
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -374,16 +392,17 @@ export default function WeekCard({
                       )}
                       {/* Теги цели */}
                       {(trackedGoal?.tags || []).length > 0 && (
-                        <div className="flex flex-wrap gap-0.5 mt-0.5">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {(trackedGoal?.tags || []).map(tagName => {
                             const tagInfo = tags.find(t => t.name === tagName)
                             return (
                               <span
                                 key={tagName}
-                                className="inline-block px-1.5 py-0.5 rounded text-[10px]"
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
                                 style={{
-                                  backgroundColor: (tagInfo?.color || '#6B7280') + '20',
-                                  color: tagInfo?.color || '#6B7280',
+                                  backgroundColor: (tagInfo?.color || '#6B7280') + '30',
+                                  color: tagInfo?.color || '#9CA3AF',
+                                  border: `1px solid ${(tagInfo?.color || '#6B7280')}50`,
                                 }}
                               >
                                 {tagName}
@@ -415,14 +434,17 @@ export default function WeekCard({
                     draggable={false}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => setEditingTagsGoal(editingTagsGoal === goalKey ? null : goalKey)}
-                    className={`p-0.5 rounded transition-colors text-xs ${
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded transition-colors text-[10px] font-medium ${
                       editingTagsGoal === goalKey
                         ? 'text-blue-400 bg-blue-500/10'
                         : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
                     }`}
                     title="Теги"
                   >
-                    🏷
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    тег
                   </button>
                   <button
                     draggable={false}

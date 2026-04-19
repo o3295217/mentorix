@@ -137,6 +137,8 @@ model Goal {
   blockedByJson String    @default("[]")
   historyJson   String    @default("[]")
   sortOrder     Int       @default(0)
+  scope         String?   @default("dream")
+  rootYearGoalId String?
   parentId      Int?
   parent        Goal?     @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children      Goal[]    @relation("GoalHierarchy")
@@ -147,6 +149,8 @@ model Goal {
   @@index([userId, periodType, periodKey])
   @@index([userId, completed])
   @@index([parentId])
+  @@index([userId, scope])
+  @@index([userId, rootYearGoalId])
   @@map("goals")
 }
 

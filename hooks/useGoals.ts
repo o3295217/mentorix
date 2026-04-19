@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { PeriodType } from '@/lib/dates'
-import { DreamGoal, Goal, GoalTag } from '@/lib/types'
+import { DreamGoal, Goal, GoalTag, YearGoalItem } from '@/lib/types'
 import { useDreamGoal } from './useDreamGoal'
 import { usePeriodGoals } from './usePeriodGoals'
 import { useTrackedGoals } from './useTrackedGoals'
 
 // Re-export types for backward compatibility
-export type { DreamGoal, Goal, GoalTag } from '@/lib/types'
+export type { DreamGoal, Goal, GoalTag, YearGoalItem } from '@/lib/types'
 
 export interface UseGoalsReturn {
   // Dream
@@ -16,9 +16,10 @@ export interface UseGoalsReturn {
   saveDream: (text: string, months: number | null) => Promise<void>
   
   // Year goals
-  yearGoals: Map<number, string[]>
+  yearGoals: Map<number, YearGoalItem[]>
+  loadYearGoalYears: () => Promise<number[]>
   loadYearGoals: (year: number) => Promise<void>
-  saveYearGoals: (year: number, goals: string[]) => Promise<void>
+  saveYearGoals: (year: number, goals: YearGoalItem[]) => Promise<void>
   addYearGoal: (year: number, text: string) => void
   removeYearGoal: (year: number, index: number) => void
   editYearGoal: (year: number, index: number, text: string) => void
@@ -41,7 +42,7 @@ export interface UseGoalsReturn {
   setGoalPriority: (periodKey: string, text: string, priority: number) => Promise<void>
   setGoalCompleted: (periodKey: string, text: string, completed: boolean) => Promise<void>
   setGoalTags: (periodKey: string, text: string, tags: string[]) => Promise<void>
-  createTrackedGoal: (periodKey: string, text: string, priority?: number, tags?: string[], parentId?: number | null) => Promise<Goal | null>
+  createTrackedGoal: (periodKey: string, text: string, priority?: number, tags?: string[], parentId?: number | null, scope?: string | null, rootYearGoalId?: string | null) => Promise<Goal | null>
   deleteGoal: (goalId: number) => Promise<boolean>
   processingGoals: Set<string>
   
@@ -99,6 +100,7 @@ export function useGoals(): UseGoalsReturn {
     saveDream: dream.saveDream,
     // Year goals
     yearGoals: period.yearGoals,
+    loadYearGoalYears: period.loadYearGoalYears,
     loadYearGoals: period.loadYearGoals,
     saveYearGoals: period.saveYearGoals,
     addYearGoal: period.addYearGoal,

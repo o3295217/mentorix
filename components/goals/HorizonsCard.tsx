@@ -6,7 +6,7 @@ interface HorizonsCardProps {
   dreamMonths: number | null
   currentYear: number
   periodGoals: Map<string, string[]>
-  yearGoals: Map<number, string[]>
+  yearGoals: Map<number, Array<{ id: string; text: string }>>
   selectedYear: number
 }
 

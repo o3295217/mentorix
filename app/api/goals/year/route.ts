@@ -3,11 +3,45 @@ import { prisma } from '@/lib/prisma'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 import { requireUserId } from '@/lib/get-user-id'
+import { randomBytes } from 'crypto'
+
+const YearGoalItemSchema = z.union([
+  z.string(),
+  z.object({ id: z.string(), text: z.string() }),
+])
 
 const YearGoalSchema = z.object({
   year: z.number().int().min(2020).max(2100),
-  goals: z.array(z.string()),
+  goals: z.array(YearGoalItemSchema),
 })
+
+interface YearGoalItem {
+  id: string
+  text: string
+}
+
+function generateYearGoalId(): string {
+  return 'yg_' + randomBytes(6).toString('hex')
+}
+
+/** Parse goalsJson: supports both legacy string[] and new {id,text}[] */
+function parseGoalsJson(raw: string): YearGoalItem[] {
+  const parsed = safeParseJson<Array<string | YearGoalItem>>(raw, [])
+  return parsed.map(item =>
+    typeof item === 'string'
+      ? { id: generateYearGoalId(), text: item }
+      : item
+  )
+}
+
+/** Normalize incoming goals array to {id,text}[] */
+function normalizeGoals(goals: Array<string | { id?: string; text: string }>): YearGoalItem[] {
+  return goals.map(item =>
+    typeof item === 'string'
+      ? { id: generateYearGoalId(), text: item }
+      : { id: item.id || generateYearGoalId(), text: item.text }
+  )
+}
 
 // GET /api/goals/year?year=2025
 export async function GET(request: NextRequest) {
@@ -17,7 +51,17 @@ export async function GET(request: NextRequest) {
     const yearParam = searchParams.get('year')
 
     if (!yearParam) {
-      return NextResponse.json({ error: 'year parameter is required' }, { status: 400 })
+      const yearGoals = await prisma.yearGoal.findMany({
+        where: { userId },
+        select: { year: true, goalsJson: true },
+        orderBy: { year: 'asc' },
+      })
+
+      return NextResponse.json({
+        years: yearGoals
+          .filter((item) => parseGoalsJson(item.goalsJson).length > 0)
+          .map((item) => item.year),
+      })
     }
 
     const year = parseInt(yearParam)
@@ -34,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       year: yearGoal.year,
-      goals: safeParseJson<string[]>(yearGoal.goalsJson, []),
+      goals: parseGoalsJson(yearGoal.goalsJson),
     })
   } catch (error) {
     console.error('Error fetching year goal:', error)
@@ -56,12 +100,24 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { year, goals } = validation.data
+    const { year, goals: rawGoals } = validation.data
+    const goals = normalizeGoals(rawGoals as Array<string | { id?: string; text: string }>)
 
     // Ищем существующую запись
     const existing = await prisma.yearGoal.findFirst({
       where: { userId, year },
     })
+
+    // Сохраняем ID существующих целей, если текст совпадает
+    if (existing) {
+      const existingGoals = parseGoalsJson(existing.goalsJson)
+      for (const goal of goals) {
+        if (!goal.id || goal.id.startsWith('yg_')) {
+          const match = existingGoals.find(e => e.text === goal.text)
+          if (match) goal.id = match.id
+        }
+      }
+    }
 
     const yearGoal = existing
       ? await prisma.yearGoal.update({
@@ -81,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       year: yearGoal.year,
-      goals: safeParseJson<string[]>(yearGoal.goalsJson, []),
+      goals: parseGoalsJson(yearGoal.goalsJson),
     })
   } catch (error) {
     console.error('Error saving year goal:', error)

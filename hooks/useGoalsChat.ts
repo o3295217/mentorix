@@ -39,7 +39,7 @@ interface UseGoalsChatReturn {
 
 export function useGoalsChat(
   dreamGoal: DreamGoal | null,
-  yearGoals: Map<number, string[]>,
+  yearGoals: Map<number, Array<{ id: string; text: string }>>,
   periodGoals: Map<string, string[]>,
   selectedYear: number,
   selectedMonth: number,
@@ -79,7 +79,9 @@ export function useGoalsChat(
       const context = {
         dream: dreamGoal?.goalText || '',
         dreamMonths: dreamGoal?.months || undefined,
-        yearGoals: Object.fromEntries(yearGoals),
+        yearGoals: Object.fromEntries(
+          Array.from(yearGoals.entries()).map(([year, items]) => [year, items.map(i => i.text)])
+        ),
         periodGoals: Object.fromEntries(periodGoals),
         completedGoals,
         selectedYear,

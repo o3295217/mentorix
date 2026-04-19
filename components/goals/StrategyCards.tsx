@@ -2,15 +2,18 @@
 
 import { useState, useMemo } from 'react'
 import { useInlineEdit } from '@/hooks/useInlineEdit'
-import { Goal } from '@/lib/types'
+import { Goal, YearGoalItem } from '@/lib/types'
 
 interface StrategyCardsProps {
   years: number[]
+  horizonLabel?: string | null
+  hasArchive?: boolean
   selectedYear: number
   onSelectYear: (year: number) => void
   currentYear: number
-  yearGoals: Map<number, string[]>
+  yearGoals: Map<number, YearGoalItem[]>
   trackedGoals: Goal[]
+  yearEvaluations: Record<number, { avg: number; count: number }>
   onAddYearGoal: (year: number, text: string) => void
   onRemoveYearGoal: (year: number, index: number) => void
   onEditYearGoal: (year: number, index: number, text: string) => void
@@ -26,11 +29,14 @@ const YEAR_COLORS = [
 
 export default function StrategyCards({
   years,
+  horizonLabel,
+  hasArchive = false,
   selectedYear,
   onSelectYear,
   currentYear,
   yearGoals,
   trackedGoals,
+  yearEvaluations,
   onAddYearGoal,
   onRemoveYearGoal,
   onEditYearGoal,
@@ -38,7 +44,7 @@ export default function StrategyCards({
   return (
     <div>
       <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500 mb-3">
-        Стратегические цели ({years.length > 0 ? `${years.length} ${years.length === 1 ? 'год' : years.length < 5 ? 'года' : 'лет'}` : ''})
+        Стратегические цели{horizonLabel ? ` (${horizonLabel}${hasArchive ? ' + архив' : ''})` : hasArchive ? ' (архив)' : ''}
       </div>
       <div className="overflow-x-auto pb-2 -mx-1 scrollbar-hide">
         <div className="flex gap-4 px-1 pr-16 snap-x snap-mandatory md:snap-none" style={{ minWidth: 'min-content' }}>
@@ -47,10 +53,11 @@ export default function StrategyCards({
               key={year}
               year={year}
               isSelected={year === selectedYear}
-              isCurrent={year === currentYear}
               isPast={year < currentYear}
+              yearOffset={year - currentYear}
               goals={yearGoals.get(year) || []}
               trackedGoals={trackedGoals}
+              evalData={yearEvaluations[year]}
               color={YEAR_COLORS[i % YEAR_COLORS.length]}
               onSelect={() => onSelectYear(year)}
               onAddGoal={(text) => onAddYearGoal(year, text)}
@@ -67,10 +74,11 @@ export default function StrategyCards({
 function YearCard({
   year,
   isSelected,
-  isCurrent: _isCurrent,
   isPast,
+  yearOffset,
   goals,
   trackedGoals,
+  evalData,
   color,
   onSelect,
   onAddGoal,
@@ -79,42 +87,100 @@ function YearCard({
 }: {
   year: number
   isSelected: boolean
-  isCurrent: boolean
   isPast: boolean
-  goals: string[]
+  yearOffset: number
+  goals: YearGoalItem[]
   trackedGoals: Goal[]
+  evalData?: { avg: number; count: number }
   color: typeof YEAR_COLORS[number]
   onSelect: () => void
   onAddGoal: (text: string) => void
   onRemoveGoal: (index: number) => void
   onEditGoal: (index: number, text: string) => void
 }) {
+  // Перспективный эффект: текущий год — полный, прошлые и будущие уменьшаются и тускнеют
+  const BASE_WIDTH = 256
+  const cardWidth = yearOffset < 0
+    ? Math.round(BASE_WIDTH * 0.80)               // прошлый: -20%
+    : Math.round(BASE_WIDTH * Math.max(0.70, 1 - yearOffset * 0.05))  // будущие: -5% за каждый год
+  const cardOpacity = yearOffset < 0
+    ? 0.46                                        // прошлый: как дальний будущий год, без лишнего затемнения
+    : yearOffset === 0
+      ? 1                                         // текущий: полная яркость
+      : Math.max(0.38, 1 - yearOffset * 0.18)    // будущие: -18% за каждый год
   const [newGoal, setNewGoal] = useState('')
   const [expanded, setExpanded] = useState(false)
   const [titleExpanded, setTitleExpanded] = useState(false)
   const { editingIndex, editingText, setEditingText, startEdit, cancelEdit, saveEdit } = useInlineEdit(onEditGoal)
 
-  // Calculate total progress across all periods for this year
+  // Weighted progress: tasks decomposed from year goals (via rootYearGoalId) + daily AI evaluation
   const yearProgress = useMemo(() => {
-    const yearPrefix = `${year}-`
-    const yearGoalItems = trackedGoals.filter(t => t.periodKey.startsWith(yearPrefix))
-    const total = yearGoalItems.length
-    const completed = yearGoalItems.filter(t => t.completed).length
-    const percent = total > 0 ? Math.round((completed / total) * 100) : 0
-    return { total, completed, percent }
-  }, [year, trackedGoals])
+    const PERIOD_WEIGHT: Record<string, number> = {
+      half_year: 8,
+      quarter: 4,
+      month: 2,
+      week: 1,
+    }
+    const yearGoalIds = new Set(goals.map(g => g.id))
+    const relevantGoals = trackedGoals.filter(t =>
+      t.rootYearGoalId &&
+      yearGoalIds.has(t.rootYearGoalId)
+    )
+    const total = relevantGoals.length
+    const completed = total > 0 ? relevantGoals.filter(t => t.completed).length : 0
+    let taskPercent = 0
+    if (total > 0) {
+      let totalWeight = 0
+      let completedWeight = 0
+      for (const g of relevantGoals) {
+        const w = PERIOD_WEIGHT[g.periodType] ?? 1
+        totalWeight += w
+        if (g.completed) completedWeight += w
+      }
+      taskPercent = totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0
+    }
+
+    // Daily AI evaluation: effective days (score/10 each) as % of elapsed days in year
+    const hasEval = evalData && evalData.count > 0
+    let evalPercent = 0
+    if (hasEval) {
+      const effectiveDays = evalData.count * evalData.avg / 10
+      const now = new Date()
+      const yearStart = new Date(year, 0, 1)
+      const yearEnd = new Date(year + 1, 0, 1)
+      const totalDaysInYear = Math.round((yearEnd.getTime() - yearStart.getTime()) / 86400000)
+      const daysElapsed = year < now.getFullYear()
+        ? totalDaysInYear
+        : year === now.getFullYear()
+          ? Math.max(1, Math.floor((now.getTime() - yearStart.getTime()) / 86400000) + 1)
+          : 1
+      evalPercent = Math.min(100, Math.round((effectiveDays / daysElapsed) * 100))
+    }
+
+    // Combined progress: tasks have max weight (70%), eval supplements (30%)
+    let percent: number
+    if (total > 0 && hasEval) {
+      percent = Math.round(taskPercent * 0.7 + evalPercent * 0.3)
+    } else if (hasEval) {
+      percent = evalPercent
+    } else {
+      percent = taskPercent
+    }
+
+    return { total, completed, percent, taskPercent, evalPercent: hasEval ? evalPercent : null }
+  }, [goals, trackedGoals, evalData])
 
   // Status label
   const statusLabel = goals.length === 0
-    ? (yearProgress.total > 0 ? `${yearProgress.total} подцелей` : (isPast ? 'не заполнено' : 'запланировано'))
-    : yearProgress.total === 0
+    ? (yearProgress.total > 0 ? `${yearProgress.total} подцелей` : (yearProgress.evalPercent !== null ? `${yearProgress.percent}% по оценкам` : (isPast ? 'не заполнено' : 'запланировано')))
+    : yearProgress.total === 0 && yearProgress.evalPercent === null
       ? (isPast ? 'не заполнено' : 'запланировано')
       : yearProgress.percent === 100
         ? 'выполнено'
         : `${yearProgress.percent}% выполнено`
 
   // Summary: first goal as title or year only
-  const summaryTitle = goals.length > 0 ? goals[0] : null
+  const summaryTitle = goals.length > 0 ? goals[0].text : null
 
   const handleAdd = () => {
     if (newGoal.trim()) {
@@ -126,14 +192,23 @@ function YearCard({
   return (
     <div
       className={`
-        flex-shrink-0 w-56 sm:w-64 rounded-[24px] border p-4 transition-all cursor-pointer snap-center
+        flex-shrink-0 rounded-[24px] border p-4 transition-all cursor-pointer snap-center
         ${isSelected
-          ? 'border-blue-500/40 ring-1 ring-blue-500/20 shadow-[0_18px_60px_rgba(59,130,246,0.12)]'
-          : 'border-slate-800 hover:border-slate-700'
+          ? isPast
+            ? 'border-slate-600/50 ring-1 ring-slate-500/20 shadow-[0_18px_60px_rgba(15,23,42,0.20)]'
+            : 'border-blue-500/40 ring-1 ring-blue-500/20 shadow-[0_18px_60px_rgba(59,130,246,0.12)]'
+          : isPast
+            ? 'border-slate-800/60 hover:border-slate-700/60'
+            : 'border-slate-800 hover:border-slate-700'
         }
       `}
       style={{
-        background: `radial-gradient(circle at top left, ${color.glow}, transparent 50%), linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))`,
+        width: cardWidth,
+        opacity: cardOpacity,
+        background: isPast
+          ? 'linear-gradient(180deg, rgba(15,23,42,0.82), rgba(2,6,23,0.92))'
+          : `radial-gradient(circle at top left, ${color.glow}, transparent 50%), linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))`,
+        transition: 'opacity 0.2s',
       }}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('input, button, textarea')) return
@@ -141,7 +216,7 @@ function YearCard({
       }}
     >
       {/* Year label */}
-      <div className="text-sm text-slate-500 font-medium tabular-nums">{year}</div>
+      <div className={`text-sm font-medium tabular-nums ${isPast ? 'text-slate-600' : 'text-slate-500'}`}>{year}</div>
 
       {/* Summary title — first goal as bold headline */}
       {summaryTitle ? (
@@ -162,7 +237,7 @@ function YearCard({
         ) : (
           <div className="group/title relative mt-1">
             <h3
-              className={`text-lg font-bold tracking-tight text-white leading-tight cursor-pointer pr-5 ${titleExpanded ? '' : 'line-clamp-2'}`}
+              className={`text-lg font-bold tracking-tight leading-tight cursor-pointer pr-5 ${isPast ? 'text-slate-300' : 'text-white'} ${titleExpanded ? '' : 'line-clamp-2'}`}
               onClick={(e) => { e.stopPropagation(); setTitleExpanded(!titleExpanded) }}
               onDoubleClick={(e) => { e.stopPropagation(); startEdit(0, summaryTitle) }}
             >
@@ -192,8 +267,8 @@ function YearCard({
         )
       ) : (
         <div className="mt-1">
-          <h3 className="text-base font-semibold tracking-tight text-slate-500 italic">Нет целей</h3>
-          <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">Какие цели на этот год?</p>
+          <h3 className={`text-base font-semibold tracking-tight italic ${isPast ? 'text-slate-600' : 'text-slate-500'}`}>Нет целей</h3>
+          <p className={`text-[11px] mt-1 leading-relaxed ${isPast ? 'text-slate-700' : 'text-slate-600'}`}>Какие цели на этот год?</p>
         </div>
       )}
 
@@ -201,11 +276,11 @@ function YearCard({
       <div className="mt-4">
         <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
           <div
-            className={`h-full bg-gradient-to-r ${color.bar} rounded-full transition-all duration-500`}
+            className={`h-full ${isPast ? 'bg-slate-600' : `bg-gradient-to-r ${color.bar}`} rounded-full transition-all duration-500`}
             style={{ width: `${yearProgress.percent}%` }}
           />
         </div>
-        <div className="text-xs text-slate-500 mt-1.5">{statusLabel}</div>
+        <div className={`text-xs mt-1.5 ${isPast ? 'text-slate-600' : 'text-slate-500'}`}>{statusLabel}</div>
       </div>
 
       {/* Expand to see all goals */}
@@ -226,7 +301,7 @@ function YearCard({
           {goals.slice(1).map((goal, i) => {
             const index = i + 1
             return (
-              <div key={index} className="group/goal flex items-start gap-2 text-sm">
+              <div key={goal.id} className="group/goal flex items-start gap-2 text-sm">
                 {editingIndex === index ? (
                   <input
                     type="text"
@@ -245,9 +320,9 @@ function YearCard({
                     <span className={`mt-1 h-1.5 w-1.5 rounded-full flex-shrink-0 ${color.bg} ${color.border} border`} />
                     <span
                       className="text-slate-300 leading-snug flex-1 cursor-text hover:text-slate-100 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); startEdit(index, goal) }}
+                      onClick={(e) => { e.stopPropagation(); startEdit(index, goal.text) }}
                     >
-                      {goal}
+                      {goal.text}
                     </span>
                     <button
                       onClick={(e) => { e.stopPropagation(); onRemoveGoal(index) }}

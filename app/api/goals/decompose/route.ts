@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAnthropicClient } from '@/lib/anthropic'
 import { requireUserId } from '@/lib/get-user-id'
 import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
+import { buildGoalsValidatePrompt } from '@/lib/prompts/goals-validate'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { z } from 'zod'
+
+const PLAN_MARKER_RE = /\[(YEAR|HALF_YEAR|QUARTER|MONTH|WEEK):/
 
 const MAX_MESSAGE_LENGTH = 2000
 const MAX_DREAM_LENGTH = 2000
@@ -137,32 +140,64 @@ export async function POST(request: NextRequest) {
       { role: 'user' as const, content: sanitizedMessage },
     ]
 
-    const stream = await anthropic.messages.stream({
+    // Генерируем ответ (буферизированно для возможной валидации)
+    const initialResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: MAX_OUTPUT_TOKENS,
       system: systemPrompt,
       messages,
     })
 
+    let finalText = initialResponse.content
+      .filter((block) => block.type === 'text')
+      .map((block) => 'text' in block ? block.text : '')
+      .join('')
+
+    // Если ответ содержит метки плана — прогоняем через валидатор
+    if (PLAN_MARKER_RE.test(finalText)) {
+      try {
+        const dreamText = sanitizedContext.dream
+        const validatePrompt = buildGoalsValidatePrompt(dreamText, finalText)
+
+        const validationResponse = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: MAX_OUTPUT_TOKENS,
+          system: validatePrompt,
+          messages: [{ role: 'user', content: 'Проверь и верни исправленный план.' }],
+        })
+
+        const validatedText = validationResponse.content
+          .filter((block) => block.type === 'text')
+          .map((block) => 'text' in block ? block.text : '')
+          .join('')
+
+        // Если валидатор вернул план с метками — используем его
+        if (PLAN_MARKER_RE.test(validatedText) && validatedText.length > 100) {
+          finalText = validatedText
+        }
+      } catch (validationError) {
+        // Если валидация упала — отдаём оригинальный план
+        console.error('Plan validation failed, using original:', validationError)
+      }
+    }
+
+    // Стримим финальный текст посимвольно (для плавного UX)
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
-      async start(controller) {
-        let streamFailed = false
-        try {
-          for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              controller.enqueue(encoder.encode(event.delta.text))
-            }
-          }
-        } catch (err) {
-          streamFailed = true
-          console.error('Stream error:', err)
-          controller.error(err instanceof Error ? err : new Error('Goals chat stream failed'))
-        } finally {
-          if (!streamFailed) {
+      start(controller) {
+        // Отправляем чанками по ~50 символов для имитации стрима
+        const chunkSize = 50
+        let offset = 0
+        const interval = setInterval(() => {
+          if (offset >= finalText.length) {
+            clearInterval(interval)
             controller.close()
+            return
           }
-        }
+          const chunk = finalText.slice(offset, offset + chunkSize)
+          controller.enqueue(encoder.encode(chunk))
+          offset += chunkSize
+        }, 30)
       },
     })
 

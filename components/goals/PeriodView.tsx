@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Goal } from '@/lib/types'
 import { resolvePeriodMeta } from '@/lib/goals-utils'
 import type { PeriodType } from '@/lib/goals-utils'
@@ -165,6 +165,11 @@ function PeriodCard({
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingText, setEditingText] = useState('')
   const [collapsed, setCollapsed] = useState(isPast && goals.length === 0)
+
+  useEffect(() => {
+    if (!isPast || goals.length > 0) setCollapsed(false)
+    else setCollapsed(true)
+  }, [isPast, goals.length])
 
   const handleAdd = () => {
     if (newGoal.trim()) {

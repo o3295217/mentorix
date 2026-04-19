@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-04-16 — update
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 5 файлов (GoalsChatPanel, HalfYearView, MonthSection...)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 3 файлов (ai-usage, goals-utils, goals-decompose)
+- 🗄️ База данных: 2 файлов
+- 📝 Документация: 3 файлов
+- 📦 Другое: 9 файлов
+
+
 ### 2026-04-14 — update
 - 🔌 API: 3 файлов (route, route, route)
 - 📄 Страницы: 3 файлов
