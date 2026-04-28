@@ -207,49 +207,94 @@ export function useGoalsChat(
       const trimmed = line.trim()
       
       // Check for period markers: [YEAR:2026], [HALF_YEAR:2026-H1], [QUARTER:2026-Q1], [MONTH:2026-03], [WEEK:2026-03-W1]
+      // Also handle AI variations: [WEEK:2026-04-1] (without W), marker + goal on same line
       const yearMatch = trimmed.match(/\[YEAR:(\d{4})\]/)
       const halfYearMatch = trimmed.match(/\[HALF_YEAR:(\d{4}-H[12])\]/)
       const quarterMatch = trimmed.match(/\[QUARTER:(\d{4}-Q[1-4])\]/)
       const monthMatch = trimmed.match(/\[MONTH:(\d{4}-\d{2})\]/)
-      const weekMatch = trimmed.match(/\[WEEK:(\d{4}-\d{2}-W\d+)\]/)
+      // Accept both [WEEK:2026-04-W1] and [WEEK:2026-04-1]
+      const weekMatch = trimmed.match(/\[WEEK:(\d{4}-\d{2}-W?\d+)\]/)
+      
+      // Extract text after the marker on the same line (if any)
+      let textAfterMarker = ''
       
       if (yearMatch) {
         currentPeriodType = 'year'
         currentPeriodKey = yearMatch[1]
         markerFound = true
-        continue
-      }
-      if (halfYearMatch) {
+        textAfterMarker = trimmed.slice(trimmed.indexOf(']') + 1).trim()
+      } else if (halfYearMatch) {
         currentPeriodType = 'half_year'
         currentPeriodKey = halfYearMatch[1]
         markerFound = true
-        continue
-      }
-      if (quarterMatch) {
+        textAfterMarker = trimmed.slice(trimmed.indexOf(']') + 1).trim()
+      } else if (quarterMatch) {
         currentPeriodType = 'quarter'
         currentPeriodKey = quarterMatch[1]
         markerFound = true
-        continue
-      }
-      if (monthMatch) {
+        textAfterMarker = trimmed.slice(trimmed.indexOf(']') + 1).trim()
+      } else if (monthMatch) {
         currentPeriodType = 'month'
         currentPeriodKey = monthMatch[1]
         markerFound = true
+        textAfterMarker = trimmed.slice(trimmed.indexOf(']') + 1).trim()
+      } else if (weekMatch) {
+        currentPeriodType = 'week'
+        // Normalize: add W prefix if missing (2026-04-1 → 2026-04-W1)
+        let weekKey = weekMatch[1]
+        if (!weekKey.includes('W')) {
+          const parts = weekKey.split('-')
+          weekKey = `${parts[0]}-${parts[1]}-W${parts[2]}`
+        }
+        currentPeriodKey = weekKey
+        markerFound = true
+        textAfterMarker = trimmed.slice(trimmed.indexOf(']') + 1).trim()
+      }
+      
+      // If marker found, try to parse goal text on the same line
+      if (textAfterMarker) {
+        // Handle "Цель N.N.N: text" or "N.N.N. text" or "N) text" after marker
+        const inlineGoalMatch = textAfterMarker.match(/^(?:Цель\s+)?(\d+(?:\.\d+)*)[.:)]\s*(.+)/)
+        if (inlineGoalMatch && inlineGoalMatch[2].length > 3 && inlineGoalMatch[2].length < 500) {
+          goals.push({
+            text: inlineGoalMatch[2].trim(),
+            periodType: currentPeriodType,
+            periodKey: currentPeriodKey,
+            hierarchyNumber: inlineGoalMatch[1],
+          })
+        } else if (textAfterMarker.length > 3 && textAfterMarker.length < 500) {
+          // Plain text after marker
+          goals.push({
+            text: textAfterMarker,
+            periodType: currentPeriodType,
+            periodKey: currentPeriodKey,
+          })
+        }
         continue
       }
-      if (weekMatch) {
-        currentPeriodType = 'week'
-        currentPeriodKey = weekMatch[1]
-        markerFound = true
+      
+      if (yearMatch || halfYearMatch || quarterMatch || monthMatch || weekMatch) {
         continue
       }
       
       // Only collect goals AFTER a period marker has been encountered
       if (!markerFound) continue
       
-      // Match hierarchical numbered lines: "1.1.1. ...", "1. ...", or bullet-point lines: "- ...", "• ...", "1) ..."
+      // Match "Цель N.N.N: text" format
+      const goalLabelMatch = trimmed.match(/^Цель\s+(\d+(?:\.\d+)*)[.:)]\s*(.+)/)
+      if (goalLabelMatch && goalLabelMatch[2].length > 3 && goalLabelMatch[2].length < 500) {
+        goals.push({
+          text: goalLabelMatch[2].trim(),
+          periodType: currentPeriodType,
+          periodKey: currentPeriodKey,
+          hierarchyNumber: goalLabelMatch[1],
+        })
+        continue
+      }
+      
+      // Match hierarchical numbered lines: "1.1.1. ...", "1. ...", or "1) ..."
       const hierarchyMatch = trimmed.match(/^(\d+(?:\.\d+)*)[.)]\s+(.+)/)
-      if (hierarchyMatch && hierarchyMatch[2].length > 3 && hierarchyMatch[2].length < 200) {
+      if (hierarchyMatch && hierarchyMatch[2].length > 3 && hierarchyMatch[2].length < 500) {
         goals.push({
           text: hierarchyMatch[2].trim(),
           periodType: currentPeriodType,
@@ -260,7 +305,7 @@ export function useGoalsChat(
       }
       // Match bullet-point lines: "- ...", "• ...", "– ..."
       const bulletMatch = trimmed.match(/^[-–—•]\s+(.+)/)
-      if (bulletMatch && bulletMatch[1].length > 3 && bulletMatch[1].length < 200) {
+      if (bulletMatch && bulletMatch[1].length > 3 && bulletMatch[1].length < 500) {
         goals.push({
           text: bulletMatch[1].trim(),
           periodType: currentPeriodType,

@@ -271,16 +271,29 @@ export function buildPlanChatContext(request: PlanChatRequest): string {
   // Прогресс целей
   if (request.goalsProgress) {
     const gp = request.goalsProgress
+
+    // Вычисляем явные даты конца недели и месяца (чтобы не было путаницы с подсчётом дней)
+    const planDate = new Date(request.date)
+    const lastDayOfMonth = new Date(planDate.getFullYear(), planDate.getMonth() + 1, 0)
+    const MONTH_RU = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
+    const lastDayOfMonthStr = `${lastDayOfMonth.getDate()} ${MONTH_RU[lastDayOfMonth.getMonth()]}`
+    // Конец недели (воскресенье)
+    const dayOfWeek = planDate.getDay()
+    const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
+    const endOfWeek = new Date(planDate)
+    endOfWeek.setDate(planDate.getDate() + daysToSunday)
+    const endOfWeekStr = `${endOfWeek.getDate()} ${MONTH_RU[endOfWeek.getMonth()]}`
+
     parts.push(`\nПРОГРЕСС ЦЕЛЕЙ:`)
-    parts.push(`• Неделя: ${gp.weekCompleted}/${gp.weekTotal} выполнено (осталось ${gp.daysLeftInWeek} дней до конца недели)`)
-    parts.push(`• Месяц: ${gp.monthCompleted}/${gp.monthTotal} выполнено (осталось ${gp.daysLeftInMonth} дней до конца месяца)`)
+    parts.push(`• Неделя: ${gp.weekCompleted}/${gp.weekTotal} выполнено (конец недели: ${endOfWeekStr}, осталось дней не считая сегодня: ${gp.daysLeftInWeek})`)
+    parts.push(`• Месяц: ${gp.monthCompleted}/${gp.monthTotal} выполнено (последний день месяца: ${lastDayOfMonthStr}, осталось дней не считая сегодня: ${gp.daysLeftInMonth})`)
     
     // Предупреждения
     if (gp.weekTotal > 0 && gp.weekCompleted < gp.weekTotal && gp.daysLeftInWeek <= 2) {
-      parts.push(`ВНИМАНИЕ: До конца недели ${gp.daysLeftInWeek} дней, а ${gp.weekTotal - gp.weekCompleted} целей ещё не выполнено!`)
+      parts.push(`ВНИМАНИЕ: До конца недели (${endOfWeekStr}) осталось ${gp.daysLeftInWeek} дней, а ${gp.weekTotal - gp.weekCompleted} целей ещё не выполнено!`)
     }
     if (gp.monthTotal > 0 && gp.monthCompleted < gp.monthTotal && gp.daysLeftInMonth <= 5) {
-      parts.push(`ВНИМАНИЕ: До конца месяца ${gp.daysLeftInMonth} дней, а ${gp.monthTotal - gp.monthCompleted} целей ещё не выполнено!`)
+      parts.push(`ВНИМАНИЕ: До конца месяца (${lastDayOfMonthStr}) осталось ${gp.daysLeftInMonth} дней, а ${gp.monthTotal - gp.monthCompleted} целей ещё не выполнено!`)
     }
   }
 

@@ -372,19 +372,28 @@ export default function GoalsChatPanel({
 
         {/* Input */}
         <div className="p-4 border-t border-slate-800">
-          <div className="flex gap-2">
-            <input
-              type="text"
+          <div className="flex gap-2 items-end">
+            <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value)
+                // Auto-resize
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   handleSend()
+                  // Reset height after send
+                  const target = e.target as HTMLTextAreaElement
+                  requestAnimationFrame(() => { target.style.height = 'auto' })
                 }
               }}
               placeholder="Спроси что-нибудь..."
-              className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+              className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-none overflow-y-auto"
+              style={{ minHeight: '42px', maxHeight: '160px' }}
+              rows={1}
               disabled={isLoading}
             />
             <button

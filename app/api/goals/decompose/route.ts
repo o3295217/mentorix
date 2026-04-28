@@ -14,7 +14,7 @@ const MAX_DREAM_LENGTH = 2000
 const MAX_GOAL_LENGTH = 1000
 const MAX_HISTORY_LENGTH = 4000
 const MAX_GOALS_PER_PERIOD = 50
-const MAX_OUTPUT_TOKENS = 3200
+const MAX_OUTPUT_TOKENS = 16000
 
 const GoalsDecomposeSchema = z.object({
   message: z.string().trim().min(1).max(8000),
@@ -29,7 +29,7 @@ const GoalsDecomposeSchema = z.object({
   }),
   history: z.array(z.object({
     role: z.enum(['user', 'assistant']),
-    content: z.string().max(12000),
+    content: z.string().max(60000),
   })).max(20).optional(),
 })
 
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
 
     const validation = GoalsDecomposeSchema.safeParse(await request.json())
     if (!validation.success) {
+      console.error('Goals decompose validation failed:', JSON.stringify(validation.error.format(), null, 2))
       return NextResponse.json(
         { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
@@ -140,73 +141,115 @@ export async function POST(request: NextRequest) {
       { role: 'user' as const, content: sanitizedMessage },
     ]
 
-    // Генерируем ответ (буферизированно для возможной валидации)
-    const initialResponse = await anthropic.messages.create({
+    const encoder = new TextEncoder()
+    const streamHeaders = {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Transfer-Encoding': 'chunked',
+    }
+
+    // Стратегия 1: Настоящий стриминг от Claude (для вопросов и обычных ответов).
+    // Буферизируем первые ~200 символов чтобы определить, есть ли метки плана.
+    // Если меток нет — переключаемся на прямой стриминг остатка.
+    // Если есть — буферизируем всё, валидируем, стримим плавно.
+
+    const stream = anthropic.messages.stream({
       model: 'claude-sonnet-4-20250514',
       max_tokens: MAX_OUTPUT_TOKENS,
       system: systemPrompt,
       messages,
     })
 
-    let finalText = initialResponse.content
-      .filter((block) => block.type === 'text')
-      .map((block) => 'text' in block ? block.text : '')
-      .join('')
-
-    // Если ответ содержит метки плана — прогоняем через валидатор
-    if (PLAN_MARKER_RE.test(finalText)) {
-      try {
-        const dreamText = sanitizedContext.dream
-        const validatePrompt = buildGoalsValidatePrompt(dreamText, finalText)
-
-        const validationResponse = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: MAX_OUTPUT_TOKENS,
-          system: validatePrompt,
-          messages: [{ role: 'user', content: 'Проверь и верни исправленный план.' }],
-        })
-
-        const validatedText = validationResponse.content
-          .filter((block) => block.type === 'text')
-          .map((block) => 'text' in block ? block.text : '')
-          .join('')
-
-        // Если валидатор вернул план с метками — используем его
-        if (PLAN_MARKER_RE.test(validatedText) && validatedText.length > 100) {
-          finalText = validatedText
-        }
-      } catch (validationError) {
-        // Если валидация упала — отдаём оригинальный план
-        console.error('Plan validation failed, using original:', validationError)
-      }
-    }
-
-    // Стримим финальный текст посимвольно (для плавного UX)
-    const encoder = new TextEncoder()
     const readable = new ReadableStream({
-      start(controller) {
-        // Отправляем чанками по ~50 символов для имитации стрима
-        const chunkSize = 50
-        let offset = 0
-        const interval = setInterval(() => {
-          if (offset >= finalText.length) {
-            clearInterval(interval)
+      async start(controller) {
+        try {
+          let buffer = ''
+          let decided = false
+          let isPlan = false
+
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              const text = event.delta.text
+
+              if (!decided) {
+                // Буферизируем начало чтобы определить тип ответа
+                buffer += text
+                if (buffer.length >= 200 || PLAN_MARKER_RE.test(buffer)) {
+                  decided = true
+                  isPlan = PLAN_MARKER_RE.test(buffer)
+
+                  if (!isPlan) {
+                    // Обычный ответ — отдаём буфер и продолжаем стримить напрямую
+                    controller.enqueue(encoder.encode(buffer))
+                    buffer = ''
+                  }
+                  // Если план — продолжаем буферизировать
+                }
+              } else if (isPlan) {
+                buffer += text
+              } else {
+                // Прямой стриминг обычного ответа
+                controller.enqueue(encoder.encode(text))
+              }
+            }
+          }
+
+          // Если так и не решили (короткий ответ < 200 символов) — это обычный ответ
+          if (!decided) {
+            controller.enqueue(encoder.encode(buffer))
             controller.close()
             return
           }
-          const chunk = finalText.slice(offset, offset + chunkSize)
-          controller.enqueue(encoder.encode(chunk))
-          offset += chunkSize
-        }, 30)
+
+          if (!isPlan) {
+            // Обычный ответ закончился — закрываем
+            controller.close()
+            return
+          }
+
+          // === ПЛАН: буферизирован полностью, прогоняем валидацию ===
+          let finalText = buffer
+
+          try {
+            const dreamText = sanitizedContext.dream
+            const validatePrompt = buildGoalsValidatePrompt(dreamText, finalText)
+
+            const validationResponse = await anthropic.messages.create({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: MAX_OUTPUT_TOKENS,
+              system: validatePrompt,
+              messages: [{ role: 'user', content: 'Проверь и верни исправленный план.' }],
+            })
+
+            const validatedText = validationResponse.content
+              .filter((block) => block.type === 'text')
+              .map((block) => 'text' in block ? block.text : '')
+              .join('')
+
+            if (PLAN_MARKER_RE.test(validatedText) && validatedText.length > 100) {
+              finalText = validatedText
+            }
+          } catch (validationError) {
+            console.error('Plan validation failed, using original:', validationError)
+          }
+
+          // Плавная посимвольная отдача плана (титры)
+          // ~30 символов каждые 50мс = ~600 символов/сек — комфортная скорость чтения
+          const CHUNK = 30
+          const DELAY = 50
+          for (let i = 0; i < finalText.length; i += CHUNK) {
+            controller.enqueue(encoder.encode(finalText.slice(i, i + CHUNK)))
+            await new Promise(resolve => setTimeout(resolve, DELAY))
+          }
+
+          controller.close()
+        } catch (streamError) {
+          controller.error(streamError)
+        }
       },
     })
 
-    return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-cache',
-      },
-    })
+    return new Response(readable, { headers: streamHeaders })
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode ?? (error as { status?: number })?.status
     if (typeof statusCode === 'number') {

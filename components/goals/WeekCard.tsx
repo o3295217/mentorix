@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Goal, GoalTag } from '@/lib/types'
 import { parseDateParam, toDateKey } from '@/lib/dates'
 import { fuzzyMatchGoal } from '@/lib/goals-utils'
@@ -91,6 +91,8 @@ export default function WeekCard({
   const isDragOver = dragOverWeek === weekKey
   const [editingWeekGoal, setEditingWeekGoal] = useState<{ weekKey: string; index: number } | null>(null)
   const [editingWeekText, setEditingWeekText] = useState('')
+  const newGoalTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const editingTextareaRef = useRef<HTMLTextAreaElement>(null)
   // Tag selection for new goal
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [showNewTagInput, setShowNewTagInput] = useState(false)
@@ -98,6 +100,53 @@ export default function WeekCard({
   const [newTagColor, setNewTagColor] = useState(TAG_COLOR_PRESETS[5])
   // Tag editing for existing goal
   const [editingTagsGoal, setEditingTagsGoal] = useState<string | null>(null)
+
+  const getExpandedMinHeight = (element: HTMLTextAreaElement) => {
+    const savedHeight = Number(element.dataset.collapsedHeight || 0)
+    if (savedHeight > 0) return savedHeight * 2
+
+    const baseHeight = Math.ceil(element.getBoundingClientRect().height)
+    element.dataset.collapsedHeight = String(baseHeight)
+    return baseHeight * 2
+  }
+
+  const resizeTextarea = (element: HTMLTextAreaElement, minHeight = 0) => {
+    element.style.height = 'auto'
+    element.style.height = `${Math.max(element.scrollHeight, minHeight)}px`
+  }
+
+  const expandTextarea = (element: HTMLTextAreaElement) => {
+    resizeTextarea(element, getExpandedMinHeight(element))
+  }
+
+  const resetTextareaHeight = (element: HTMLTextAreaElement) => {
+    element.style.height = ''
+  }
+
+  const submitNewGoal = () => {
+    const textarea = newGoalTextareaRef.current
+    const text = textarea?.value.trim()
+
+    if (!textarea || !text) return
+
+    onAddWeekGoal(weekKey, text, selectedTags.length > 0 ? selectedTags : undefined)
+    if (onNewGoalChange) onNewGoalChange('')
+    else textarea.value = ''
+    setSelectedTags([])
+    resetTextareaHeight(textarea)
+  }
+
+  useEffect(() => {
+    if (!editingWeekGoal) return
+
+    const frameId = requestAnimationFrame(() => {
+      const textarea = editingTextareaRef.current
+      if (!textarea) return
+      expandTextarea(textarea)
+    })
+
+    return () => cancelAnimationFrame(frameId)
+  }, [editingWeekGoal])
 
   return (
     <div
@@ -145,39 +194,35 @@ export default function WeekCard({
 
       {/* Добавление цели в неделю */}
       <div className="mb-2">
-        <div className="flex gap-1">
-          <input
-            type="text"
+        <div className="flex gap-1 items-end">
+          <textarea
+            ref={newGoalTextareaRef}
             value={onNewGoalChange ? (newGoalValue || '') : undefined}
-            onChange={onNewGoalChange ? (e) => onNewGoalChange(e.target.value) : undefined}
+            onChange={(e) => {
+              if (onNewGoalChange) onNewGoalChange(e.target.value)
+              expandTextarea(e.target)
+            }}
+            onFocus={(e) => expandTextarea(e.target)}
+            onBlur={(e) => {
+              if (e.target.value.trim()) resizeTextarea(e.target)
+              else resetTextareaHeight(e.target)
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const target = e.target as HTMLInputElement
-                if (target.value.trim()) {
-                  onAddWeekGoal(weekKey, target.value, selectedTags.length > 0 ? selectedTags : undefined)
-                  if (onNewGoalChange) onNewGoalChange('')
-                  else target.value = ''
-                  setSelectedTags([])
-                }
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                submitNewGoal()
               }
             }}
             placeholder={isGrid ? '+ задача' : 'Цель на неделю...'}
             className={isGrid
-              ? 'flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700'
-              : 'flex-1 px-2 py-1 text-xs border border-slate-700 rounded-xl bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600'
+              ? 'flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700 resize-none overflow-hidden leading-5'
+              : 'flex-1 px-2 py-1 text-xs border border-slate-700 rounded-xl bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600 resize-none overflow-hidden leading-5'
             }
+            rows={1}
           />
           {!isGrid && (
             <button
-              onClick={(e) => {
-                const input = e.currentTarget.parentElement?.querySelector('input[type="text"]') as HTMLInputElement
-                if (input?.value.trim()) {
-                  onAddWeekGoal(weekKey, input.value, selectedTags.length > 0 ? selectedTags : undefined)
-                  if (onNewGoalChange) onNewGoalChange('')
-                  else input.value = ''
-                  setSelectedTags([])
-                }
-              }}
+              onClick={submitNewGoal}
               className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-lg transition-colors"
             >
               +
@@ -321,8 +366,12 @@ export default function WeekCard({
               >
                 {editingWeekGoal?.weekKey === weekKey && editingWeekGoal?.index === index ? (
                   <textarea
+                    ref={editingTextareaRef}
                     value={editingWeekText}
-                    onChange={(e) => setEditingWeekText(e.target.value)}
+                    onChange={(e) => {
+                      setEditingWeekText(e.target.value)
+                      expandTextarea(e.target)
+                    }}
                     onBlur={() => {
                       if (editingWeekText.trim()) onEditWeekGoal(weekKey, index, editingWeekText)
                       setEditingWeekGoal(null); setEditingWeekText('')
@@ -335,8 +384,8 @@ export default function WeekCard({
                       }
                       if (e.key === 'Escape') { setEditingWeekGoal(null); setEditingWeekText('') }
                     }}
-                    className="w-full px-2 py-1 text-xs border border-blue-500/50 rounded bg-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none"
-                    rows={3}
+                    className="w-full px-2 py-1 text-xs border border-blue-500/50 rounded bg-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none overflow-hidden leading-5"
+                    rows={1}
                     autoFocus
                   />
                 ) : (
