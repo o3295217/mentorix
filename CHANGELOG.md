@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-04-28 — fix: исправлен контекст дат в чате плана дня; обновлены промпты целей и документация
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 2 файлов (GoalsChatPanel, WeekCard)
+- 📚 Библиотеки: 3 файлов (goals-decompose, goals-validate, plan-chat)
+- 📝 Документация: 4 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-04-19 — update
 - 🔌 API: 5 файлов (route, route, route...)
 - 🧩 Компоненты: 5 файлов (HorizonsCard, MonthSection, PeriodView...)

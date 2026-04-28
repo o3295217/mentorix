@@ -67,6 +67,20 @@ async function getCompletedTasksForPeriod(userId: string, start: Date, end: Date
     completedTexts.push(task.taskText)
   }
 
+  // Проверяем Goals (tracked goals), отмеченные выполненными на странице целей
+  // periodKey формируется для недели/месяца/квартала/полугодия/года внутри периода
+  const completedGoals = await prisma.goal.findMany({
+    where: {
+      userId,
+      completed: true,
+    },
+    select: { text: true },
+  })
+
+  for (const goal of completedGoals) {
+    completedTexts.push(goal.text)
+  }
+
   return completedTexts
 }
 
