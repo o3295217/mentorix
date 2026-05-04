@@ -6,6 +6,17 @@
 
 ## [Unreleased]
 
+### 2026-05-04 — Implement code review fixes and daily planning UX updates
+- 🔌 API: 28 файлов (route, route, route...)
+- 🧩 Компоненты: 8 файлов (AuthProvider, BalanceFlags, ProgressIndicator...)
+- 📄 Страницы: 8 файлов
+- 📚 Библиотеки: 21 файлов (anthropic, app-url, auth...)
+- 🗄️ База данных: 11 файлов
+- ⚙️ Конфигурация: 5 файлов
+- 📝 Документация: 7 файлов
+- 📦 Другое: 49 файлов
+
+
 ### 2026-04-28 — fix: синхронизация Goals→PeriodGoal — учитываем completed goals со страницы целей
 - 📝 Документация: 1 файлов
 

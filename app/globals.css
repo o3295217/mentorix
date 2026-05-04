@@ -71,6 +71,30 @@
     @apply bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium py-2 px-4 rounded-xl transition-all;
   }
 
+  /* Акцент для кнопки, когда план изменен, но еще не сохранен */
+  .btn-dirty-attention {
+    position: relative;
+    isolation: isolate;
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.48),
+      0 0 0 4px rgba(251, 146, 60, 0.1),
+      0 0 22px rgba(251, 146, 60, 0.14);
+    animation: btn-dirty-frame-pulse 1.9s ease-in-out infinite;
+  }
+
+  .btn-dirty-attention::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    border-radius: calc(0.75rem + 12px);
+    background: radial-gradient(circle at center, rgba(251, 191, 36, 0.22), rgba(251, 146, 60, 0.1) 46%, rgba(251, 146, 60, 0) 74%);
+    filter: blur(14px);
+    opacity: 0.26;
+    pointer-events: none;
+    z-index: -1;
+    animation: btn-dirty-aura-pulse 2.2s ease-in-out infinite;
+  }
+
   .btn-secondary {
     @apply bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 font-medium py-2 px-4 rounded-xl transition-colors;
   }
@@ -129,6 +153,30 @@
     50% {
       box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.5);
       transform: scale(1.02);
+    }
+  }
+
+  @keyframes btn-dirty-frame-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 0 1px rgba(251, 191, 36, 0.42),
+        0 0 0 3px rgba(251, 146, 60, 0.08),
+        0 0 18px rgba(251, 146, 60, 0.1);
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px rgba(255, 251, 235, 0.95),
+        0 0 0 6px rgba(251, 146, 60, 0.18),
+        0 0 30px rgba(251, 191, 36, 0.22);
+    }
+  }
+
+  @keyframes btn-dirty-aura-pulse {
+    0%, 100% {
+      opacity: 0.18;
+    }
+    50% {
+      opacity: 0.42;
     }
   }
 
@@ -446,6 +494,21 @@
   }
   .landing-flow-dot {
     animation: none !important;
+  }
+  .btn-dirty-attention {
+    animation: none !important;
+  }
+  .btn-dirty-attention::after {
+    animation: none !important;
+  }
+  .btn-dirty-attention {
+    box-shadow:
+      0 0 0 2px rgba(251, 191, 36, 0.55),
+      0 0 0 5px rgba(251, 146, 60, 0.12),
+      0 0 24px rgba(251, 146, 60, 0.14) !important;
+  }
+  .btn-dirty-attention::after {
+    opacity: 0.24 !important;
   }
   .ion-tag,
   .ion-sphere,

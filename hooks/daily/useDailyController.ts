@@ -210,6 +210,7 @@ export function useDaily(): UseDailyReturn {
         setTasks([])
         setSelectedTasks(new Set())
         setExtraTasks([])
+        setHasUnsavedChanges(false)
       } else {
         const daily = await dailyRes.json()
 
@@ -235,6 +236,8 @@ export function useDaily(): UseDailyReturn {
             serverPlanText.length === 0 ||
             (draftDiffersFromServer && draftUpdatedAtMs > serverUpdatedAtMs)
           )
+
+          setHasUnsavedChanges(shouldUseDraft)
           
           console.log('[useDaily] loadData for', loadingDate, {
             hasDraft: !!draft,
@@ -313,6 +316,9 @@ export function useDaily(): UseDailyReturn {
             }))
             setTasks(tasksWithIds)
             setSelectedTasks(sanitizeSelectedForTotal(draft.selectedTaskIds, tasksWithIds.length))
+            setHasUnsavedChanges(true)
+          } else {
+            setHasUnsavedChanges(false)
           }
         }
       }
@@ -386,6 +392,7 @@ export function useDaily(): UseDailyReturn {
     setSelectedTasks(new Set())
     setExtraTasks([])
     setNewTaskText('')
+    setHasUnsavedChanges(false)
     // НЕ сбрасываем chatMessages — они загружаются отдельным useEffect из localStorage
     setCheckPlanResult(null)
     loadData(controller.signal)
@@ -612,6 +619,7 @@ export function useDaily(): UseDailyReturn {
     const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
+    setHasUnsavedChanges(true)
     showMessage(`✅ Добавлено ${newHabitTexts.length} ${newHabitTexts.length === 1 ? 'привычка' : 'привычек'}`)
   }, [tasks, selectedTasks, habits, buildTasksFromTexts, remapSelectionByText, showMessage])
 
@@ -639,6 +647,28 @@ export function useDaily(): UseDailyReturn {
     } catch (error) {
       console.error('Error creating habit:', error)
       showMessage(`❌ Ошибка при создании привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+    }
+  }, [showMessage])
+
+  const updateHabit = useCallback(async (
+    habitId: number,
+    updates: { taskText?: string; frequency?: string; daysOfWeek?: number[] }
+  ) => {
+    try {
+      const habit = await fetchJson<Habit>('/api/habits', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: habitId,
+          ...updates,
+        }),
+      })
+
+      setHabits(prev => prev.map(item => item.id === habitId ? habit : item))
+      showMessage('🔄 Привычка обновлена!')
+    } catch (error) {
+      console.error('Error updating habit:', error)
+      showMessage(`❌ Ошибка при обновлении привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }, [showMessage])
 
@@ -768,6 +798,7 @@ export function useDaily(): UseDailyReturn {
     setTasks(newTasks)
     setSelectedTasks(updatedSelected)
     setDraggedTaskId(null)
+    setHasUnsavedChanges(true)
   }, [draggedTaskId, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
   const savePlan = useCallback(async () => {
@@ -1021,6 +1052,7 @@ export function useDaily(): UseDailyReturn {
     habitSuggestions,
     addHabitsToTasks,
     createHabitFromTask,
+    updateHabit,
     deleteHabit,
   }
 }

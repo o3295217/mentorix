@@ -77,6 +77,7 @@ export interface UseDailyReturn {
   habitSuggestions: HabitSuggestion[]
   addHabitsToTasks: (habitTexts?: string[]) => void
   createHabitFromTask: (taskText: string, frequency?: string, daysOfWeek?: number[]) => Promise<void>
+  updateHabit: (habitId: number, updates: { taskText?: string; frequency?: string; daysOfWeek?: number[] }) => Promise<void>
   deleteHabit: (habitId: number) => Promise<void>
 
   checkingPlan: boolean

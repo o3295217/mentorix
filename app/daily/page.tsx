@@ -23,12 +23,18 @@ export default function DailyPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
   const activeTaskActionRowRef = useRef<HTMLDivElement | null>(null)
+  const habitEditorRef = useRef<HTMLDivElement | null>(null)
+  const tasksContainerRef = useRef<HTMLDivElement | null>(null)
   const [mounted, setMounted] = useState(false)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
 
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
+  const [editingHabitId, setEditingHabitId] = useState<number | null>(null)
+  const [editingHabitText, setEditingHabitText] = useState('')
+  const [editingHabitFrequency, setEditingHabitFrequency] = useState<FrequencyType>('daily')
+  const [editingHabitDays, setEditingHabitDays] = useState<number[]>([])
   
   // Локальное состояние action-кнопок строки задачи
   const [activeTaskAction, setActiveTaskAction] = useState<{ taskId: number; type: TaskActionType } | null>(null)
@@ -67,6 +73,31 @@ export default function DailyPage() {
     }
   }, [dismissedSuggestions])
 
+  // Автоскролл полотна задач к низу при раскрытии блока «Выполнено»
+  // (ждём окончания CSS-перехода max-h, иначе scrollHeight ещё не обновлён)
+  useEffect(() => {
+    if (!showCompleted) return
+    const container = tasksContainerRef.current
+    if (!container) return
+    const animate = (from: number, to: number, duration: number) => {
+      const start = performance.now()
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / duration)
+        const eased = 1 - Math.pow(1 - t, 3)
+        container.scrollTop = from + (to - from) * eased
+        if (t < 1) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    }
+    const tick = () => {
+      const target = container.scrollHeight - container.clientHeight
+      animate(container.scrollTop, target, 320)
+    }
+    // Перeход max-h занимает 200ms — даём чуть больше, чтобы scrollHeight успел вырасти
+    const id = window.setTimeout(tick, 230)
+    return () => window.clearTimeout(id)
+  }, [showCompleted])
+
   useEffect(() => {
     if (!activeTaskAction) return
 
@@ -91,6 +122,37 @@ export default function DailyPage() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [activeTaskAction])
+
+  useEffect(() => {
+    if (editingHabitId === null) return
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (!habitEditorRef.current) return
+      if (!habitEditorRef.current.contains(event.target as Node)) {
+        setEditingHabitId(null)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setEditingHabitId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [editingHabitId])
+
+  useEffect(() => {
+    if (!showHabitsExpanded) {
+      setEditingHabitId(null)
+    }
+  }, [showHabitsExpanded])
   
   const {
     selectedDate,
@@ -146,6 +208,7 @@ export default function DailyPage() {
     habitSuggestions,
     addHabitsToTasks,
     createHabitFromTask,
+    updateHabit,
     deleteHabit,
   } = useDaily()
 
@@ -193,11 +256,45 @@ export default function DailyPage() {
     return habits.find(h => h.taskText.toLowerCase() === taskText.toLowerCase())
   }
 
+  const normalizeHabitFrequency = (frequency: string): FrequencyType => {
+    if (
+      frequency === 'daily' ||
+      frequency === 'weekdays' ||
+      frequency === 'weekends' ||
+      frequency === 'weekly' ||
+      frequency === 'custom'
+    ) {
+      return frequency
+    }
+
+    return 'daily'
+  }
+
+  const parseHabitDays = (daysOfWeek: string | null): number[] => {
+    if (!daysOfWeek) return []
+
+    try {
+      const parsed = JSON.parse(daysOfWeek)
+      if (!Array.isArray(parsed)) return []
+
+      return parsed
+        .filter((day): day is number => Number.isInteger(day) && day >= 1 && day <= 7)
+        .sort((left, right) => left - right)
+    } catch {
+      return []
+    }
+  }
+
   const closeTaskAction = useCallback(() => {
     setActiveTaskAction(null)
   }, [])
 
+  const closeHabitEditor = useCallback(() => {
+    setEditingHabitId(null)
+  }, [])
+
   const toggleTaskAction = useCallback((taskId: number, type: TaskActionType) => {
+    setEditingHabitId(null)
     setActiveTaskAction((prev) => {
       if (prev?.taskId === taskId && prev.type === type) {
         return null
@@ -227,6 +324,62 @@ export default function DailyPage() {
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
     )
   }
+
+  const toggleEditingHabitDay = (day: number) => {
+    setEditingHabitDays(prev =>
+      prev.includes(day) ? prev.filter(item => item !== day) : [...prev, day].sort()
+    )
+  }
+
+  const startEditingHabit = useCallback((habitId: number) => {
+    if (editingHabitId === habitId) {
+      closeHabitEditor()
+      return
+    }
+
+    const habit = habits.find(item => item.id === habitId)
+    if (!habit) return
+
+    setActiveTaskAction(null)
+    setEditingHabitId(habit.id)
+    setEditingHabitText(habit.taskText)
+    setEditingHabitFrequency(normalizeHabitFrequency(habit.frequency))
+    setEditingHabitDays(parseHabitDays(habit.daysOfWeek))
+  }, [closeHabitEditor, editingHabitId, habits])
+
+  const handleSaveHabit = useCallback(async () => {
+    if (editingHabitId === null) return
+
+    const nextTaskText = editingHabitText.trim()
+    if (!nextTaskText) {
+      showMessage('❌ Название привычки не может быть пустым')
+      return
+    }
+
+    await updateHabit(editingHabitId, {
+      taskText: nextTaskText,
+      frequency: editingHabitFrequency,
+      daysOfWeek: editingHabitFrequency === 'weekly' || editingHabitFrequency === 'custom'
+        ? editingHabitDays
+        : [],
+    })
+
+    setEditingHabitId(null)
+  }, [editingHabitDays, editingHabitFrequency, editingHabitId, editingHabitText, showMessage, updateHabit])
+
+  const handleDeleteHabitFromEditor = useCallback(async () => {
+    if (editingHabitId === null) return
+
+    const habit = habits.find(item => item.id === editingHabitId)
+    if (!habit) return
+
+    if (!confirm(`Удалить привычку "${habit.taskText}"?`)) {
+      return
+    }
+
+    await deleteHabit(editingHabitId)
+    setEditingHabitId(null)
+  }, [deleteHabit, editingHabitId, habits])
 
   // Проверка невыполненных задач перед оценкой
   const handleEvaluateClick = () => {
@@ -371,6 +524,8 @@ export default function DailyPage() {
       }
     })()
   }, [selectedDate])
+
+  const showSavePlanAttention = hasUnsavedChanges && !saving
 
   return (
     <div className="space-y-6">
@@ -634,17 +789,17 @@ export default function DailyPage() {
                     {habits.map((habit) => {
                       const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
                       return (
-                        <span
+                        <div
                           key={habit.id}
                           className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
                             isInPlan
-                              ? 'bg-green-500/15 text-green-400 line-through opacity-60'
+                              ? 'bg-green-500/15 text-green-400'
                               : 'bg-amber-500/15 text-amber-300'
                           }`}
                         >
                           <button
                             onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
-                            className={isInPlan ? 'cursor-default' : 'hover:text-amber-900 transition-colors'}
+                            className={isInPlan ? 'cursor-default line-through opacity-60' : 'hover:text-amber-900 transition-colors'}
                             title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
                             disabled={isInPlan}
                           >
@@ -655,19 +810,121 @@ export default function DailyPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              if (confirm(`Удалить привычку "${habit.taskText}"?`)) {
-                                deleteHabit(habit.id)
-                              }
+                              startEditingHabit(habit.id)
                             }}
-                            className="ml-1 text-amber-400 hover:text-red-500 transition-colors"
-                            title="Удалить привычку"
+                            className={`ml-1 w-5 h-5 flex items-center justify-center rounded transition-colors ${
+                              editingHabitId === habit.id
+                                ? 'bg-amber-500 text-white'
+                                : 'text-amber-400 hover:bg-amber-500/15 hover:text-amber-200'
+                            }`}
+                            title="Редактировать привычку"
+                            aria-pressed={editingHabitId === habit.id}
                           >
-                            
+                            ✎
                           </button>
-                        </span>
+                        </div>
                       )
                     })}
                   </div>
+
+                  {editingHabitId !== null && (
+                    <div
+                      ref={habitEditorRef}
+                      className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3"
+                    >
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={editingHabitText}
+                          onChange={(e) => setEditingHabitText(e.target.value)}
+                          className="w-full rounded-lg border border-amber-500/20 bg-gray-900/70 px-3 py-2 text-sm text-amber-50 outline-none transition-colors focus:border-amber-400"
+                          placeholder="Название привычки"
+                        />
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-amber-200">Повтор:</span>
+                          {[
+                            { value: 'daily', label: 'Ежедневно' },
+                            { value: 'weekdays', label: 'Будни' },
+                            { value: 'weekends', label: 'Выходные' },
+                            { value: 'weekly', label: 'Раз в неделю' },
+                            { value: 'custom', label: 'Свои дни' },
+                          ].map(option => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setEditingHabitFrequency(option.value as FrequencyType)}
+                              className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                                editingHabitFrequency === option.value
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {(editingHabitFrequency === 'weekly' || editingHabitFrequency === 'custom') && (
+                          <div className="flex flex-wrap gap-1">
+                            {[
+                              { day: 1, label: 'Пн' },
+                              { day: 2, label: 'Вт' },
+                              { day: 3, label: 'Ср' },
+                              { day: 4, label: 'Чт' },
+                              { day: 5, label: 'Пт' },
+                              { day: 6, label: 'Сб' },
+                              { day: 7, label: 'Вс' },
+                            ].map(({ day, label }) => (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => toggleEditingHabitDay(day)}
+                                className={`w-9 h-9 rounded-lg text-xs font-medium transition-colors ${
+                                  editingHabitDays.includes(day)
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteHabitFromEditor()}
+                            className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors text-sm"
+                          >
+                            Удалить
+                          </button>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={closeHabitEditor}
+                              className="px-3 py-1.5 border border-gray-700 text-gray-200 rounded-lg hover:bg-gray-800 transition-colors text-sm"
+                            >
+                              Отмена
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveHabit()}
+                              disabled={
+                                editingHabitText.trim().length === 0 ||
+                                ((editingHabitFrequency === 'weekly' || editingHabitFrequency === 'custom') && editingHabitDays.length === 0)
+                              }
+                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
+                            >
+                              Сохранить
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 )}
               </div>
@@ -707,7 +964,7 @@ export default function DailyPage() {
           )}
 
           {/* Список задач */}
-          <div className="space-y-2 flex-1 overflow-y-auto pr-6 chat-scrollbar">
+          <div ref={tasksContainerRef} className="space-y-2 flex-1 overflow-y-auto pr-6 chat-scrollbar">
             {tasks.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
                 Добавьте задачи на день...
@@ -1153,9 +1410,9 @@ export default function DailyPage() {
             <button 
               onClick={savePlan} 
               disabled={saving} 
-              className={`btn-primary disabled:opacity-50 w-full ${hasUnsavedChanges ? 'ring-2 ring-orange-400 ring-offset-2' : ''}`}
+              className={`btn-primary disabled:opacity-50 w-full ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
             >
-              {saving ? 'Сохранение...' : hasUnsavedChanges ? 'Сохранить план' : 'Сохранить план'}
+              {saving ? 'Сохранение...' : 'Сохранить план'}
             </button>
           </div>
         </div>
