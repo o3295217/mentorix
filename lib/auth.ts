@@ -11,7 +11,7 @@ import { getAuditContext } from './audit';
 
 const BCRYPT_ROUNDS = 12;
 
-function hashToken(token: string): string {
+export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
@@ -225,7 +225,7 @@ export async function loginUser(
       return { success: false, error: 'Неверный email или пароль' };
     }
 
-    if (!user.isActive) {
+    if (!user.isActive || user.deletedAt) {
       return { success: false, error: 'Аккаунт деактивирован' };
     }
 
@@ -311,7 +311,7 @@ export async function createSession(
 // Получить пользователя по ID (для создания сессии после верификации)
 export async function getUserById(userId: string): Promise<AuthUser | null> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
+  if (!user || !user.isActive || user.deletedAt) return null;
   return {
     id: user.id,
     email: user.email,
@@ -325,9 +325,10 @@ export async function getUserById(userId: string): Promise<AuthUser | null> {
 export async function getUserByEmail(email: string): Promise<{ id: string; name: string | null; emailVerified: boolean } | null> {
   const user = await prisma.user.findUnique({ 
     where: { email },
-    select: { id: true, name: true, emailVerified: true }
+    select: { id: true, name: true, emailVerified: true, isActive: true, deletedAt: true }
   });
-  return user;
+  if (!user || !user.isActive || user.deletedAt) return null;
+  return { id: user.id, name: user.name, emailVerified: user.emailVerified };
 }
 
 // Проверка сессии
@@ -344,7 +345,7 @@ export async function validateSession(token: string): Promise<AuthUser | null> {
       await prisma.session.delete({ where: { id: session.id } });
       return null;
     }
-    if (!session.user.isActive) return null;
+    if (!session.user.isActive || session.user.deletedAt) return null;
 
     return {
       id: session.user.id,
@@ -389,7 +390,7 @@ export async function changePassword(
 ): Promise<AuthResult> {
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
+    if (!user || !user.isActive || user.deletedAt) {
       return { success: false, error: 'Пользователь не найден' };
     }
 
@@ -448,7 +449,12 @@ export function getTokenFromRequest(request: Request): string | null {
 export async function getAuthUser(request: Request): Promise<AuthUser | null> {
   const token = getTokenFromRequest(request);
   if (!token) return null;
-  return validateSession(token);
+  const user = await validateSession(token);
+  if (user) {
+    const { ipAddress, userAgent } = getAuditContext(request)
+    setAuditContext({ userId: user.id, ipAddress, userAgent })
+  }
+  return user;
 }
 
 // Проверка, что пользователь авторизован (для API routes)
@@ -457,8 +463,6 @@ export async function requireAuth(request: Request): Promise<AuthUser> {
   if (!user) {
     throw new AuthError('Unauthorized', 401);
   }
-  const { ipAddress, userAgent } = getAuditContext(request)
-  setAuditContext({ userId: user.id, ipAddress, userAgent })
   return user;
 }
 
@@ -489,7 +493,7 @@ export async function resetPassword(
 ): Promise<AuthResult> {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
+    if (!user || !user.isActive || user.deletedAt) {
       return { success: false, error: 'Пользователь не найден' };
     }
 
@@ -543,7 +547,7 @@ export async function createEmailVerificationToken(userId: string): Promise<stri
   await prisma.emailVerificationToken.create({
     data: {
       userId,
-      token,
+      token: hashToken(token),
       expiresAt,
     },
   });
@@ -560,7 +564,7 @@ export async function verifyEmailToken(token: string): Promise<{
   userId?: string;
 }> {
   const verificationToken = await prisma.emailVerificationToken.findUnique({
-    where: { token },
+    where: { token: hashToken(token) },
     include: { user: true },
   });
 
@@ -574,6 +578,10 @@ export async function verifyEmailToken(token: string): Promise<{
 
   if (verificationToken.expiresAt < new Date()) {
     return { success: false, error: 'Срок действия ссылки истёк. Запросите новую.' };
+  }
+
+  if (!verificationToken.user.isActive || verificationToken.user.deletedAt) {
+    return { success: false, error: 'Аккаунт деактивирован' };
   }
 
   // Помечаем токен как использованный и верифицируем email
@@ -614,7 +622,7 @@ export async function createInitialAdmin(
   name?: string
 ): Promise<AuthResult> {
   // Проверяем, есть ли уже пользователи
-  const userCount = await prisma.user.count();
+  const userCount = await prisma.user.count({ where: { deletedAt: null } });
   if (userCount > 0) {
     return { success: false, error: 'Пользователи уже существуют' };
   }

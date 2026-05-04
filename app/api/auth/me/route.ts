@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser, changePassword } from '@/lib/auth';
+import { shouldUseSecureCookies } from '@/lib/cookie-security';
 
 const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
 
@@ -65,9 +66,10 @@ export async function PUT(request: Request) {
 
     // После смены пароля удаляем cookie (нужно перелогиниться)
     const response = NextResponse.json({ success: true });
+    const useSecureCookie = shouldUseSecureCookies();
     response.cookies.set('auth_token', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: useSecureCookie,
       sameSite: 'strict',
       expires: new Date(0),
       path: '/',

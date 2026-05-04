@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { evaluateDayNewWithUsage, updateUserInsights } from '@/lib/anthropic'
 import { DailyEvaluationRequest } from '@/lib/prompts/types'
-import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
+import { getDailyEvaluationGoalsContext, getLatestDreamGoal, mapUserProfile } from '@/lib/user-context'
 
 // In-memory lock и прогресс для предотвращения параллельных batch запросов
 interface BatchProgress {
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
         planText: { not: null },
         OR: [
           { factText: { not: null } },
-          { selectedTasksJson: { not: null } },
+          { selectedTasksJson: { not: Prisma.DbNull } },
         ],
         evaluation: null,
       },
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
         planText: { not: null },
         OR: [
           { factText: { not: null } },
-          { selectedTasksJson: { not: null } },
+          { selectedTasksJson: { not: Prisma.DbNull } },
         ],
         evaluation: null,
       },
@@ -151,19 +152,17 @@ export async function POST(request: NextRequest) {
     })
 
     // Загрузить общие данные для оценки
-    const dream = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    const userProfile = await prisma.userProfile.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    const openTasks = await prisma.openTask.findMany({
-      where: { userId, isClosed: false },
-    })
+    const [dream, userProfile, openTasks] = await Promise.all([
+      getLatestDreamGoal(userId),
+      prisma.userProfile.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.openTask.findMany({
+        where: { userId, isClosed: false },
+      }),
+    ])
+    const mappedUserProfile = mapUserProfile(userProfile)
 
     const results: { evaluated: number; failed: number; errors: string[] } = {
       evaluated: 0,
@@ -200,35 +199,8 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Загрузить цели для конкретной даты
         const date = dailyEntry.date
-        const year = date.getFullYear()
-
-        const halfYearPeriod = getPeriodDates(date, 'half_year')
-        const quarterPeriod = getPeriodDates(date, 'quarter')
-        const monthPeriod = getPeriodDates(date, 'month')
-        const weekPeriod = getPeriodDates(date, 'week')
-
-        const [currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
-          await Promise.all([
-            prisma.yearGoal.findFirst({ where: { userId, year } }),
-            prisma.periodGoal.findFirst({
-              where: { userId, periodType: 'half_year', periodStart: halfYearPeriod.start },
-              orderBy: { createdAt: 'desc' },
-            }),
-            prisma.periodGoal.findFirst({
-              where: { userId, periodType: 'quarter', periodStart: quarterPeriod.start },
-              orderBy: { createdAt: 'desc' },
-            }),
-            prisma.periodGoal.findFirst({
-              where: { userId, periodType: 'month', periodStart: monthPeriod.start },
-              orderBy: { createdAt: 'desc' },
-            }),
-            prisma.periodGoal.findFirst({
-              where: { userId, periodType: 'week', periodStart: weekPeriod.start },
-              orderBy: { createdAt: 'desc' },
-            }),
-          ])
+        const goals = await getDailyEvaluationGoalsContext(userId, date, dream)
 
         // Сформировать запрос
         const evaluationRequest: DailyEvaluationRequest = {
@@ -237,34 +209,8 @@ export async function POST(request: NextRequest) {
           factText: derived.factText,
           uncompletedTasks: derived.uncompletedTasks,
           extraTasks,
-          goals: {
-            dreamGoal: dream?.goalText || 'Не указана',
-            dreamYears: dream?.months ? Math.ceil(dream.months / 12) : undefined,
-            dreamMonths: dream?.months || undefined,
-            yearGoals: safeParseJson(currentYearGoal?.goalsJson, []),
-            halfYearGoals: safeParseJson(halfYearGoals?.goalsJson, []),
-            quarterGoals: safeParseJson(quarterGoals?.goalsJson, []),
-            monthGoals: safeParseJson(monthGoals?.goalsJson, []),
-            weekGoals: safeParseJson(weekGoals?.goalsJson, []),
-          },
-          userProfile: userProfile
-            ? {
-                name: userProfile.name || undefined,
-                occupation: userProfile.occupation || undefined,
-                industry: userProfile.industry || undefined,
-                maritalStatus: userProfile.maritalStatus || undefined,
-                hobbies: userProfile.hobbies || undefined,
-                sports: userProfile.sports || undefined,
-                location: userProfile.location || undefined,
-                age: userProfile.age || undefined,
-                education: userProfile.education || undefined,
-                teamSize: userProfile.teamSize || undefined,
-                workExperience: userProfile.workExperience || undefined,
-                values: userProfile.values || undefined,
-                challenges: userProfile.challenges || undefined,
-                other: userProfile.other || undefined,
-              }
-            : undefined,
+          goals,
+          userProfile: mappedUserProfile,
           context: {
             emotionalState: dailyEntry.emotionalState || undefined,
             physicalState: dailyEntry.physicalState || undefined,
@@ -318,8 +264,8 @@ export async function POST(request: NextRequest) {
           workFamilyAlignment: evaluationResponse.horizontal_alignment?.work_family,
           workValuesAlignment: evaluationResponse.horizontal_alignment?.work_values,
           suggestedTasksJson: evaluationResponse.suggested_tasks
-            ? JSON.stringify(evaluationResponse.suggested_tasks)
-            : null,
+            ? evaluationResponse.suggested_tasks as unknown as Prisma.InputJsonValue
+            : Prisma.DbNull,
         }
 
         await prisma.evaluation.upsert({

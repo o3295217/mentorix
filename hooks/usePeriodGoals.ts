@@ -8,6 +8,20 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
   const [yearGoals, setYearGoals] = useState<Map<number, YearGoalItem[]>>(new Map())
   const [periodGoals, setPeriodGoals] = useState<Map<string, string[]>>(new Map())
 
+  const setYearGoalsFromRecord = useCallback((goalsByYear: Record<string, YearGoalItem[]>) => {
+    setYearGoals(new Map(Object.entries(goalsByYear).map(([year, goals]) => [Number(year), goals])))
+  }, [])
+
+  const mergePeriodGoalsFromRecord = useCallback((goalsByPeriod: Record<string, string[]>) => {
+    setPeriodGoals(prev => {
+      const next = new Map(prev)
+      for (const [key, goals] of Object.entries(goalsByPeriod)) {
+        next.set(key, goals)
+      }
+      return next
+    })
+  }, [])
+
   const loadYearGoalYears = useCallback(async (): Promise<number[]> => {
     try {
       const res = await fetch('/api/goals/year')
@@ -252,6 +266,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
 
   return {
     yearGoals,
+    setYearGoalsFromRecord,
     loadYearGoalYears,
     loadYearGoals,
     saveYearGoals,
@@ -259,6 +274,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
     removeYearGoal,
     editYearGoal,
     periodGoals,
+    mergePeriodGoalsFromRecord,
     loadPeriodGoalsWithKey,
     loadAllWeeksForMonth,
     savePeriodGoals,

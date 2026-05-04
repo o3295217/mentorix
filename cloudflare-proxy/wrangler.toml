@@ -7,12 +7,19 @@ mode = "smart"
 
 [durable_objects]
 bindings = [
-  { name = "ANTHROPIC_PROXY", class_name = "AnthropicProxyDO" }
+  { name = "ANTHROPIC_PROXY", class_name = "AnthropicProxyDO" },
+  { name = "RATE_LIMITER", class_name = "RateLimitDO" }
 ]
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["AnthropicProxyDO"]
 
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RateLimitDO"]
+
 [vars]
 ALLOWED_ORIGINS = "https://assist.labaiion.ru"
+ANTHROPIC_API_URL = "https://api.anthropic.com"
+RATE_LIMIT_PER_MINUTE = "60"

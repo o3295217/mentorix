@@ -3,7 +3,9 @@
  * Worker принимает запрос → передаёт Durable Object в US → тот вызывает Anthropic
  */
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com';
+const DEFAULT_ANTHROPIC_API_URL = 'https://api.anthropic.com';
+const DEFAULT_RATE_LIMIT_PER_MINUTE = 60;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 function getAllowedOrigins(env) {
   return String(env.ALLOWED_ORIGINS || '')
@@ -51,6 +53,77 @@ function jsonResponse(payload, init = {}) {
   });
 }
 
+function getClientIp(request) {
+  return request.headers.get('CF-Connecting-IP')
+    || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || 'unknown';
+}
+
+function getRateLimit(env) {
+  const parsed = Number(env.RATE_LIMIT_PER_MINUTE || DEFAULT_RATE_LIMIT_PER_MINUTE);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_RATE_LIMIT_PER_MINUTE;
+}
+
+function getAnthropicApiUrl(env) {
+  const rawUrl = String(env.ANTHROPIC_API_URL || DEFAULT_ANTHROPIC_API_URL).trim();
+  return rawUrl.replace(/\/+$/, '') || DEFAULT_ANTHROPIC_API_URL;
+}
+
+async function checkRateLimit(request, env, namespace) {
+  if (!env.RATE_LIMITER) {
+    return { allowed: false, retryAfter: 60, error: 'Rate limiter not configured' };
+  }
+
+  const id = env.RATE_LIMITER.idFromName(namespace);
+  const stub = env.RATE_LIMITER.get(id);
+  const response = await stub.fetch('https://rate-limit/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      key: getClientIp(request),
+      limit: getRateLimit(env),
+      windowMs: RATE_LIMIT_WINDOW_MS,
+    }),
+  });
+
+  return response.json();
+}
+
+export class RateLimitDO {
+  constructor() {
+    this.buckets = new Map();
+    this.lastCleanup = 0;
+  }
+
+  async fetch(request) {
+    const { key, limit, windowMs } = await request.json();
+    const now = Date.now();
+    const bucket = Math.floor(now / windowMs);
+    const bucketKey = `${key}:${bucket}`;
+
+    if (now - this.lastCleanup > windowMs) {
+      for (const existingKey of this.buckets.keys()) {
+        const existingBucket = Number(existingKey.split(':').pop());
+        if (existingBucket < bucket) this.buckets.delete(existingKey);
+      }
+      this.lastCleanup = now;
+    }
+
+    const count = (this.buckets.get(bucketKey) || 0) + 1;
+    this.buckets.set(bucketKey, count);
+
+    const retryAfter = Math.max(1, Math.ceil(((bucket + 1) * windowMs - now) / 1000));
+    return jsonResponse({
+      allowed: count <= limit,
+      remaining: Math.max(0, limit - count),
+      retryAfter,
+    }, {
+      status: count <= limit ? 200 : 429,
+      headers: { 'Retry-After': String(retryAfter) },
+    });
+  }
+}
+
 // ============================
 // DURABLE OBJECT — запускается в US (wnam)
 // ============================
@@ -68,7 +141,7 @@ export class AnthropicProxyDO {
       cleanHeaders.set(key, value);
     }
 
-    const anthropicUrl = ANTHROPIC_API_URL + pathname + (search || '');
+    const anthropicUrl = getAnthropicApiUrl(this.env) + pathname + (search || '');
 
     const response = await fetch(anthropicUrl, {
       method,
@@ -132,6 +205,14 @@ export default {
     const authError = validateProxySecret(request, env);
     if (authError) {
       return jsonResponse(authError.payload, { status: authError.status, headers: corsHeaders });
+    }
+
+    const rateLimit = await checkRateLimit(request, env, 'anthropic-proxy');
+    if (!rateLimit.allowed) {
+      return jsonResponse(
+        { error: rateLimit.error || 'Too Many Requests', retryAfter: rateLimit.retryAfter },
+        { status: 429, headers: { ...corsHeaders, 'Retry-After': String(rateLimit.retryAfter || 60) } }
+      );
     }
 
     // Собираем заголовки для Anthropic

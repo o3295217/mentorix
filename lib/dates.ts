@@ -1,6 +1,16 @@
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns'
 
 export type PeriodType = 'week' | 'month' | 'quarter' | 'half_year' | 'year'
+export type AiDateRangeType = 'week' | 'month' | 'quarter' | 'year' | 'custom'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const MAX_AI_DATE_RANGE_DAYS: Record<AiDateRangeType, number> = {
+  week: 8,
+  month: 32,
+  quarter: 93,
+  year: 367,
+  custom: 367,
+}
 
 export function getPeriodDates(date: Date, periodType: PeriodType): { start: Date; end: Date } {
   switch (periodType) {
@@ -86,6 +96,37 @@ export function parseDateParam(value: string): Date {
     return new Date(y, m - 1, d)
   }
   return new Date(value)
+}
+
+export function validateAiDateRange(options: {
+  periodType: AiDateRangeType
+  startDate: Date
+  endDate: Date
+  label: string
+}): { success: true; days: number } | { success: false; error: string } {
+  const { periodType, startDate, endDate, label } = options
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return { success: false, error: `Invalid ${label} date range` }
+  }
+
+  if (startDate > endDate) {
+    return { success: false, error: `${label} start date must be before or equal to end date` }
+  }
+
+  const startUtc = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+  const endUtc = Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+  const days = Math.floor((endUtc - startUtc) / DAY_MS) + 1
+  const maxDays = MAX_AI_DATE_RANGE_DAYS[periodType]
+
+  if (days > maxDays) {
+    return {
+      success: false,
+      error: `${label} range is too large for ${periodType}. Maximum is ${maxDays} days.`,
+    }
+  }
+
+  return { success: true, days }
 }
 
 // Local date key, safe for date-only semantics.

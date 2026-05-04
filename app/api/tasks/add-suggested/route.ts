@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { parseDateParam } from '@/lib/dates'
 import { areTasksSimilar } from '@/lib/task-match'
 import { requireUserId } from '@/lib/get-user-id'
+import { safeParseJson } from '@/lib/api-utils'
+
+type SuggestedTaskJson = { taskText?: unknown }
 
 async function removeSuggestedTaskFromEvaluation(params: {
   userId: string
@@ -18,28 +22,24 @@ async function removeSuggestedTaskFromEvaluation(params: {
   const evaluation = dailyEntry?.evaluation
   if (!evaluation?.suggestedTasksJson) return
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(evaluation.suggestedTasksJson)
-  } catch {
-    return
-  }
-
-  if (!Array.isArray(parsed)) return
+  const parsed = safeParseJson<SuggestedTaskJson[]>(evaluation.suggestedTasksJson, [])
 
   const filtered = parsed.filter((t) => {
     if (!t || typeof t !== 'object') return false
-    const taskText = (t as { taskText?: unknown }).taskText
+    const taskText = t.taskText
     if (typeof taskText !== 'string') return true
     return !areTasksSimilar(taskText, params.taskText)
   })
 
-  const newJson = filtered.length > 0 ? JSON.stringify(filtered) : null
-  if (newJson === evaluation.suggestedTasksJson) return
+  if (filtered.length === parsed.length) return
 
   await prisma.evaluation.update({
     where: { id: evaluation.id },
-    data: { suggestedTasksJson: newJson },
+    data: {
+      suggestedTasksJson: filtered.length > 0
+        ? filtered as unknown as Prisma.InputJsonValue
+        : Prisma.DbNull,
+    },
   })
 }
 

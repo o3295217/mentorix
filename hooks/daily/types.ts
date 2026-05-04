@@ -1,0 +1,121 @@
+import type { DragEvent } from 'react'
+import type { DailyEntry, OpenTask } from '@/lib/types'
+
+export type DailyPlanDraft = {
+  updatedAt: string
+  planText: string
+  selectedTaskIds: number[]
+  newTaskText?: string
+}
+
+export interface TaskSuggestion {
+  goalText: string
+  reason: string
+  difficulty: 'легко' | 'средне' | 'сложно'
+  source: 'week' | 'month'
+}
+
+export interface CheckPlanResult {
+  overall: string
+  suggestions: TaskSuggestion[]
+  warnings: string[]
+  tips: string[]
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface Habit {
+  id: number
+  taskText: string
+  frequency: string
+  daysOfWeek: string | null
+  interval: number | null
+  isActive: boolean
+  streak: number
+  bestStreak: number
+  totalDone: number
+  sortOrder: number
+}
+
+export interface HabitSuggestion {
+  text: string
+  consecutiveDays: number
+  totalCount: number
+  reason: string
+}
+
+export interface PeriodGoalItem {
+  text: string
+  completed: boolean
+}
+
+export interface UseDailyReturn {
+  selectedDate: string
+  setSelectedDate: (date: string) => void
+  planText: string
+  setPlanText: (text: string) => void
+  weekGoals: PeriodGoalItem[]
+  monthGoals: PeriodGoalItem[]
+  dailyEntry: DailyEntry | null
+  tasks: OpenTask[]
+  selectedTasks: Set<number>
+  extraTasks: string[]
+  newExtraTaskText: string
+  setNewExtraTaskText: (text: string) => void
+  newTaskText: string
+  setNewTaskText: (text: string) => void
+  saving: boolean
+  evaluating: boolean
+  message: string
+  showMessage: (text: string, duration?: number) => void
+  hasUnsavedChanges: boolean
+
+  habits: Habit[]
+  habitSuggestions: HabitSuggestion[]
+  addHabitsToTasks: (habitTexts?: string[]) => void
+  createHabitFromTask: (taskText: string, frequency?: string, daysOfWeek?: number[]) => Promise<void>
+  deleteHabit: (habitId: number) => Promise<void>
+
+  checkingPlan: boolean
+  checkPlanResult: CheckPlanResult | null
+  checkPlan: () => Promise<void>
+  clearCheckPlanResult: () => void
+
+  chatMessages: ChatMessage[]
+  chatInput: string
+  setChatInput: (text: string) => void
+  sendChatMessage: (initialMessage?: string) => Promise<void>
+  sendingChat: boolean
+  clearChat: () => void
+
+  addTask: () => void
+  addExtraTask: () => void
+  removeExtraTask: (index: number) => void
+  startEditingExtraTask: (index: number, currentText: string) => void
+  saveEditedExtraTask: (index: number) => void
+  cancelEditingExtraTask: () => void
+  editingExtraTaskIndex: number | null
+  editingExtraTaskText: string
+  setEditingExtraTaskText: (text: string) => void
+  addGoalToTasks: (goalText: string) => void
+  removeTask: (taskId: number) => void
+  postponeTask: (taskId: number, taskText: string) => Promise<void>
+  toggleTaskSelection: (taskId: number) => void
+  startEditingTask: (taskId: number, currentText: string) => void
+  saveEditedTask: (taskId: number) => void
+  cancelEditingTask: () => void
+  editingTaskId: number | null
+  editingTaskText: string
+  setEditingTaskText: (text: string) => void
+
+  draggedTaskId: number | null
+  handleDragStart: (taskId: number) => void
+  handleDragOver: (e: DragEvent) => void
+  handleDrop: (targetTaskId: number) => void
+
+  savePlan: () => Promise<void>
+  evaluate: (router: { push: (path: string) => void }) => Promise<void>
+}

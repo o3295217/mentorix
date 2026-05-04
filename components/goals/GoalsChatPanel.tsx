@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import type { ParsedGoal } from '@/hooks/useGoalsChat'
-import { MONTH_NAMES, formatPeriodLabel } from '@/lib/goals-utils'
+import { formatPeriodLabel } from '@/lib/goals-utils'
 
 interface ChatMessage {
   role: 'user' | 'assistant'

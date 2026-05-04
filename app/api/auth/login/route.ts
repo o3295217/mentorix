@@ -4,6 +4,7 @@ import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-li
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme'
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { audit, getAuditContext } from '@/lib/audit'
+import { shouldUseSecureCookies } from '@/lib/cookie-security'
 
 export async function POST(request: Request) {
   try {
@@ -73,8 +74,7 @@ export async function POST(request: Request) {
     });
 
     // Устанавливаем cookie
-    // Secure только если явно указано (для HTTPS)
-    const useSecureCookie = process.env.COOKIE_SECURE === 'true';
+    const useSecureCookie = shouldUseSecureCookies();
     response.cookies.set('auth_token', result.session.token, {
       httpOnly: true,
       secure: useSecureCookie,

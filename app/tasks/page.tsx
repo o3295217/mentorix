@@ -1,11 +1,13 @@
 'use client'
 
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { addDays, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { OpenTask } from '@/lib/types'
+import { DailyEntry, OpenTask, PaginatedResponse } from '@/lib/types'
 import { parseDateParam } from '@/lib/dates'
 import { areTasksSimilar } from '@/lib/task-match'
+import { expectOk, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
+import { safeParseJson } from '@/lib/safe-json'
 
 type TaskType = OpenTask['taskType']
 
@@ -107,37 +109,59 @@ function EmptyState({ text }: { text: string }) {
   )
 }
 
-function TaskCard({
-  task,
-  today,
-  inPlanDate,
-  tone,
-  closeRequested,
-  deleteRequested,
-  onAddToPlan,
-  onRequestClose,
-  onCancelClose,
-  onConfirmClose,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
-}: {
-  task: OpenTask
+type TaskCardState = {
   today: string
   inPlanDate?: string
   tone: TaskTone
   closeRequested: boolean
   deleteRequested: boolean
-  onAddToPlan: (task: OpenTask) => void
-  onRequestClose: (taskId: number) => void
-  onCancelClose: () => void
-  onConfirmClose: (taskId: number) => void
-  onRequestDelete: (taskId: number) => void
-  onCancelDelete: () => void
-  onConfirmDelete: (taskId: number) => void
+}
+
+type TaskCardActions = {
+  addToPlan: (task: OpenTask) => void
+  requestClose: (taskId: number) => void
+  cancelClose: () => void
+  confirmClose: (taskId: number) => void
+  requestDelete: (taskId: number) => void
+  cancelDelete: () => void
+  confirmDelete: (taskId: number) => void
+  saveEdit: (taskId: number, newText: string) => Promise<void>
+}
+
+type TaskSectionState = {
+  today: string
+  tasksInPlan: Record<number, string>
+  hideInPlan: boolean
+  confirmCloseId: number | null
+  confirmDeleteId: number | null
+}
+
+function TaskCard({
+  task,
+  state,
+  actions,
+}: {
+  task: OpenTask
+  state: TaskCardState
+  actions: TaskCardActions
 }) {
+  const { today, inPlanDate, tone, closeRequested, deleteRequested } = state
+  const { addToPlan, requestClose, cancelClose, confirmClose, requestDelete, cancelDelete, confirmDelete, saveEdit } = actions
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState(task.taskText)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    const trimmed = editText.trim()
+    if (!trimmed || trimmed === task.taskText) { setIsEditing(false); return }
+    setSaving(true)
+    await saveEdit(task.id, trimmed)
+    setSaving(false)
+    setIsEditing(false)
+  }
+
   return (
-    <div className={`rounded-2xl border p-4 ${tone.itemClass}`}>
+    <div className={`group animate-fade-in-up rounded-2xl border p-4 ${tone.itemClass}`}>
       <div className="flex flex-col gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -148,72 +172,98 @@ function TaskCard({
             )}
           </div>
 
-          <p className="mt-3 text-[15px] leading-6 text-gray-100">{task.taskText}</p>
+          {isEditing ? (
+            <div className="mt-3 flex flex-col gap-2">
+              <textarea
+                autoFocus
+                rows={3}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave() }}
+                className="w-full resize-none rounded-xl border border-white/15 bg-white/[0.05] px-3 py-2 text-[15px] leading-6 text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white transition hover:bg-white/20 disabled:opacity-50"
+                >
+                  {saving ? 'Сохранение...' : 'Сохранить'}
+                </button>
+                <button
+                  onClick={() => { setIsEditing(false); setEditText(task.taskText) }}
+                  className="rounded-full px-3 py-1 text-xs font-medium text-gray-400 transition hover:text-white"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-[15px] leading-6 text-gray-100">{task.taskText}</p>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">{formatTaskDate(task.originDate)}</p>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {!inPlanDate && (
-              <button
-                onClick={() => onAddToPlan(task)}
-                className="rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-300 transition hover:bg-green-500/20 hover:text-green-200"
-              >
-                В план
-              </button>
-            )}
+          {closeRequested ? (
+            <div className="flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-xs">
+              <span className="text-green-200">Закрыть?</span>
+              <button onClick={() => confirmClose(task.id)} className="rounded-full bg-green-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-green-500">Да</button>
+              <button onClick={cancelClose} className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:bg-white/5">Нет</button>
+            </div>
+          ) : deleteRequested ? (
+            <div className="flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs">
+              <span className="text-red-200">Удалить?</span>
+              <button onClick={() => confirmDelete(task.id)} className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-red-500">Да</button>
+              <button onClick={cancelDelete} className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:bg-white/5">Нет</button>
+            </div>
+          ) : (
+            <div className={`flex items-center gap-1 transition-opacity duration-150 ${isEditing ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
+              {!inPlanDate && (
+                <button
+                  title="В план"
+                  onClick={() => addToPlan(task)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 transition hover:bg-green-500/15 hover:text-green-400"
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="12" height="12" rx="2" />
+                    <path d="M5 8h6M8 5v6" />
+                  </svg>
+                </button>
+              )}
 
-            {closeRequested ? (
-              <div className="flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-xs">
-                <span className="text-green-200">Закрыть?</span>
-                <button
-                  onClick={() => onConfirmClose(task.id)}
-                  className="rounded-full bg-green-600 px-2.5 py-0.5 text-[11px] font-medium text-white transition hover:bg-green-500"
-                >
-                  Да
-                </button>
-                <button
-                  onClick={onCancelClose}
-                  className="rounded-full px-2 py-0.5 text-[11px] font-medium text-gray-300 transition hover:bg-white/5"
-                >
-                  Нет
-                </button>
-              </div>
-            ) : (
               <button
-                onClick={() => onRequestClose(task.id)}
-                className="text-sm font-medium text-gray-300 transition hover:text-white"
+                title="Закрыть задачу"
+                onClick={() => requestClose(task.id)}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 transition hover:bg-white/8 hover:text-gray-200"
               >
-                Закрыть
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+                </svg>
               </button>
-            )}
 
-            {deleteRequested ? (
-              <div className="flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs">
-                <span className="text-red-200">Удалить?</span>
-                <button
-                  onClick={() => onConfirmDelete(task.id)}
-                  className="rounded-full bg-red-600 px-2.5 py-0.5 text-[11px] font-medium text-white transition hover:bg-red-500"
-                >
-                  Да
-                </button>
-                <button
-                  onClick={onCancelDelete}
-                  className="rounded-full px-2 py-0.5 text-[11px] font-medium text-gray-300 transition hover:bg-white/5"
-                >
-                  Нет
-                </button>
-              </div>
-            ) : (
               <button
-                onClick={() => onRequestDelete(task.id)}
-                className="text-sm font-medium text-red-300 transition hover:text-red-200"
+                title="Изменить"
+                onClick={() => { setIsEditing(true); setEditText(task.taskText) }}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 transition hover:bg-white/8 hover:text-gray-200"
               >
-                Удалить
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 2.5a1.5 1.5 0 0 1 2.5 1.5L5 13l-3 1 1-3 8.5-8.5Z" />
+                </svg>
               </button>
-            )}
-          </div>
+
+              <button
+                title="Удалить"
+                onClick={() => requestDelete(task.id)}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 transition hover:bg-red-500/15 hover:text-red-400"
+              >
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 4h10M6 4V2.5h4V4M5 4l.5 9h5l.5-9" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -224,37 +274,18 @@ function TaskSection({
   type,
   tasks,
   totalCount,
-  today,
-  tasksInPlan,
-  hideInPlan,
-  confirmCloseId,
-  confirmDeleteId,
-  onAddToPlan,
-  onRequestClose,
-  onCancelClose,
-  onConfirmClose,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
+  state,
+  actions,
   headerContent,
 }: {
   type: TaskType
   tasks: OpenTask[]
   totalCount: number
-  today: string
-  tasksInPlan: Record<number, string>
-  hideInPlan: boolean
-  confirmCloseId: number | null
-  confirmDeleteId: number | null
-  onAddToPlan: (task: OpenTask) => void
-  onRequestClose: (taskId: number) => void
-  onCancelClose: () => void
-  onConfirmClose: (taskId: number) => void
-  onRequestDelete: (taskId: number) => void
-  onCancelDelete: () => void
-  onConfirmDelete: (taskId: number) => void
+  state: TaskSectionState
+  actions: TaskCardActions
   headerContent?: ReactNode
 }) {
+  const { today, tasksInPlan, hideInPlan, confirmCloseId, confirmDeleteId } = state
   const tone = TASK_TONES[type]
   const hiddenCount = Math.max(totalCount - tasks.length, 0)
 
@@ -294,18 +325,14 @@ function TaskSection({
             <TaskCard
               key={task.id}
               task={task}
-              today={today}
-              inPlanDate={tasksInPlan[task.id]}
-              tone={tone}
-              closeRequested={confirmCloseId === task.id}
-              deleteRequested={confirmDeleteId === task.id}
-              onAddToPlan={onAddToPlan}
-              onRequestClose={onRequestClose}
-              onCancelClose={onCancelClose}
-              onConfirmClose={onConfirmClose}
-              onRequestDelete={onRequestDelete}
-              onCancelDelete={onCancelDelete}
-              onConfirmDelete={onConfirmDelete}
+              state={{
+                today,
+                inPlanDate: tasksInPlan[task.id],
+                tone,
+                closeRequested: confirmCloseId === task.id,
+                deleteRequested: confirmDeleteId === task.id,
+              }}
+              actions={actions}
             />
           ))
         )}
@@ -321,13 +348,15 @@ function ClosedTaskCard({ task, onReopen }: { task: OpenTask; onReopen: (taskId:
   return (
     <div className={`rounded-2xl border p-4 ${statusMeta.cardClass}`}>
       <p className="text-[15px] leading-6 text-gray-300">{task.taskText}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-gray-500">
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-sm text-gray-500">
           {task.closedAt ? format(new Date(task.closedAt), 'd MMM yyyy', { locale: ru }) : ''}
         </span>
-        <div className={`flex min-w-[112px] flex-1 items-center justify-center gap-1.5 text-[9px] font-normal uppercase tracking-[0.12em] ${statusMeta.indicatorClass}`}>
-          <span className={`hidden h-px flex-1 rounded-full sm:block ${statusMeta.lineClass}`} />
-          <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${statusMeta.iconClass}`}>
+        <div className="flex items-center gap-2">
+          <span
+            title={statusMeta.label}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${statusMeta.iconClass}`}
+          >
             {isPaused ? (
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
                 <rect x="4" y="3" width="3" height="10" rx="1" />
@@ -339,15 +368,17 @@ function ClosedTaskCard({ task, onReopen }: { task: OpenTask; onReopen: (taskId:
               </svg>
             )}
           </span>
-          <span className="text-sm font-normal normal-case tracking-normal leading-none">{statusMeta.label}</span>
-          <span className={`hidden h-px flex-1 rounded-full sm:block ${statusMeta.lineClass}`} />
+          <button
+            onClick={() => onReopen(task.id)}
+            title="Вернуть в активные"
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border transition hover:bg-white/10 ${statusMeta.iconClass}`}
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" aria-hidden="true">
+              <path d="M3 8a5 5 0 1 0 1.5-3.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 4.5V8h3.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
-        <button
-          onClick={() => onReopen(task.id)}
-          className={`ml-auto text-sm font-medium transition ${statusMeta.buttonClass}`}
-        >
-          Вернуть
-        </button>
       </div>
     </div>
   )
@@ -393,45 +424,35 @@ export default function TasksPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
   const [newPersonalTask, setNewPersonalTask] = useState('')
+  const archiveRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     loadTasks()
   }, [])
 
+  const showTaskMessage = (text: string) => {
+    setMessage(text)
+    setTimeout(() => setMessage(''), 3000)
+  }
+
   const loadTasks = async () => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
 
-      const [openRes, closedRes, dailyRes] = await Promise.all([
-        fetch('/api/tasks/open'),
-        fetch('/api/tasks/closed'),
-        fetch(`/api/daily?date=${today}`),
+      const [openData, closedData, daily] = await Promise.all([
+        fetchJson<OpenTask[]>('/api/tasks/open'),
+        fetchJson<PaginatedResponse<OpenTask>>('/api/tasks/closed?limit=100'),
+        fetchJson<DailyEntry | null>(`/api/daily?date=${today}`),
       ])
 
-      let openData: OpenTask[] = []
-      if (openRes.ok) {
-        openData = await openRes.json()
-        setOpenTasks(openData)
-      }
+      setOpenTasks(openData)
+      setClosedTasks(closedData.items)
 
-      if (closedRes.ok) {
-        const closedData = await closedRes.json()
-        setClosedTasks(closedData)
-      }
-
-      if (dailyRes.ok && openData.length > 0) {
-        const daily = await dailyRes.json()
+      if (daily && openData.length > 0) {
         const planText = daily?.planText || ''
         const planTasks = planText.split('\n').filter((task: string) => task.trim())
 
-        let extraTasks: string[] = []
-        if (daily?.extraTasksJson) {
-          try {
-            extraTasks = JSON.parse(daily.extraTasksJson)
-          } catch {
-            extraTasks = []
-          }
-        }
+        const extraTasks = safeParseJson<string[]>(daily?.extraTasksJson, [])
 
         const allPlanTasks = [...planTasks, ...extraTasks]
         const inPlanMap: Record<number, string> = {}
@@ -447,15 +468,30 @@ export default function TasksPage() {
       }
     } catch (error) {
       console.error('Error loading tasks:', error)
+      showTaskMessage(`Ошибка загрузки задач: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const editTask = async (taskId: number, newText: string) => {
+    try {
+      const updatedTask = await fetchJson<OpenTask>(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskText: newText }),
+      })
+      setOpenTasks((prev) => prev.map((task) => task.id === taskId ? { ...task, ...updatedTask } : task))
+    } catch (error) {
+      console.error('Error editing task:', error)
+      showTaskMessage(`Ошибка редактирования: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }
 
   const closeTask = async (taskId: number) => {
     try {
       const res = await fetch(`/api/tasks/${taskId}/close`, { method: 'POST' })
-      if (!res.ok) return
+      await expectOk(res)
 
       const closedTask = openTasks.find((task) => task.id === taskId)
       if (closedTask) {
@@ -466,35 +502,35 @@ export default function TasksPage() {
           delete updated[taskId]
           return updated
         })
-        setMessage('Задача закрыта')
-        setTimeout(() => setMessage(''), 3000)
+        showTaskMessage('Задача закрыта')
       }
     } catch (error) {
       console.error('Error closing task:', error)
+      showTaskMessage(`Ошибка закрытия: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }
 
   const reopenTask = async (taskId: number) => {
     try {
       const res = await fetch(`/api/tasks/${taskId}/reopen`, { method: 'POST' })
-      if (!res.ok) return
+      await expectOk(res)
 
       const reopenedTask = closedTasks.find((task) => task.id === taskId)
       if (reopenedTask) {
         setClosedTasks((prev) => prev.filter((task) => task.id !== taskId))
         setOpenTasks((prev) => [{ ...reopenedTask, isClosed: false, archiveStatus: null, closedAt: undefined }, ...prev])
-        setMessage('Задача возвращена')
-        setTimeout(() => setMessage(''), 3000)
+        showTaskMessage('Задача возвращена')
       }
     } catch (error) {
       console.error('Error reopening task:', error)
+      showTaskMessage(`Ошибка возврата: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }
 
   const deleteTask = async (taskId: number, isClosed: boolean = false) => {
     try {
       const res = await fetch(`/api/tasks/${taskId}/delete`, { method: 'DELETE' })
-      if (!res.ok) return
+      await expectOk(res)
 
       if (isClosed) {
         setClosedTasks((prev) => prev.filter((task) => task.id !== taskId))
@@ -508,10 +544,10 @@ export default function TasksPage() {
         return updated
       })
 
-      setMessage('Задача удалена')
-      setTimeout(() => setMessage(''), 3000)
+      showTaskMessage('Задача удалена')
     } catch (error) {
       console.error('Error deleting task:', error)
+      showTaskMessage(`Ошибка удаления: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }
 
@@ -525,33 +561,24 @@ export default function TasksPage() {
     if (!selectedTask) return
 
     try {
-      const dailyRes = await fetch(`/api/daily?date=${selectedDate}`)
-      const daily = dailyRes.ok ? await dailyRes.json() : null
+      const daily = await fetchJson<DailyEntry | null>(`/api/daily?date=${selectedDate}`)
       const currentPlan = daily?.planText || ''
       const planTasks = currentPlan ? currentPlan.split('\n').filter((task: string) => task.trim()) : []
 
-      let currentExtraTasks: string[] = []
-      if (daily?.extraTasksJson) {
-        try {
-          currentExtraTasks = JSON.parse(daily.extraTasksJson)
-        } catch {
-          currentExtraTasks = []
-        }
-      }
+      const currentExtraTasks = safeParseJson<string[]>(daily?.extraTasksJson, [])
 
       const existsInPlan = planTasks.some((task: string) => areTasksSimilar(task, selectedTask.taskText))
       const existsInExtra = currentExtraTasks.some((task) => areTasksSimilar(task, selectedTask.taskText))
 
       if (existsInPlan || existsInExtra) {
-        setMessage('Похожая задача уже есть в плане на этот день')
-        setTimeout(() => setMessage(''), 3000)
+        showTaskMessage('Похожая задача уже есть в плане на этот день')
         setShowDateModal(false)
         return
       }
 
       const newPlanText = currentPlan ? `${currentPlan}\n${selectedTask.taskText}` : selectedTask.taskText
 
-      const saveRes = await fetch('/api/daily', {
+      await fetchJson<DailyEntry>('/api/daily', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -560,21 +587,17 @@ export default function TasksPage() {
         }),
       })
 
-      if (saveRes.ok) {
-        setTasksInPlan((prev) => ({ ...prev, [selectedTask.id]: selectedDate }))
+      setTasksInPlan((prev) => ({ ...prev, [selectedTask.id]: selectedDate }))
 
-        const dateLabel = selectedDate === format(new Date(), 'yyyy-MM-dd')
-          ? 'сегодня'
-          : format(parseDateParam(selectedDate), 'd MMM', { locale: ru })
+      const dateLabel = selectedDate === format(new Date(), 'yyyy-MM-dd')
+        ? 'сегодня'
+        : format(parseDateParam(selectedDate), 'd MMM', { locale: ru })
 
-        setMessage(`Добавлено в план на ${dateLabel}`)
-        setTimeout(() => setMessage(''), 3000)
-        setShowDateModal(false)
-      }
+      showTaskMessage(`Добавлено в план на ${dateLabel}`)
+      setShowDateModal(false)
     } catch (error) {
       console.error('Error adding task to plan:', error)
-      setMessage('Ошибка при добавлении в план')
-      setTimeout(() => setMessage(''), 3000)
+      showTaskMessage(`Ошибка при добавлении в план: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }
 
@@ -583,7 +606,7 @@ export default function TasksPage() {
     if (!text) return
 
     try {
-      const res = await fetch('/api/tasks/open', {
+      const newTask = await fetchJson<OpenTask>('/api/tasks/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -593,21 +616,12 @@ export default function TasksPage() {
         }),
       })
 
-      if (!res.ok) {
-        setMessage('Не удалось добавить задачу')
-        setTimeout(() => setMessage(''), 3000)
-        return
-      }
-
-      const newTask = await res.json()
       setOpenTasks((prev) => [newTask, ...prev])
       setNewPersonalTask('')
-      setMessage('Задача добавлена')
-      setTimeout(() => setMessage(''), 3000)
+      showTaskMessage('Задача добавлена')
     } catch (error) {
       console.error('Error adding task:', error)
-      setMessage('Ошибка при добавлении задачи')
-      setTimeout(() => setMessage(''), 3000)
+      showTaskMessage(`Ошибка при добавлении задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }
 
@@ -626,6 +640,31 @@ export default function TasksPage() {
   const strategicClosed = closedTasks.filter((task) => task.taskType === 'strategic')
   const operationalClosed = closedTasks.filter((task) => task.taskType === 'operational')
   const personalClosed = closedTasks.filter((task) => task.taskType === 'personal')
+
+  const taskSectionState: TaskSectionState = {
+    today,
+    tasksInPlan,
+    hideInPlan,
+    confirmCloseId,
+    confirmDeleteId,
+  }
+
+  const taskSectionActions: TaskCardActions = {
+    addToPlan: openDateModal,
+    requestClose: setConfirmCloseId,
+    cancelClose: () => setConfirmCloseId(null),
+    confirmClose: (taskId) => {
+      closeTask(taskId)
+      setConfirmCloseId(null)
+    },
+    requestDelete: setConfirmDeleteId,
+    cancelDelete: () => setConfirmDeleteId(null),
+    confirmDelete: (taskId) => {
+      deleteTask(taskId)
+      setConfirmDeleteId(null)
+    },
+    saveEdit: editTask,
+  }
 
   if (loading) {
     return (
@@ -671,7 +710,13 @@ export default function TasksPage() {
             <div className="flex flex-wrap items-center justify-end gap-2">
               {closedTasks.length > 0 && (
                 <button
-                  onClick={() => setShowClosed((prev) => !prev)}
+                  onClick={() => {
+                    const opening = !showClosed
+                    setShowClosed(opening)
+                    if (opening) {
+                      setTimeout(() => archiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+                    }
+                  }}
                   className="text-sm font-medium text-gray-400 transition hover:text-white"
                 >
                   {showClosed ? `Скрыть архив (${closedTasks.length})` : `Показать архив (${closedTasks.length})`}
@@ -690,24 +735,8 @@ export default function TasksPage() {
               type="personal"
               tasks={personalOpen}
               totalCount={personalTotal.length}
-              today={today}
-              tasksInPlan={tasksInPlan}
-              hideInPlan={hideInPlan}
-              confirmCloseId={confirmCloseId}
-              confirmDeleteId={confirmDeleteId}
-              onAddToPlan={openDateModal}
-              onRequestClose={setConfirmCloseId}
-              onCancelClose={() => setConfirmCloseId(null)}
-              onConfirmClose={(taskId) => {
-                closeTask(taskId)
-                setConfirmCloseId(null)
-              }}
-              onRequestDelete={setConfirmDeleteId}
-              onCancelDelete={() => setConfirmDeleteId(null)}
-              onConfirmDelete={(taskId) => {
-                deleteTask(taskId)
-                setConfirmDeleteId(null)
-              }}
+              state={taskSectionState}
+              actions={taskSectionActions}
               headerContent={
                 <div className="space-y-3">
                   <div className="flex flex-col gap-3">
@@ -735,48 +764,16 @@ export default function TasksPage() {
               type="strategic"
               tasks={strategicOpen}
               totalCount={strategicTotal.length}
-              today={today}
-              tasksInPlan={tasksInPlan}
-              hideInPlan={hideInPlan}
-              confirmCloseId={confirmCloseId}
-              confirmDeleteId={confirmDeleteId}
-              onAddToPlan={openDateModal}
-              onRequestClose={setConfirmCloseId}
-              onCancelClose={() => setConfirmCloseId(null)}
-              onConfirmClose={(taskId) => {
-                closeTask(taskId)
-                setConfirmCloseId(null)
-              }}
-              onRequestDelete={setConfirmDeleteId}
-              onCancelDelete={() => setConfirmDeleteId(null)}
-              onConfirmDelete={(taskId) => {
-                deleteTask(taskId)
-                setConfirmDeleteId(null)
-              }}
+              state={taskSectionState}
+              actions={taskSectionActions}
             />
 
             <TaskSection
               type="operational"
               tasks={operationalOpen}
               totalCount={operationalTotal.length}
-              today={today}
-              tasksInPlan={tasksInPlan}
-              hideInPlan={hideInPlan}
-              confirmCloseId={confirmCloseId}
-              confirmDeleteId={confirmDeleteId}
-              onAddToPlan={openDateModal}
-              onRequestClose={setConfirmCloseId}
-              onCancelClose={() => setConfirmCloseId(null)}
-              onConfirmClose={(taskId) => {
-                closeTask(taskId)
-                setConfirmCloseId(null)
-              }}
-              onRequestDelete={setConfirmDeleteId}
-              onCancelDelete={() => setConfirmDeleteId(null)}
-              onConfirmDelete={(taskId) => {
-                deleteTask(taskId)
-                setConfirmDeleteId(null)
-              }}
+              state={taskSectionState}
+              actions={taskSectionActions}
             />
         </div>
 
@@ -787,7 +784,7 @@ export default function TasksPage() {
         )}
 
         {closedTasks.length > 0 && showClosed && (
-          <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.32),rgba(15,23,42,0.12))] p-5 backdrop-blur-md sm:p-6">
+          <section ref={archiveRef} className="animate-fade-in-up rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.32),rgba(15,23,42,0.12))] p-5 backdrop-blur-md sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-gray-600">Архив</div>

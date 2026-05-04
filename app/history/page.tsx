@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, isToday, differenceInCalendarDays, isAfter } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
-import { DailyEntry, DreamGoal } from '@/lib/types'
+import { DailyEntry, DreamGoal, PaginatedResponse } from '@/lib/types'
 import { safeParseJson } from '@/lib/safe-json'
 
 interface MonthData {
@@ -53,21 +53,39 @@ export default function HistoryPage() {
 
   useEffect(() => {
     loadEntries()
-  }, [])
+  }, [monthsToShow])
 
   const loadEntries = async () => {
     try {
-      const [entriesRes, dreamRes] = await Promise.all([
-        fetch('/api/daily'),
-        fetch('/api/goals/dream'),
-      ])
+      setLoading(true)
+      const today = new Date()
+      const from = startOfMonth(subMonths(today, monthsToShow - 1))
+      const to = endOfMonth(today)
+      const entriesData: DailyEntry[] = []
+      let offset = 0
+      let hasMore = true
 
-      if (!entriesRes.ok) {
-        console.error('Failed to load entries:', entriesRes.status)
-        return
+      while (hasMore) {
+        const params = new URLSearchParams({
+          from: format(from, 'yyyy-MM-dd'),
+          to: format(to, 'yyyy-MM-dd'),
+          limit: '100',
+          offset: String(offset),
+        })
+        const entriesRes = await fetch(`/api/daily?${params}`)
+
+        if (!entriesRes.ok) {
+          console.error('Failed to load entries:', entriesRes.status)
+          break
+        }
+
+        const page = await entriesRes.json() as PaginatedResponse<DailyEntry>
+        entriesData.push(...page.items)
+        hasMore = page.hasMore
+        offset += page.limit
       }
 
-      const entriesData = await entriesRes.json()
+      const dreamRes = await fetch('/api/goals/dream')
       setEntries(entriesData)
 
       if (dreamRes.ok) {

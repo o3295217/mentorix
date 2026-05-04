@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.22s ease-out both;
+  }
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
 @layer base {
   body {
     @apply bg-gray-950 text-gray-100;
@@ -213,21 +229,21 @@
   }
 
   .nav-menu-link {
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-manrope), sans-serif;
     font-size: 0.95rem;
     font-weight: 500;
     letter-spacing: -0.015em;
   }
 
   .nav-user-text {
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-manrope), sans-serif;
     font-size: 0.96rem;
     font-weight: 500;
     letter-spacing: -0.01em;
   }
 
   .nav-user-action {
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-manrope), sans-serif;
     font-size: 0.95rem;
     font-weight: 500;
     letter-spacing: -0.01em;

@@ -79,6 +79,10 @@ touch .env.production
 AUTH_SECRET=$(openssl rand -hex 32)
 echo "AUTH_SECRET=$AUTH_SECRET"
 
+# Генерируем отдельный ключ шифрования бэкапов вне директории проекта
+openssl rand -base64 32 > /home/ubuntu/.backup-key
+chmod 600 /home/ubuntu/.backup-key
+
 # Редактируем конфигурацию
 nano .env.production
 ```
@@ -86,6 +90,7 @@ nano .env.production
 ### Обязательные переменные:
 ```env
 AUTH_SECRET=<сгенерированный-ключ>
+ENCRYPTION_KEY=<openssl rand -hex 32>
 ANTHROPIC_API_KEY=<ваш-api-key>
 REGISTRATION_MODE=open
 COOKIE_SECURE=true
@@ -325,6 +330,8 @@ docker exec ai-assistant-production sh -c 'echo test > /app/test'
 
 Автоматический скрипт безопасности запускается каждые 30 минут.
 
+Очистка просроченных auth-записей запускается раз в сутки и удаляет expired sessions, expired reset/email verification tokens и уже использованные reset/email verification tokens.
+
 ### Настройка (выполнить один раз)
 ```bash
 # Добавить в crontab на сервере
@@ -332,6 +339,9 @@ ssh vk
 crontab -e
 # Добавить строку:
 */30 * * * * sudo /bin/sh /home/ubuntu/ai-assistant-spec/scripts/monitor.sh >> /home/ubuntu/ai-assistant-spec/logs/monitor/cron.log 2>&1
+
+# Добавить строку для ежедневной очистки auth-токенов:
+15 4 * * * docker exec ai-assistant-production node scripts/cleanup-expired.mjs >> /home/ubuntu/ai-assistant-spec/backups/cleanup-expired.log 2>&1
 ```
 
 ### Проверка алертов (с мака)
@@ -397,7 +407,9 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 ## Бекапы
 
 Бэкапы работают автоматически через Docker-контейнер `ai-assistant-backup` (описан в `docker-compose.production.yml`).
-Ежедневно в 03:00 делается `pg_dump + gzip`, хранятся последние 30 бэкапов в `./backups/`.
+Ежедневно в 03:00 делается `pg_dump + gzip + openssl enc`, хранятся последние 30 зашифрованных бэкапов в `./backups/`.
+
+Ключ шифрования хранится на сервере вне проекта: `/home/ubuntu/.backup-key`. Он монтируется в backup-контейнер read-only как `/run/secrets/backup-key`. Потеря этого файла означает, что расшифровать новые бэкапы будет невозможно.
 
 ```bash
 # Ручной бэкап
@@ -407,8 +419,14 @@ docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
 cat backups/backup.log
 
 # Восстановление из бэкапа
-gunzip -c backups/pg_YYYY-MM-DD_HH-MM-SS.sql.gz | docker exec -i ai-assistant-db psql -U ai_assistant
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 \
+  -pass file:/home/ubuntu/.backup-key \
+  -in backups/pg_YYYY-MM-DD_HH-MM-SS.sql.gz.enc \
+  | gunzip \
+  | docker exec -i ai-assistant-db psql -U ai_assistant
 ```
+
+Старые файлы `backups/pg_*.sql.gz`, созданные до включения шифрования, остаются незашифрованными. После проверки новых `.sql.gz.enc` бэкапов их нужно вручную удалить или зашифровать отдельно.
 
 ---
 

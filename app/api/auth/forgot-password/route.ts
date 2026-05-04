@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail, getPasswordResetEmailContent } from '@/lib/email';
 import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
+import { hashToken } from '@/lib/auth';
+import { getAppUrl } from '@/lib/app-url';
 
 // Генерация токена
 function generateResetToken(): string {
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: successMessage });
     }
 
-    if (!user.isActive) {
+    if (!user.isActive || user.deletedAt) {
       return NextResponse.json({ message: successMessage });
     }
 
@@ -65,13 +67,13 @@ export async function POST(request: Request) {
     await prisma.passwordResetToken.create({
       data: {
         userId: user.id,
-        token,
+        token: hashToken(token),
         expiresAt,
       },
     });
 
     // Формируем ссылку
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = getAppUrl();
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
     // Отправляем email

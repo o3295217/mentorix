@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-04-28**
+> Последнее обновление: **2026-05-04**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (51)
+## API Endpoints (53)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -60,6 +60,7 @@
 | `/api/facts` | GET |
 | `/api/facts/summary` | GET |
 | `/api/forecast` | POST |
+| `/api/goals/context` | GET |
 | `/api/goals/decompose` | POST |
 | `/api/goals/dream` | GET, POST |
 | `/api/goals/items` | GET, POST, PUT, DELETE |
@@ -81,6 +82,7 @@
 | `/api/profile/items` | POST, DELETE, PATCH |
 | `/api/profile/theme` | GET, POST |
 | `/api/progress` | GET |
+| `/api/tasks/[id]` | PATCH |
 | `/api/tasks/[id]/close` | POST |
 | `/api/tasks/[id]/delete` | DELETE |
 | `/api/tasks/[id]/reopen` | POST |
@@ -89,11 +91,10 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (36)
+## Компоненты (32)
 
 - `AuthGuard`
 - `AuthProvider`
-- `BalanceFlags`
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `ExpandableInput`
@@ -104,18 +105,15 @@
 - `Providers`
 - `Speedometer`
 - `ThemeProvider`
-- `ThemeToggle`
 - `UncompletedTasksModal`
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
-- `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
 - `goals/PeriodView`
 - `goals/StrategyCards`
 - `goals/WeekCard`
-- `goals/WeekStrip`
 - `landing/CtaSection`
 - `landing/DayFlowSection`
 - `landing/DreamSection`
@@ -145,6 +143,7 @@
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 | lastLoginAt | `DateTime?` |
+| deletedAt | `DateTime?` |
 | dreamGoals | `DreamGoal[]` |
 | yearGoals | `YearGoal[]` |
 | periodGoals | `PeriodGoal[]` |
@@ -198,7 +197,7 @@
 | userId | `String` |
 | user | `User` |
 | year | `Int` |
-| goalsJson | `String` |
+| goalsJson | `Json` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 
@@ -211,7 +210,7 @@
 | periodType | `String` |
 | periodStart | `DateTime` |
 | periodEnd | `DateTime` |
-| goalsJson | `String` |
+| goalsJson | `Json` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 
@@ -228,9 +227,9 @@
 | completedAt | `DateTime?` |
 | deadline | `DateTime?` |
 | priority | `String` |
-| tagsJson | `String` |
-| blockedByJson | `String` |
-| historyJson | `String` |
+| tagsJson | `Json` |
+| blockedByJson | `Json` |
+| historyJson | `Json` |
 | sortOrder | `Int` |
 | scope | `String?` |
 | rootYearGoalId | `String?` |
@@ -259,8 +258,8 @@
 | date | `DateTime` |
 | planText | `String?` |
 | factText | `String?` |
-| planSnapshotJson | `String?` |
-| extraTasksJson | `String` |
+| planSnapshotJson | `Json?` |
+| extraTasksJson | `Json` |
 | emotionalState | `String?` |
 | physicalState | `String?` |
 | lifeEvents | `String?` |
@@ -269,7 +268,7 @@
 | sleepQuality | `Int?` |
 | familyTime | `Int?` |
 | exerciseTime | `Int?` |
-| selectedTasksJson | `String?` |
+| selectedTasksJson | `Json?` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 | evaluation | `Evaluation?` |
@@ -301,7 +300,7 @@
 | workFamilyAlignment | `String?` |
 | workValuesAlignment | `String?` |
 | recommendationsText | `String` |
-| suggestedTasksJson | `String?` |
+| suggestedTasksJson | `Json?` |
 | createdAt | `DateTime` |
 
 ### OpenTask
@@ -479,7 +478,7 @@
 | totalCompleted | `Int` |
 | avgCompletionPct | `Float` |
 | avgDailyScore | `Float` |
-| completionByDayJson | `String` |
+| completionByDayJson | `Json` |
 
 ### PasswordResetToken
 | Поле | Тип |
@@ -527,10 +526,10 @@
 | periodType | `String` |
 | periodKey | `String` |
 | summaryText | `String` |
-| keyAchievements | `String` |
+| keyAchievements | `Json` |
 | tasksCompleted | `Int` |
 | goalsCompleted | `Int` |
-| topCategoriesJson | `String?` |
+| topCategoriesJson | `Json?` |
 
 ### ChatMessage
 | Поле | Тип |
@@ -588,10 +587,9 @@
 
 ## Зависимости
 
-### Production (11)
+### Production (10)
 - @anthropic-ai/sdk
 - @prisma/client
-- @types/nodemailer
 - bcrypt
 - date-fns
 - next
@@ -601,16 +599,18 @@
 - recharts
 - zod
 
-### Development (16)
+### Development (19)
 - @eslint/js
 - @types/bcrypt
 - @types/node
+- @types/nodemailer
 - @types/react
 - @types/react-dom
 - autoprefixer
 - baseline-browser-mapping
 - eslint
 - eslint-config-next
+- eslint-plugin-react-hooks
 - husky
 - lint-staged
 - postcss
@@ -618,3 +618,4 @@
 - tailwindcss
 - typescript
 - typescript-eslint
+- vitest

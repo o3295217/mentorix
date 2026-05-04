@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getUserByEmail, createEmailVerificationToken } from '@/lib/auth';
 import { sendEmail, getEmailVerificationContent } from '@/lib/email';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { getAppUrl } from '@/lib/app-url';
 
 // Rate limiter для повторной отправки
 const resendRateLimiter = {
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
 
     // Создаём новый токен и отправляем письмо
     const token = await createEmailVerificationToken(user.id);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = getAppUrl();
     const verifyUrl = `${appUrl}/verify-email?token=${token}`;
     
     const emailContent = getEmailVerificationContent(verifyUrl, user.name || undefined);

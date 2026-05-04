@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
@@ -25,7 +26,7 @@ function generateYearGoalId(): string {
 }
 
 /** Parse goalsJson: supports both legacy string[] and new {id,text}[] */
-function parseGoalsJson(raw: string): YearGoalItem[] {
+function parseGoalsJson(raw: unknown): YearGoalItem[] {
   const parsed = safeParseJson<Array<string | YearGoalItem>>(raw, [])
   return parsed.map(item =>
     typeof item === 'string'
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
       ? await prisma.yearGoal.update({
           where: { id: existing.id },
           data: {
-            goalsJson: JSON.stringify(goals),
+            goalsJson: goals as unknown as Prisma.InputJsonValue,
             updatedAt: new Date(),
           },
         })
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId,
             year,
-            goalsJson: JSON.stringify(goals),
+            goalsJson: goals as unknown as Prisma.InputJsonValue,
           },
         })
 

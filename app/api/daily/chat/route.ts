@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { getPeriodDates, parseDateParam, toDateKey } from '@/lib/dates'
+import { parseDateParam, toDateKey } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import {
@@ -14,8 +14,9 @@ import {
 import { getUserStatsForAI } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
-import { getAnthropicClient } from '@/lib/anthropic'
+import { DEFAULT_ROUTE_AI_MODEL, getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { getWorkContextForAI } from '@/lib/completed-work'
+import { getPlanUserContext } from '@/lib/user-context'
 
 const ChatSchema = z.object({
   date: z.string().trim().min(1).max(32),
@@ -77,34 +78,16 @@ export async function POST(request: NextRequest) {
     const historyStartDate = new Date(targetDate)
     historyStartDate.setDate(historyStartDate.getDate() - 14)
     
-    // Даты периодов
-    const weekPeriod = getPeriodDates(targetDate, 'week')
-    const monthPeriod = getPeriodDates(targetDate, 'month')
-
     // Получить контекст (мечта, цели, профиль, insights, история, прогресс целей, статистика, кэш знаний)
     const [
-      dream,
-      weekGoalsRecord,
-      monthGoalsRecord,
-      userProfile,
-      userInsights,
+      planContext,
       recentEntries,
       trackedGoals,
       cumulativeStats,
       knowledgeCache,
       workContext,
     ] = await Promise.all([
-      prisma.dreamGoal.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      prisma.periodGoal.findFirst({
-        where: { userId, periodType: 'week', periodStart: weekPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.periodGoal.findFirst({
-        where: { userId, periodType: 'month', periodStart: monthPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.userProfile.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      prisma.userInsights.findFirst({ where: { userId } }),
+      getPlanUserContext(userId, targetDate),
       // История план/факт за последние 14 дней
       prisma.dailyEntry.findMany({
         where: {
@@ -156,9 +139,6 @@ export async function POST(request: NextRequest) {
       getWorkContextForAI(userId, targetDate),
     ])
 
-    const weekGoals = safeParseJson<string[]>(weekGoalsRecord?.goalsJson, [])
-    const monthGoals = safeParseJson<string[]>(monthGoalsRecord?.goalsJson, [])
-
     // Типизация для истории
     type RecentEntry = typeof recentEntries[number]
     type TrackedGoal = typeof trackedGoals[number]
@@ -183,9 +163,9 @@ export async function POST(request: NextRequest) {
     const monthTracked = trackedGoals.filter((g: TrackedGoal) => !g.periodKey.includes('-W'))
     
     const goalsProgress: GoalsProgress = {
-      weekTotal: weekGoals.length,
+      weekTotal: planContext.weekGoals.length,
       weekCompleted: weekTracked.filter((g: TrackedGoal) => g.completed).length,
-      monthTotal: monthGoals.length,
+      monthTotal: planContext.monthGoals.length,
       monthCompleted: monthTracked.filter((g: TrackedGoal) => g.completed).length,
       daysLeftInWeek: getDaysLeftInWeek(targetDate),
       daysLeftInMonth: getDaysLeftInMonth(targetDate),
@@ -198,38 +178,15 @@ export async function POST(request: NextRequest) {
       currentTime: currentTime || undefined,
       planTasks,
       completedTasks,
-      weekGoals,
-      monthGoals,
-      dreamGoal: dream?.goalText || 'Не указана',
+      weekGoals: planContext.weekGoals,
+      monthGoals: planContext.monthGoals,
+      dreamGoal: planContext.dreamGoal,
       messages,
       dayHistory,
       goalsProgress,
       cumulativeStats,
-      profile: userProfile ? {
-        name: userProfile.name || undefined,
-        occupation: userProfile.occupation || undefined,
-        industry: userProfile.industry || undefined,
-        maritalStatus: userProfile.maritalStatus || undefined,
-        hobbies: userProfile.hobbies || undefined,
-        sports: userProfile.sports || undefined,
-        location: userProfile.location || undefined,
-        age: userProfile.age || undefined,
-        education: userProfile.education || undefined,
-        teamSize: userProfile.teamSize || undefined,
-        workExperience: userProfile.workExperience || undefined,
-        values: userProfile.values || undefined,
-        challenges: userProfile.challenges || undefined,
-        other: userProfile.other || undefined,
-      } : undefined,
-      insights: userInsights ? {
-        patterns: userInsights.patterns,
-        strengths: userInsights.strengths,
-        challenges: userInsights.challenges,
-        preferences: userInsights.preferences,
-        recommendations: userInsights.recommendations,
-        motivators: userInsights.motivators,
-        evaluationCount: userInsights.evaluationCount,
-      } : undefined,
+      profile: planContext.profile,
+      insights: planContext.insights,
       knowledgeCache,
       workContext,
     }
@@ -296,8 +253,9 @@ export async function POST(request: NextRequest) {
 
     // Вызов Claude API
     const startTime = Date.now()
+    const model = getAiModel(DEFAULT_ROUTE_AI_MODEL)
     const response = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-20250514',  // Sonnet для чата
+      model,
       max_tokens: 1024,
       system: [
         {
@@ -320,7 +278,7 @@ export async function POST(request: NextRequest) {
     await logAIUsage({
       userId,
       endpoint: 'chat',
-      model: 'claude-sonnet-4-20250514',
+      model,
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
       durationMs,

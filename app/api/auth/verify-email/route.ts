@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyEmailToken, getUserById, createSession } from '@/lib/auth';
 import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac';
 import { DEFAULT_THEME_PREFERENCE, THEME_COOKIE_KEY } from '@/lib/theme';
+import { shouldUseSecureCookies } from '@/lib/cookie-security';
 
 export async function POST(request: Request) {
   try {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     });
 
     // Устанавливаем cookies сессии
-    const useSecureCookie = process.env.COOKIE_SECURE === 'true';
+    const useSecureCookie = shouldUseSecureCookies();
     
     response.cookies.set('auth_token', session.token, {
       httpOnly: true,

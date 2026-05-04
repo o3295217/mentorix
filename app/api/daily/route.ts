@@ -3,8 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { parseDateParam, toDateKey } from '@/lib/dates'
 import { splitLines } from '@/lib/fact-utils'
+import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { syncCompletedWorkForEntry, recalculateWorkSummary } from '@/lib/completed-work'
+import { buildPaginatedResponse, parsePaginationParams } from '@/lib/pagination'
+import { Prisma } from '@prisma/client'
 
 const DailyEntrySchema = z.object({
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -23,6 +26,7 @@ export async function GET(request: NextRequest) {
     const dateStr = searchParams.get('date')
     const from = searchParams.get('from')
     const to = searchParams.get('to')
+    const { limit, offset } = parsePaginationParams(searchParams, { defaultLimit: 100 })
 
     // Get single entry by date
     if (dateStr) {
@@ -58,40 +62,52 @@ export async function GET(request: NextRequest) {
 
     // Get list of entries
     if (from && to) {
-      const entries = await prisma.dailyEntry.findMany({
-        where: {
-          userId,
-          date: {
-            gte: parseDateParam(from),
-            lte: parseDateParam(to),
-          },
-          // Фильтруем пустые записи (без плана И без факта)
-          OR: [
-            { planText: { not: null } },
-            { factText: { not: null } },
-          ],
-        },
-        include: { evaluation: true },
-        orderBy: { date: 'desc' },
-      })
-
-      return NextResponse.json(entries)
-    }
-
-    // Получить все записи (для истории)
-    const entries = await prisma.dailyEntry.findMany({
-      where: {
+      const where: Prisma.DailyEntryWhereInput = {
         userId,
+        date: {
+          gte: parseDateParam(from),
+          lte: parseDateParam(to),
+        },
+        // Фильтруем пустые записи (без плана И без факта)
         OR: [
           { planText: { not: null } },
           { factText: { not: null } },
         ],
-      },
-      include: { evaluation: true },
-      orderBy: { date: 'desc' },
-    })
+      }
+      const [entries, total] = await Promise.all([
+        prisma.dailyEntry.findMany({
+          where,
+          include: { evaluation: true },
+          orderBy: { date: 'desc' },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.dailyEntry.count({ where }),
+      ])
 
-    return NextResponse.json(entries)
+      return NextResponse.json(buildPaginatedResponse({ items: entries, total, limit, offset }))
+    }
+
+    // Получить записи для истории
+    const where: Prisma.DailyEntryWhereInput = {
+      userId,
+      OR: [
+        { planText: { not: null } },
+        { factText: { not: null } },
+      ],
+    }
+    const [entries, total] = await Promise.all([
+      prisma.dailyEntry.findMany({
+        where,
+        include: { evaluation: true },
+        orderBy: { date: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.dailyEntry.count({ where }),
+    ])
+
+    return NextResponse.json(buildPaginatedResponse({ items: entries, total, limit, offset }))
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
@@ -121,6 +137,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, planText, factText, selectedTasksJson, extraTasksJson } = validation.data
+    const selectedTasksValue = selectedTasksJson === undefined
+      ? undefined
+      : selectedTasksJson === null
+        ? Prisma.DbNull
+        : safeParseJson<Array<string | number>>(selectedTasksJson, []) as unknown as Prisma.InputJsonValue
+    const extraTasksValue = extraTasksJson === undefined
+      ? undefined
+      : safeParseJson<string[]>(extraTasksJson, []) as unknown as Prisma.InputJsonValue
     
     // Нормализуем дату к формату YYYY-MM-DD
     const requestedDateKey = date.match(/^\d{4}-\d{2}-\d{2}$/) 
@@ -152,7 +176,7 @@ export async function POST(request: NextRequest) {
 
     const planLines = planText !== undefined ? splitLines(planText) : []
     const shouldSetSnapshot = planText !== undefined && planLines.length > 0 && !existing?.planSnapshotJson
-    const planSnapshotJson = shouldSetSnapshot ? JSON.stringify(planLines) : undefined
+    const planSnapshotJson = shouldSetSnapshot ? planLines as unknown as Prisma.InputJsonValue : undefined
 
     // Upsert daily entry
     const entry = existing
@@ -161,8 +185,8 @@ export async function POST(request: NextRequest) {
           data: {
             ...(planText !== undefined && { planText }),
             ...(factText !== undefined && { factText }),
-            ...(selectedTasksJson !== undefined && { selectedTasksJson }),
-            ...(extraTasksJson !== undefined && { extraTasksJson }),
+            ...(selectedTasksValue !== undefined && { selectedTasksJson: selectedTasksValue }),
+            ...(extraTasksValue !== undefined && { extraTasksJson: extraTasksValue }),
             ...(planSnapshotJson !== undefined && { planSnapshotJson }),
           },
           include: { evaluation: true },
@@ -173,9 +197,9 @@ export async function POST(request: NextRequest) {
             date: entryDate,
             planText: planText || '',
             factText: factText || '',
-            selectedTasksJson: selectedTasksJson || null,
-            extraTasksJson: extraTasksJson || '[]',
-            planSnapshotJson: planLines.length > 0 ? JSON.stringify(planLines) : null,
+            selectedTasksJson: selectedTasksValue || Prisma.DbNull,
+            extraTasksJson: extraTasksValue || [],
+            planSnapshotJson: planLines.length > 0 ? planLines as unknown as Prisma.InputJsonValue : Prisma.DbNull,
           },
           include: { evaluation: true },
         })

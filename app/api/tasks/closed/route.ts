@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { buildPaginatedResponse, parsePaginationParams } from '@/lib/pagination'
 
 export async function GET(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const tasks = await prisma.openTask.findMany({
-      where: { userId, isClosed: true },
-      orderBy: { closedAt: 'desc' },
-    })
+    const { limit, offset } = parsePaginationParams(request.nextUrl.searchParams)
+    const where = { userId, isClosed: true }
+    const [tasks, total] = await Promise.all([
+      prisma.openTask.findMany({
+        where,
+        orderBy: { closedAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.openTask.count({ where }),
+    ])
 
-    return NextResponse.json(tasks)
+    return NextResponse.json(buildPaginatedResponse({ items: tasks, total, limit, offset }))
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {

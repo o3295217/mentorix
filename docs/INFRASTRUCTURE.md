@@ -72,7 +72,7 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 
 ### Бэкап
 
-Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних).
+Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних зашифрованных файлов `pg_*.sql.gz.enc`). Ключ хранится на сервере вне проекта: `/home/ubuntu/.backup-key`.
 
 ```bash
 # Ручной бэкап
@@ -80,6 +80,25 @@ docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
 
 # Проверка лога
 cat backups/backup.log
+
+# Расшифровка для восстановления
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 \
+  -pass file:/home/ubuntu/.backup-key \
+  -in backups/pg_YYYY-MM-DD_HH-MM-SS.sql.gz.enc \
+  | gunzip \
+  | docker exec -i ai-assistant-db psql -U ai_assistant
+```
+
+### Очистка auth-токенов
+
+Скрипт `scripts/cleanup-expired.mjs` удаляет expired sessions, expired reset/email verification tokens и уже использованные reset/email verification tokens.
+
+```bash
+# Ручной запуск внутри production-контейнера
+docker exec ai-assistant-production node scripts/cleanup-expired.mjs
+
+# Рекомендуемый cron на сервере
+15 4 * * * docker exec ai-assistant-production node scripts/cleanup-expired.mjs >> /home/ubuntu/ai-assistant-spec/backups/cleanup-expired.log 2>&1
 ```
 
 ### Проверка алертов мониторинга (с мака)
@@ -100,8 +119,22 @@ Anthropic блокирует API-запросы с российских IP. Дл
 - **Расположение кода:** `cloudflare-proxy/` в корне проекта
 - **Механизм:** Worker принимает запрос → передаёт Durable Object (location hint: wnam/US) → DO вызывает Anthropic API с американского IP
 - **Защита:** заголовок `x-proxy-secret` (секрет хранится в Cloudflare Secrets и в `.env.production`)
+- **Rate limit:** Durable Object `RATE_LIMITER`, по умолчанию `60 req/min` на IP (`CF-Connecting-IP`)
 - **Деплой Worker:** `cd cloudflare-proxy && wrangler deploy`
 - **Аккаунт Cloudflare:** авторизация через `wrangler login`
+
+Лимит меняется в `cloudflare-proxy/wrangler.toml` через `RATE_LIMIT_PER_MINUTE`. При превышении Worker возвращает `429` и header `Retry-After`, не вызывая Anthropic API.
+
+## Cloudflare Worker — прокси для Telegram Bot API
+
+Для обхода блокировок Telegram API используется отдельный Worker `cloudflare-tg-proxy/`.
+
+- **Worker name:** `tg-proxy`
+- **Защита:** заголовок `x-tg-proxy-secret` (секрет `TG_PROXY_SECRET` хранится в Cloudflare Secrets)
+- **Rate limit:** Durable Object `RATE_LIMITER`, по умолчанию `30 req/min` на IP (`CF-Connecting-IP`)
+- **Деплой Worker:** `cd cloudflare-tg-proxy && wrangler deploy`
+
+Лимит меняется в `cloudflare-tg-proxy/wrangler.toml` через `RATE_LIMIT_PER_MINUTE`. При превышении Worker возвращает `429` и header `Retry-After`, не вызывая Telegram API.
 
 ### Локальная разработка
 На маке прокси не нужен — API Anthropic работает напрямую. Переменные `ANTHROPIC_PROXY_URL` и `ANTHROPIC_PROXY_SECRET` в `.env.local` не задаются.
@@ -282,7 +315,7 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 ## Известные особенности
 - Проект на сервере НЕ git-репозиторий — синхронизация через rsync
 - Cookie: флаг `Secure=true` (HTTPS через nginx + Let's Encrypt)
-- Prisma: используется `prisma db push` (не migrate) при старте контейнера
+- Prisma: используется `prisma migrate deploy` при старте контейнера
 - Docker Compose требует флаги `-f docker-compose.production.yml --env-file .env.production`
 - Nginx слушает порты 80 и 443, проксирует на localhost:3000
 - Nginx rate limit: `general_limit` 60r/s burst 30 для `/api/` (не хранить `.bak` файлы в sites-enabled!)

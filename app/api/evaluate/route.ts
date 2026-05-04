@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { evaluateDayNewWithUsage, updateUserInsights } from '@/lib/anthropic'
 import { DailyEvaluationRequest } from '@/lib/prompts/types'
-import { getPeriodDates } from '@/lib/dates'
 import { buildFactFromSelection, safeParseJsonArray } from '@/lib/fact-utils'
 import { z } from 'zod'
 import { ApiErrors, safeParseJson } from '@/lib/api-utils'
@@ -11,6 +11,7 @@ import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { recalculateWorkSummary } from '@/lib/completed-work'
+import { getDailyEvaluationUserContext } from '@/lib/user-context'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
@@ -71,46 +72,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Получить мечту
-    const dream = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    // Получить все цели из новой иерархической структуры
     const date = dailyEntry.date
-    const year = date.getFullYear()
-
-    // Периоды для загрузки из period_goals
-    const halfYearPeriod = getPeriodDates(date, 'half_year')
-    const quarterPeriod = getPeriodDates(date, 'quarter')
-    const monthPeriod = getPeriodDates(date, 'month')
-    const weekPeriod = getPeriodDates(date, 'week')
-
-    const [currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
-      await Promise.all([
-        // Загружаем цели на год из year_goals
-        prisma.yearGoal.findFirst({
-          where: { userId, year },
-        }),
-        // Остальные цели из period_goals (как раньше)
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'half_year', periodStart: halfYearPeriod.start },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'quarter', periodStart: quarterPeriod.start },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'month', periodStart: monthPeriod.start },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'week', periodStart: weekPeriod.start },
-          orderBy: { createdAt: 'desc' },
-        }),
-      ])
+    const userContext = await getDailyEvaluationUserContext(userId, date)
 
     // Получить незакрытые задачи
     const openTasks = await prisma.openTask.findMany({
@@ -148,12 +111,6 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Получить профиль пользователя
-    const userProfile = await prisma.userProfile.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
-
     // Подготовить запрос для оценки (ОБНОВЛЕННЫЙ ФОРМАТ)
     const evaluationRequest: DailyEvaluationRequest = {
       date: date.toLocaleDateString('ru-RU'),
@@ -161,35 +118,8 @@ export async function POST(request: NextRequest) {
       factText: derived.factText,
       uncompletedTasks: derived.uncompletedTasks,
       extraTasks,
-      goals: {
-        dreamGoal: dream?.goalText || 'Не указана',
-        dreamYears: dream?.months ? Math.ceil(dream.months / 12) : undefined,
-        dreamMonths: dream?.months || undefined,
-        // Цели на год теперь из year_goals таблицы
-        yearGoals: safeParseJson(currentYearGoal?.goalsJson, []),
-        halfYearGoals: safeParseJson(halfYearGoals?.goalsJson, []),
-        quarterGoals: safeParseJson(quarterGoals?.goalsJson, []),
-        monthGoals: safeParseJson(monthGoals?.goalsJson, []),
-        weekGoals: safeParseJson(weekGoals?.goalsJson, []),
-      },
-      userProfile: userProfile
-        ? {
-            name: userProfile.name || undefined,
-            occupation: userProfile.occupation || undefined,
-            industry: userProfile.industry || undefined,
-            maritalStatus: userProfile.maritalStatus || undefined,
-            hobbies: userProfile.hobbies || undefined,
-            sports: userProfile.sports || undefined,
-            location: userProfile.location || undefined,
-            age: userProfile.age || undefined,
-            education: userProfile.education || undefined,
-            teamSize: userProfile.teamSize || undefined,
-            workExperience: userProfile.workExperience || undefined,
-            values: userProfile.values || undefined,
-            challenges: userProfile.challenges || undefined,
-            other: userProfile.other || undefined,
-          }
-        : undefined,
+      goals: userContext.goals,
+      userProfile: userContext.profile,
       context: {
         emotionalState: dailyEntry.emotionalState || undefined,
         physicalState: dailyEntry.physicalState || undefined,
@@ -247,8 +177,8 @@ export async function POST(request: NextRequest) {
       workValuesAlignment: evaluationResponse.horizontal_alignment?.work_values,
       // Предложенные задачи
       suggestedTasksJson: evaluationResponse.suggested_tasks
-        ? JSON.stringify(evaluationResponse.suggested_tasks)
-        : null,
+        ? evaluationResponse.suggested_tasks as unknown as Prisma.InputJsonValue
+        : Prisma.DbNull,
     }
 
     // Сохранить или обновить оценку (upsert для повторных оценок)

@@ -36,11 +36,14 @@ async function main() {
     // Проверяем существует ли пользователь
     const user = await prisma.user.findUnique({ where: { email } });
     
-    if (!user) {
+    if (!user || !user.isActive || user.deletedAt) {
       console.error(`❌ Пользователь с email "${email}" не найден`);
       
       // Показываем список пользователей
-      const users = await prisma.user.findMany({ select: { email: true, name: true } });
+      const users = await prisma.user.findMany({
+        where: { deletedAt: null, isActive: true },
+        select: { email: true, name: true },
+      });
       if (users.length > 0) {
         console.log('\n📋 Существующие пользователи:');
         users.forEach(u => console.log(`   - ${u.email} (${u.name || 'без имени'})`));

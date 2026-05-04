@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { PeriodType } from '@/lib/dates'
-import { DreamGoal, Goal, GoalTag, YearGoalItem } from '@/lib/types'
+import { DreamGoal, DreamProgressSummary, Goal, GoalsContextResponse, GoalTag, YearGoalItem } from '@/lib/types'
 import { useDreamGoal } from './useDreamGoal'
 import { usePeriodGoals } from './usePeriodGoals'
 import { useTrackedGoals } from './useTrackedGoals'
@@ -13,6 +13,10 @@ export type { DreamGoal, Goal, GoalTag, YearGoalItem } from '@/lib/types'
 export interface UseGoalsReturn {
   // Dream
   dreamGoal: DreamGoal | null
+  dreamProgress: DreamProgressSummary
+  yearEvaluations: Record<number, { avg: number; count: number }>
+  archivedYearGoalYears: number[]
+  loadGoalsContext: (year: number) => Promise<void>
   saveDream: (text: string, months: number | null) => Promise<void>
   
   // Year goals
@@ -62,6 +66,9 @@ export interface UseGoalsReturn {
 
 export function useGoals(): UseGoalsReturn {
   const [message, setMessage] = useState('')
+  const [dreamProgress, setDreamProgress] = useState<DreamProgressSummary>({ total: 0, completed: 0, percent: 0 })
+  const [yearEvaluations, setYearEvaluations] = useState<Record<number, { avg: number; count: number }>>({})
+  const [archivedYearGoalYears, setArchivedYearGoalYears] = useState<number[]>([])
   const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const currentYear = new Date().getFullYear()
 
@@ -87,16 +94,35 @@ export function useGoals(): UseGoalsReturn {
   const period = usePeriodGoals(showMessage)
   const tracked = useTrackedGoals(showMessage, period.periodGoals)
 
-  // Initial load
-  useEffect(() => {
-    dream.loadDream()
-    tracked.loadTags()
-    tracked.loadTrackedGoals()
-  }, [dream.loadDream, tracked.loadTags, tracked.loadTrackedGoals])
+  const loadGoalsContext = useCallback(async (year: number) => {
+    try {
+      const res = await fetch(`/api/goals/context?year=${year}`)
+      if (!res.ok) throw new Error(`Failed to load goals context: ${res.status}`)
+
+      const context = await res.json() as GoalsContextResponse
+      dream.setDreamGoal(context.dreamGoal)
+      period.setYearGoalsFromRecord(context.yearGoals)
+      period.mergePeriodGoalsFromRecord(context.periodGoals)
+      tracked.setGoals(context.goals)
+      tracked.setTags(context.tags)
+      setDreamProgress(context.dreamProgress)
+      setYearEvaluations(
+        Object.fromEntries(Object.entries(context.yearEvaluations).map(([contextYear, value]) => [Number(contextYear), value]))
+      )
+      setArchivedYearGoalYears(context.archivedYearGoalYears)
+    } catch (error) {
+      console.error('Error loading goals context:', error)
+      showMessage('❌ Ошибка загрузки карты целей')
+    }
+  }, [dream.setDreamGoal, period.setYearGoalsFromRecord, period.mergePeriodGoalsFromRecord, tracked.setGoals, tracked.setTags, showMessage])
 
   return {
     // Dream
     dreamGoal: dream.dreamGoal,
+    dreamProgress,
+    yearEvaluations,
+    archivedYearGoalYears,
+    loadGoalsContext,
     saveDream: dream.saveDream,
     // Year goals
     yearGoals: period.yearGoals,

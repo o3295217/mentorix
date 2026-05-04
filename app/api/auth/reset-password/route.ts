@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hashPasswordForReset as hashPassword } from '@/lib/auth';
+import { hashPasswordForReset as hashPassword, hashToken } from '@/lib/auth';
 import { MIN_PASSWORD_LENGTH } from '@/lib/auth-constants'
 import { checkRateLimit, getClientIdentifier, rateLimiters } from '@/lib/rate-limit';
 
@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     }
 
     const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
+      include: { user: { select: { isActive: true, deletedAt: true } } },
     });
 
     if (!resetToken) {
@@ -31,6 +32,10 @@ export async function GET(request: Request) {
 
     if (resetToken.expiresAt < new Date()) {
       return NextResponse.json({ valid: false, error: 'Ссылка истекла' });
+    }
+
+    if (!resetToken.user.isActive || resetToken.user.deletedAt) {
+      return NextResponse.json({ valid: false, error: 'Аккаунт деактивирован' });
     }
 
     return NextResponse.json({ valid: true });
@@ -76,7 +81,8 @@ export async function POST(request: Request) {
 
     // Находим токен
     const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
+      include: { user: { select: { isActive: true, deletedAt: true } } },
     });
 
     if (!resetToken) {
@@ -96,6 +102,13 @@ export async function POST(request: Request) {
     if (resetToken.expiresAt < new Date()) {
       return NextResponse.json(
         { error: 'Ссылка истекла. Запросите новую.' },
+        { status: 400 }
+      );
+    }
+
+    if (!resetToken.user.isActive || resetToken.user.deletedAt) {
+      return NextResponse.json(
+        { error: 'Аккаунт деактивирован' },
         { status: 400 }
       );
     }

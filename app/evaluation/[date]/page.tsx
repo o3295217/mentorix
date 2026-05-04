@@ -6,6 +6,7 @@ import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import { DailyEntry, OpenTask, SuggestedTask } from '@/lib/types'
 import { areTasksSimilar } from '@/lib/task-match'
+import { safeParseJson } from '@/lib/safe-json'
 
 function getScoreColor(score: number): string {
   if (score >= 7) return 'text-green-400'
@@ -22,22 +23,14 @@ interface TaskWithStatus {
 // Вычисление списка задач со статусами
 function computeTasksWithStatus(
   planText: string | null,
-  selectedTasksJson: string | null,
-  extraTasksJson: string | null
+  selectedTasksJson: unknown,
+  extraTasksJson: unknown
 ): TaskWithStatus[] {
   const planTasks = (planText || '').split('\n').map(t => t.trim()).filter(Boolean)
   
-  let selectedIds: number[] = []
-  if (selectedTasksJson) {
-    try {
-      const parsed = JSON.parse(selectedTasksJson)
-      if (Array.isArray(parsed)) {
-        selectedIds = parsed.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0 && id <= planTasks.length)
-      }
-    } catch {
-      // Игнорируем ошибки парсинга JSON
-    }
-  }
+  const selectedIds = safeParseJson<Array<string | number>>(selectedTasksJson, [])
+    .map(id => Number(id))
+    .filter(id => Number.isInteger(id) && id > 0 && id <= planTasks.length)
   
   const selectedSet = new Set(selectedIds)
   const result: TaskWithStatus[] = []
@@ -52,20 +45,12 @@ function computeTasksWithStatus(
   })
   
   // Добавить extraTasks
-  if (extraTasksJson) {
-    try {
-      const extras = JSON.parse(extraTasksJson)
-      if (Array.isArray(extras)) {
-        extras.forEach((t: string) => {
-          if (t) {
-            result.push({ text: t, status: 'extra' })
-          }
-        })
-      }
-    } catch {
-      // Игнорируем ошибки парсинга extra tasks
+  const extras = safeParseJson<string[]>(extraTasksJson, [])
+  extras.forEach((t: string) => {
+    if (t) {
+      result.push({ text: t, status: 'extra' })
     }
-  }
+  })
   
   return result
 }
@@ -77,6 +62,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const [addingTask, setAddingTask] = useState<string | null>(null)
   const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set())
   const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
+  const [taskError, setTaskError] = useState('')
 
   useEffect(() => {
     loadData()
@@ -110,9 +96,10 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
   const addTaskToOpen = async (task: SuggestedTask) => {
     if (!dailyEntry) {
-      alert('Ошибка: данные дня не загружены')
+      setTaskError('Данные дня не загружены')
       return
     }
+    setTaskError('')
     setAddingTask(task.taskText)
     try {
       const res = await fetch('/api/tasks/add-suggested', {
@@ -131,12 +118,12 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
         throw new Error(`Failed to add task: ${res.status}`)
       }
 
-      setAddedTasks(new Set(addedTasks).add(task.taskText))
+      setAddedTasks((current) => new Set(current).add(task.taskText))
       // Перечитать dailyEntry, чтобы предложенная задача исчезла и после обновления страницы
       await loadData()
     } catch (error) {
       console.error('Error adding task:', error)
-      alert('Ошибка при добавлении задачи')
+      setTaskError('Ошибка при добавлении задачи')
     } finally {
       setAddingTask(null)
     }
@@ -175,15 +162,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const evaluation = dailyEntry.evaluation
   const date = new Date(dailyEntry.date)
 
-  const suggestedTasks: SuggestedTask[] = (() => {
-    if (!evaluation.suggestedTasksJson) return []
-    try {
-      const parsed = JSON.parse(evaluation.suggestedTasksJson)
-      return Array.isArray(parsed) ? (parsed as SuggestedTask[]) : []
-    } catch {
-      return []
-    }
-  })()
+  const suggestedTasks = safeParseJson<SuggestedTask[]>(evaluation.suggestedTasksJson, [])
 
   const duplicateSuggestedTasks = suggestedTasks.filter((s) =>
     openTasks.some((t) => areTasksSimilar(t.taskText, s.taskText))
@@ -356,6 +335,12 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
       </div>
 
       {/* Suggested Tasks */}
+      {taskError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-100">
+          {taskError}
+        </div>
+      )}
+
       {(visibleSuggestedTasks.length > 0 || duplicateSuggestedTasks.length > 0) && (
         <div className="card">
           <h2 className="font-bold mb-4 text-purple-100"> Предложенные задачи</h2>
@@ -366,7 +351,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
               <p className="text-purple-100">
                  По этой теме уже есть незакрытые задачи (совпадение по названию/смыслу). Вместо создания дубля — сфокусируйся на закрытии
                 существующей во вкладке{' '}
-                <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>.
+                <Link href="/tasks" className="font-semibold underline">Задачи</Link>.
               </p>
             </div>
           )}
@@ -416,11 +401,13 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
               )
             })}
           </div>
-          <div className="mt-4 p-3 rounded bg-purple-800/50">
-            <p className="text-purple-100">
-               Добавленные задачи появятся на вкладке <Link href="/tasks" className="font-semibold underline">Незакрытые задачи</Link>
-            </p>
-          </div>
+          {visibleSuggestedTasks.length > 0 && (
+            <div className="mt-4 p-3 rounded bg-purple-800/50">
+              <p className="text-purple-100">
+                 Добавленные задачи появятся на вкладке <Link href="/tasks" className="font-semibold underline">Задачи</Link>
+              </p>
+            </div>
+          )}
         </div>
       )}
 

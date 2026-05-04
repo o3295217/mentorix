@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
 import { DEFAULT_THEME_PREFERENCE, isThemePreference, THEME_COOKIE_KEY, type ThemePreference } from '@/lib/theme'
+import { shouldUseSecureCookies } from '@/lib/cookie-security'
 
 function setThemeCookie(response: NextResponse, theme: ThemePreference) {
-  const useSecureCookie = process.env.COOKIE_SECURE === 'true'
+  const useSecureCookie = shouldUseSecureCookies()
   response.cookies.set(THEME_COOKIE_KEY, theme, {
     httpOnly: false,
     secure: useSecureCookie,
@@ -18,8 +19,8 @@ function setThemeCookie(response: NextResponse, theme: ThemePreference) {
 export async function GET(request: NextRequest) {
   try {
     const userId = await requireUserId(request)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const user = await prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { themePreference: true },
     })
 
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid theme' }, { status: 400 })
     }
 
-    const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
+    const userExists = await prisma.user.findFirst({ where: { id: userId, deletedAt: null }, select: { id: true } })
     if (userExists) {
       await prisma.user.update({
         where: { id: userId },

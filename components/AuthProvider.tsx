@@ -39,29 +39,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
 
-  const checkAuth = useCallback(async (pathToCheck: string | null) => {
-    // На страницах авторизации (login, register и т.д.) — не проверяем
-    if (isAuthPage(pathToCheck)) {
-      setLoading(false)
-      return
-    }
-
-    // Ставим loading при начале проверки — убирает мерцание при смене маршрута
+  const loadUser = useCallback(async (): Promise<AuthUser | null> => {
     setLoading(true)
-
-    const optional = isOptionalAuthPage(pathToCheck)
 
     try {
       const res = await fetch('/api/auth/me')
 
       if (res.status === 401) {
         setUser(null)
-        // На главной не редиректим — покажем Landing
-        if (!optional) {
-          router.push(`/login?redirect=${encodeURIComponent(pathToCheck || '/')}`)
-        }
-        return
+        return null
       }
 
       if (res.ok) {
@@ -69,23 +57,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // API может возвращать { user: {...} } или напрямую {...}
         const userData = data?.user ?? data
         setUser(userData)
-        
-        // Редирект на онбординг для новых пользователей
-        if (!userData.onboardingCompleted && pathToCheck !== '/onboarding') {
-          router.push('/onboarding')
-        }
+        return userData
       }
+
+      setUser(null)
+      return null
     } catch (error) {
       console.error('Auth check error:', error)
       setUser(null)
+      return null
     } finally {
+      setAuthChecked(true)
       setLoading(false)
     }
-  }, [router])
+  }, [])
 
   useEffect(() => {
-    void checkAuth(pathname)
-  }, [checkAuth, pathname])
+    if (isAuthPage(pathname)) {
+      setLoading(false)
+      setAuthChecked(false)
+      return
+    }
+
+    let cancelled = false
+
+    async function ensureAuthForRoute() {
+      const currentUser = authChecked ? user : await loadUser()
+      if (cancelled) return
+
+      const optional = isOptionalAuthPage(pathname)
+      if (!currentUser) {
+        if (!optional) {
+          router.push(`/login?redirect=${encodeURIComponent(pathname || '/')}`)
+        }
+        return
+      }
+
+      if (!currentUser.onboardingCompleted && pathname !== '/onboarding') {
+        router.push('/onboarding')
+      }
+    }
+
+    void ensureAuthForRoute()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authChecked, loadUser, pathname, router, user])
 
   const logout = useCallback(async () => {
     try {
@@ -94,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error)
     } finally {
       setUser(null)
+      setAuthChecked(false)
       router.push('/login')
     }
   }, [router])
@@ -103,8 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     isAuthenticated: !!user,
     logout,
-    refresh: () => checkAuth(pathname),
-  }), [user, loading, logout, checkAuth, pathname])
+    refresh: async () => { await loadUser() },
+  }), [user, loading, logout, loadUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

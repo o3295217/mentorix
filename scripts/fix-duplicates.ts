@@ -2,6 +2,18 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+function safeParseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string')
+  if (typeof value !== 'string' || value.length === 0) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 async function main() {
   // Step 1: Delete junk entries ("ыф", "sa")
   const junkResult = await prisma.periodGoal.deleteMany({
@@ -24,8 +36,8 @@ async function main() {
     if (!existing) {
       seen.set(key, pg)
     } else {
-      const keptGoals: string[] = JSON.parse(existing.goalsJson)
-      const pgGoals: string[] = JSON.parse(pg.goalsJson)
+      const keptGoals = safeParseJsonArray(existing.goalsJson)
+      const pgGoals = safeParseJsonArray(pg.goalsJson)
       if (pgGoals.filter(g => g.trim()).length > keptGoals.filter(g => g.trim()).length) {
         toDelete.push(existing.id)
         seen.set(key, pg)
@@ -56,7 +68,7 @@ async function main() {
   })
   console.log('\nPeriodGoal records for 2026:')
   for (const pg of pgs2026) {
-    console.log(`  [${pg.id}] ${pg.periodType} ${pg.periodStart.toISOString().slice(0, 10)} ${pg.goalsJson}`)
+    console.log(`  [${pg.id}] ${pg.periodType} ${pg.periodStart.toISOString().slice(0, 10)} ${JSON.stringify(pg.goalsJson)}`)
   }
 
   await prisma.$disconnect()

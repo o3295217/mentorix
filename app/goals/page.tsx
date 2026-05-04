@@ -18,17 +18,17 @@ import GoalsChatPanel from '@/components/goals/GoalsChatPanel'
 export default function GoalsPage() {
   const {
     dreamGoal,
+    dreamProgress,
+    yearEvaluations,
+    archivedYearGoalYears,
+    loadGoalsContext,
     saveDream,
     yearGoals,
-    loadYearGoalYears,
-    loadYearGoals,
     saveYearGoals,
     addYearGoal,
     removeYearGoal,
     editYearGoal,
     periodGoals,
-    loadPeriodGoalsWithKey,
-    loadAllWeeksForMonth,
     savePeriodGoals,
     addPeriodGoal,
     addPeriodGoalBatch,
@@ -68,7 +68,6 @@ export default function GoalsPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [chatOpen, setChatOpen] = useState(false)
   const [setupComplete, setSetupComplete] = useState(false)
-  const [archivedYearGoalYears, setArchivedYearGoalYears] = useState<number[]>([])
 
   // UI-состояния для недель
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set())
@@ -122,36 +121,9 @@ export default function GoalsPage() {
 
   const years = useMemo(() => [...archiveYears, ...activeYears], [archiveYears, activeYears])
 
-  // Прогресс к мечте — из API, основан на dreamProgressScore ежедневных оценок AI
-  const [dreamProgress, setDreamProgress] = useState({ total: 0, completed: 0, percent: 0 })
-
   useEffect(() => {
-    if (!dreamGoal) return
-    fetch('/api/progress')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && typeof data.progressPercent === 'number') {
-          const pct = Math.round(data.progressPercent)
-          setDreamProgress({
-            total: data.targetDays || 1,
-            completed: Math.round(data.effectiveDays || 0),
-            percent: pct,
-          })
-        }
-      })
-      .catch(() => {})
-  }, [dreamGoal])
-
-  // Средние оценки dreamProgressScore по годам (для учёта в прогрессе стратегических карточек)
-  const [yearEvaluations, setYearEvaluations] = useState<Record<number, { avg: number; count: number }>>({})
-
-  useEffect(() => {
-    if (!dreamGoal) return
-    fetch('/api/goals/year-evaluations')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data) setYearEvaluations(data) })
-      .catch(() => {})
-  }, [dreamGoal])
+    void loadGoalsContext(selectedYear)
+  }, [loadGoalsContext, selectedYear])
 
   // Определение: есть ли уже заполненные цели?
   const hasAnyGoals = useMemo(() => {
@@ -168,54 +140,11 @@ export default function GoalsPage() {
   const pageState = !dreamGoal ? 0 : !setupComplete ? 1 : 2
 
   useEffect(() => {
-    if (!dreamGoal) return
-
-    let cancelled = false
-
-    loadYearGoalYears().then((years) => {
-      if (cancelled) return
-      const pastYears = years.filter((year) => year < currentYear)
-      setArchivedYearGoalYears(pastYears)
-      for (const year of pastYears) loadYearGoals(year)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [dreamGoal, currentYear, loadYearGoalYears, loadYearGoals])
-
-  useEffect(() => {
     if (years.length === 0) return
     if (!years.includes(selectedYear)) {
       setSelectedYear(activeYears[0] ?? years[0])
     }
   }, [years, activeYears, selectedYear])
-
-  // Загрузка годовых целей
-  useEffect(() => {
-    if (activeYears.length === 0) return
-    for (const year of activeYears) loadYearGoals(year)
-  }, [activeYears, loadYearGoals])
-
-  // Загрузка данных для выбранного года
-  useEffect(() => {
-    if (!dreamGoal || pageState < 2) return
-    for (let h = 1; h <= 2; h++) {
-      loadPeriodGoalsWithKey('half_year', new Date(selectedYear, (h - 1) * 6, 1))
-    }
-    for (let q = 1; q <= 4; q++) {
-      loadPeriodGoalsWithKey('quarter', new Date(selectedYear, (q - 1) * 3, 1))
-    }
-    for (let m = 0; m < 12; m++) {
-      loadPeriodGoalsWithKey('month', new Date(selectedYear, m, 1))
-    }
-  }, [selectedYear, dreamGoal, pageState, loadPeriodGoalsWithKey])
-
-  // Загрузка недель для выбранного месяца
-  useEffect(() => {
-    if (!dreamGoal || pageState < 2) return
-    loadAllWeeksForMonth(selectedYear, selectedMonth)
-  }, [selectedYear, selectedMonth, dreamGoal, pageState, loadAllWeeksForMonth])
 
   // Горячие клавиши
   useEffect(() => {

@@ -5,7 +5,6 @@ export { useGoalsChat } from './useGoalsChat'
 export { useAcceptGoals } from './useAcceptGoals'
 export { useAutoSaveProfile } from './useAutoSaveProfile'
 export { useDaily } from './useDaily'
-export { useForecast } from './useForecast'
 export { useInlineEdit } from './useInlineEdit'
 export { useCopyDropdown } from './useCopyDropdown'
 

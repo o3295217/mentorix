@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { ForecastResponse } from '@/lib/prompts/types'
+import { fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 
 interface ForecastApiResponse {
   forecast: ForecastResponse
@@ -42,6 +43,7 @@ export default function ForecastPage() {
 
   const [loading, setLoading] = useState(false)
   const [forecast, setForecast] = useState<ForecastApiResponse | null>(null)
+  const [errorMessage, setErrorMessage] = useState('')
 
   // Автоматически установить базовый период при загрузке
   useEffect(() => {
@@ -51,6 +53,7 @@ export default function ForecastPage() {
 
   const selectBasePeriod = (type: 'week' | 'month' | 'quarter' | 'year' | 'custom') => {
     setBasePeriodType(type)
+    setErrorMessage('')
 
     if (type === 'custom') {
       // Для custom не меняем даты - пользователь сам выберет
@@ -82,6 +85,7 @@ export default function ForecastPage() {
 
   const selectHorizonPeriod = (type: 'week' | 'month' | 'quarter' | 'year' | 'custom') => {
     setForecastHorizon(type)
+    setErrorMessage('')
 
     if (type === 'custom') {
       // Для custom не меняем даты - пользователь сам выберет
@@ -117,15 +121,16 @@ export default function ForecastPage() {
 
   const generateForecast = async () => {
     if (!basePeriodStart || !basePeriodEnd) {
-      alert('Выберите базовый период для анализа')
+      setErrorMessage('Выберите базовый период для анализа')
       return
     }
 
     if (!horizonStart || !horizonEnd) {
-      alert('Выберите период для прогноза')
+      setErrorMessage('Выберите период для прогноза')
       return
     }
 
+    setErrorMessage('')
     setLoading(true)
     try {
       const body: {
@@ -144,22 +149,15 @@ export default function ForecastPage() {
         horizonEnd,
       }
 
-      const res = await fetch('/api/forecast', {
+      const data = await fetchJson<ForecastApiResponse>('/api/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to generate forecast')
-      }
-
-      const data = await res.json()
       setForecast(data)
     } catch (error) {
       console.error('Error generating forecast:', error)
-      alert(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+      setErrorMessage(`Ошибка: ${getFetchErrorMessage(error, 'неизвестная ошибка')}`)
     } finally {
       setLoading(false)
     }
@@ -399,6 +397,11 @@ export default function ForecastPage() {
         >
           {loading ? 'Генерирую прогноз...' : ' Сгенерировать прогноз'}
         </button>
+        {errorMessage && (
+          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-100">
+            {errorMessage}
+          </div>
+        )}
       </div>
 
       {/* Результаты прогноза */}
@@ -589,10 +592,10 @@ export default function ForecastPage() {
             </div>
           </div>
 
-          {/* Сценарии "что если" */}
+          {/* Сценарии что если */}
           {forecast.forecast.whatIfScenarios.length > 0 && (
             <div className="card">
-              <h2 className="text-2xl font-bold mb-4">Сценарии "Что если?"</h2>
+              <h2 className="text-2xl font-bold mb-4">Сценарии &ldquo;Что если?&rdquo;</h2>
               <div className="space-y-3">
                 {forecast.forecast.whatIfScenarios.map((scenario) => (
                   <div key={scenario.scenario} className="bg-gray-900/80 p-4 rounded-lg border-l-4 border-indigo-500">

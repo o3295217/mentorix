@@ -8,17 +8,19 @@
     "start": "next start",
     "lint": "eslint app components hooks lib --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cleanup:expired": "node scripts/cleanup-expired.mjs",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
     "@prisma/client": "5.22.0",
-    "@types/nodemailer": "^7.0.5",
     "bcrypt": "^6.0.0",
     "date-fns": "^4.1.0",
-    "next": "16.0.1",
-    "nodemailer": "^7.0.12",
+    "next": "16.2.4",
+    "nodemailer": "^8.0.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
@@ -28,18 +30,25 @@
     "@eslint/js": "^9.39.1",
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^22.10.1",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
     "baseline-browser-mapping": "^2.9.7",
     "eslint": "^9.17.0",
-    "eslint-config-next": "16.0.1",
+    "eslint-config-next": "16.2.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "postcss": "^8.4.49",
+    "postcss": "8.5.10",
     "prisma": "5.22.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.49.0"
+    "typescript-eslint": "^8.49.0",
+    "vitest": "^4.1.5"
+  },
+  "overrides": {
+    "lodash": "4.18.1",
+    "postcss": "8.5.10"
   }
 }

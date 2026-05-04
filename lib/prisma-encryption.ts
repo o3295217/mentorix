@@ -1,5 +1,33 @@
 import { Prisma } from '@prisma/client'
-import { encrypt, decrypt, isEncryptionEnabled, ENCRYPTED_FIELDS } from './encryption'
+import { encrypt, decrypt, isEncrypted, isEncryptionEnabled, ENCRYPTED_FIELDS, ENCRYPTED_JSON_FIELDS } from './encryption'
+
+const RELATION_MODEL_BY_MODEL: Record<string, Record<string, string>> = {
+  User: {
+    dreamGoals: 'DreamGoal',
+    yearGoals: 'YearGoal',
+    periodGoals: 'PeriodGoal',
+    goals: 'Goal',
+    dailyEntries: 'DailyEntry',
+    openTasks: 'OpenTask',
+    profile: 'UserProfile',
+    profileBlocks: 'ProfileBlock',
+    habits: 'Habit',
+    insights: 'UserInsights',
+    insightEntries: 'InsightEntry',
+    periodEvaluations: 'PeriodEvaluation',
+    worldContexts: 'WorldContext',
+    chatMessages: 'ChatMessage',
+    completedWork: 'CompletedWork',
+    workSummaries: 'WorkSummary',
+    planningProfile: 'PlanningProfile',
+  },
+  DailyEntry: { evaluation: 'Evaluation' },
+  Evaluation: { dailyEntry: 'DailyEntry' },
+  Goal: { parent: 'Goal', children: 'Goal' },
+  ProfileBlock: { categories: 'ProfileCategory', items: 'ProfileItem' },
+  ProfileCategory: { block: 'ProfileBlock', items: 'ProfileItem' },
+  ProfileItem: { block: 'ProfileBlock', category: 'ProfileCategory' },
+}
 
 // Шифрует указанные поля в объекте data
 function encryptFields(model: string, data: Record<string, unknown>): Record<string, unknown> {
@@ -7,10 +35,13 @@ function encryptFields(model: string, data: Record<string, unknown>): Record<str
   if (!fields) return data
 
   const result = { ...data }
+  const jsonFields = new Set(ENCRYPTED_JSON_FIELDS[model] || [])
   for (const field of fields) {
     const value = result[field]
-    if (typeof value === 'string' && value.length > 0) {
-      result[field] = encrypt(value)
+    if (jsonFields.has(field)) {
+      result[field] = encryptJsonField(value)
+    } else if (typeof value === 'string' && value.length > 0) {
+      result[field] = isEncrypted(value) ? value : encrypt(value)
     }
   }
   return result
@@ -21,13 +52,38 @@ function decryptFields(model: string, record: Record<string, unknown>): Record<s
   const fields = ENCRYPTED_FIELDS[model]
   if (!fields) return record
 
+  const jsonFields = new Set(ENCRYPTED_JSON_FIELDS[model] || [])
   for (const field of fields) {
     const value = record[field]
-    if (typeof value === 'string' && value.length > 0) {
+    if (jsonFields.has(field)) {
+      record[field] = decryptJsonField(value)
+    } else if (typeof value === 'string' && value.length > 0) {
       record[field] = decrypt(value)
     }
   }
   return record
+}
+
+function encryptJsonField(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+
+  if (typeof value === 'string') {
+    if (value.length === 0 || isEncrypted(value)) return value
+    return encrypt(value)
+  }
+
+  return encrypt(JSON.stringify(value))
+}
+
+function decryptJsonField(value: unknown): unknown {
+  if (typeof value !== 'string' || value.length === 0) return value
+
+  const plaintext = decrypt(value)
+  try {
+    return JSON.parse(plaintext)
+  } catch {
+    return plaintext
+  }
 }
 
 // Рекурсивно расшифровывает результат (объект, массив, или вложенные связи)
@@ -40,16 +96,17 @@ function decryptResult(model: string, result: unknown): unknown {
     decryptFields(model, result as Record<string, unknown>)
     // Расшифровываем вложенные связи
     for (const [key, value] of Object.entries(result as Record<string, unknown>)) {
-      if (value !== null && typeof value === 'object' && ENCRYPTED_FIELDS[capitalize(key)]) {
-        (result as Record<string, unknown>)[key] = decryptResult(capitalize(key), value)
+      const relationModel = getRelationModel(model, key)
+      if (value !== null && typeof value === 'object' && relationModel) {
+        (result as Record<string, unknown>)[key] = decryptResult(relationModel, value)
       }
     }
   }
   return result
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
+function getRelationModel(model: string, relationKey: string): string | undefined {
+  return RELATION_MODEL_BY_MODEL[model]?.[relationKey]
 }
 
 // Prisma middleware для автоматического шифрования/расшифровки
@@ -57,10 +114,12 @@ export const encryptionMiddleware: Prisma.Middleware = async (params, next) => {
   if (!isEncryptionEnabled()) return next(params)
 
   const model = params.model
-  if (!model || !ENCRYPTED_FIELDS[model]) return next(params)
+  if (!model) return next(params)
+  const hasEncryptedFields = !!ENCRYPTED_FIELDS[model]
+  const hasEncryptedRelations = !!RELATION_MODEL_BY_MODEL[model]
 
   // Шифрование при записи
-  if (params.action === 'create' || params.action === 'update' || params.action === 'upsert') {
+  if (hasEncryptedFields && (params.action === 'create' || params.action === 'update' || params.action === 'upsert')) {
     if (params.args.data) {
       params.args.data = encryptFields(model, params.args.data)
     }
@@ -75,7 +134,7 @@ export const encryptionMiddleware: Prisma.Middleware = async (params, next) => {
     }
   }
 
-  if (params.action === 'createMany' || params.action === 'updateMany') {
+  if (hasEncryptedFields && (params.action === 'createMany' || params.action === 'updateMany')) {
     if (params.args.data) {
       if (Array.isArray(params.args.data)) {
         params.args.data = params.args.data.map((item: Record<string, unknown>) =>
@@ -99,7 +158,9 @@ export const encryptionMiddleware: Prisma.Middleware = async (params, next) => {
     params.action === 'update' ||
     params.action === 'upsert'
   ) {
-    return decryptResult(model, result)
+    if (hasEncryptedFields || hasEncryptedRelations) {
+      return decryptResult(model, result)
+    }
   }
 
   return result

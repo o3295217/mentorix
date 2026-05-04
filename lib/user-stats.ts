@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma'
+import { safeParseJson } from '@/lib/safe-json'
+import { getTaskType } from '@/lib/task-categorize'
 
 // Тип для статистики по дням недели
 interface DayStats {
@@ -19,33 +21,6 @@ const DAYS_RU: { [key: number]: string } = {
   4: 'четверг',
   5: 'пятница',
   6: 'суббота',
-}
-
-// Определить тип задачи по тексту
-function getTaskType(text: string): string {
-  const lower = text.toLowerCase()
-  
-  // Привычки
-  if (lower.includes('подъём') || lower.includes('подъем') || 
-      lower.includes('зарядка') || lower.includes('душ') ||
-      lower.includes('начало работы') || lower.match(/^\d{1,2}:\d{2}/)) {
-    return 'привычки'
-  }
-  
-  // Оперативки/созвоны
-  if (lower.includes('оперативка') || lower.includes('созвон') ||
-      lower.includes('встреча') || lower.includes('звонок')) {
-    return 'созвоны'
-  }
-  
-  // Стратегические (длинные задачи с ключевыми словами)
-  if (lower.includes('стратег') || lower.includes('бюджет') ||
-      lower.includes('планирование') || lower.includes('анализ') ||
-      lower.includes('разработка') || lower.includes('проект')) {
-    return 'стратегические'
-  }
-  
-  return 'операционные'
 }
 
 // Извлечь ключевые слова из задачи
@@ -104,9 +79,7 @@ export async function recalculateUserStats(userId: string): Promise<void> {
       ? entry.planText.split('\n').filter(l => l.trim())
       : []
     
-    const selectedIds: number[] = entry.selectedTasksJson
-      ? JSON.parse(entry.selectedTasksJson)
-      : []
+    const selectedIds = safeParseJson<number[]>(entry.selectedTasksJson, [])
 
     const plannedCount = planLines.length
     const completedCount = Math.min(selectedIds.length, plannedCount)
@@ -287,62 +260,37 @@ export async function recalculateUserStats(userId: string): Promise<void> {
   // Привычки: средний % выполнения
   const habitsAvgCompletion = completionByType['привычки'] || 0
 
-  // Сохранить в БД (ищем по userId)
-  const existingStats = await prisma.userStats.findFirst({ where: { userId } })
-  
-  if (existingStats) {
-    await prisma.userStats.update({
-      where: { id: existingStats.id },
-      data: {
-        totalDays,
-        totalPlanned,
-        totalCompleted,
-        avgCompletionPct,
-        avgDailyScore,
-        completionByDayJson: JSON.stringify(completionByDay),
-        completionByTypeJson: JSON.stringify(completionByType),
-        frequentCompletedJson: JSON.stringify(frequentCompleted),
-        frequentFailedJson: JSON.stringify(frequentFailed),
-        habitsAvgCompletion,
-        trendDirection,
-        trendPct,
-        bestDayOfWeek: bestDay || null,
-        worstDayOfWeek: worstDay || null,
-        optimalTaskCount,
-        currentStreak,
-        bestStreak,
-      },
-    })
-  } else {
-    await prisma.userStats.create({
-      data: {
-        userId,
-        totalDays,
-        totalPlanned,
-        totalCompleted,
-        avgCompletionPct,
-        avgDailyScore,
-        completionByDayJson: JSON.stringify(completionByDay),
-        completionByTypeJson: JSON.stringify(completionByType),
-        frequentCompletedJson: JSON.stringify(frequentCompleted),
-        frequentFailedJson: JSON.stringify(frequentFailed),
-        habitsAvgCompletion,
-        trendDirection,
-        trendPct,
-        bestDayOfWeek: bestDay || null,
-        worstDayOfWeek: worstDay || null,
-        optimalTaskCount,
-        currentStreak,
-        bestStreak,
-      },
-    })
+  const statsData = {
+    totalDays,
+    totalPlanned,
+    totalCompleted,
+    avgCompletionPct,
+    avgDailyScore,
+    completionByDayJson: completionByDay,
+    completionByTypeJson: completionByType,
+    frequentCompletedJson: frequentCompleted,
+    frequentFailedJson: frequentFailed,
+    habitsAvgCompletion,
+    trendDirection,
+    trendPct,
+    bestDayOfWeek: bestDay || null,
+    worstDayOfWeek: worstDay || null,
+    optimalTaskCount,
+    currentStreak,
+    bestStreak,
   }
+
+  await prisma.userStats.upsert({
+    where: { userId },
+    create: { userId, ...statsData },
+    update: statsData,
+  })
 
   console.log('[UserStats] Recalculated stats for user', userId, ':', totalDays, 'days')
 }
 
 // Вспомогательная функция для расчёта % выполнения
-function calculateCompletionPct(entries: { planText: string | null; selectedTasksJson: string | null }[]): number {
+function calculateCompletionPct(entries: { planText: string | null; selectedTasksJson: unknown }[]): number {
   let total = 0
   let completed = 0
 
@@ -350,9 +298,7 @@ function calculateCompletionPct(entries: { planText: string | null; selectedTask
     const planLines = entry.planText
       ? entry.planText.split('\n').filter(l => l.trim())
       : []
-    const selectedIds: number[] = entry.selectedTasksJson
-      ? JSON.parse(entry.selectedTasksJson)
-      : []
+    const selectedIds = safeParseJson<number[]>(entry.selectedTasksJson, [])
 
     total += planLines.length
     completed += Math.min(selectedIds.length, planLines.length)
@@ -396,7 +342,7 @@ export async function getUserStatsForAI(userId: string): Promise<string> {
   lines.push(``)
   
   // По дням недели
-  const byDay = JSON.parse(stats.completionByDayJson || '{}')
+  const byDay = safeParseJson<Record<string, number>>(stats.completionByDayJson, {})
   if (Object.keys(byDay).length > 0) {
     lines.push(`📅 Эффективность по дням недели:`)
     for (const [day, pct] of Object.entries(byDay)) {
@@ -413,7 +359,7 @@ export async function getUserStatsForAI(userId: string): Promise<string> {
   }
   
   // По типам задач
-  const byType = JSON.parse(stats.completionByTypeJson || '{}')
+  const byType = safeParseJson<Record<string, number>>(stats.completionByTypeJson, {})
   if (Object.keys(byType).length > 0) {
     lines.push(`🏷️ Эффективность по типам задач:`)
     for (const [type, pct] of Object.entries(byType)) {
@@ -424,8 +370,8 @@ export async function getUserStatsForAI(userId: string): Promise<string> {
   }
   
   // Ключевые слова
-  const completed = JSON.parse(stats.frequentCompletedJson || '[]')
-  const failed = JSON.parse(stats.frequentFailedJson || '[]')
+  const completed = safeParseJson<string[]>(stats.frequentCompletedJson, [])
+  const failed = safeParseJson<string[]>(stats.frequentFailedJson, [])
   
   if (completed.length > 0) {
     lines.push(`✅ Часто ВЫПОЛНЯЕМЫЕ задачи (ключевые слова): ${completed.slice(0, 5).join(', ')}`)

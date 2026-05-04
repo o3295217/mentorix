@@ -8,31 +8,37 @@ import { useDaily } from '@/hooks/useDaily'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 import { areTasksSimilar } from '@/lib/task-match'
+import { fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
+type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
+
+type FactsResponse = {
+  items: Array<{ id: number; text: string; type: string; category: string | null }>
+  stats: { total: number }
+}
 
 export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const activeTaskActionRowRef = useRef<HTMLDivElement | null>(null)
   const [mounted, setMounted] = useState(false)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
 
-  // Модальное окно создания привычки
-  const [showHabitModal, setShowHabitModal] = useState(false)
-  const [habitTaskText, setHabitTaskText] = useState('')
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
   
-  // Inline-подтверждение действий (taskId + тип действия)
-  const [confirmAction, setConfirmAction] = useState<{ taskId: number; type: 'delete' | 'postpone' } | null>(null)
+  // Локальное состояние action-кнопок строки задачи
+  const [activeTaskAction, setActiveTaskAction] = useState<{ taskId: number; type: TaskActionType } | null>(null)
   
   // Inline-подтверждение удаления extra tasks
   const [confirmExtraDelete, setConfirmExtraDelete] = useState<number | null>(null)
   
   // Сворачивание выполненных задач
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showHabitsExpanded, setShowHabitsExpanded] = useState(false)
   
   // Отклонённые предложения привычек - загружаем из localStorage
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => {
@@ -60,6 +66,31 @@ export default function DailyPage() {
       localStorage.setItem('dismissedHabitSuggestions', JSON.stringify([...dismissedSuggestions]))
     }
   }, [dismissedSuggestions])
+
+  useEffect(() => {
+    if (!activeTaskAction) return
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (!activeTaskActionRowRef.current) return
+      if (!activeTaskActionRowRef.current.contains(event.target as Node)) {
+        setActiveTaskAction(null)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveTaskAction(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [activeTaskAction])
   
   const {
     selectedDate,
@@ -109,6 +140,7 @@ export default function DailyPage() {
     handleDrop,
     savePlan,
     evaluate,
+    showMessage,
     // Habits
     habits,
     habitSuggestions,
@@ -161,22 +193,32 @@ export default function DailyPage() {
     return habits.find(h => h.taskText.toLowerCase() === taskText.toLowerCase())
   }
 
-  // Открыть модальное окно для создания привычки
-  const openHabitModal = (taskText: string) => {
-    setHabitTaskText(taskText)
-    setHabitFrequency('daily')
-    setHabitDays([])
-    setShowHabitModal(true)
-  }
+  const closeTaskAction = useCallback(() => {
+    setActiveTaskAction(null)
+  }, [])
+
+  const toggleTaskAction = useCallback((taskId: number, type: TaskActionType) => {
+    setActiveTaskAction((prev) => {
+      if (prev?.taskId === taskId && prev.type === type) {
+        return null
+      }
+      return { taskId, type }
+    })
+
+    if (type === 'habit-create') {
+      setHabitFrequency('daily')
+      setHabitDays([])
+    }
+  }, [])
 
   // Создать привычку с выбранными параметрами
-  const handleCreateHabit = async () => {
+  const handleCreateHabit = async (taskText: string) => {
     await createHabitFromTask(
-      habitTaskText, 
+      taskText,
       habitFrequency, 
       habitFrequency === 'weekly' || habitFrequency === 'custom' ? habitDays : undefined
     )
-    setShowHabitModal(false)
+    setActiveTaskAction(null)
   }
 
   // Переключить день недели
@@ -211,7 +253,7 @@ export default function DailyPage() {
     
     // Отправляем решения на сервер
     try {
-      const res = await fetch('/api/tasks/process-uncompleted', {
+      await fetchJson('/api/tasks/process-uncompleted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -219,12 +261,10 @@ export default function DailyPage() {
           sourceDate: selectedDate
         })
       })
-      
-      if (!res.ok) {
-        console.error('Error processing uncompleted tasks')
-      }
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error processing uncompleted tasks:', error)
+      showMessage(`Не удалось обработать невыполненные задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      return
     }
     
     // Продолжаем оценку
@@ -301,24 +341,34 @@ export default function DailyPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [weekRes, todayRes] = await Promise.all([
-          fetch('/api/facts?period=week&limit=200'),
-          fetch(`/api/facts?from=${selectedDate}&to=${selectedDate}&limit=200`),
+        const [weekResult, todayResult] = await Promise.allSettled([
+          fetchJson<FactsResponse>('/api/facts?period=week&limit=200'),
+          fetchJson<FactsResponse>(`/api/facts?from=${selectedDate}&to=${selectedDate}&limit=200`),
         ])
-        if (weekRes.ok) {
-          const data = await weekRes.json()
+
+        if (weekResult.status === 'fulfilled') {
           // Неделя — без привычек (фильтр по category, т.к. type всегда 'task')
-          const withoutHabits = (data.items as Array<{ id: number; text: string; type: string; category: string | null }>).filter((i) => i.category !== 'привычки')
+          const withoutHabits = weekResult.value.items.filter((i) => i.category !== 'привычки')
           setWeekFacts(withoutHabits)
           setWeekFactsTotal(withoutHabits.length)
+        } else {
+          console.error('Error loading week facts:', weekResult.reason)
+          setWeekFacts([])
+          setWeekFactsTotal(0)
         }
-        if (todayRes.ok) {
-          const data = await todayRes.json()
+
+        if (todayResult.status === 'fulfilled') {
           // Сегодня — всё выполненное
-          setTodayFacts(data.items)
-          setTodayFactsTotal(data.stats.total)
+          setTodayFacts(todayResult.value.items)
+          setTodayFactsTotal(todayResult.value.stats.total)
+        } else {
+          console.error('Error loading today facts:', todayResult.reason)
+          setTodayFacts([])
+          setTodayFactsTotal(0)
         }
-      } catch { /* игнорируем */ }
+      } catch (error) {
+        console.error('Error loading facts:', error)
+      }
     })()
   }, [selectedDate])
 
@@ -356,10 +406,11 @@ export default function DailyPage() {
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="text-blue-400 hover:text-blue-200 text-sm px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/20 rounded-md whitespace-nowrap font-medium"
+                        className="text-blue-400 hover:text-blue-200 text-lg leading-none px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/20 rounded-md whitespace-nowrap font-medium"
                         title="Добавить в план дня"
+                        aria-label="Добавить в план дня"
                       >
-                        → в план дня
+                        →
                       </button>
                     )}
                   </li>
@@ -392,10 +443,11 @@ export default function DailyPage() {
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="text-purple-400 hover:text-purple-200 text-sm px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/20 rounded-md whitespace-nowrap font-medium"
+                        className="text-purple-400 hover:text-purple-200 text-lg leading-none px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/20 rounded-md whitespace-nowrap font-medium"
                         title="Добавить в план дня"
+                        aria-label="Добавить в план дня"
                       >
-                        → в план дня
+                        →
                       </button>
                     )}
                   </li>
@@ -529,14 +581,12 @@ export default function DailyPage() {
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
 
             return (
-              <div className="group mb-4 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg mr-6 transition-all duration-200 hover:p-3">
-                {/* Компактный вид — одна строка */}
+              <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mr-6">
                 <div className="flex items-center gap-2">
-                  
                   <span className="text-sm text-amber-300 font-medium">
                     Привычки ({habits.length})
                   </span>
-                  <div className="flex-1 flex gap-1 overflow-hidden group-hover:hidden">
+                  <div className="flex-1 flex gap-1 overflow-hidden">
                     {habits.slice(0, 3).map((habit) => {
                       const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
                       return (
@@ -556,18 +606,30 @@ export default function DailyPage() {
                       <span className="text-xs text-amber-500">+{habits.length - 3}</span>
                     )}
                   </div>
-                  {habitsNotInPlan.length > 0 && (
-                    <button
-                      onClick={() => addHabitsToTasks()}
-                      className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      + Все в план
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowHabitsExpanded((prev) => !prev)}
+                    className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-md bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors"
+                    title={showHabitsExpanded ? 'Свернуть привычки' : 'Развернуть привычки'}
+                    aria-label={showHabitsExpanded ? 'Свернуть привычки' : 'Развернуть привычки'}
+                    aria-expanded={showHabitsExpanded}
+                  >
+                    {showHabitsExpanded ? '▴' : '▾'}
+                  </button>
                 </div>
-                
-                {/* Развёрнутый вид — при наведении */}
-                <div className="hidden group-hover:block mt-2 pt-2 border-t border-amber-500/20">
+
+                {showHabitsExpanded && (
+                <div className="mt-3 pt-3 border-t border-amber-500/20">
+                  {habitsNotInPlan.length > 0 && (
+                    <div className="mb-2 flex justify-end">
+                      <button
+                        onClick={() => addHabitsToTasks()}
+                        className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors"
+                      >
+                        + Все в план
+                      </button>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-1">
                     {habits.map((habit) => {
                       const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
@@ -607,6 +669,7 @@ export default function DailyPage() {
                     })}
                   </div>
                 </div>
+                )}
               </div>
             )
           })()}
@@ -619,7 +682,7 @@ export default function DailyPage() {
                 {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).slice(0, 3).map((suggestion, index) => (
                   <div key={index} className="flex items-center justify-between text-sm gap-2">
                     <span className="text-amber-300 truncate flex-1">
-                      "{suggestion.text}" — {suggestion.totalCount} раз
+                      &ldquo;{suggestion.text}&rdquo; — {suggestion.totalCount} раз
                     </span>
                     <div className="flex gap-1 flex-shrink-0">
                       <button
@@ -654,147 +717,258 @@ export default function DailyPage() {
                 {/* Невыполненные задачи */}
                 {tasks.filter(t => !selectedTasks.has(t.id)).map((task) => {
                   const index = tasks.findIndex(t => t.id === task.id)
+                  const habit = getHabitForTask(task.taskText)
+                  const isPostponeActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'postpone'
+                  const isHabitActive = activeTaskAction?.taskId === task.id && (activeTaskAction.type === 'habit-create' || activeTaskAction.type === 'habit-remove')
+                  const isDeleteActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'
+
                   return (
                     <div
                       key={task.id}
-                      draggable={editingTaskId !== task.id}
-                      onDragStart={() => handleDragStart(task.id)}
-                      onDragOver={handleDragOver}
-                      onDrop={() => handleDrop(task.id)}
-                      className={`flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors ${
-                        editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
-                      } ${
-                    selectedTasks.has(task.id)
-                      ? 'bg-green-500/10 border-green-500/20'
-                      : savedFlags[index]
-                        ? 'bg-gray-900/80 border-gray-700 hover:border-gray-600'
-                        : 'bg-gray-900/80 border-gray-700 hover:border-gray-600 opacity-60'
-                  } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
-                >
-                  <span className="text-gray-500 cursor-grab active:cursor-grabbing">⋮⋮</span>
-                  <input
-                    type="checkbox"
-                    checked={selectedTasks.has(task.id)}
-                    onChange={() => toggleTaskSelection(task.id)}
-                  />
-
-                  {editingTaskId === task.id ? (
-                    <input
-                      type="text"
-                      value={editingTaskText}
-                      onChange={(e) => setEditingTaskText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          saveEditedTask(task.id)
-                        } else if (e.key === 'Escape') {
-                          cancelEditingTask()
-                        }
-                      }}
-                      onBlur={() => saveEditedTask(task.id)}
-                      autoFocus
-                      className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100"
-                    />
-                  ) : (
-                    <span
-                      className={`flex-1 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
-                      onDoubleClick={() => startEditingTask(task.id, task.taskText)}
-                      title="Дважды кликните для редактирования"
+                      ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
+                      className="space-y-2"
                     >
-                      {task.taskText}
-                    </span>
-                  )}
-
-                  {/* Кнопка перенести на завтра */}
-                  {confirmAction?.taskId === task.id && confirmAction.type === 'postpone' ? (
-                    <div className="flex items-center gap-1 bg-blue-500/15 rounded px-1">
-                      <span className="text-xs text-blue-400">На завтра?</span>
-                      <button
-                        onClick={() => {
-                          postponeTask(task.id, task.taskText)
-                          setConfirmAction(null)
-                        }}
-                        className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
+                      <div
+                        draggable={editingTaskId !== task.id}
+                        onDragStart={() => handleDragStart(task.id)}
+                        onDragOver={handleDragOver}
+                        onDrop={() => handleDrop(task.id)}
+                        className={`flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors ${
+                          editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
+                        } ${
+                      selectedTasks.has(task.id)
+                        ? 'bg-green-500/10 border-green-500/20'
+                        : savedFlags[index]
+                          ? 'bg-gray-900/80 border-gray-700 hover:border-gray-600'
+                          : 'bg-gray-900/80 border-gray-700 hover:border-gray-600 opacity-60'
+                    } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                       >
-                        ✓
-                      </button>
-                      <button
-                        onClick={() => setConfirmAction(null)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
-                      >
-                        ✗
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmAction({ taskId: task.id, type: 'postpone' })}
-                      className="w-6 h-6 flex items-center justify-center text-blue-500 hover:text-blue-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
-                      title="Перенести на завтра"
-                    >
-                      →
-                    </button>
-                  )}
+                        <span className="text-gray-500 cursor-grab active:cursor-grabbing">⋮⋮</span>
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.has(task.id)}
+                          onChange={() => toggleTaskSelection(task.id)}
+                        />
 
-                  {/* Кнопка создать/удалить привычку */}
-                  {(() => {
-                    const habit = getHabitForTask(task.taskText)
-                    if (habit) {
-                      // Задача является привычкой — показываем кнопку удаления цикла
-                      return (
+                        {editingTaskId === task.id ? (
+                          <input
+                            type="text"
+                            value={editingTaskText}
+                            onChange={(e) => setEditingTaskText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                saveEditedTask(task.id)
+                              } else if (e.key === 'Escape') {
+                                cancelEditingTask()
+                              }
+                            }}
+                            onBlur={() => saveEditedTask(task.id)}
+                            autoFocus
+                            className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100"
+                          />
+                        ) : (
+                          <span
+                            className={`flex-1 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
+                            onDoubleClick={() => startEditingTask(task.id, task.taskText)}
+                            title="Дважды кликните для редактирования"
+                          >
+                            {task.taskText}
+                          </span>
+                        )}
+
                         <button
-                          onClick={() => {
-                            if (confirm(`Снять цикличность с "${task.taskText}"?`)) {
-                              deleteHabit(habit.id)
-                            }
-                          }}
-                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-red-500 hover:bg-gray-700 rounded transition-all"
-                          title="Снять цикличность (удалить привычку)"
+                          onClick={() => toggleTaskAction(task.id, 'postpone')}
+                          className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                            isPostponeActive
+                              ? 'bg-blue-500/15 text-blue-300 opacity-100'
+                              : 'text-blue-500 hover:text-blue-400 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                          }`}
+                          title="Перенести на завтра"
+                          aria-pressed={isPostponeActive}
                         >
-                          ×
+                          →
                         </button>
-                      )
-                    } else {
-                      // Не привычка — показываем кнопку создания
-                      return (
+
                         <button
-                          onClick={() => openHabitModal(task.taskText)}
-                          className="w-6 h-6 flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
-                          title="Сделать привычкой"
+                          onClick={() => toggleTaskAction(task.id, habit ? 'habit-remove' : 'habit-create')}
+                          className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                            isHabitActive
+                              ? 'bg-amber-500/15 text-amber-300 opacity-100'
+                              : 'text-amber-500 hover:text-amber-400 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                          }`}
+                          title={habit ? 'Снять цикличность' : 'Сделать привычкой'}
+                          aria-pressed={isHabitActive}
                         >
                           ↻
                         </button>
-                      )
-                    }
-                  })()}
-                  {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
-                    <div className="flex items-center gap-1 bg-red-900/50 rounded px-1">
-                      <span className="text-xs text-red-300">Удалить?</span>
-                      <button
-                        onClick={() => {
-                          removeTask(task.id)
-                          setConfirmAction(null)
-                        }}
-                        className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={() => setConfirmAction(null)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
-                      >
-                        ✗
-                      </button>
+
+                        <button
+                          onClick={() => toggleTaskAction(task.id, 'delete')}
+                          className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                            isDeleteActive
+                              ? 'bg-red-500/15 text-red-300 opacity-100'
+                              : 'text-red-500 hover:text-red-400 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                          }`}
+                          title="Удалить задачу"
+                          aria-pressed={isDeleteActive}
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      {activeTaskAction?.taskId === task.id && (
+                        <div className={`ml-10 mr-2 rounded-lg border px-3 py-2 ${
+                          activeTaskAction.type === 'postpone'
+                            ? 'border-blue-500/20 bg-blue-500/10'
+                            : activeTaskAction.type === 'delete'
+                              ? 'border-red-500/20 bg-red-900/30'
+                              : 'border-amber-500/20 bg-amber-500/10'
+                        }`}>
+                          {activeTaskAction.type === 'postpone' && (
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm text-blue-300">Перенести задачу на завтра?</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    postponeTask(task.id, task.taskText)
+                                    closeTaskAction()
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={closeTaskAction}
+                                  className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                >
+                                  ✗
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {activeTaskAction.type === 'delete' && (
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm text-red-300">Удалить задачу?</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    removeTask(task.id)
+                                    closeTaskAction()
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={closeTaskAction}
+                                  className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                >
+                                  ✗
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {activeTaskAction.type === 'habit-remove' && habit && (
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm text-amber-200">Снять цикличность с задачи?</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={async () => {
+                                    await deleteHabit(habit.id)
+                                    closeTaskAction()
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={closeTaskAction}
+                                  className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                >
+                                  ✗
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {activeTaskAction.type === 'habit-create' && (
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm text-amber-200">Сделать привычкой:</span>
+                                {[
+                                  { value: 'daily', label: 'Ежедневно' },
+                                  { value: 'weekdays', label: 'Будни' },
+                                  { value: 'weekends', label: 'Выходные' },
+                                  { value: 'weekly', label: 'Раз в неделю' },
+                                  { value: 'custom', label: 'Свои дни' },
+                                ].map(option => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setHabitFrequency(option.value as FrequencyType)}
+                                    className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                                      habitFrequency === option.value
+                                        ? 'bg-amber-500 text-white'
+                                        : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                    }`}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {(habitFrequency === 'weekly' || habitFrequency === 'custom') && (
+                                <div className="flex flex-wrap gap-1">
+                                  {[
+                                    { day: 1, label: 'Пн' },
+                                    { day: 2, label: 'Вт' },
+                                    { day: 3, label: 'Ср' },
+                                    { day: 4, label: 'Чт' },
+                                    { day: 5, label: 'Пт' },
+                                    { day: 6, label: 'Сб' },
+                                    { day: 7, label: 'Вс' },
+                                  ].map(({ day, label }) => (
+                                    <button
+                                      key={day}
+                                      type="button"
+                                      onClick={() => toggleDay(day)}
+                                      className={`w-9 h-9 rounded-lg text-xs font-medium transition-colors ${
+                                        habitDays.includes(day)
+                                          ? 'bg-amber-500 text-white'
+                                          : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                      }`}
+                                    >
+                                      {label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={closeTaskAction}
+                                  className="px-3 py-1.5 border border-gray-700 text-gray-200 rounded-lg hover:bg-gray-800 transition-colors text-sm"
+                                >
+                                  Отмена
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCreateHabit(task.taskText)}
+                                  disabled={(habitFrequency === 'weekly' || habitFrequency === 'custom') && habitDays.length === 0}
+                                  className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
+                                >
+                                  Создать
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmAction({ taskId: task.id, type: 'delete' })}
-                      className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
-                      title="Удалить задачу"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
                   )
                 })}
 
@@ -822,51 +996,62 @@ export default function DailyPage() {
                       {tasks.filter(t => selectedTasks.has(t.id)).map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-gray-900/80 border-gray-700 opacity-50 hover:opacity-70"
+                          ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
+                          className="space-y-2"
                         >
-                          
-                          <input
-                            type="checkbox"
-                            checked={true}
-                            onChange={() => toggleTaskSelection(task.id)}
-                          />
-                          <span className="flex-1 text-base text-gray-400">
-                            {task.taskText}
-                          </span>
-                          {confirmAction?.taskId === task.id && confirmAction.type === 'delete' ? (
-                            <div className="flex items-center gap-1 bg-red-900/50 rounded px-1">
-                              <span className="text-xs text-red-300">Удалить?</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removeTask(task.id)
-                                  setConfirmAction(null)
-                                }}
-                                className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
-                              >
-                                ✓
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setConfirmAction(null)
-                                }}
-                                className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
-                              >
-                                ✗
-                              </button>
-                            </div>
-                          ) : (
+                          <div className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-gray-900/80 border-gray-700 opacity-50 hover:opacity-70">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              onChange={() => toggleTaskSelection(task.id)}
+                            />
+                            <span className="flex-1 text-base text-gray-400">
+                              {task.taskText}
+                            </span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setConfirmAction({ taskId: task.id, type: 'delete' })
+                                toggleTaskAction(task.id, 'delete')
                               }}
-                              className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
+                              className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                                activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'
+                                  ? 'bg-red-500/15 text-red-300 opacity-100'
+                                  : 'text-red-400 hover:text-red-300 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                              }`}
                               title="Удалить задачу"
+                              aria-pressed={activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'}
                             >
                               ×
                             </button>
+                          </div>
+
+                          {activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete' && (
+                            <div className="ml-10 mr-2 rounded-lg border border-red-500/20 bg-red-900/30 px-3 py-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-sm text-red-300">Удалить задачу?</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      removeTask(task.id)
+                                      closeTaskAction()
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      closeTaskAction()
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                  >
+                                    ✗
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -937,13 +1122,13 @@ export default function DailyPage() {
                             removeExtraTask(index)
                             setConfirmExtraDelete(null)
                           }}
-                          className="w-5 h-5 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-xs"
+                          className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
                         >
                           ✓
                         </button>
                         <button
                           onClick={() => setConfirmExtraDelete(null)}
-                          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-xs"
+                          className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
                         >
                           ✗
                         </button>
@@ -951,7 +1136,7 @@ export default function DailyPage() {
                     ) : (
                       <button
                         onClick={() => setConfirmExtraDelete(index)}
-                        className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
+                        className="w-8 h-8 flex items-center justify-center text-2xl leading-none text-red-500 hover:text-red-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
                         title="Удалить"
                       >
                         ×
@@ -1174,98 +1359,6 @@ export default function DailyPage() {
           )
         })()}
       </div>
-
-      {/* Модальное окно создания привычки */}
-      {showHabitModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-900/80 border border-gray-700 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-xl font-bold mb-4 text-white">Создать привычку</h3>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-1">Задача:</label>
-              <p className="text-gray-100 bg-gray-950 p-2 rounded">{habitTaskText}</p>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Повторять:</label>
-              <div className="space-y-2">
-                {[
-                  { value: 'daily', label: 'Ежедневно' },
-                  { value: 'weekdays', label: 'По будням (Пн-Пт)' },
-                  { value: 'weekends', label: 'По выходным (Сб-Вс)' },
-                  { value: 'weekly', label: 'Раз в неделю' },
-                  { value: 'custom', label: 'Выбрать дни' },
-                ].map(option => (
-                  <label 
-                    key={option.value} 
-                    className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors ${
-                      habitFrequency === option.value 
-                        ? 'border-amber-500 bg-amber-900/20' 
-                        : 'border-gray-700 hover:border-gray-600'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="frequency"
-                      value={option.value}
-                      checked={habitFrequency === option.value}
-                      onChange={(e) => setHabitFrequency(e.target.value as FrequencyType)}
-                      className="mr-2"
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Выбор дней для weekly и custom */}
-            {(habitFrequency === 'weekly' || habitFrequency === 'custom') && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Дни недели:</label>
-                <div className="flex gap-1">
-                  {[
-                    { day: 1, label: 'Пн' },
-                    { day: 2, label: 'Вт' },
-                    { day: 3, label: 'Ср' },
-                    { day: 4, label: 'Чт' },
-                    { day: 5, label: 'Пт' },
-                    { day: 6, label: 'Сб' },
-                    { day: 7, label: 'Вс' },
-                  ].map(({ day, label }) => (
-                    <button
-                      key={day}
-                      onClick={() => toggleDay(day)}
-                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                        habitDays.includes(day)
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-gray-800 text-gray-200 hover:bg-gray-600'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setShowHabitModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-700 text-gray-200 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleCreateHabit}
-                disabled={(habitFrequency === 'weekly' || habitFrequency === 'custom') && habitDays.length === 0}
-                className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
-              >
-                Создать
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Модалка невыполненных задач */}
       {showUncompletedModal && (

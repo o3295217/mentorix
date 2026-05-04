@@ -292,9 +292,9 @@ if [ "$HOUR" = "08" ] && [ ! -f "$DIGEST_SENT_FILE" ]; then
       const since = new Date('${YESTERDAY}T00:00:00Z');
       const until = new Date('${DATE_TAG}T00:00:00Z');
       Promise.all([
-        p.\$queryRawUnsafe(\"SELECT action, COUNT(*)::int as cnt FROM audit_logs WHERE \\\"createdAt\\\" >= '\"+since.toISOString()+\"' AND \\\"createdAt\\\" < '\"+until.toISOString()+\"' GROUP BY action ORDER BY cnt DESC\"),
-        p.\$queryRawUnsafe(\"SELECT DISTINCT \\\"ipAddress\\\" FROM audit_logs WHERE \\\"createdAt\\\" >= '\"+since.toISOString()+\"' AND \\\"createdAt\\\" < '\"+until.toISOString()+\"' AND \\\"ipAddress\\\" IS NOT NULL\"),
-        p.\$queryRawUnsafe(\"SELECT COUNT(*)::int as total FROM audit_logs WHERE \\\"createdAt\\\" >= '\"+since.toISOString()+\"' AND \\\"createdAt\\\" < '\"+until.toISOString()+\"'\")
+        p.\$queryRaw\`SELECT action, COUNT(*)::int as cnt FROM audit_logs WHERE \"createdAt\" >= \${since} AND \"createdAt\" < \${until} GROUP BY action ORDER BY cnt DESC\`,
+        p.\$queryRaw\`SELECT DISTINCT \"ipAddress\" FROM audit_logs WHERE \"createdAt\" >= \${since} AND \"createdAt\" < \${until} AND \"ipAddress\" IS NOT NULL\`,
+        p.\$queryRaw\`SELECT COUNT(*)::int as total FROM audit_logs WHERE \"createdAt\" >= \${since} AND \"createdAt\" < \${until}\`
       ]).then(([actions, ips, [total]]) => {
         const lines = [total.total + ' событий'];
         actions.forEach(a => lines.push(a.action + ': ' + a.cnt));

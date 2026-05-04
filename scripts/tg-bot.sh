@@ -243,12 +243,13 @@ cmd_check() {
   AUDIT_DATA=$(docker exec "$CONTAINER" node -e "
     const { PrismaClient } = require('@prisma/client');
     const p = new PrismaClient();
-    const h24 = new Date(Date.now() - 24*60*60*1000).toISOString();
+    const h24 = new Date(Date.now() - 24*60*60*1000);
+    const loginAction = 'login';
     Promise.all([
-      p.\$queryRawUnsafe(\"SELECT action, COUNT(*)::int as cnt FROM audit_logs WHERE \\\"createdAt\\\" >= '\" + h24 + \"' GROUP BY action ORDER BY cnt DESC\"),
-      p.\$queryRawUnsafe(\"SELECT COUNT(DISTINCT \\\"ipAddress\\\")::int as cnt FROM audit_logs WHERE \\\"createdAt\\\" >= '\" + h24 + \"' AND \\\"ipAddress\\\" IS NOT NULL\"),
-      p.\$queryRawUnsafe(\"SELECT COUNT(*)::int as cnt FROM sessions WHERE \\\"expiresAt\\\" > NOW()\"),
-      p.\$queryRawUnsafe(\"SELECT \\\"ipAddress\\\", MAX(\\\"createdAt\\\") as t FROM audit_logs WHERE action='login' AND \\\"createdAt\\\" >= '\" + h24 + \"' GROUP BY \\\"ipAddress\\\"\"),
+      p.\$queryRaw\`SELECT action, COUNT(*)::int as cnt FROM audit_logs WHERE \"createdAt\" >= \${h24} GROUP BY action ORDER BY cnt DESC\`,
+      p.\$queryRaw\`SELECT COUNT(DISTINCT \"ipAddress\")::int as cnt FROM audit_logs WHERE \"createdAt\" >= \${h24} AND \"ipAddress\" IS NOT NULL\`,
+      p.\$queryRaw\`SELECT COUNT(*)::int as cnt FROM sessions WHERE \"expiresAt\" > NOW()\`,
+      p.\$queryRaw\`SELECT \"ipAddress\", MAX(\"createdAt\") as t FROM audit_logs WHERE action = \${loginAction} AND \"createdAt\" >= \${h24} GROUP BY \"ipAddress\"\`,
     ]).then(([actions, [ips], [sessions], loginIps]) => {
       const r = {};
       r.actions = actions.map(a => a.action + ': ' + a.cnt).join(', ') || 'нет';

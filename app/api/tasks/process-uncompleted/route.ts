@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { parseDateParam } from '@/lib/dates'
 import { requireUserId } from '@/lib/get-user-id'
 import { areTasksSimilar } from '@/lib/task-match'
+import { safeParseJson } from '@/lib/api-utils'
 
 interface TransferAction {
   type: 'transfer'
@@ -123,18 +124,13 @@ export async function POST(request: NextRequest) {
             })
 
             if (sourceEntry) {
-              let selectedTasks: number[] = []
-              try {
-                selectedTasks = JSON.parse(sourceEntry.selectedTasksJson || '[]')
-              } catch {
-                selectedTasks = []
-              }
+              const selectedTasks = safeParseJson<number[]>(sourceEntry.selectedTasksJson, [])
 
               if (!selectedTasks.includes(taskId)) {
                 selectedTasks.push(taskId)
                 await prisma.dailyEntry.update({
                   where: { id: sourceEntry.id },
-                  data: { selectedTasksJson: JSON.stringify(selectedTasks) }
+                  data: { selectedTasksJson: selectedTasks }
                 })
               }
             }

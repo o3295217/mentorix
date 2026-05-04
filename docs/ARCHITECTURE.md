@@ -1028,12 +1028,11 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (15 основных + 10 для целей)
+### Список компонентов (13 основных + 8 для целей)
 
 **Основные:**
 - `AuthGuard`
 - `AuthProvider`
-- `BalanceFlags`
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `ExpandableInput`
@@ -1044,20 +1043,17 @@ export async function getUserStatsForAI(): Promise<string>
 - `Providers`
 - `Speedometer`
 - `ThemeProvider`
-- `ThemeToggle`
 - `UncompletedTasksModal`
 
 **Компоненты целей (goals/):**
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
-- `goals/HorizonsCard`
 - `goals/MonthSection`
 - `goals/MonthTimeline`
 - `goals/PeriodView`
 - `goals/StrategyCards`
 - `goals/WeekCard`
-- `goals/WeekStrip`
 
 ### Иерархия компонентов целей
 

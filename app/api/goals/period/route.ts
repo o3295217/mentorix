@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         },
       },
       update: {
-        goalsJson: JSON.stringify(goals),
+        goalsJson: goals,
         periodEnd: parsedEnd,
       },
       create: {
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         periodType,
         periodStart: parsedStart,
         periodEnd: parsedEnd,
-        goalsJson: JSON.stringify(goals),
+        goalsJson: goals,
       },
     })
 

@@ -3,6 +3,7 @@ import { logoutUser, getTokenFromRequest, getAuthUser } from '@/lib/auth';
 import { THEME_COOKIE_KEY } from '@/lib/theme'
 import { AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { audit, getAuditContext } from '@/lib/audit'
+import { shouldUseSecureCookies } from '@/lib/cookie-security'
 
 export async function POST(request: Request) {
   try {
@@ -18,11 +19,12 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({ success: true });
+    const useSecureCookie = shouldUseSecureCookies();
     
     // Удаляем cookie
     response.cookies.set('auth_token', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: useSecureCookie,
       sameSite: 'strict',
       expires: new Date(0),
       path: '/',
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
     // Удаляем cookie подписи
     response.cookies.set(AUTH_SIG_COOKIE, '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: useSecureCookie,
       sameSite: 'strict',
       expires: new Date(0),
       path: '/',
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     // Удаляем cookie темы
     response.cookies.set(THEME_COOKIE_KEY, '', {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      secure: useSecureCookie,
       sameSite: 'lax',
       expires: new Date(0),
       path: '/',

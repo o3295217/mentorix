@@ -3,6 +3,7 @@
  * Запуск: npx tsx scripts/backfill-completed-work.ts
  */
 import { PrismaClient } from '@prisma/client'
+import { getTaskCategory } from '../lib/task-categorize'
 
 const prisma = new PrismaClient()
 
@@ -10,27 +11,17 @@ function splitLines(text: string | null | undefined): string[] {
   return (text || '').split('\n').map(t => t.trim()).filter(Boolean)
 }
 
-function safeParseJsonArray<T>(json: string | null | undefined): T[] {
-  if (!json) return []
+function safeParseJsonArray<T>(json: unknown): T[] {
+  if (json === null || json === undefined || json === '') return []
+  if (Array.isArray(json)) return json as T[]
+  if (typeof json !== 'string') return []
+
   try {
     const parsed = JSON.parse(json)
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
-}
-
-function getTaskCategory(text: string): string {
-  const lower = text.toLowerCase()
-  if (lower.includes('подъём') || lower.includes('подъем') ||
-      lower.includes('зарядка') || lower.includes('душ') ||
-      lower.includes('начало работы') || lower.match(/^\d{1,2}:\d{2}/)) return 'привычки'
-  if (lower.includes('оперативка') || lower.includes('созвон') ||
-      lower.includes('встреча') || lower.includes('звонок')) return 'созвоны'
-  if (lower.includes('стратег') || lower.includes('бюджет') ||
-      lower.includes('планирование') || lower.includes('анализ') ||
-      lower.includes('разработка') || lower.includes('проект')) return 'стратегические'
-  return 'операционные'
 }
 
 async function main() {
@@ -207,10 +198,10 @@ function buildSummary(periodType: string, periodKey: string, items: Array<{ type
 
   return {
     summaryText: parts.join('. '),
-    keyAchievements: JSON.stringify(achievements),
+    keyAchievements: achievements,
     tasksCompleted,
     goalsCompleted,
-    topCategoriesJson: JSON.stringify(catCounts),
+    topCategoriesJson: catCounts,
   }
 }
 

@@ -34,6 +34,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
+  deletedAt     DateTime?
   
   // Связи
   dreamGoals    DreamGoal[]
@@ -59,6 +60,7 @@ model User {
   workSummaries WorkSummary[]
   planningProfile PlanningProfile?
 
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -97,7 +99,7 @@ model YearGoal {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   year      Int
-  goalsJson String
+  goalsJson Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -113,7 +115,7 @@ model PeriodGoal {
   periodType  String
   periodStart DateTime
   periodEnd   DateTime
-  goalsJson   String
+  goalsJson   Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -133,9 +135,9 @@ model Goal {
   completedAt   DateTime?
   deadline      DateTime?
   priority      String    @default("medium")
-  tagsJson      String    @default("[]")
-  blockedByJson String    @default("[]")
-  historyJson   String    @default("[]")
+  tagsJson      Json      @default("[]")
+  blockedByJson Json      @default("[]")
+  historyJson   Json      @default("[]")
   sortOrder     Int       @default(0)
   scope         String?   @default("dream")
   rootYearGoalId String?
@@ -176,8 +178,8 @@ model DailyEntry {
   date             DateTime
   planText         String?
   factText         String?
-  planSnapshotJson String?
-  extraTasksJson   String       @default("[]")
+  planSnapshotJson Json?
+  extraTasksJson   Json         @default("[]")
   
   // Контекст дня
   emotionalState   String?
@@ -188,7 +190,7 @@ model DailyEntry {
   sleepQuality     Int?
   familyTime       Int?
   exerciseTime     Int?
-  selectedTasksJson String?
+  selectedTasksJson Json?
   
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -233,7 +235,7 @@ model Evaluation {
   workValuesAlignment   String?
   
   recommendationsText   String
-  suggestedTasksJson    String?
+  suggestedTasksJson    Json?
   createdAt             DateTime   @default(now())
 
   @@index([dreamProgressScore])
@@ -437,6 +439,7 @@ model InsightEntry {
 
   @@index([userId])
   @@index([userId, category])
+  @@index([userId, createdAt])
   @@map("insight_entries")
 }
 
@@ -449,10 +452,10 @@ model UserStats {
   totalCompleted       Int      @default(0)
   avgCompletionPct     Float    @default(0)
   avgDailyScore        Float    @default(0)
-  completionByDayJson  String   @default("{}")
-  completionByTypeJson String   @default("{}")
-  frequentCompletedJson String  @default("[]")
-  frequentFailedJson   String   @default("[]")
+  completionByDayJson  Json     @default("{}")
+  completionByTypeJson Json     @default("{}")
+  frequentCompletedJson Json    @default("[]")
+  frequentFailedJson   Json     @default("[]")
   habitsAvgCompletion  Float    @default(0)
   trendDirection       String?
   trendPct             Float    @default(0)
@@ -527,10 +530,10 @@ model WorkSummary {
   periodType        String   // week | month | quarter
   periodKey         String   // 2026-03-W3, 2026-03, 2026-Q1
   summaryText       String   // компактная сводка для контекста ИИ
-  keyAchievements   String   @default("[]") // JSON array строк
+  keyAchievements   Json     @default("[]") // JSON array строк
   tasksCompleted    Int      @default(0)
   goalsCompleted    Int      @default(0)
-  topCategoriesJson String?  // JSON {"стратегические": 5, "операционные": 12}
+  topCategoriesJson Json?    // JSON {"стратегические": 5, "операционные": 12}
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateForecast } from '@/lib/anthropic'
 import { ForecastRequest, DayDataFull } from '@/lib/prompts/types'
-import { parseDateParam } from '@/lib/dates'
+import { parseDateParam, validateAiDateRange } from '@/lib/dates'
 import { buildFactFromSelection } from '@/lib/fact-utils'
-import { ApiErrors, safeParseJson } from '@/lib/api-utils'
+import { ApiErrors } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { getForecastHorizonGoals, getLatestDreamGoal, getLatestUserProfile } from '@/lib/user-context'
 import { z } from 'zod'
 
 const ForecastSchema = z.object({
@@ -95,11 +96,34 @@ export async function POST(request: NextRequest) {
       horizonEnd,
     } = validation.data
 
-    // Получить мечту
-    const dream = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
+    const baseStart = parseDateParam(basePeriodStart)
+    const baseEnd = parseDateParam(basePeriodEnd)
+    const baseRangeValidation = validateAiDateRange({
+      periodType: basePeriodType,
+      startDate: baseStart,
+      endDate: baseEnd,
+      label: 'Base period',
     })
+    if (!baseRangeValidation.success) {
+      return NextResponse.json({ error: baseRangeValidation.error }, { status: 400 })
+    }
+
+    let horizonStartDate: Date | undefined
+    if (forecastHorizon !== 'dream' && horizonStart && horizonEnd) {
+      horizonStartDate = parseDateParam(horizonStart)
+      const horizonEndDate = parseDateParam(horizonEnd)
+      const horizonRangeValidation = validateAiDateRange({
+        periodType: forecastHorizon,
+        startDate: horizonStartDate,
+        endDate: horizonEndDate,
+        label: 'Forecast horizon',
+      })
+      if (!horizonRangeValidation.success) {
+        return NextResponse.json({ error: horizonRangeValidation.error }, { status: 400 })
+      }
+    }
+
+    const dream = await getLatestDreamGoal(userId)
 
     if (!dream) {
       return NextResponse.json(
@@ -109,9 +133,6 @@ export async function POST(request: NextRequest) {
     }
 
     // === ЗАГРУЗКА ДАННЫХ БАЗОВОГО ПЕРИОДА ===
-    const baseStart = parseDateParam(basePeriodStart)
-    const baseEnd = parseDateParam(basePeriodEnd)
-
     const dailyEntries = await prisma.dailyEntry.findMany({
       where: {
         userId,
@@ -170,62 +191,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // === ЗАГРУЗКА ЦЕЛЕЙ ГОРИЗОНТА ===
-    let horizonGoals: string[] = []
-    let horizonStartDate: Date | undefined
-
-    if (forecastHorizon === 'dream') {
-      // Для мечты берем годовые цели
-      const currentYear = new Date().getFullYear()
-      const yearGoal = await prisma.yearGoal.findFirst({
-        where: { userId, year: currentYear },
-      })
-      if (yearGoal) {
-        horizonGoals = safeParseJson(yearGoal.goalsJson, [])
-      }
-    } else if (horizonStart && horizonEnd) {
-      horizonStartDate = parseDateParam(horizonStart)
-
-      if (forecastHorizon === 'week') {
-        const weekGoal = await prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'week', periodStart: horizonStartDate },
-          orderBy: { createdAt: 'desc' },
-        })
-        if (weekGoal) {
-          horizonGoals = safeParseJson(weekGoal.goalsJson, [])
-        }
-      } else if (forecastHorizon === 'month') {
-        const monthGoal = await prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'month', periodStart: horizonStartDate },
-          orderBy: { createdAt: 'desc' },
-        })
-        if (monthGoal) {
-          horizonGoals = safeParseJson(monthGoal.goalsJson, [])
-        }
-      } else if (forecastHorizon === 'quarter') {
-        const quarterGoal = await prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'quarter', periodStart: horizonStartDate },
-          orderBy: { createdAt: 'desc' },
-        })
-        if (quarterGoal) {
-          horizonGoals = safeParseJson(quarterGoal.goalsJson, [])
-        }
-      } else if (forecastHorizon === 'year') {
-        const year = horizonStartDate.getFullYear()
-        const yearGoal = await prisma.yearGoal.findFirst({
-          where: { userId, year },
-        })
-        if (yearGoal) {
-          horizonGoals = safeParseJson(yearGoal.goalsJson, [])
-        }
-      }
-    }
-
-    // Получить профиль пользователя
-    const userProfile = await prisma.userProfile.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [horizonGoals, userProfile] = await Promise.all([
+      getForecastHorizonGoals({ userId, forecastHorizon, horizonStartDate }),
+      getLatestUserProfile(userId),
+    ])
 
     // Подготовить запрос для прогноза (НОВАЯ СТРУКТУРА)
     const forecastRequest: ForecastRequest = {
@@ -243,24 +212,7 @@ export async function POST(request: NextRequest) {
       dreamGoal: dream.goalText,
       dreamYears: dream.months ? Math.ceil(dream.months / 12) : undefined,
       dreamMonths: dream.months || undefined,
-      userProfile: userProfile
-        ? {
-            name: userProfile.name || undefined,
-            occupation: userProfile.occupation || undefined,
-            industry: userProfile.industry || undefined,
-            maritalStatus: userProfile.maritalStatus || undefined,
-            hobbies: userProfile.hobbies || undefined,
-            sports: userProfile.sports || undefined,
-            location: userProfile.location || undefined,
-            age: userProfile.age || undefined,
-            education: userProfile.education || undefined,
-            teamSize: userProfile.teamSize || undefined,
-            workExperience: userProfile.workExperience || undefined,
-            values: userProfile.values || undefined,
-            challenges: userProfile.challenges || undefined,
-            other: userProfile.other || undefined,
-          }
-        : undefined,
+      userProfile,
     }
 
     // Вызвать Claude API для прогноза

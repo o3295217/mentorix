@@ -1,5 +1,13 @@
 // Типы для API-ответов (фронтенд)
 
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
 // === МЕЧТА ===
 export interface DreamGoal {
   id: number
@@ -34,7 +42,7 @@ export interface Evaluation {
   workHealthAlignment?: string
   workFamilyAlignment?: string
   workValuesAlignment?: string
-  suggestedTasksJson?: string
+  suggestedTasksJson?: unknown
   createdAt: string
 }
 
@@ -44,8 +52,8 @@ export interface DailyEntry {
   date: string
   planText?: string
   factText?: string
-  planSnapshotJson?: string
-  extraTasksJson?: string
+  planSnapshotJson?: unknown
+  extraTasksJson?: unknown
   emotionalState?: string
   physicalState?: string
   lifeEvents?: string
@@ -54,7 +62,7 @@ export interface DailyEntry {
   sleepQuality?: number
   familyTime?: number
   exerciseTime?: number
-  selectedTasksJson?: string
+  selectedTasksJson?: unknown
   createdAt: string
   updatedAt: string
   evaluation?: Evaluation
@@ -87,6 +95,24 @@ export interface ProgressStats {
     medium: number
     poor: number
   }
+}
+
+export interface DreamProgressSummary {
+  total: number
+  completed: number
+  percent: number
+}
+
+export interface GoalsContextResponse {
+  dreamGoal: DreamGoal | null
+  activeYears: number[]
+  archivedYearGoalYears: number[]
+  yearGoals: Record<string, YearGoalItem[]>
+  periodGoals: Record<string, string[]>
+  goals: Goal[]
+  tags: GoalTag[]
+  dreamProgress: DreamProgressSummary
+  yearEvaluations: Record<string, { avg: number; count: number }>
 }
 
 // === ЭЛЕМЕНТ ГОДОВОЙ ЦЕЛИ ===

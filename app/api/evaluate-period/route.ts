@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { evaluatePeriod } from '@/lib/anthropic'
 import { PeriodEvaluationRequest, DayData } from '@/lib/prompts/types'
-import { parseDateParam } from '@/lib/dates'
-import { ApiErrors, safeParseJson } from '@/lib/api-utils'
+import { parseDateParam, validateAiDateRange } from '@/lib/dates'
+import { ApiErrors } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { getPeriodEvaluationUserContext } from '@/lib/user-context'
 import { z } from 'zod'
 
 const PeriodEvaluationSchema = z.object({
@@ -37,6 +38,15 @@ export async function POST(request: NextRequest) {
 
     const startDate = parseDateParam(periodStart)
     const endDate = parseDateParam(periodEnd)
+    const rangeValidation = validateAiDateRange({
+      periodType,
+      startDate,
+      endDate,
+      label: 'Period',
+    })
+    if (!rangeValidation.success) {
+      return NextResponse.json({ error: rangeValidation.error }, { status: 400 })
+    }
 
     // Получить все дневные записи за период
     const dailyEntries = await prisma.dailyEntry.findMany({
@@ -78,42 +88,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Получить мечту
-    const dream = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    // Получить цели для периода
-    const year = startDate.getFullYear()
-    const [currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] =
-      await Promise.all([
-        prisma.yearGoal.findFirst({
-          where: { userId, year },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'half_year', periodStart: { lte: startDate } },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'quarter', periodStart: { lte: startDate } },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'month', periodStart: { lte: startDate } },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.periodGoal.findFirst({
-          where: { userId, periodType: 'week', periodStart: { lte: startDate } },
-          orderBy: { createdAt: 'desc' },
-        }),
-      ])
-
-    // Получить профиль пользователя
-    const userProfile = await prisma.userProfile.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
+    const userContext = await getPeriodEvaluationUserContext(userId, startDate)
 
     // Подготовить данные дней для оценки
     const daysData: DayData[] = daysWithEvaluations.map((entry) => ({
@@ -137,34 +112,8 @@ export async function POST(request: NextRequest) {
       periodStart: startDate.toLocaleDateString('ru-RU'),
       periodEnd: endDate.toLocaleDateString('ru-RU'),
       days: daysData,
-      goals: {
-        dreamGoal: dream?.goalText || 'Не указана',
-        dreamYears: dream?.months ? Math.ceil(dream.months / 12) : undefined,
-        dreamMonths: dream?.months || undefined,
-        yearGoals: safeParseJson(currentYearGoal?.goalsJson, []),
-        halfYearGoals: safeParseJson(halfYearGoals?.goalsJson, []),
-        quarterGoals: safeParseJson(quarterGoals?.goalsJson, []),
-        monthGoals: safeParseJson(monthGoals?.goalsJson, []),
-        weekGoals: safeParseJson(weekGoals?.goalsJson, []),
-      },
-      userProfile: userProfile
-        ? {
-            name: userProfile.name || undefined,
-            occupation: userProfile.occupation || undefined,
-            industry: userProfile.industry || undefined,
-            maritalStatus: userProfile.maritalStatus || undefined,
-            hobbies: userProfile.hobbies || undefined,
-            sports: userProfile.sports || undefined,
-            location: userProfile.location || undefined,
-            age: userProfile.age || undefined,
-            education: userProfile.education || undefined,
-            teamSize: userProfile.teamSize || undefined,
-            workExperience: userProfile.workExperience || undefined,
-            values: userProfile.values || undefined,
-            challenges: userProfile.challenges || undefined,
-            other: userProfile.other || undefined,
-          }
-        : undefined,
+      goals: userContext.goals,
+      userProfile: userContext.profile,
     }
 
     // Вызвать Claude API для периодической оценки

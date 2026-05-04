@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { assertEncryptionConfig, getEncryptionKeyHex } from './encryption-config'
 
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12
@@ -6,19 +7,20 @@ const AUTH_TAG_LENGTH = 16
 const PREFIX = 'enc_v1:'
 
 let encryptionKey: Buffer | null = null
+let encryptionKeyHex: string | null = null
 
 function getKey(): Buffer {
-  if (encryptionKey) return encryptionKey
+  assertEncryptionConfig()
 
-  const hex = process.env.ENCRYPTION_KEY
+  const hex = getEncryptionKeyHex()
   if (!hex) {
     throw new Error('ENCRYPTION_KEY is not set. Generate with: openssl rand -hex 32')
   }
-  if (hex.length !== 64) {
-    throw new Error('ENCRYPTION_KEY must be 64 hex characters (32 bytes)')
-  }
+
+  if (encryptionKey && encryptionKeyHex === hex) return encryptionKey
 
   encryptionKey = Buffer.from(hex, 'hex')
+  encryptionKeyHex = hex
   return encryptionKey
 }
 
@@ -61,8 +63,11 @@ export function isEncrypted(value: string): boolean {
 }
 
 export function isEncryptionEnabled(): boolean {
-  return !!process.env.ENCRYPTION_KEY
+  assertEncryptionConfig()
+  return !!getEncryptionKeyHex()
 }
+
+export { assertEncryptionConfig }
 
 // Карта: модель → поля для шифрования
 export const ENCRYPTED_FIELDS: Record<string, string[]> = {
@@ -108,4 +113,13 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   WorkSummary: ['summaryText', 'keyAchievements'],
   ChatMessage: ['content'],
   PlanningProfile: ['constraints'],
+}
+
+export const ENCRYPTED_JSON_FIELDS: Record<string, string[]> = {
+  YearGoal: ['goalsJson'],
+  PeriodGoal: ['goalsJson'],
+  Goal: ['historyJson'],
+  DailyEntry: ['planSnapshotJson', 'extraTasksJson', 'selectedTasksJson'],
+  Evaluation: ['suggestedTasksJson'],
+  WorkSummary: ['keyAchievements'],
 }

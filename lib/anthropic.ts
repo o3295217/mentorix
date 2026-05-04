@@ -22,6 +22,13 @@ import { notifyTelegram } from './telegram'
 
 let _anthropic: Anthropic | null = null
 
+export const DEFAULT_AI_MODEL = 'claude-sonnet-4-6'
+export const DEFAULT_ROUTE_AI_MODEL = 'claude-sonnet-4-20250514'
+
+export function getAiModel(fallbackModel = DEFAULT_AI_MODEL): string {
+  return process.env.AI_MODEL?.trim() || fallbackModel
+}
+
 export function getAnthropicClient(): Anthropic {
   if (!_anthropic) {
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -314,6 +321,7 @@ export async function evaluateDayNewWithUsage(
   request: DailyEvaluationRequest
 ): Promise<EvaluationResultWithUsage> {
   const startTime = Date.now()
+  const model = getAiModel()
   
   // Проверка наличия мечты и целей
   const validation = validateGoals(request)
@@ -341,7 +349,7 @@ export async function evaluateDayNewWithUsage(
   // Вызов Claude API с Prompt Caching и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 4096,
       system: [
         {
@@ -387,7 +395,7 @@ export async function evaluateDayNewWithUsage(
   return {
     result,
     usage: {
-      model: 'claude-sonnet-4-6',
+      model,
       inputTokens: message.usage.input_tokens,
       outputTokens: message.usage.output_tokens,
       durationMs,
@@ -425,13 +433,14 @@ export async function evaluateDay(
 export async function evaluatePeriod(
   request: PeriodEvaluationRequest
 ): Promise<PeriodEvaluationResponse> {
+  const model = getAiModel()
   // Построение промпта для периодической оценки
   const prompt = buildPeriodEvaluationPrompt(request)
 
   // Вызов Claude API с кэшированием и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-6', // Sonnet для периодических оценок
+      model,
       max_tokens: 8192,
       messages: [
         {
@@ -472,13 +481,14 @@ export async function evaluatePeriod(
 export async function generateForecast(
   request: ForecastRequest
 ): Promise<ForecastResponse> {
+  const model = getAiModel()
   // Построение промпта для прогноза
   const prompt = buildForecastPrompt(request)
 
   // Вызов Claude API с кэшированием и retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 8192,
       messages: [
         {
@@ -639,6 +649,7 @@ function normalizeInsightsResponse(raw: UpdateInsightsResponse | UserInsightsUpd
 export async function updateUserInsights(
   request: UpdateInsightsRequest
 ): Promise<UpdateInsightsResponse> {
+  const model = getAiModel()
   const currentInsightsText = request.currentInsights
     ? JSON.stringify(request.currentInsights, null, 2)
     : 'Профиль пока не сформирован'
@@ -669,7 +680,7 @@ export async function updateUserInsights(
   // Используем Haiku с retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 2048,
       messages: [
         {

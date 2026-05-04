@@ -56,10 +56,10 @@ services:
       - REGISTRATION_MODE=${REGISTRATION_MODE:-open}
       - MAX_USERS=${MAX_USERS:-0}
       - INVITE_CODE=${INVITE_CODE:-}
-      # Cookie secure flag (set to 'true' only for HTTPS)
-      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      # Cookie secure flag: production defaults to HTTPS-safe cookies
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
       # App URL (для ссылок в email)
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env.production}
       # SMTP (для отправки email: сброс пароля, верификация)
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
@@ -68,13 +68,14 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       # AI API
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-}
       - ANTHROPIC_PROXY_URL=${ANTHROPIC_PROXY_URL:-}
       - ANTHROPIC_PROXY_SECRET=${ANTHROPIC_PROXY_SECRET:-}
       # Telegram notifications
       - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
       - TG_CHAT_ID=${TG_CHAT_ID:-}
       # Шифрование данных (AES-256-GCM)
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env.production}
     volumes:
       # Backup directory
       - ./backups:/app/backups
@@ -127,16 +128,18 @@ services:
       - PGUSER=${POSTGRES_USER:-ai_assistant}
       - PGPASSWORD=${POSTGRES_PASSWORD}
       - PGDATABASE=${POSTGRES_DB:-ai_assistant}
+      - BACKUP_KEY_FILE=/run/secrets/backup-key
     volumes:
       - ./backups:/backups
       - ./scripts/prod-backup.sh:/usr/local/bin/prod-backup.sh:ro
+      - ${BACKUP_KEY_FILE:-/home/ubuntu/.backup-key}:/run/secrets/backup-key:ro
     depends_on:
       postgres:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        env | grep '^PG' > /run/pg.env
+        env | grep -E '^(PG|BACKUP_)' > /run/pg.env
         /usr/local/bin/prod-backup.sh
         echo "0 3 * * * /usr/local/bin/prod-backup.sh" | crontab -
         exec crond -f -l 8

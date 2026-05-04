@@ -16,6 +16,7 @@ import {
   startOfYear,
 } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import type { PaginatedResponse } from '@/lib/types'
 
 interface PeriodEvaluation {
   id: number
@@ -196,8 +197,8 @@ export default function PeriodsPage() {
         return
       }
 
-      const data = await res.json()
-      setEvaluations(data)
+      const data = await res.json() as PaginatedResponse<PeriodEvaluation>
+      setEvaluations(data.items)
     } catch (error) {
       console.error('Error fetching evaluations:', error)
       setErrorMessage('Не удалось загрузить историю периодов.')

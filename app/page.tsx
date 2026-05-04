@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { format, startOfWeek } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -95,9 +95,13 @@ function getGreeting(): string {
   return 'Доброй ночи'
 }
 
+function getDateKey(date: Date): string {
+  return format(date, 'yyyy-MM-dd')
+}
+
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth()
-  const [today] = useState(new Date())
+  const [today, setToday] = useState(() => new Date())
   const [dreamGoal, setDreamGoal] = useState<DreamGoal | null>(null)
   const [dailyEntry, setDailyEntry] = useState<DailyEntry | null>(null)
   const [progressStats, setProgressStats] = useState<ProgressStats | null>(null)
@@ -157,18 +161,9 @@ export default function HomePage() {
     }
   }, [dailyEntry, today])
 
-  useEffect(() => {
-    // Загружаем данные только если пользователь авторизован
-    if (user) {
-      fetchData()
-    } else if (!authLoading) {
-      setLoading(false)
-    }
-  }, [user, authLoading])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const dateStr = format(today, 'yyyy-MM-dd')
+      const dateStr = getDateKey(today)
       const weekStart = startOfWeek(today, { weekStartsOn: 1 })
       
       // Параллельная загрузка всех данных
@@ -209,7 +204,37 @@ export default function HomePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [today])
+
+  useEffect(() => {
+    const refreshToday = () => {
+      const nextToday = new Date()
+      setToday((currentToday) => (getDateKey(currentToday) === getDateKey(nextToday) ? currentToday : nextToday))
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshToday()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', refreshToday)
+    const intervalId = window.setInterval(refreshToday, 60 * 1000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', refreshToday)
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Загружаем данные только если пользователь авторизован
+    if (user) {
+      fetchData()
+    } else if (!authLoading) {
+      setLoading(false)
+    }
+  }, [user, authLoading, fetchData])
 
   // Показываем загрузку пока проверяется авторизация
   if (authLoading || (user && loading)) {

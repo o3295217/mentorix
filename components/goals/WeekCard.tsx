@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Goal, GoalTag } from '@/lib/types'
 import { parseDateParam, toDateKey } from '@/lib/dates'
 import { fuzzyMatchGoal } from '@/lib/goals-utils'
-import { WeekData } from './WeekStrip'
+
+interface WeekData {
+  num: number
+  key: string
+  start: Date
+  end: Date
+}
 
 const TAG_COLOR_PRESETS = [
   '#3B82F6',

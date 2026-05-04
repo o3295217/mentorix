@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAnthropicClient } from '@/lib/anthropic'
+import { DEFAULT_ROUTE_AI_MODEL, getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { requireUserId } from '@/lib/get-user-id'
 import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
 import { buildGoalsValidatePrompt } from '@/lib/prompts/goals-validate'
@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = buildGoalsDecomposePrompt(sanitizedContext, planningProfile, userProfile, profileBlocks)
     const anthropic = getAnthropicClient()
+    const model = getAiModel(DEFAULT_ROUTE_AI_MODEL)
 
     const messages = [
       ...sanitizedHistory,
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
     // Если есть — буферизируем всё, валидируем, стримим плавно.
 
     const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
+      model,
       max_tokens: MAX_OUTPUT_TOKENS,
       system: systemPrompt,
       messages,
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
             const validatePrompt = buildGoalsValidatePrompt(dreamText, finalText)
 
             const validationResponse = await anthropic.messages.create({
-              model: 'claude-sonnet-4-20250514',
+              model,
               max_tokens: MAX_OUTPUT_TOKENS,
               system: validatePrompt,
               messages: [{ role: 'user', content: 'Проверь и верни исправленный план.' }],

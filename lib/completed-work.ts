@@ -1,30 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { splitLines, safeParseJsonArray } from '@/lib/fact-utils'
+import { getTaskCategory } from '@/lib/task-categorize'
 import { getISOWeek, startOfWeek, format } from 'date-fns'
 
-// Определить категорию задачи (переиспользуем логику из user-stats)
-export function getTaskCategory(text: string): string {
-  const lower = text.toLowerCase()
-
-  if (lower.includes('подъём') || lower.includes('подъем') ||
-      lower.includes('зарядка') || lower.includes('душ') ||
-      lower.includes('начало работы') || lower.match(/^\d{1,2}:\d{2}/)) {
-    return 'привычки'
-  }
-
-  if (lower.includes('оперативка') || lower.includes('созвон') ||
-      lower.includes('встреча') || lower.includes('звонок')) {
-    return 'созвоны'
-  }
-
-  if (lower.includes('стратег') || lower.includes('бюджет') ||
-      lower.includes('планирование') || lower.includes('анализ') ||
-      lower.includes('разработка') || lower.includes('проект')) {
-    return 'стратегические'
-  }
-
-  return 'операционные'
-}
+export { getTaskCategory }
 
 // Получить periodKey для даты
 export function getWeekKey(date: Date): string {
@@ -49,8 +28,8 @@ export async function syncCompletedWorkForEntry(params: {
   entryId: number
   date: Date
   planText: string | null
-  selectedTasksJson: string | null
-  extraTasksJson: string | null
+  selectedTasksJson: unknown
+  extraTasksJson: unknown
 }): Promise<void> {
   const { userId, entryId, date, planText, selectedTasksJson, extraTasksJson } = params
 
@@ -222,17 +201,17 @@ async function recalculateWorkSummaryForPeriod(
       periodType,
       periodKey,
       summaryText: summaryParts.join('. '),
-      keyAchievements: JSON.stringify(achievements),
+      keyAchievements: achievements,
       tasksCompleted,
       goalsCompleted,
-      topCategoriesJson: JSON.stringify(catCounts),
+      topCategoriesJson: catCounts,
     },
     update: {
       summaryText: summaryParts.join('. '),
-      keyAchievements: JSON.stringify(achievements),
+      keyAchievements: achievements,
       tasksCompleted,
       goalsCompleted,
-      topCategoriesJson: JSON.stringify(catCounts),
+      topCategoriesJson: catCounts,
     },
   })
 }

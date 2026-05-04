@@ -1,5 +1,8 @@
-export function safeParseJsonArray<T>(json: string | null | undefined): T[] {
-  if (!json) return []
+export function safeParseJsonArray<T>(json: unknown): T[] {
+  if (json === null || json === undefined || json === '') return []
+  if (Array.isArray(json)) return json as T[]
+  if (typeof json !== 'string') return []
+
   try {
     const parsed = JSON.parse(json) as unknown
     return Array.isArray(parsed) ? (parsed as T[]) : []
@@ -18,7 +21,7 @@ export function splitLines(text: string | null | undefined): string[] {
 export function buildFactFromSelection(params: {
   planText: string | null | undefined
   factText: string | null | undefined
-  selectedTasksJson: string | null | undefined
+  selectedTasksJson: unknown
 }): { factText: string; completedTasks: string[]; uncompletedTasks: string[] } {
   const planTasks = splitLines(params.planText)
 

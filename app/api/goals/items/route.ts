@@ -5,6 +5,8 @@ import { parseDateParam } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { syncCompletedWorkForGoal, removeCompletedWorkForGoal } from '@/lib/completed-work'
+import { buildPaginatedResponse, parsePaginationParams } from '@/lib/pagination'
+import { goalPriorityNumberToString, mapGoalForResponse } from '@/lib/goal-response'
 import { z } from 'zod'
 
 const GoalPrioritySchema = z.union([
@@ -35,24 +37,6 @@ const GoalUpdateSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).max(100000).optional(),
 })
 
-// Конвертация числа приоритета в строку
-const priorityNumToStr = (num: number): string => {
-  switch (num) {
-    case 2: return 'high'
-    case 1: return 'medium'
-    default: return 'none'
-  }
-}
-
-// Конвертация строки приоритета в число
-const priorityStrToNum = (str: string): number => {
-  switch (str) {
-    case 'high': return 2
-    case 'medium': return 1
-    default: return 0
-  }
-}
-
 // GET - получить цели по периоду
 export async function GET(request: NextRequest) {
   try {
@@ -60,25 +44,25 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const periodType = searchParams.get('periodType')
     const periodKey = searchParams.get('periodKey')
+    const { limit, offset } = parsePaginationParams(searchParams, { defaultLimit: 100 })
 
     const where: Prisma.GoalWhereInput = { userId }
     if (periodType) where.periodType = periodType
     if (periodKey) where.periodKey = periodKey
 
-    const goals = await prisma.goal.findMany({
-      where,
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    })
+    const [goals, total] = await Promise.all([
+      prisma.goal.findMany({
+        where,
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        take: limit,
+        skip: offset,
+      }),
+      prisma.goal.count({ where }),
+    ])
 
-    return NextResponse.json(goals.map(g => ({
-      ...g,
-      priority: priorityStrToNum(g.priority),
-      tags: safeParseJson<string[]>(g.tagsJson, []),
-      blockedBy: safeParseJson<number[]>(g.blockedByJson, []),
-      history: safeParseJson<Array<{ type: string; date: string }>>(g.historyJson, []),
-      scope: g.scope || 'dream',
-      rootYearGoalId: g.rootYearGoalId || null,
-    })))
+    const items = goals.map(mapGoalForResponse)
+
+    return NextResponse.json(buildPaginatedResponse({ items, total, limit, offset }))
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode
     if (typeof statusCode === 'number') {
@@ -115,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     // priority приходит как число (0-3), конвертируем в строку
-    const priorityStr = typeof priority === 'number' ? priorityNumToStr(priority) : (priority || 'none')
+    const priorityStr = typeof priority === 'number' ? goalPriorityNumberToString(priority) : (priority || 'none')
 
     const goal = await prisma.goal.create({
       data: {
@@ -125,11 +109,11 @@ export async function POST(request: NextRequest) {
         periodKey,
         deadline: deadline ? parseDateParam(deadline) : null,
         priority: priorityStr,
-        tagsJson: JSON.stringify(tags || []),
-        historyJson: JSON.stringify([{
+        tagsJson: tags || [],
+        historyJson: [{
           type: 'created',
           date: new Date().toISOString(),
-        }]),
+        }],
         parentId: parentId || null,
         scope: scope || 'dream',
         rootYearGoalId: rootYearGoalId || null,
@@ -138,12 +122,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...goal,
-      priority: priorityStrToNum(goal.priority),
-      tags: safeParseJson<string[]>(goal.tagsJson, []),
-      blockedBy: safeParseJson<number[]>(goal.blockedByJson, []),
-      history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
-      scope: goal.scope || 'dream',
-      rootYearGoalId: goal.rootYearGoalId || null,
+      ...mapGoalForResponse(goal),
     })
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode
@@ -189,7 +168,7 @@ export async function PUT(request: NextRequest) {
 
     // Конвертируем priority из числа в строку если нужно
     const priorityStr = priority !== undefined 
-      ? (typeof priority === 'number' ? priorityNumToStr(priority) : priority)
+      ? (typeof priority === 'number' ? goalPriorityNumberToString(priority) : priority)
       : undefined
 
     const goal = await prisma.goal.update({
@@ -202,10 +181,10 @@ export async function PUT(request: NextRequest) {
         }),
         ...(deadline !== undefined && { deadline: deadline ? parseDateParam(deadline) : null }),
         ...(priorityStr !== undefined && { priority: priorityStr }),
-        ...(tags !== undefined && { tagsJson: JSON.stringify(tags) }),
-        ...(blockedBy !== undefined && { blockedByJson: JSON.stringify(blockedBy) }),
+        ...(tags !== undefined && { tagsJson: tags }),
+        ...(blockedBy !== undefined && { blockedByJson: blockedBy }),
         ...(sortOrder !== undefined && { sortOrder }),
-        historyJson: JSON.stringify(history),
+        historyJson: history,
       },
     })
 
@@ -230,12 +209,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       ...goal,
-      priority: priorityStrToNum(goal.priority),
-      tags: safeParseJson<string[]>(goal.tagsJson, []),
-      blockedBy: safeParseJson<number[]>(goal.blockedByJson, []),
-      history: safeParseJson<Array<{ type: string; date: string }>>(goal.historyJson, []),
-      scope: goal.scope || 'dream',
-      rootYearGoalId: goal.rootYearGoalId || null,
+      ...mapGoalForResponse(goal),
     })
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode

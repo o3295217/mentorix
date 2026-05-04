@@ -8,6 +8,8 @@ import { signToken, AUTH_SIG_COOKIE } from '@/lib/hmac'
 import { sendEmail, getEmailVerificationContent } from '@/lib/email';
 import { notifyTelegram } from '@/lib/telegram';
 import { audit, getAuditContext } from '@/lib/audit'
+import { shouldUseSecureCookies } from '@/lib/cookie-security'
+import { getAppUrl } from '@/lib/app-url'
 
 function verificationResponse() {
   return NextResponse.json({
@@ -104,10 +106,10 @@ export async function POST(request: Request) {
     if (existingUser) {
       const requiresVerification = isEmailVerificationRequired()
 
-      if (requiresVerification && !existingUser.emailVerified && existingUser.isActive) {
+      if (requiresVerification && !existingUser.emailVerified && existingUser.isActive && !existingUser.deletedAt) {
         try {
           const token = await createEmailVerificationToken(existingUser.id)
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+          const appUrl = getAppUrl()
           const verifyUrl = `${appUrl}/verify-email?token=${token}`
           const emailContent = getEmailVerificationContent(verifyUrl, existingUser.name || undefined)
 
@@ -126,7 +128,7 @@ export async function POST(request: Request) {
     // Проверяем лимит пользователей
     const maxUsers = parseInt(process.env.MAX_USERS || '0');
     if (maxUsers > 0) {
-      const userCount = await prisma.user.count();
+      const userCount = await prisma.user.count({ where: { deletedAt: null } });
       if (userCount >= maxUsers) {
         return NextResponse.json(
           { error: 'Достигнут лимит пользователей' },
@@ -157,7 +159,7 @@ export async function POST(request: Request) {
     // Если нужна верификация — отправляем письмо
     if (requiresVerification && !emailVerified && result.userId) {
       const token = await createEmailVerificationToken(result.userId);
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const appUrl = getAppUrl();
       const verifyUrl = `${appUrl}/verify-email?token=${token}`;
       
       const emailContent = getEmailVerificationContent(verifyUrl, name);
@@ -194,7 +196,7 @@ export async function POST(request: Request) {
     audit({ userId: result.session.user.id, action: 'register', resource: 'User', details: normalizedEmail, ...getAuditContext(request) })
 
     // Устанавливаем cookie
-    const useSecureCookie = process.env.COOKIE_SECURE === 'true';
+    const useSecureCookie = shouldUseSecureCookies();
     response.cookies.set('auth_token', result.session.token, {
       httpOnly: true,
       secure: useSecureCookie,

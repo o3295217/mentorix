@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { getPeriodDates, parseDateParam, toDateKey } from '@/lib/dates'
+import { parseDateParam, toDateKey } from '@/lib/dates'
 import { buildFactFromSelection, splitLines } from '@/lib/fact-utils'
-import { safeParseJson } from '@/lib/api-utils'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import {
   CHECK_PLAN_SYSTEM_PROMPT,
@@ -13,7 +12,8 @@ import {
 } from '@/lib/prompts/check-plan'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
-import { getAnthropicClient } from '@/lib/anthropic'
+import { DEFAULT_ROUTE_AI_MODEL, getAiModel, getAnthropicClient } from '@/lib/anthropic'
+import { getPlanUserContext } from '@/lib/user-context'
 
 const CheckPlanSchema = z.object({
   date: z.string(),
@@ -52,29 +52,7 @@ export async function POST(request: NextRequest) {
     const { date, planTasks } = validation.data
     const targetDate = parseDateParam(date)
 
-    // Получить мечту
-    const dream = await prisma.dreamGoal.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    // Получить цели недели и месяца
-    const weekPeriod = getPeriodDates(targetDate, 'week')
-    const monthPeriod = getPeriodDates(targetDate, 'month')
-
-    const [weekGoalsRecord, monthGoalsRecord] = await Promise.all([
-      prisma.periodGoal.findFirst({
-        where: { userId, periodType: 'week', periodStart: weekPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.periodGoal.findFirst({
-        where: { userId, periodType: 'month', periodStart: monthPeriod.start },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ])
-
-    const weekGoals = safeParseJson<string[]>(weekGoalsRecord?.goalsJson, [])
-    const monthGoals = safeParseJson<string[]>(monthGoalsRecord?.goalsJson, [])
+    const planContext = await getPlanUserContext(userId, targetDate)
 
     // Получить историю за последние 7 дней
     const historyStart = new Date(targetDate)
@@ -106,54 +84,26 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Получить профиль пользователя и insights
-    const [userProfile, userInsights] = await Promise.all([
-      prisma.userProfile.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      prisma.userInsights.findFirst({ where: { userId } }),
-    ])
-
     // Построить запрос
     const checkRequest: CheckPlanRequest = {
       date,
       dayOfWeek: getDayOfWeek(date),
       planTasks,
-      weekGoals,
-      monthGoals,
-      dreamGoal: dream?.goalText || 'Не указана',
+      weekGoals: planContext.weekGoals,
+      monthGoals: planContext.monthGoals,
+      dreamGoal: planContext.dreamGoal,
       recentHistory,
-      profile: userProfile ? {
-        name: userProfile.name || undefined,
-        occupation: userProfile.occupation || undefined,
-        industry: userProfile.industry || undefined,
-        maritalStatus: userProfile.maritalStatus || undefined,
-        hobbies: userProfile.hobbies || undefined,
-        sports: userProfile.sports || undefined,
-        location: userProfile.location || undefined,
-        age: userProfile.age || undefined,
-        education: userProfile.education || undefined,
-        teamSize: userProfile.teamSize || undefined,
-        workExperience: userProfile.workExperience || undefined,
-        values: userProfile.values || undefined,
-        challenges: userProfile.challenges || undefined,
-        other: userProfile.other || undefined,
-      } : undefined,
-      insights: userInsights ? {
-        patterns: userInsights.patterns,
-        strengths: userInsights.strengths,
-        challenges: userInsights.challenges,
-        preferences: userInsights.preferences,
-        recommendations: userInsights.recommendations,
-        motivators: userInsights.motivators,
-        evaluationCount: userInsights.evaluationCount,
-      } : undefined,
+      profile: planContext.profile,
+      insights: planContext.insights,
     }
 
     const userPrompt = buildCheckPlanPrompt(checkRequest)
 
     // Вызов Claude API
     const startTime = Date.now()
+    const model = getAiModel(DEFAULT_ROUTE_AI_MODEL)
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-20250514',  // Sonnet для проверки плана
+      model,
       max_tokens: 1024,
       system: [
         {
@@ -175,7 +125,7 @@ export async function POST(request: NextRequest) {
     await logAIUsage({
       userId,
       endpoint: 'check-plan',
-      model: 'claude-sonnet-4-20250514',
+      model,
       inputTokens: message.usage.input_tokens,
       outputTokens: message.usage.output_tokens,
       durationMs,

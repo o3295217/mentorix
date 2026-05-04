@@ -33,5 +33,5 @@ export function useDreamGoal(showMessage: (text: string) => void) {
     }
   }, [showMessage])
 
-  return { dreamGoal, loadDream, saveDream }
+  return { dreamGoal, setDreamGoal, loadDream, saveDream }
 }

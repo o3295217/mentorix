@@ -4,6 +4,9 @@ import { safeParseJson } from '@/lib/api-utils'
 import { z } from 'zod'
 import { requireUserId } from '@/lib/get-user-id'
 
+type GoalMovePoint = { periodType: string; periodKey: string }
+type GoalMoveHistoryEntry = { type: string; date: string; from?: GoalMovePoint; to?: GoalMovePoint }
+
 const MoveGoalSchema = z.object({
   id: z.number().int().positive(),
   toPeriodType: z.enum(['year', 'half_year', 'quarter', 'month', 'week']),
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
-    const history = safeParseJson<Array<{ type: string; date: string; from?: unknown; to?: unknown }>>(goal.historyJson, [])
+    const history = safeParseJson<GoalMoveHistoryEntry[]>(goal.historyJson, [])
     history.push({
       type: 'moved',
       date: new Date().toISOString(),
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest) {
       data: {
         periodType: toPeriodType,
         periodKey: toPeriodKey,
-        historyJson: JSON.stringify(history),
+        historyJson: history,
       },
     })
 

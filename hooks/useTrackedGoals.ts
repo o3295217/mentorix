@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { Goal, GoalTag } from '@/lib/types'
+import { Goal, GoalTag, PaginatedResponse } from '@/lib/types'
 import { fuzzyMatchGoal, periodTypeFromKey } from '@/lib/goals-utils'
 
 export function useTrackedGoals(
@@ -16,12 +16,22 @@ export function useTrackedGoals(
   // Tracked goals operations
   const loadTrackedGoals = useCallback(async (): Promise<Goal[]> => {
     try {
-      const res = await fetch('/api/goals/items')
-      const data = await res.json()
-      if (Array.isArray(data)) {
-        setGoals(data)
-        return data
+      const loadedGoals: Goal[] = []
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const res = await fetch(`/api/goals/items?limit=100&offset=${offset}`)
+        if (!res.ok) throw new Error(`Failed to load goals: ${res.status}`)
+
+        const data = await res.json() as PaginatedResponse<Goal>
+        loadedGoals.push(...data.items)
+        hasMore = data.hasMore
+        offset += data.limit
       }
+
+      setGoals(loadedGoals)
+      return loadedGoals
     } catch (error) {
       console.error('Error loading tracked goals:', error)
     }
@@ -269,6 +279,7 @@ export function useTrackedGoals(
 
   return {
     goals,
+    setGoals,
     loadTrackedGoals,
     toggleGoalCompleted,
     updateGoalPriority,
@@ -279,6 +290,7 @@ export function useTrackedGoals(
     deleteGoal,
     processingGoals,
     tags,
+    setTags,
     loadTags,
     createTag,
     deleteTag,

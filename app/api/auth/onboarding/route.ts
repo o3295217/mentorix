@@ -13,10 +13,17 @@ export async function POST(request: Request) {
       );
     }
 
-    await prisma.user.update({
-      where: { id: userId },
+    const result = await prisma.user.updateMany({
+      where: { id: userId, deletedAt: null },
       data: { onboardingCompleted: true },
     });
+
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -39,8 +46,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const user = await prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { onboardingCompleted: true },
     });
 
