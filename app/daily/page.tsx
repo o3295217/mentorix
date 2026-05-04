@@ -1008,12 +1008,11 @@ export default function DailyPage() {
                         />
 
                         {editingTaskId === task.id ? (
-                          <input
-                            type="text"
+                          <textarea
                             value={editingTaskText}
                             onChange={(e) => setEditingTaskText(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
+                              if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()
                                 saveEditedTask(task.id)
                               } else if (e.key === 'Escape') {
@@ -1022,7 +1021,19 @@ export default function DailyPage() {
                             }}
                             onBlur={() => saveEditedTask(task.id)}
                             autoFocus
-                            className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100"
+                            rows={1}
+                            ref={(el) => {
+                              if (el) {
+                                el.style.height = 'auto'
+                                el.style.height = el.scrollHeight + 'px'
+                              }
+                            }}
+                            onInput={(e) => {
+                              const el = e.currentTarget
+                              el.style.height = 'auto'
+                              el.style.height = el.scrollHeight + 'px'
+                            }}
+                            className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100 resize-none overflow-hidden leading-relaxed"
                           />
                         ) : (
                           <span

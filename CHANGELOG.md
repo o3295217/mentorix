@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-05-04 — feat(daily): inline habit editing, dirty-state halo, auto-scroll on Выполнено expand
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+- 📦 Другое: 3 файлов
+
+
 ### 2026-05-04 — Implement code review fixes and daily planning UX updates
 - 🔌 API: 28 файлов (route, route, route...)
 - 🧩 Компоненты: 8 файлов (AuthProvider, BalanceFlags, ProgressIndicator...)
