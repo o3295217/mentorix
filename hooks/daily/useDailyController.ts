@@ -698,11 +698,11 @@ export function useDaily(): UseDailyReturn {
     setHasUnsavedChanges(true)
   }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
-  // Перенести задачу на следующий день
-  const postponeTask = useCallback(async (taskId: number, taskText: string) => {
+  // Перенести задачу на выбранный день
+  const postponeTask = useCallback(async (taskId: number, taskText: string, targetDate?: string) => {
     try {
-      // Вычисляем завтрашнюю дату
       const tomorrow = format(new Date(new Date(selectedDate).getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+      const transferDate = targetDate || tomorrow
       
       // Отправляем на сервер
       await fetchJson('/api/tasks/process-uncompleted', {
@@ -712,7 +712,7 @@ export function useDaily(): UseDailyReturn {
           decisions: [{
             taskId,
             taskText,
-            action: { type: 'transfer', date: tomorrow }
+            action: { type: 'transfer', date: transferDate }
           }],
           sourceDate: selectedDate
         })
@@ -725,7 +725,7 @@ export function useDaily(): UseDailyReturn {
       setTasks(updatedTasks)
       setSelectedTasks(updatedSelected)
       setHasUnsavedChanges(true)
-      showMessage('➡️ Задача перенесена на завтра')
+      showMessage(`➡️ Задача перенесена на ${transferDate}`)
     } catch (error) {
       console.error('Error postponing task:', error)
       showMessage(`❌ Ошибка при переносе задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`)

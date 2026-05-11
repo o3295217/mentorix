@@ -103,7 +103,7 @@ export interface UseDailyReturn {
   setEditingExtraTaskText: (text: string) => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
-  postponeTask: (taskId: number, taskText: string) => Promise<void>
+  postponeTask: (taskId: number, taskText: string, targetDate?: string) => Promise<void>
   toggleTaskSelection: (taskId: number) => void
   startEditingTask: (taskId: number, currentText: string) => void
   saveEditedTask: (taskId: number) => void

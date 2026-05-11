@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-05-04**
+> Последнее обновление: **2026-05-11**
 
 ## Общая информация
 
@@ -91,7 +91,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (32)
+## Компоненты (33)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -114,6 +114,7 @@
 - `goals/PeriodView`
 - `goals/StrategyCards`
 - `goals/WeekCard`
+- `icons/index`
 - `landing/CtaSection`
 - `landing/DayFlowSection`
 - `landing/DreamSection`

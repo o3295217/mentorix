@@ -104,6 +104,14 @@ echo -e "${YELLOW}Удаление файла блокировки (.next/dev/lo
 rm -f ".next/dev/lock"
 echo -e "${GREEN}✓ Файл блокировки удален${NC}"
 
+# Очистка Turbopack cache: macOS/Google Drive могут добавить служебный файл Icon\r,
+# из-за которого Next.js падает с "Unexpected file in persistence directory".
+echo -e "${YELLOW}Очистка кэша Turbopack...${NC}"
+if [ -d ".next/dev/cache/turbopack" ]; then
+    rm -rf ".next/dev/cache/turbopack"
+fi
+echo -e "${GREEN}✓ Кэш Turbopack очищен${NC}"
+
 # Функция для поиска свободного порта
 find_free_port() {
     local port=$1

@@ -1,20 +1,44 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { format, startOfWeek, endOfWeek } from 'date-fns'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { useDaily } from '@/hooks/useDaily'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
+import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskPostponeIcon, TaskRepeatIcon } from '@/components/icons'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 import { areTasksSimilar } from '@/lib/task-match'
 import { fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
+type FactItem = { id: number; text: string; type: string; category: string | null }
+
+const taskActionButtonBase = 'flex h-8 w-8 items-center justify-center rounded-md border transition-colors'
+const confirmButtonBase = 'flex h-7 w-7 items-center justify-center rounded-md text-sm leading-none transition-colors'
+
+function getNextDateKey(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`)
+  date.setDate(date.getDate() + 1)
+  return format(date, 'yyyy-MM-dd')
+}
+
+function parseDateKey(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00`)
+}
+
+function getWorkNoun(count: number) {
+  const lastTwoDigits = count % 100
+  const lastDigit = count % 10
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'дел'
+  if (lastDigit === 1) return 'дело'
+  if (lastDigit >= 2 && lastDigit <= 4) return 'дела'
+  return 'дел'
+}
 
 type FactsResponse = {
-  items: Array<{ id: number; text: string; type: string; category: string | null }>
+  items: FactItem[]
   stats: { total: number }
 }
 
@@ -38,6 +62,7 @@ export default function DailyPage() {
   
   // Локальное состояние action-кнопок строки задачи
   const [activeTaskAction, setActiveTaskAction] = useState<{ taskId: number; type: TaskActionType } | null>(null)
+  const [postponeTargetDate, setPostponeTargetDate] = useState('')
   
   // Inline-подтверждение удаления extra tasks
   const [confirmExtraDelete, setConfirmExtraDelete] = useState<number | null>(null)
@@ -58,13 +83,13 @@ export default function DailyPage() {
   })
 
   // Виджет «Сделано на этой неделе»
-  const [weekFacts, setWeekFacts] = useState<Array<{ id: number; text: string; type: string; category: string | null }>>([])
+  const [weekFacts, setWeekFacts] = useState<FactItem[]>([])
   const [weekFactsTotal, setWeekFactsTotal] = useState(0)
   const [showWeekFacts, setShowWeekFacts] = useState(false)
-  // Виджет «Сделано сегодня»
-  const [todayFacts, setTodayFacts] = useState<Array<{ id: number; text: string; type: string; category: string | null }>>([])
-  const [todayFactsTotal, setTodayFactsTotal] = useState(0)
-  const [showTodayFacts, setShowTodayFacts] = useState(false)
+  // Виджет «Сделано за месяц»
+  const [monthFacts, setMonthFacts] = useState<FactItem[]>([])
+  const [monthFactsTotal, setMonthFactsTotal] = useState(0)
+  const [showMonthFacts, setShowMonthFacts] = useState(false)
   
   // Сохраняем отклонённые предложения в localStorage
   useEffect(() => {
@@ -234,7 +259,7 @@ export default function DailyPage() {
 
   // Заголовок для блока целей недели с датами
   const weekLabel = useMemo(() => {
-    const date = new Date(selectedDate)
+    const date = parseDateKey(selectedDate)
     const weekStart = startOfWeek(date, { weekStartsOn: 1 })
     const weekEnd = endOfWeek(date, { weekStartsOn: 1 })
     const startDay = format(weekStart, 'd', { locale: ru })
@@ -245,7 +270,7 @@ export default function DailyPage() {
 
   // Заголовок для блока целей месяца
   const monthLabel = useMemo(() => {
-    const date = new Date(selectedDate)
+    const date = parseDateKey(selectedDate)
     const monthName = format(date, 'LLLL', { locale: ru })
     // Первая буква заглавная
     return `План на ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`
@@ -305,8 +330,10 @@ export default function DailyPage() {
     if (type === 'habit-create') {
       setHabitFrequency('daily')
       setHabitDays([])
+    } else if (type === 'postpone') {
+      setPostponeTargetDate(getNextDateKey(selectedDate))
     }
-  }, [])
+  }, [selectedDate])
 
   // Создать привычку с выбранными параметрами
   const handleCreateHabit = async (taskText: string) => {
@@ -490,13 +517,19 @@ export default function DailyPage() {
     setMounted(true)
   }, [])
 
-  // Загрузка фактов текущей недели и сегодня
+  // Загрузка фактов недели и месяца относительно выбранной даты
   useEffect(() => {
     (async () => {
       try {
-        const [weekResult, todayResult] = await Promise.allSettled([
-          fetchJson<FactsResponse>('/api/facts?period=week&limit=200'),
-          fetchJson<FactsResponse>(`/api/facts?from=${selectedDate}&to=${selectedDate}&limit=200`),
+        const selected = parseDateKey(selectedDate)
+        const weekStart = startOfWeek(selected, { weekStartsOn: 1 })
+        const weekEnd = endOfWeek(selected, { weekStartsOn: 1 })
+        const monthStart = startOfMonth(selected)
+        const monthEnd = endOfMonth(selected)
+
+        const [weekResult, monthResult] = await Promise.allSettled([
+          fetchJson<FactsResponse>(`/api/facts?from=${format(weekStart, 'yyyy-MM-dd')}&to=${format(weekEnd, 'yyyy-MM-dd')}&limit=200`),
+          fetchJson<FactsResponse>(`/api/facts?from=${format(monthStart, 'yyyy-MM-dd')}&to=${format(monthEnd, 'yyyy-MM-dd')}&limit=500`),
         ])
 
         if (weekResult.status === 'fulfilled') {
@@ -510,14 +543,15 @@ export default function DailyPage() {
           setWeekFactsTotal(0)
         }
 
-        if (todayResult.status === 'fulfilled') {
-          // Сегодня — всё выполненное
-          setTodayFacts(todayResult.value.items)
-          setTodayFactsTotal(todayResult.value.stats.total)
+        if (monthResult.status === 'fulfilled') {
+          // Месяц — без привычек (фильтр по category, т.к. type всегда 'task')
+          const withoutHabits = monthResult.value.items.filter((i) => i.category !== 'привычки')
+          setMonthFacts(withoutHabits)
+          setMonthFactsTotal(withoutHabits.length)
         } else {
-          console.error('Error loading today facts:', todayResult.reason)
-          setTodayFacts([])
-          setTodayFactsTotal(0)
+          console.error('Error loading month facts:', monthResult.reason)
+          setMonthFacts([])
+          setMonthFactsTotal(0)
         }
       } catch (error) {
         console.error('Error loading facts:', error)
@@ -535,7 +569,7 @@ export default function DailyPage() {
       </div>
 
       <p className="text-lg text-gray-400">
-        {mounted ? format(new Date(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
+        {mounted ? format(parseDateKey(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
       </p>
 
       {/* Context from periods */}
@@ -615,24 +649,24 @@ export default function DailyPage() {
         </div>
       </div>
 
-      {/* Виджеты «Сделано сегодня» и «Сделано на этой неделе» */}
-      {(todayFactsTotal > 0 || weekFactsTotal > 0) && (
-        <div className={`grid grid-cols-1 ${todayFactsTotal > 0 && weekFactsTotal > 0 ? 'md:grid-cols-2' : ''} gap-4`}>
-          {/* Сделано сегодня */}
-          {todayFactsTotal > 0 && (
+      {/* Виджеты «Сделано за неделю» и «Сделано за месяц» */}
+      {(weekFactsTotal > 0 || monthFactsTotal > 0) && (
+        <div className={`grid grid-cols-1 ${weekFactsTotal > 0 && monthFactsTotal > 0 ? 'md:grid-cols-2' : ''} gap-4`}>
+          {/* Сделано за неделю */}
+          {weekFactsTotal > 0 && (
           <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4">
             <button
-              onClick={() => setShowTodayFacts(!showTodayFacts)}
+              onClick={() => setShowWeekFacts(!showWeekFacts)}
               className="w-full flex items-center justify-between"
             >
               <h3 className="text-sm font-medium text-blue-300">
-                Сделано сегодня: {todayFactsTotal} {todayFactsTotal === 1 ? 'дело' : todayFactsTotal >= 2 && todayFactsTotal <= 4 ? 'дела' : 'дел'}
+                Сделано за неделю: {weekFactsTotal} {getWorkNoun(weekFactsTotal)}
               </h3>
-              <span className="text-blue-400 text-xs">{showTodayFacts ? '▲ скрыть' : '▼ показать'}</span>
+              <span className="text-blue-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
             </button>
-            {showTodayFacts && (
+            {showWeekFacts && (
               <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-                {todayFacts.map(item => (
+                {weekFacts.map(item => (
                   <div key={item.id} className="flex items-center gap-2 text-sm">
                     <span className="text-blue-500">✓</span>
                     <span className="text-gray-300">{item.text}</span>
@@ -649,23 +683,23 @@ export default function DailyPage() {
           </div>
           )}
 
-          {/* Сделано на этой неделе */}
-          {weekFactsTotal > 0 && (
-          <div className="rounded-xl bg-green-500/5 border border-green-500/20 p-4">
+          {/* Сделано за месяц */}
+          {monthFactsTotal > 0 && (
+          <div className="rounded-xl bg-purple-500/5 border border-purple-500/20 p-4">
             <button
-              onClick={() => setShowWeekFacts(!showWeekFacts)}
+              onClick={() => setShowMonthFacts(!showMonthFacts)}
               className="w-full flex items-center justify-between"
             >
-              <h3 className="text-sm font-medium text-green-300">
-                Сделано на неделе: {weekFactsTotal} {weekFactsTotal === 1 ? 'дело' : weekFactsTotal >= 2 && weekFactsTotal <= 4 ? 'дела' : 'дел'}
+              <h3 className="text-sm font-medium text-purple-300">
+                Сделано за месяц: {monthFactsTotal} {getWorkNoun(monthFactsTotal)}
               </h3>
-              <span className="text-green-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
+              <span className="text-purple-400 text-xs">{showMonthFacts ? '▲ скрыть' : '▼ показать'}</span>
             </button>
-            {showWeekFacts && (
+            {showMonthFacts && (
               <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-                {weekFacts.map(item => (
+                {monthFacts.map(item => (
                   <div key={item.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-green-500">✓</span>
+                    <span className="text-purple-500">✓</span>
                     <span className="text-gray-300">{item.text}</span>
                     {item.category && (
                       <span className={`text-[10px] ml-auto ${
@@ -983,7 +1017,7 @@ export default function DailyPage() {
                     <div
                       key={task.id}
                       ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
-                      className="space-y-2"
+                      className="relative"
                     >
                       <div
                         draggable={editingTaskId !== task.id}
@@ -1047,70 +1081,82 @@ export default function DailyPage() {
 
                         <button
                           onClick={() => toggleTaskAction(task.id, 'postpone')}
-                          className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                          className={`${taskActionButtonBase} ${
                             isPostponeActive
-                              ? 'bg-blue-500/15 text-blue-300 opacity-100'
-                              : 'text-blue-500 hover:text-blue-400 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                              ? 'border-blue-400/35 bg-blue-500/5 text-blue-300'
+                              : 'border-transparent text-blue-300/65 hover:border-blue-400/20 hover:bg-blue-500/5 hover:text-blue-200'
                           }`}
-                          title="Перенести на завтра"
+                          title="Перенести на дату"
                           aria-pressed={isPostponeActive}
                         >
-                          →
+                          <TaskPostponeIcon className="h-[18px] w-[18px]" />
                         </button>
 
                         <button
                           onClick={() => toggleTaskAction(task.id, habit ? 'habit-remove' : 'habit-create')}
-                          className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                          className={`${taskActionButtonBase} ${
                             isHabitActive
-                              ? 'bg-amber-500/15 text-amber-300 opacity-100'
-                              : 'text-amber-500 hover:text-amber-400 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                              ? 'border-amber-400/35 bg-amber-500/5 text-amber-300'
+                              : 'border-transparent text-amber-300/65 hover:border-amber-400/20 hover:bg-amber-500/5 hover:text-amber-200'
                           }`}
                           title={habit ? 'Снять цикличность' : 'Сделать привычкой'}
                           aria-pressed={isHabitActive}
                         >
-                          ↻
+                          <TaskRepeatIcon className="h-[18px] w-[18px]" />
                         </button>
 
                         <button
                           onClick={() => toggleTaskAction(task.id, 'delete')}
-                          className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                          className={`${taskActionButtonBase} ${
                             isDeleteActive
-                              ? 'bg-red-500/15 text-red-300 opacity-100'
-                              : 'text-red-500 hover:text-red-400 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                              ? 'border-red-400/35 bg-red-500/5 text-red-300'
+                              : 'border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200'
                           }`}
                           title="Удалить задачу"
                           aria-pressed={isDeleteActive}
                         >
-                          ×
+                          <TaskDeleteIcon className="h-[18px] w-[18px]" />
                         </button>
                       </div>
 
                       {activeTaskAction?.taskId === task.id && (
-                        <div className={`ml-10 mr-2 rounded-lg border px-3 py-2 ${
+                        <div className={`absolute right-2 top-full z-30 mt-1 rounded-lg border border-gray-700/45 bg-gray-900/25 px-2.5 py-1.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm ${
                           activeTaskAction.type === 'postpone'
-                            ? 'border-blue-500/20 bg-blue-500/10'
+                            ? 'min-w-[300px]'
                             : activeTaskAction.type === 'delete'
-                              ? 'border-red-500/20 bg-red-900/30'
-                              : 'border-amber-500/20 bg-amber-500/10'
+                              ? 'min-w-[190px]'
+                              : activeTaskAction.type === 'habit-create'
+                                ? 'w-[500px] max-w-[calc(100%-3rem)]'
+                                : 'min-w-[220px]'
                         }`}>
                           {activeTaskAction.type === 'postpone' && (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-sm text-blue-300">Перенести задачу на завтра?</span>
+                              <label className="flex items-center gap-2 text-xs text-gray-300">
+                                <span>Перенести на</span>
+                                <input
+                                  type="date"
+                                  value={postponeTargetDate}
+                                  min={getNextDateKey(selectedDate)}
+                                  onChange={(event) => setPostponeTargetDate(event.target.value)}
+                                  className="h-8 rounded-md border border-gray-700/70 bg-transparent px-2 text-sm text-gray-100 outline-none transition-colors hover:border-gray-500/70 focus:border-gray-400/80"
+                                />
+                              </label>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => {
-                                    postponeTask(task.id, task.taskText)
+                                    postponeTask(task.id, task.taskText, postponeTargetDate)
                                     closeTaskAction()
                                   }}
-                                  className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                  disabled={!postponeTargetDate}
+                                  className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200 disabled:opacity-40`}
                                 >
-                                  ✓
+                                  <CheckIcon className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={closeTaskAction}
-                                  className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                  className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
                                 >
-                                  ✗
+                                  <CloseIcon className="h-4 w-4" />
                                 </button>
                               </div>
                             </div>
@@ -1118,22 +1164,22 @@ export default function DailyPage() {
 
                           {activeTaskAction.type === 'delete' && (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-sm text-red-300">Удалить задачу?</span>
+                              <span className="text-xs text-gray-300">Удалить задачу?</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => {
                                     removeTask(task.id)
                                     closeTaskAction()
                                   }}
-                                  className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                  className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
                                 >
-                                  ✓
+                                  <CheckIcon className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={closeTaskAction}
-                                  className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                  className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
                                 >
-                                  ✗
+                                  <CloseIcon className="h-4 w-4" />
                                 </button>
                               </div>
                             </div>
@@ -1141,31 +1187,31 @@ export default function DailyPage() {
 
                           {activeTaskAction.type === 'habit-remove' && habit && (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-sm text-amber-200">Снять цикличность с задачи?</span>
+                              <span className="text-xs text-gray-300">Снять цикличность?</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={async () => {
                                     await deleteHabit(habit.id)
                                     closeTaskAction()
                                   }}
-                                  className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                  className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
                                 >
-                                  ✓
+                                  <CheckIcon className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={closeTaskAction}
-                                  className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                  className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
                                 >
-                                  ✗
+                                  <CloseIcon className="h-4 w-4" />
                                 </button>
                               </div>
                             </div>
                           )}
 
                           {activeTaskAction.type === 'habit-create' && (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm text-amber-200">Сделать привычкой:</span>
+                                <span className="text-xs text-gray-300">Сделать привычкой:</span>
                                 {[
                                   { value: 'daily', label: 'Ежедневно' },
                                   { value: 'weekdays', label: 'Будни' },
@@ -1177,10 +1223,10 @@ export default function DailyPage() {
                                     key={option.value}
                                     type="button"
                                     onClick={() => setHabitFrequency(option.value as FrequencyType)}
-                                    className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                                    className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                                       habitFrequency === option.value
-                                        ? 'bg-amber-500 text-white'
-                                        : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                        ? 'border-gray-500/60 bg-gray-700/45 text-gray-100'
+                                        : 'border-gray-700/60 bg-transparent text-gray-400 hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200'
                                     }`}
                                   >
                                     {option.label}
@@ -1203,10 +1249,10 @@ export default function DailyPage() {
                                       key={day}
                                       type="button"
                                       onClick={() => toggleDay(day)}
-                                      className={`w-9 h-9 rounded-lg text-xs font-medium transition-colors ${
+                                      className={`h-8 w-8 rounded-md border text-xs font-medium transition-colors ${
                                         habitDays.includes(day)
-                                          ? 'bg-amber-500 text-white'
-                                          : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                          ? 'border-gray-500/60 bg-gray-700/45 text-gray-100'
+                                          : 'border-gray-700/60 bg-transparent text-gray-400 hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200'
                                       }`}
                                     >
                                       {label}
@@ -1215,11 +1261,11 @@ export default function DailyPage() {
                                 </div>
                               )}
 
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-2 pt-1">
                                 <button
                                   type="button"
                                   onClick={closeTaskAction}
-                                  className="px-3 py-1.5 border border-gray-700 text-gray-200 rounded-lg hover:bg-gray-800 transition-colors text-sm"
+                                  className="rounded-md border border-gray-700/70 bg-transparent px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200"
                                 >
                                   Отмена
                                 </button>
@@ -1227,7 +1273,7 @@ export default function DailyPage() {
                                   type="button"
                                   onClick={() => void handleCreateHabit(task.taskText)}
                                   disabled={(habitFrequency === 'weekly' || habitFrequency === 'custom') && habitDays.length === 0}
-                                  className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
+                                  className="rounded-md border border-gray-500/60 bg-gray-700/45 px-3 py-1.5 text-xs text-gray-100 transition-colors hover:bg-gray-700/65 disabled:opacity-40"
                                 >
                                   Создать
                                 </button>
@@ -1265,7 +1311,7 @@ export default function DailyPage() {
                         <div
                           key={task.id}
                           ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
-                          className="space-y-2"
+                          className="relative"
                         >
                           <div className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-gray-900/80 border-gray-700 opacity-50 hover:opacity-70">
                             <input
@@ -1281,22 +1327,22 @@ export default function DailyPage() {
                                 e.stopPropagation()
                                 toggleTaskAction(task.id, 'delete')
                               }}
-                              className={`w-8 h-8 flex items-center justify-center text-2xl leading-none rounded transition-all ${
+                              className={`${taskActionButtonBase} ${
                                 activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'
-                                  ? 'bg-red-500/15 text-red-300 opacity-100'
-                                  : 'text-red-400 hover:text-red-300 hover:bg-gray-700 opacity-70 hover:opacity-100'
+                                  ? 'border-red-400/35 bg-red-500/5 text-red-300'
+                                  : 'border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200'
                               }`}
                               title="Удалить задачу"
                               aria-pressed={activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'}
                             >
-                              ×
+                              <TaskDeleteIcon className="h-[18px] w-[18px]" />
                             </button>
                           </div>
 
                           {activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete' && (
-                            <div className="ml-10 mr-2 rounded-lg border border-red-500/20 bg-red-900/30 px-3 py-2">
+                            <div className="absolute right-2 top-full z-30 mt-1 min-w-[190px] rounded-lg border border-gray-700/45 bg-gray-900/25 px-2.5 py-1.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm">
                               <div className="flex items-center justify-between gap-3">
-                                <span className="text-sm text-red-300">Удалить задачу?</span>
+                                <span className="text-xs text-gray-300">Удалить задачу?</span>
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={(e) => {
@@ -1304,18 +1350,18 @@ export default function DailyPage() {
                                       removeTask(task.id)
                                       closeTaskAction()
                                     }}
-                                    className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                                    className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
                                   >
-                                    ✓
+                                    <CheckIcon className="h-4 w-4" />
                                   </button>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       closeTaskAction()
                                     }}
-                                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                                    className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
                                   >
-                                    ✗
+                                    <CloseIcon className="h-4 w-4" />
                                   </button>
                                 </div>
                               </div>
@@ -1383,31 +1429,31 @@ export default function DailyPage() {
                       </span>
                     )}
                     {confirmExtraDelete === index ? (
-                      <div className="flex items-center gap-1 bg-red-900/50 rounded px-1">
-                        <span className="text-xs text-red-300">Удалить?</span>
+                      <div className="flex items-center gap-1 rounded-md border border-gray-700/45 bg-gray-900/25 px-1.5 py-0.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm">
+                        <span className="text-xs text-gray-300">Удалить?</span>
                         <button
                           onClick={() => {
                             removeExtraTask(index)
                             setConfirmExtraDelete(null)
                           }}
-                          className="w-6 h-6 flex items-center justify-center text-green-400 hover:bg-green-500/15 rounded text-lg leading-none"
+                          className={`${confirmButtonBase} text-gray-300 hover:bg-gray-800/50 hover:text-green-300`}
                         >
-                          ✓
+                          <CheckIcon className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setConfirmExtraDelete(null)}
-                          className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-700 rounded text-lg leading-none"
+                          className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
                         >
-                          ✗
+                          <CloseIcon className="h-4 w-4" />
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => setConfirmExtraDelete(index)}
-                        className="w-8 h-8 flex items-center justify-center text-2xl leading-none text-red-500 hover:text-red-400 hover:bg-gray-700 rounded opacity-70 hover:opacity-100 transition-all"
+                        className={`${taskActionButtonBase} border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200`}
                         title="Удалить"
                       >
-                        ×
+                        <TaskDeleteIcon className="h-[18px] w-[18px]" />
                       </button>
                     )}
                   </div>

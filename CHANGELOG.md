@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-05-04 — feat(daily): textarea с авто-ростом для инлайн-редактирования задач
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-05-04 — feat(daily): inline habit editing, dirty-state halo, auto-scroll on Выполнено expand
 - 📄 Страницы: 1 файлов
 - 📝 Документация: 1 файлов

@@ -13,14 +13,29 @@ interface DateIndicators {
   }
 }
 
+type DateIndicator = DateIndicators[string]
+
+interface DateState {
+  indicator?: DateIndicator
+  isCurrentMonth: boolean
+  isFuture: boolean
+  isPast: boolean
+  isSelected: boolean
+  isToday: boolean
+}
+
 interface DatePickerWithIndicatorsProps {
   value: string // "yyyy-MM-dd"
   onChange: (value: string) => void
 }
 
+function parseDateKey(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00`)
+}
+
 export default function DatePickerWithIndicators({ value, onChange }: DatePickerWithIndicatorsProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [currentMonth, setCurrentMonth] = useState(new Date(value))
+  const [currentMonth, setCurrentMonth] = useState(parseDateKey(value))
   const [indicators, setIndicators] = useState<DateIndicators>({})
   const pickerRef = useRef<HTMLDivElement>(null)
 
@@ -69,6 +84,11 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
     setIsOpen(false)
   }, [onChange])
 
+  const toggleCalendar = useCallback(() => {
+    setCurrentMonth(parseDateKey(value))
+    setIsOpen((open) => !open)
+  }, [value])
+
   const goToToday = () => {
     const today = new Date()
     setCurrentMonth(today)
@@ -116,65 +136,118 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
     return indicators[dateKey]
   }
 
-  const renderIndicatorDot = (date: Date) => {
-    const indicator = getIndicatorForDate(date)
-    if (!indicator) return null
-
+  const getDateState = (date: Date): DateState => {
+    const dateStr = format(date, 'yyyy-MM-dd')
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const dateNoTime = new Date(date)
     dateNoTime.setHours(0, 0, 0, 0)
-    const isPast = dateNoTime < today
-    const isFuture = dateNoTime > today
 
-    // Будущие даты с планом = зелёная точка
-    if (isFuture && indicator.hasPlan) {
-      return 
+    return {
+      indicator: getIndicatorForDate(date),
+      isCurrentMonth: date.getMonth() === currentMonth.getMonth(),
+      isFuture: dateNoTime > today,
+      isPast: dateNoTime < today,
+      isSelected: dateStr === value && dateNoTime.getTime() !== today.getTime(),
+      isToday: dateNoTime.getTime() === today.getTime(),
+    }
+  }
+
+  const getEvaluationDotClass = (score?: number) => {
+    if (score === undefined) return 'bg-slate-400 shadow-[0_0_6px_rgba(148,163,184,0.8)]'
+    if (score >= 7) return 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.85)]'
+    if (score >= 5) return 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.85)]'
+    return 'bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.85)]'
+  }
+
+  const renderDayMarkers = (date: Date) => {
+    const state = getDateState(date)
+    const { indicator } = state
+    if (!indicator) return null
+
+    const hasPlanWithoutEvaluation = !state.isFuture && indicator.hasPlan && !indicator.hasEvaluation
+    const planBarClass = state.isPast ? 'bg-amber-400' : 'bg-blue-400'
+
+    return (
+      <span className="pointer-events-none absolute inset-0">
+        {state.isFuture && indicator.hasPlan && (
+          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.85)]" />
+        )}
+        {hasPlanWithoutEvaluation && (
+          <span className={`absolute bottom-1 left-2 right-2 h-0.5 rounded-full ${planBarClass}`} />
+        )}
+        {indicator.hasEvaluation && (
+          <span className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${getEvaluationDotClass(indicator.dreamProgressScore)}`} />
+        )}
+      </span>
+    )
+  }
+
+  type LegendSampleType = 'selected' | 'today' | 'evaluated' | 'waiting' | 'planned' | 'future'
+
+  const renderLegendSample = (type: LegendSampleType) => {
+    if (type === 'selected') {
+      return <span className="h-4 w-5 rounded bg-blue-500" />
     }
 
-    // Прошедшие даты с выполненным планом = синяя обводка (показываем через CSS класс)
-    // Прошедшие даты без факта = красная точка
-    if (isPast && indicator.hasPlan) {
-      if (indicator.hasFact) {
-        // Синяя обводка добавится через className
-        return null
-      } else {
-        // Красная точка = просрочено
-        return 
-      }
+    if (type === 'today') {
+      return <span className="h-4 w-5 rounded border border-emerald-300" />
+    }
+
+    if (type === 'evaluated') {
+      return <span className="h-2 w-2 rounded-full bg-emerald-400" />
+    }
+
+    if (type === 'planned') {
+      return <span className="h-0.5 w-5 rounded-full bg-blue-400" />
+    }
+
+    if (type === 'waiting') {
+      return <span className="h-0.5 w-5 rounded-full bg-amber-400" />
+    }
+
+    if (type === 'future') {
+      return (
+        <span className="relative h-4 w-5 rounded border border-slate-700">
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-cyan-300" />
+        </span>
+      )
     }
 
     return null
   }
 
+  const renderLegendHeading = (label: string) => (
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+      <span aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  )
+
+  const renderLegendItem = (type: LegendSampleType, label: string) => (
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2">
+      <span className="flex w-6 justify-center">
+        {renderLegendSample(type)}
+      </span>
+      <span className="min-w-0 leading-tight">{label}</span>
+    </div>
+  )
+
   const getDayClassName = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const isSelected = dateStr === value
-    const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-    const isCurrentMonth = date.getMonth() === currentMonth.getMonth()
-    const indicator = getIndicatorForDate(date)
+    const state = getDateState(date)
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const dateNoTime = new Date(date)
-    dateNoTime.setHours(0, 0, 0, 0)
-    const isPast = dateNoTime < today
+    let className = 'relative flex h-10 w-10 cursor-pointer items-center justify-center rounded text-sm transition-colors '
 
-    let className = 'relative w-10 h-10 flex items-center justify-center rounded cursor-pointer text-sm '
-
-    if (isSelected) {
+    if (state.isSelected) {
       className += 'bg-blue-500 text-white font-bold '
-    } else if (isToday) {
-      className += 'font-semibold text-white bg-blue-900'
-    } else if (!isCurrentMonth) {
-      className += 'text-gray-500 '
+    } else if (!state.isCurrentMonth) {
+      className += 'text-gray-600 hover:bg-gray-800/60 '
     } else {
       className += 'hover:bg-gray-700 text-gray-100 '
     }
 
-    // Синяя обводка для прошедших дат с выполненным планом
-    if (isPast && indicator?.hasPlan && indicator?.hasFact) {
-      className += 'ring-2 ring-blue-400 '
+    if (state.isToday && !state.isSelected) {
+      className += 'font-semibold text-white ring-1 ring-emerald-300/90 ring-offset-1 ring-offset-gray-900 '
     }
 
     return className
@@ -188,8 +261,8 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
       {/* Input */}
       <input
         type="text"
-        value={format(new Date(value), 'd MMMM yyyy', { locale: ru })}
-        onClick={() => setIsOpen(!isOpen)}
+        value={format(parseDateKey(value), 'd MMMM yyyy', { locale: ru })}
+        onClick={toggleCalendar}
         readOnly
         className="input w-auto cursor-pointer"
       />
@@ -231,30 +304,35 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
             {days.map((date, i) => (
               <div key={i} className={getDayClassName(date)} onClick={() => handleDateSelect(date)}>
                 {date.getDate()}
-                {renderIndicatorDot(date)}
+                {renderDayMarkers(date)}
               </div>
             ))}
           </div>
 
-          {/* Footer */}
-          <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between text-sm">
-            <button onClick={() => setIsOpen(false)} className="text-blue-400 hover:underline">
-              Удалить
+          <div className="mt-4 flex justify-between border-t border-gray-700 pt-4 text-sm">
+            <button onClick={() => setIsOpen(false)} className="text-gray-400 transition-colors hover:text-gray-200">
+              Закрыть
             </button>
-            <button onClick={goToToday} className="text-blue-400 hover:underline">
+            <button onClick={goToToday} className="text-blue-400 transition-colors hover:text-blue-300">
               Сегодня
             </button>
           </div>
 
-          {/* Legend */}
-          <div className="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-400 space-y-1">
-            <div className="flex items-center gap-2">
-              
-              <span>Запланировано</span>
-            </div>
-            <div className="flex items-center gap-2">
-              
-              <span>Оценено</span>
+          <div className="mt-3 border-t border-gray-700 pt-3 text-xs text-gray-400">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+              <div className="space-y-2">
+                {renderLegendHeading('День')}
+                {renderLegendItem('selected', 'Выбранный')}
+                {renderLegendItem('today', 'Сегодня')}
+                {renderLegendItem('evaluated', 'Оценён')}
+              </div>
+
+              <div className="space-y-2">
+                {renderLegendHeading('План')}
+                {renderLegendItem('planned', 'План сегодня')}
+                {renderLegendItem('future', 'Будущий план')}
+                {renderLegendItem('waiting', 'Ждёт оценки')}
+              </div>
             </div>
           </div>
         </div>

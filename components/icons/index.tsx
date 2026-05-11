@@ -1,0 +1,78 @@
+import type { ReactNode, SVGProps } from 'react'
+
+export type IconProps = SVGProps<SVGSVGElement>
+
+type IconBaseProps = IconProps & {
+  children: ReactNode
+}
+
+function IconBase({ children, ...props }: IconBaseProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      {...props}
+    >
+      {children}
+    </svg>
+  )
+}
+
+export function TaskPostponeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M7 3v3" />
+      <path d="M17 3v3" />
+      <path d="M4.5 8.5h15" />
+      <rect x="4.5" y="5" width="15" height="15.5" rx="3" />
+      <path d="M9 14h5.5" />
+      <path d="m12.5 11.5 2.5 2.5-2.5 2.5" />
+    </IconBase>
+  )
+}
+
+export function TaskRepeatIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m17 3 3 3-3 3" />
+      <path d="M4 11V9a3 3 0 0 1 3-3h13" />
+      <path d="m7 21-3-3 3-3" />
+      <path d="M20 13v2a3 3 0 0 1-3 3H4" />
+    </IconBase>
+  )
+}
+
+export function TaskDeleteIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 7h16" />
+      <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
+      <path d="M18 7 17.2 18.2A2 2 0 0 1 15.2 20H8.8a2 2 0 0 1-2-1.8L6 7" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
+    </IconBase>
+  )
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m5 12 4 4L19 6" />
+    </IconBase>
+  )
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </IconBase>
+  )
+}

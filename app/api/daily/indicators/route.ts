@@ -53,8 +53,11 @@ export async function GET(request: NextRequest) {
     entries.forEach((entry) => {
       const dateKey = toDateKey(entry.date) // local date key
       const selected = safeParseJsonArray<number>(entry.selectedTasksJson)
+      const extraTasks = safeParseJsonArray<string>(entry.extraTasksJson)
+      const hasPlan = !!entry.planText?.trim() || extraTasks.length > 0
+
       indicators[dateKey] = {
-        hasPlan: !!entry.planText,
+        hasPlan,
         hasFact: selected.length > 0 || !!entry.factText,
         hasEvaluation: !!entry.evaluation,
         dreamProgressScore: entry.evaluation?.dreamProgressScore,
