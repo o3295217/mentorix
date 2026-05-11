@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-05-11 — feat(daily): refine planning widgets and calendar
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 2 файлов (DatePickerWithIndicators, index)
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 2 файлов
+- 📦 Другое: 116 файлов
+
+
 ### 2026-05-04 — feat(daily): textarea с авто-ростом для инлайн-редактирования задач
 - 📄 Страницы: 1 файлов
 - 📝 Документация: 1 файлов
