@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-05-18 — fix: handle suggested tasks parsing and transfer state
+- 🧩 Компоненты: 1 файлов (UncompletedTasksModal)
+- 📚 Библиотеки: 1 файлов (safe-json)
+- 📦 Другое: 1 файлов
+
+
 ### 2026-05-18 — docs: update changelog
 - 📝 Документация: 1 файлов
 
