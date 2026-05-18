@@ -409,6 +409,13 @@ export default function DailyPage() {
 
   // Проверка невыполненных задач перед оценкой
   const handleEvaluateClick = () => {
+    // Для повторной оценки не поднимаем модалку снова: решение по невыполненным
+    // задачам уже было принято при первой оценке этого дня.
+    if (dailyEntry?.evaluation) {
+      evaluate(router)
+      return
+    }
+
     // Найти невыполненные задачи: есть в плане (tasks), но не отмечены (не в selectedTasks)
     const uncompleted = tasks.filter(t => !selectedTasks.has(t.id))
     
