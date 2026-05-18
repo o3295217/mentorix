@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-05-18 — docs: add security review plan
+- 📝 Документация: 1 файлов
+
+
 ### 2026-05-18 — feat(daily): improve daily page layout and evaluation controls
 - 📄 Страницы: 1 файлов
 - 📝 Документация: 1 файлов
