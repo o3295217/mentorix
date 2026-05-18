@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-05-18 — feat(daily): improve daily page layout and evaluation controls
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-05-11 — feat(daily): refine planning widgets and calendar
 - 🔌 API: 1 файлов (route)
 - 🧩 Компоненты: 2 файлов (DatePickerWithIndicators, index)
