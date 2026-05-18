@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-05-18 — docs: update changelog
+- 📝 Документация: 1 файлов
+
+
 ### 2026-05-18 — docs: add security review plan
 - 📝 Документация: 1 файлов
 
