@@ -120,14 +120,14 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   onClick={() => setAction(task.id, { type: 'transfer', date: tomorrow })}
-                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
+                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'transfer' && decisions[task.id]?.date === tomorrow ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
                    Завтра
                 </button>
                 
                 <button
                   onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  className="text-xs px-2 py-1 rounded text-gray-300 transition bg-gray-600 hover:bg-gray-500"
+                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'transfer' && decisions[task.id]?.date !== tomorrow ? 'bg-blue-500 text-white' : 'text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
                    Другая дата
                 </button>

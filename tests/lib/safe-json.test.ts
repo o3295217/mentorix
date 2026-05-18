@@ -22,4 +22,9 @@ describe('safeParseJson', () => {
     expect(safeParseJson({ ok: true }, { ok: false })).toEqual({ ok: true })
     expect(safeParseJson(['a', 'b'], [])).toEqual(['a', 'b'])
   })
+
+  it('returns fallback when array fallback receives a non-array value', () => {
+    expect(safeParseJson('{"taskText":"one task"}', [])).toEqual([])
+    expect(safeParseJson({ taskText: 'one task' }, [])).toEqual([])
+  })
 })
