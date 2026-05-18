@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-05-18 — fix: skip uncompleted modal on reevaluate
+- 📄 Страницы: 1 файлов
+
+
 ### 2026-05-18 — fix: handle suggested tasks parsing and transfer state
 - 🧩 Компоненты: 1 файлов (UncompletedTasksModal)
 - 📚 Библиотеки: 1 файлов (safe-json)
