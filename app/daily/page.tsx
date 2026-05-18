@@ -99,7 +99,6 @@ export default function DailyPage() {
   }, [dismissedSuggestions])
 
   // Автоскролл полотна задач к низу при раскрытии блока «Выполнено»
-  // (ждём окончания CSS-перехода max-h, иначе scrollHeight ещё не обновлён)
   useEffect(() => {
     if (!showCompleted) return
     const container = tasksContainerRef.current
@@ -118,7 +117,7 @@ export default function DailyPage() {
       const target = container.scrollHeight - container.clientHeight
       animate(container.scrollTop, target, 320)
     }
-    // Перeход max-h занимает 200ms — даём чуть больше, чтобы scrollHeight успел вырасти
+    // Даём layout обновиться после раскрытия нижнего блока.
     const id = window.setTimeout(tick, 230)
     return () => window.clearTimeout(id)
   }, [showCompleted])
@@ -459,11 +458,15 @@ export default function DailyPage() {
   }, [chatMessages])
 
   // Статистика выполнения
-  const taskIdSet = new Set(tasks.map(t => t.id))
-  const completedCount = Array.from(selectedTasks).filter(id => taskIdSet.has(id)).length
+  const activeTasks = tasks.filter(t => !selectedTasks.has(t.id))
+  const completedTasks = tasks.filter(t => selectedTasks.has(t.id))
+  const completedCount = completedTasks.length
   const totalCount = tasks.length
   const completionPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const extraDoneCount = extraTasks.length
+  const hasEvaluation = !!dailyEntry?.evaluation
+  const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && dailyEntry.evaluation?.createdAt
+    && new Date(dailyEntry.updatedAt) > new Date(dailyEntry.evaluation.createdAt)
 
   const normalizePlanLine = (value: string) => {
     let s = (value || '')
@@ -770,7 +773,7 @@ export default function DailyPage() {
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
 
             return (
-              <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mr-6">
+              <div className={`relative z-40 mb-4 mr-6 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 ${showHabitsExpanded ? 'shadow-[0_12px_32px_rgba(0,0,0,0.28)]' : ''}`}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-amber-300 font-medium">
                     Привычки ({habits.length})
@@ -808,57 +811,57 @@ export default function DailyPage() {
                 </div>
 
                 {showHabitsExpanded && (
-                <div className="mt-3 pt-3 border-t border-amber-500/20">
-                  {habitsNotInPlan.length > 0 && (
-                    <div className="mb-2 flex justify-end">
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 shadow-2xl ring-1 ring-amber-500/10 backdrop-blur-md">
+                  <div className="flex items-start gap-2">
+                    <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                      {habits.map((habit) => {
+                        const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
+                        return (
+                          <div
+                            key={habit.id}
+                            className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
+                              isInPlan
+                                ? 'bg-green-500/15 text-green-400'
+                                : 'bg-amber-500/15 text-amber-300'
+                            }`}
+                          >
+                            <button
+                              onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
+                              className={isInPlan ? 'cursor-default line-through opacity-60' : 'hover:text-amber-900 transition-colors'}
+                              title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
+                              disabled={isInPlan}
+                            >
+                              {isInPlan && ' '}
+                              {habit.taskText}
+                              {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>{habit.streak}</span>}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                startEditingHabit(habit.id)
+                              }}
+                              className={`ml-1 w-5 h-5 flex items-center justify-center rounded transition-colors ${
+                                editingHabitId === habit.id
+                                  ? 'bg-amber-500 text-white'
+                                  : 'text-amber-400 hover:bg-amber-500/15 hover:text-amber-200'
+                              }`}
+                              title="Редактировать привычку"
+                              aria-pressed={editingHabitId === habit.id}
+                            >
+                              ✎
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {habitsNotInPlan.length > 0 && (
                       <button
                         onClick={() => addHabitsToTasks()}
-                        className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded transition-colors"
+                        className="h-8 flex-shrink-0 rounded-md bg-amber-600/80 px-2.5 text-xs text-white transition-colors hover:bg-amber-600"
                       >
                         + Все в план
                       </button>
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-1">
-                    {habits.map((habit) => {
-                      const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
-                      return (
-                        <div
-                          key={habit.id}
-                          className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
-                            isInPlan
-                              ? 'bg-green-500/15 text-green-400'
-                              : 'bg-amber-500/15 text-amber-300'
-                          }`}
-                        >
-                          <button
-                            onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
-                            className={isInPlan ? 'cursor-default line-through opacity-60' : 'hover:text-amber-900 transition-colors'}
-                            title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
-                            disabled={isInPlan}
-                          >
-                            {isInPlan && ' '}
-                            {habit.taskText}
-                            {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>{habit.streak}</span>}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              startEditingHabit(habit.id)
-                            }}
-                            className={`ml-1 w-5 h-5 flex items-center justify-center rounded transition-colors ${
-                              editingHabitId === habit.id
-                                ? 'bg-amber-500 text-white'
-                                : 'text-amber-400 hover:bg-amber-500/15 hover:text-amber-200'
-                            }`}
-                            title="Редактировать привычку"
-                            aria-pressed={editingHabitId === habit.id}
-                          >
-                            ✎
-                          </button>
-                        </div>
-                      )
-                    })}
+                    )}
                   </div>
 
                   {editingHabitId !== null && (
@@ -998,7 +1001,7 @@ export default function DailyPage() {
           )}
 
           {/* Список задач */}
-          <div ref={tasksContainerRef} className="space-y-2 flex-1 overflow-y-auto pr-6 chat-scrollbar">
+          <div ref={tasksContainerRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-6 chat-scrollbar">
             {tasks.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
                 Добавьте задачи на день...
@@ -1006,7 +1009,7 @@ export default function DailyPage() {
             ) : (
               <>
                 {/* Невыполненные задачи */}
-                {tasks.filter(t => !selectedTasks.has(t.id)).map((task) => {
+                {activeTasks.map((task) => {
                   const index = tasks.findIndex(t => t.id === task.id)
                   const habit = getHabitForTask(task.taskText)
                   const isPostponeActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'postpone'
@@ -1287,8 +1290,8 @@ export default function DailyPage() {
                 })}
 
                 {/* Выполненные задачи — карточка-триггер + список */}
-                {tasks.filter(t => selectedTasks.has(t.id)).length > 0 && (
-                  <>
+                {completedTasks.length > 0 && (
+                  <div className="mt-auto flex-shrink-0 space-y-2 pt-2">
                     {/* Карточка "Выполнено" в стиле задачи */}
                     <div
                       onClick={() => setShowCompleted(!showCompleted)}
@@ -1299,20 +1302,21 @@ export default function DailyPage() {
                       </span>
                       
                       <span className="flex-1 text-base text-green-400 font-medium">
-                        Выполнено ({tasks.filter(t => selectedTasks.has(t.id)).length})
+                        Выполнено ({completedTasks.length})
                       </span>
                     </div>
                     
                     {/* Выполненные задачи — появляются с анимацией */}
-                    <div className={`space-y-2 overflow-hidden transition-all duration-200 ${
-                      showCompleted ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+                    <div className={`grid transition-[grid-template-rows,opacity] duration-200 ${
+                      showCompleted ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
                     }`}>
-                      {tasks.filter(t => selectedTasks.has(t.id)).map((task) => (
-                        <div
-                          key={task.id}
-                          ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
-                          className="relative"
-                        >
+                      <div className={`min-h-0 space-y-2 ${showCompleted ? 'overflow-visible' : 'overflow-hidden'}`}>
+                        {completedTasks.map((task) => (
+                          <div
+                            key={task.id}
+                            ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
+                            className="relative"
+                          >
                           <div className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-gray-900/80 border-gray-700 opacity-50 hover:opacity-70">
                             <input
                               type="checkbox"
@@ -1367,10 +1371,11 @@ export default function DailyPage() {
                               </div>
                             </div>
                           )}
-                        </div>
-                      ))}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </>
             )}
@@ -1462,15 +1467,79 @@ export default function DailyPage() {
             )}
           </div>
 
-          {/* Кнопка сохранения - закреплена внизу */}
+          {/* Основные действия - закреплены внизу */}
           <div className="mt-auto pt-4 flex-shrink-0 pr-6">
-            <button 
-              onClick={savePlan} 
-              disabled={saving} 
-              className={`btn-primary disabled:opacity-50 w-full ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
-            >
-              {saving ? 'Сохранение...' : 'Сохранить план'}
-            </button>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button 
+                  onClick={savePlan} 
+                  disabled={saving} 
+                  className={`btn-primary w-full disabled:opacity-50 sm:flex-1 ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
+                >
+                  {saving ? 'Сохранение...' : 'Сохранить план'}
+                </button>
+
+                {!hasEvaluation ? (
+                  <button
+                    onClick={handleEvaluateClick}
+                    disabled={evaluating || selectedTasks.size === 0}
+                    className="btn-secondary flex w-full items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 sm:w-auto"
+                  >
+                    {evaluating ? (
+                      <>
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Анализирую...
+                      </>
+                    ) : 'Оценить день'}
+                  </button>
+                ) : (
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    <button
+                      onClick={() => router.push(`/evaluation/${selectedDate}`)}
+                      className="btn-secondary w-full whitespace-nowrap sm:w-auto"
+                    >
+                      Посмотреть оценку →
+                    </button>
+                    <button
+                      onClick={handleEvaluateClick}
+                      disabled={evaluating || selectedTasks.size === 0}
+                      className={`btn-secondary flex w-full items-center justify-center gap-2 whitespace-nowrap text-sm disabled:opacity-50 sm:w-auto ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
+                    >
+                      {evaluating ? (
+                        <>
+                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Анализирую...
+                        </>
+                      ) : planChangedAfterEval ? 'Обновить оценку ↻' : 'Получить заново'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {message && (
+                <div className={`flex items-center gap-2 text-sm transition-all duration-300 ${
+                  message.includes('Ошибка') ? 'text-red-400' : message.includes('получена') ? 'text-green-400' : 'text-slate-400'
+                }`}>
+                  {message.includes('Ошибка') && (
+                    <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  {message.includes('получена') && (
+                    <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  <span>{message}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1588,90 +1657,6 @@ export default function DailyPage() {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Evaluate */}
-      <div className="card relative overflow-hidden bg-gradient-to-r from-primary-900/30 to-purple-900/30 border border-primary-700">
-        {/* Animated progress bar */}
-        {evaluating && (
-          <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 animate-[eval-progress_1.5s_ease-in-out_infinite]" style={{ width: '40%' }} />
-          </div>
-        )}
-        <h2 className="text-xl font-bold mb-4 text-white">Получить оценку дня от ION</h2>
-        <p className="text-base text-gray-300 mb-4">
-          После выполнения задач (отметьте чекбоксами), получите детальную оценку и обратную связь.
-        </p>
-        {(() => {
-          const hasEvaluation = !!dailyEntry?.evaluation
-          const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && dailyEntry.evaluation?.createdAt
-            && new Date(dailyEntry.updatedAt) > new Date(dailyEntry.evaluation.createdAt)
-          return (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                {!hasEvaluation ? (
-                  <button
-                    onClick={handleEvaluateClick}
-                    disabled={evaluating || selectedTasks.size === 0}
-                    className="btn-primary disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {evaluating ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Анализирую...
-                      </>
-                    ) : 'Получить оценку дня'}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => router.push(`/evaluation/${selectedDate}`)}
-                      className="btn-primary"
-                    >
-                      Посмотреть оценку →
-                    </button>
-                    <button
-                      onClick={handleEvaluateClick}
-                      disabled={evaluating || selectedTasks.size === 0}
-                      className={`btn-secondary text-sm disabled:opacity-50 flex items-center gap-2 ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
-                    >
-                      {evaluating ? (
-                        <>
-                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                          Анализирую...
-                        </>
-                      ) : planChangedAfterEval ? 'Обновить оценку ↻' : 'Получить заново'}
-                    </button>
-                  </>
-                )}
-              </div>
-              {/* Inline status message */}
-              {message && (
-                <div className={`flex items-center gap-2 text-sm transition-all duration-300 ${
-                  message.includes('Ошибка') ? 'text-red-400' : message.includes('получена') ? 'text-green-400' : 'text-slate-400'
-                }`}>
-                  {message.includes('Ошибка') && (
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  )}
-                  {message.includes('получена') && (
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                  {message}
-                </div>
-              )}
-            </div>
-          )
-        })()}
       </div>
 
       {/* Модалка невыполненных задач */}
