@@ -54,7 +54,7 @@ COPY --from=builder /app/prisma ./prisma
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY scripts/cleanup-expired.mjs /app/scripts/cleanup-expired.mjs
+COPY --from=builder /app/scripts/cleanup-expired.mjs /app/scripts/cleanup-expired.mjs
 
 USER root
 RUN chmod +x /app/docker-entrypoint.sh && \
