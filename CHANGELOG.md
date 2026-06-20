@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-06-20 — fix: make SSH owner-key fingerprint configurable in monitor.sh
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-06-20 — chore: make monitoring/tg-bot scripts host-agnostic
 - 📝 Документация: 1 файлов
 - 📦 Другое: 4 файлов
