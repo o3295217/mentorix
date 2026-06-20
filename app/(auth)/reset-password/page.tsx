@@ -111,10 +111,8 @@ function ResetPasswordForm() {
           <div>
             <Link href="/" className="flex justify-center hover:opacity-80 transition-opacity">
               <span className="inline-flex flex-col items-stretch">
-                <span className="text-4xl sm:text-5xl font-black tracking-tight inline-flex">
-                  <span className="aion-letter-a">A</span>
-                  <span className="aion-letter-i">I</span>
-                  <span className="aion-letters-on">ON</span>
+                <span className="text-4xl sm:text-5xl font-black tracking-tight landing-gradient-text">
+                  mentorix
                 </span>
                 <span className="aion-subtitle text-xs uppercase font-medium mt-1 landing-gradient-text-subtle">
                   {'ассистент'.split('').map((c, i) => <span key={i}>{c}</span>)}
@@ -161,10 +159,8 @@ function ResetPasswordForm() {
           <div>
             <Link href="/" className="flex justify-center hover:opacity-80 transition-opacity">
               <span className="inline-flex flex-col items-stretch">
-                <span className="text-4xl sm:text-5xl font-black tracking-tight inline-flex">
-                  <span className="aion-letter-a">A</span>
-                  <span className="aion-letter-i">I</span>
-                  <span className="aion-letters-on">ON</span>
+                <span className="text-4xl sm:text-5xl font-black tracking-tight landing-gradient-text">
+                  mentorix
                 </span>
                 <span className="aion-subtitle text-xs uppercase font-medium mt-1 landing-gradient-text-subtle">
                   {'ассистент'.split('').map((c, i) => <span key={i}>{c}</span>)}
@@ -198,10 +194,8 @@ function ResetPasswordForm() {
         <div>
           <Link href="/" className="flex justify-center hover:opacity-80 transition-opacity">
             <span className="inline-flex flex-col items-stretch">
-              <span className="text-4xl sm:text-5xl font-black tracking-tight inline-flex">
-                <span className="aion-letter-a">A</span>
-                <span className="aion-letter-i">I</span>
-                <span className="aion-letters-on">ON</span>
+              <span className="text-4xl sm:text-5xl font-black tracking-tight landing-gradient-text">
+                mentorix
               </span>
               <span className="aion-subtitle text-xs uppercase font-medium mt-1 landing-gradient-text-subtle">
                 {'ассистент'.split('').map((c, i) => <span key={i}>{c}</span>)}

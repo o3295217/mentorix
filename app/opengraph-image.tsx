@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og'
 import { getAppHost } from '@/lib/app-url'
 
 export const runtime = 'edge'
-export const alt = 'AION — ИИ-ассистент для достижения целей'
+export const alt = 'mentorix — ИИ-ассистент для достижения целей'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -65,17 +65,15 @@ export default async function Image() {
               display: 'flex',
             }}
           >
-            <span style={{ color: '#818cf8' }}>A</span>
             <span
               style={{
-                background: 'linear-gradient(180deg, #c084fc, #60a5fa)',
+                background: 'linear-gradient(90deg, #818cf8, #c084fc, #60a5fa)',
                 backgroundClip: 'text',
                 color: 'transparent',
               }}
             >
-              I
+              mentorix
             </span>
-            <span style={{ color: '#e2e8f0' }}>ON</span>
           </div>
           <div
             style={{
@@ -138,7 +136,7 @@ export default async function Image() {
             lineHeight: 1.5,
           }}
         >
-          Опиши цель — ИОН построит маршрут и будет ежедневно помогать двигаться вперёд
+          Опиши цель — Ментор построит маршрут и будет ежедневно помогать двигаться вперёд
         </div>
 
         {/* Bottom bar with features */}

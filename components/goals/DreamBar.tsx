@@ -233,7 +233,7 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
         <div className="relative overflow-hidden rounded-[28px] border-2 border-dashed border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-8 text-center">
           <h3 className="text-lg font-semibold tracking-tight text-white mb-2">Готов планировать?</h3>
           <p className="text-sm text-slate-400 leading-6 max-w-md mx-auto mb-8">
-            Разложи мечту на годы, кварталы и месяцы — сам или с помощью ИОН
+            Разложи мечту на годы, кварталы и месяцы — сам или с помощью Ментора
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
             <button
@@ -252,7 +252,7 @@ export default function DreamBar({ dreamGoal, onSave, progress, isSetup, onSetup
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
               </svg>
-              ИОН поможет
+              Ментор поможет
             </button>
           </div>
         </div>

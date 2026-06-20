@@ -12,7 +12,7 @@ export default function ToolsSection() {
             <span className="landing-gradient-text">под контролем</span>
           </h2>
           <p className="landing-reveal landing-reveal-delay-1 mt-4 max-w-2xl mx-auto text-lg text-gray-400">
-            ИОН показывает темп, прогноз и сигналы отклонения, чтобы вы замечали их раньше, чем потеряете направление.
+            Гид показывает темп, прогноз и сигналы отклонения, чтобы вы замечали их раньше, чем потеряете направление.
           </p>
         </div>
 

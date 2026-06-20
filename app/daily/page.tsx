@@ -1553,7 +1553,7 @@ export default function DailyPage() {
         {/* Chat - Right (40%) */}
         <div className="lg:col-span-2 card flex flex-col" style={{ minHeight: '500px', maxHeight: '80vh' }}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <h2 className="text-xl font-bold">Обсуждение плана с ION</h2>
+            <h2 className="text-xl font-bold">Обсуждение плана с Ассистентом</h2>
             {chatMessages.length > 0 && (
               <button 
                 onClick={clearChat}
@@ -1572,7 +1572,7 @@ export default function DailyPage() {
           >
             {chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
-                <p className="text-center text-gray-500 text-sm mb-4">Спросите ION:</p>
+                <p className="text-center text-gray-500 text-sm mb-4">Спросите Ассистента:</p>
                 <button
                   onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации')}
                   disabled={sendingChat || tasks.length === 0}
@@ -1618,7 +1618,7 @@ export default function DailyPage() {
                     </div>
                   ) : (
                     <div className="py-1">
-                      <div className="text-sm font-medium text-gray-400 mb-1">ION</div>
+                      <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
                       <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
                     </div>
                   )}
@@ -1627,7 +1627,7 @@ export default function DailyPage() {
             )}
             {sendingChat && (
               <div className="py-1">
-                <div className="text-sm font-medium text-gray-400 mb-1">ION</div>
+                <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
                 <span className="text-sm text-gray-500">печатает...</span>
               </div>
             )}

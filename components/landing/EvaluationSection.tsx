@@ -114,12 +114,12 @@ export default function EvaluationSection() {
               Шаг третий
             </span>
             <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight">
-              ИОН показывает,
+              Ментор показывает,
               <br />
               <span className="landing-gradient-text">ведёт ли день к цели</span>
             </h2>
             <p className="mt-6 text-lg text-gray-400 leading-relaxed">
-              ИОН не просто ставит оценку за день. Он помогает понять,
+              Наставник не просто ставит оценку за день. Он помогает понять,
               что действительно двигало вас к цели, где теряется фокус
               и какой следующий шаг даст лучший результат.
             </p>

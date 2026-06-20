@@ -13,25 +13,25 @@ export default function DreamSection() {
               <span className="landing-gradient-text">контекст и цель</span>
             </h2>
             <p className="mt-6 text-lg text-gray-400 leading-relaxed">
-              Сначала вы заполняете профиль, чтобы ION понял ваш ритм жизни,
+              Сначала вы заполняете профиль, чтобы Наставник понял ваш ритм жизни,
               интересы и приоритеты. Это помогает строить не абстрактный,
               а реалистичный путь к цели.
             </p>
             <p className="mt-4 text-lg text-gray-400 leading-relaxed">
-              Потом вы описываете мечту или цель и&nbsp;выбираете срок&nbsp;— ION
+              Потом вы описываете мечту или цель и&nbsp;выбираете срок&nbsp;— Куратор
               раскладывает путь на&nbsp;годовые, квартальные, месячные и&nbsp;недельные
               шаги, чтобы каждый день опирался на&nbsp;ваш реальный контекст.
             </p>
           </div>
 
-          {/* Visual: ИОН засасывает анкету → молния → Мечта загорается */}
+          {/* Visual: Куратор засасывает анкету → молния → Мечта загорается */}
           <div data-reveal className="landing-reveal landing-reveal-delay-1">
             <div className="relative">
               <div className="absolute -inset-5 rounded-[30px] bg-blue-500/8 blur-3xl" />
               <div className="relative rounded-2xl border border-slate-800/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.42),rgba(15,23,42,0.18))] px-6 py-3 backdrop-blur-md sm:px-8 sm:py-4">
 
                 <div className="relative">
-                  {/* Orbit: теги вокруг ION сферы, засасываются к центру */}
+                  {/* Orbit: теги вокруг сферы Куратора, засасываются к центру */}
                   <div className="relative w-full" style={{ height: '210px' }}>
                     {/* Теги на орбите */}
                     {[
@@ -50,12 +50,12 @@ export default function DreamSection() {
                       </span>
                     ))}
 
-                    {/* ION сфера в центре орбиты */}
+                    {/* Сфера Куратора в центре орбиты */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
                       <div className="ion-sphere-glow absolute -inset-8 rounded-full bg-blue-500/20 blur-2xl" />
                       <div className="ion-sphere relative flex h-14 w-14 items-center justify-center rounded-full border border-blue-400/40 bg-[radial-gradient(circle_at_30%_30%,rgba(96,165,250,0.5),rgba(59,130,246,0.15)_50%,rgba(15,23,42,0.9)_80%)] shadow-[0_0_32px_rgba(96,165,250,0.2)]">
                         <div className="absolute inset-1.5 rounded-full border border-white/10" />
-                        <span className="text-[10px] font-bold tracking-[0.2em] text-blue-100">ION</span>
+                        <span className="text-[10px] font-bold tracking-[0.2em] text-blue-100">М</span>
                       </div>
                     </div>
                   </div>

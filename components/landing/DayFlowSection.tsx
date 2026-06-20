@@ -35,7 +35,7 @@ export default function DayFlowSection() {
             <span className="landing-gradient-text">работает на цель</span>
           </h2>
           <p className="landing-reveal landing-reveal-delay-2 mt-4 max-w-2xl mx-auto text-lg text-gray-400 leading-relaxed">
-            ION помогает собрать день из того, что действительно двигает вас к цели,
+            Помощник помогает собрать день из того, что действительно двигает вас к цели,
             выделить главное без перегруза и потом показать, насколько этот день
             сработал на результат.
           </p>

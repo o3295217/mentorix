@@ -70,10 +70,8 @@ export default function Navigation() {
       <div className="flex justify-between h-16">
         <div className="flex space-x-8">
           <Link href="/" className="flex items-center">
-            <span className="nav-logo" aria-label="ION Assistant">
-              <span className="nav-logo-a">A</span>
-              <span className="nav-logo-i">I</span>
-              <span className="nav-logo-on">ON</span>
+            <span className="nav-logo" aria-label="mentorix">
+              mentorix
             </span>
           </Link>
           {/* Desktop menu */}

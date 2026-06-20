@@ -25,19 +25,19 @@ const orbitron = Orbitron({
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: 'AION',
+  title: 'mentorix',
   description: 'Личный ИИ-ассистент для управления эффективностью. Превращаем мечту в ежедневное действие.',
   openGraph: {
-    title: 'AION — ИИ-ассистент для достижения целей',
+    title: 'mentorix — ИИ-ассистент для достижения целей',
     description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
-    siteName: 'AION',
+    siteName: 'mentorix',
     locale: 'ru_RU',
     type: 'website',
     url: appUrl,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'AION — ИИ-ассистент для достижения целей',
+    title: 'mentorix — ИИ-ассистент для достижения целей',
     description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
   },
 }

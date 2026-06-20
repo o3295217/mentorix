@@ -16,10 +16,8 @@ export default function HeroSection() {
         {/* Logo */}
         <div className="landing-fade-in mb-6 flex flex-col items-center">
           <div className="inline-flex flex-col items-stretch">
-            <span className="text-5xl sm:text-6xl font-black tracking-tight inline-flex">
-              <span className="aion-letter-a">A</span>
-              <span className="aion-letter-i">I</span>
-              <span className="aion-letters-on">ON</span>
+            <span className="text-5xl sm:text-6xl font-black tracking-tight landing-gradient-text">
+              mentorix
             </span>
             <span className="aion-subtitle text-sm sm:text-base uppercase font-medium mt-1 landing-gradient-text-subtle">
               {'ассистент'.split('').map((c, i) => <span key={i}>{c}</span>)}
@@ -31,12 +29,12 @@ export default function HeroSection() {
         <h1 className="landing-fade-in landing-delay-1 text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-[1.1] tracking-tight">
           Сделай каждый день шагом к&nbsp;мечте&nbsp;—
           <br />
-          <span className="landing-gradient-text">ИОН не&nbsp;даст сбиться с&nbsp;пути</span>
+          <span className="landing-gradient-text">Ментор не&nbsp;даст сбиться с&nbsp;пути</span>
         </h1>
 
         {/* Sub */}
         <p className="landing-fade-in landing-delay-2 mt-8 max-w-2xl mx-auto text-lg sm:text-xl text-gray-400 leading-relaxed">
-          Опиши мечту или цель&nbsp;— ИОН построит для тебя понятный маршрут,
+          Опиши мечту или цель&nbsp;— Гид построит для тебя понятный маршрут,
           разложит его на&nbsp;шаги и&nbsp;будет ежедневно помогать двигаться вперёд.
         </p>
 

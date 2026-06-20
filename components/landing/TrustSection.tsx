@@ -10,12 +10,12 @@ export default function TrustSection() {
       <div className="relative max-w-6xl mx-auto">
         <div className="max-w-3xl mx-auto text-center" data-reveal>
           <h2 className="landing-reveal landing-reveal-delay-1 text-3xl sm:text-5xl font-bold text-white leading-tight tracking-tight">
-            Почему ИОНу можно
+            Почему Ментору можно
             <br />
             <span className="landing-gradient-text">доверить важное</span>
           </h2>
           <p className="landing-reveal landing-reveal-delay-2 mt-4 max-w-2xl mx-auto text-lg text-slate-400 leading-relaxed">
-            ИОН работает с личными целями и ежедневной рефлексией. Поэтому здесь важны не только польза, но и ощущение защищённого личного пространства.
+            Куратор работает с личными целями и ежедневной рефлексией. Поэтому здесь важны не только польза, но и ощущение защищённого личного пространства.
           </p>
         </div>
 

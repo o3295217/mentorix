@@ -9,7 +9,7 @@ export default function CtaSection() {
 
       <div className="relative max-w-3xl mx-auto text-center" data-reveal>
         <p className="landing-reveal text-lg sm:text-xl text-slate-400 font-medium mb-4">
-          ИОН помогает связывать цель с каждым днём.
+          Помощник помогает связывать цель с каждым днём.
         </p>
         <h2 className="landing-reveal text-4xl sm:text-6xl font-bold text-white leading-tight tracking-tight">
           Путь к&nbsp;мечте начинается
@@ -17,7 +17,7 @@ export default function CtaSection() {
           <span className="landing-gradient-text">прямо сейчас</span>
         </h2>
         <p className="landing-reveal landing-reveal-delay-1 mt-6 text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          Попробуйте магию ИОН: расскажите о себе и своей цели. Вы даже не подозреваете, что ждёт вас впереди.
+          Попробуйте магию Ассистента: расскажите о себе и своей цели. Вы даже не подозреваете, что ждёт вас впереди.
         </p>
         <div className="landing-reveal landing-reveal-delay-2 mt-10">
           <Link

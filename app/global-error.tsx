@@ -20,7 +20,7 @@ export default function GlobalError({
         <main className="flex min-h-screen items-center justify-center bg-gray-950 px-4 py-12 text-gray-100">
           <div className="w-full max-w-xl rounded-2xl border border-red-500/20 bg-red-950/20 p-6 text-center shadow-2xl shadow-red-950/10">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-red-300/80">Критический сбой</p>
-            <h1 className="mt-3 text-2xl font-semibold text-white">AION временно не загрузился</h1>
+            <h1 className="mt-3 text-2xl font-semibold text-white">mentorix временно не загрузился</h1>
             <p className="mt-3 text-sm leading-6 text-gray-300">
               Перезапустите приложение. Если ошибка повторится, код события поможет найти причину в логах.
             </p>

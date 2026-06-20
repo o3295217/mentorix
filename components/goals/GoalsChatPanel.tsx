@@ -195,7 +195,7 @@ export default function GoalsChatPanel({
           className="hidden md:flex items-center justify-center w-6 flex-shrink-0
             bg-slate-800/40 hover:bg-slate-700/60 border-r border-slate-800/60
             text-slate-600 hover:text-slate-300 transition-colors"
-          title="Скрыть ИОН"
+          title="Скрыть Ментора"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />

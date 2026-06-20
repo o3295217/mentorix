@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'AION - Вход',
+  title: 'mentorix - Вход',
   description: 'Вход в систему',
 }
 
