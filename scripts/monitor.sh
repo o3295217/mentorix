@@ -7,15 +7,16 @@
 
 set -e
 
-APP_DIR="/home/ubuntu/ai-assistant-spec"
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+HOME_DIR="$(dirname "$APP_DIR")"
 LOG_DIR="$APP_DIR/logs/monitor"
 CONTAINER="ai-assistant-production"
 ALERT_FILE="$LOG_DIR/alerts.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 DATE_TAG=$(date '+%Y-%m-%d')
 LOG_FILE="$LOG_DIR/$DATE_TAG.log"
-TG_ENV_FILE="/home/ubuntu/.tg-bot-env"
-TG_TOKEN_FILE="${TG_BOT_TOKEN_FILE:-/home/ubuntu/.tg-bot-token}"
+TG_ENV_FILE="$HOME_DIR/.tg-bot-env"
+TG_TOKEN_FILE="${TG_BOT_TOKEN_FILE:-$HOME_DIR/.tg-bot-token}"
 
 if [ -f "$TG_ENV_FILE" ]; then
   . "$TG_ENV_FILE"

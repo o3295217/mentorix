@@ -6,10 +6,11 @@
 # Запускается как systemd-сервис: tg-bot.service
 # =============================================================================
 
-TG_ENV_FILE="/home/ubuntu/.tg-bot-env"
-TG_TOKEN_FILE="${TG_BOT_TOKEN_FILE:-/home/ubuntu/.tg-bot-token}"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOME_DIR="$(dirname "$APP_DIR")"
+TG_ENV_FILE="$HOME_DIR/.tg-bot-env"
+TG_TOKEN_FILE="${TG_BOT_TOKEN_FILE:-$HOME_DIR/.tg-bot-token}"
 CONTAINER="ai-assistant-production"
-APP_DIR="/home/ubuntu/ai-assistant-spec"
 LOG_DIR="$APP_DIR/logs/monitor"
 OFFSET_FILE="$LOG_DIR/.tg_offset"
 

@@ -1,3 +1,7 @@
+# Шаблон systemd-сервиса для tg-bot.sh.
+# Пути ниже — под VK Cloud (User=ubuntu). На другом сервере замените
+# /home/ubuntu и User на актуальные перед установкой в /etc/systemd/system/.
+
 [Unit]
 Description=AI Assistant Telegram Bot
 After=docker.service
