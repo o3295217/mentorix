@@ -52,6 +52,7 @@ docker-compose.production.yml
 vkcloud-key/
 backups/
 scripts/
+!scripts/cleanup-expired.mjs
 
 # Misc
 README.md
