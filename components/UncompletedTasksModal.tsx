@@ -118,19 +118,28 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
 
               {/* Action buttons */}
               <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  onClick={() => setAction(task.id, { type: 'transfer', date: tomorrow })}
-                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'transfer' && decisions[task.id]?.date === tomorrow ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
-                >
-                   Завтра
-                </button>
-                
-                <button
-                  onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'transfer' && decisions[task.id]?.date !== tomorrow ? 'bg-blue-500 text-white' : 'text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
-                >
-                   Другая дата
-                </button>
+                {(() => {
+                  const decision = decisions[task.id]
+                  const isTransferTomorrow = decision?.type === 'transfer' && decision.date === tomorrow
+                  const isTransferOtherDate = decision?.type === 'transfer' && decision.date !== tomorrow
+                  return (
+                    <>
+                      <button
+                        onClick={() => setAction(task.id, { type: 'transfer', date: tomorrow })}
+                        className={`text-xs px-2 py-1 rounded transition ${isTransferTomorrow ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
+                      >
+                         Завтра
+                      </button>
+
+                      <button
+                        onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                        className={`text-xs px-2 py-1 rounded transition ${isTransferOtherDate ? 'bg-blue-500 text-white' : 'text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
+                      >
+                         Другая дата
+                      </button>
+                    </>
+                  )
+                })()}
 
                 <button
                   onClick={() => setAction(task.id, { type: 'backlog' })}
