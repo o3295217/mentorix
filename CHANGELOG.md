@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-06-20 — chore: make monitoring/tg-bot scripts host-agnostic
+- 📝 Документация: 1 файлов
+- 📦 Другое: 4 файлов
+
+
 ### 2026-06-20 — fix: dockerignore was blocking cleanup-expired.mjs from build context
 - 📝 Документация: 1 файлов
 - 📦 Другое: 1 файлов

@@ -227,7 +227,7 @@ log "Docker security: ReadOnly=$READONLY SecurityOpt=$SECOPT"
 # Входы с чужим ключом — алерт
 # -----------------------------------------------------------------------------
 KNOWN_IPS_FILE="$LOG_DIR/known_ips.txt"
-OWNER_KEY="nfqLRtnaM5GFT75MGTi7zRTRY0Omqoqvl978E4qI5xU"
+OWNER_KEY="${OWNER_SSH_KEY:-nfqLRtnaM5GFT75MGTi7zRTRY0Omqoqvl978E4qI5xU}"
 
 touch "$KNOWN_IPS_FILE"
 
