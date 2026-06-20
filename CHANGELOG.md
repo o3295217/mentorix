@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-06-20 — chore: move deploy scripts into deploy/ and add Contabo deploy script
+- 📝 Документация: 4 файлов
+- 📦 Другое: 3 файлов
+
+
 ### 2026-05-18 — fix: skip uncompleted modal on reevaluate
 - 📄 Страницы: 1 файлов
 
