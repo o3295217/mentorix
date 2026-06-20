@@ -61,7 +61,7 @@ rsync -avz --delete \
 
 ### Или скрипт деплоя
 ```bash
-./deploy-vk.sh
+./deploy/deploy-vk.sh
 ```
 
 ---
@@ -229,7 +229,7 @@ docker logs -f ai-assistant-production
 docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
 
 # Обновление (с мака)
-./deploy-vk.sh
+./deploy/deploy-vk.sh
 ```
 
 ---

@@ -260,7 +260,7 @@ npx prisma migrate reset
 
 - **URL:** https://assist.labaiion.ru
 - **Сервер:** VK Cloud (Ubuntu, 4 vCPU, 4GB RAM)
-- **Деплой:** `./deploy-vk.sh` (rsync + Docker build)
+- **Деплой:** `./deploy/deploy-vk.sh` (rsync + Docker build)
 - **SSL:** Let's Encrypt (Nginx reverse proxy)
 - **Документация:** [docs/DEPLOY.md](docs/DEPLOY.md), [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md)
 
