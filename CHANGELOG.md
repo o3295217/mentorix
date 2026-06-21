@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-06-21 — fix: human-readable CPU alerts in monitor.sh, exclude self-noise
+- 📝 Документация: 2 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-06-20 — rebrand: AION -> mentorix, vary assistant naming across landing copy
 - 🧩 Компоненты: 11 файлов (Navigation, DreamBar, GoalsChatPanel...)
 - 📄 Страницы: 5 файлов
