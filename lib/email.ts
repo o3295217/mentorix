@@ -101,7 +101,7 @@ export function getEmailVerificationContent(verifyUrl: string, userName?: string
   text: string;
   html: string;
 } {
-  const appName = 'ION Assistant';
+  const appName = 'mentorix';
   const name = userName || 'Пользователь';
   const safeName = escapeHtml(name);
   const safeUrl = escapeHtml(verifyUrl);
@@ -169,7 +169,7 @@ export function getPasswordResetEmailContent(resetUrl: string, userName?: string
   text: string;
   html: string;
 } {
-  const appName = 'ION Assistant';
+  const appName = 'mentorix';
   const name = userName || 'Пользователь';
   const safeName = escapeHtml(name);
   const safeUrl = escapeHtml(resetUrl);

@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-06-21 — chore: reserve memory floor and CPU priority for our containers
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-06-21 — fix: human-readable CPU alerts in monitor.sh, exclude self-noise
 - 📝 Документация: 2 файлов
 - 📦 Другое: 1 файлов

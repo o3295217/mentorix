@@ -14,16 +14,16 @@ export default function DreamProgress({ dreamGoal, months }: DreamProgressProps)
 
   if (!dreamGoal || dreamGoal === 'Не указана') {
     return (
-      <div className="relative overflow-hidden rounded-[28px] border-2 border-red-800/60 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.12),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-6">
+      <div className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.12),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-6">
         <div className="text-center space-y-4">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10">
-            <svg className="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-400/10">
+            <svg className="h-7 w-7 text-violet-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
           </div>
-          <h2 className="text-xl font-semibold text-white">У тебя нет мечты</h2>
+          <h2 className="text-xl font-semibold text-white">Мечта пока не задана</h2>
           <p className="text-sm text-slate-400 leading-6 max-w-xs mx-auto">
-            Система создана, чтобы привести тебя к мечте. Без неё невозможно оценить прогресс.
+            Опиши свою мечту, чтобы видеть прогресс и получать персональные рекомендации.
           </p>
-          <a href="/goals" className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-red-600 to-red-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:from-red-500 hover:to-red-400">
+          <a href="/goals" className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-violet-400">
             Создать мечту →
           </a>
         </div>
