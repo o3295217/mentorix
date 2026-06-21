@@ -178,11 +178,16 @@ if [ -n "$SUSPICIOUS" ]; then
   alert "⚠️ Подозрительные процессы на хосте: $SUSPICIOUS"
 fi
 
-# Процессы с аномально высоким CPU (>50%), исключая Docker, системные, healthcheck и саму команду ps
-HOST_HIGH_CPU=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1 && $3>50 && $11!~/docker|containerd|sshd|systemd|telegraf|nginx|postgres|node|ps|awk|sort|grep|monitor/' | head -5 || true)
+# Процессы с аномально высоким CPU (>50%), исключая Docker, системные, healthcheck,
+# саму команду ps и собственный пайплайн мониторинга (ps/awk/head/monitor.sh иначе ловят сами себя)
+HOST_HIGH_CPU=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1 && $3>50 && $0!~/docker|containerd|sshd|systemd|telegraf|nginx|postgres|node |[ \/]ps aux|[ \/]awk |[ \/]sort |[ \/]grep |monitor\.sh|head -|\/bin\/sh$/ {
+  cmd="";
+  for (i=11; i<=NF; i++) cmd = cmd $i " ";
+  printf "• %s — %s%% CPU (пользователь %s)\n", cmd, $3, $1
+}' | head -5 || true)
 
 if [ -n "$HOST_HIGH_CPU" ]; then
-  alert "⚡ Высокая нагрузка CPU на хосте:
+  alert "⚡ Высокая нагрузка CPU на хосте (не приложение, посторонний процесс):
 $HOST_HIGH_CPU"
 fi
 

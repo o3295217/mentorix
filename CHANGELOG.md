@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-06-20 — rebrand: AION -> mentorix, vary assistant naming across landing copy
+- 🧩 Компоненты: 11 файлов (Navigation, DreamBar, GoalsChatPanel...)
+- 📄 Страницы: 5 файлов
+- 📚 Библиотеки: 1 файлов (plan-chat)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 7 файлов
+
+
 ### 2026-06-20 — docs: update changelog
 - 📝 Документация: 1 файлов
 
