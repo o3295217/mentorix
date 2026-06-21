@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { evaluatePeriod } from '@/lib/anthropic'
+import { evaluatePeriodWithUsage } from '@/lib/anthropic'
+import { logAIUsage } from '@/lib/ai-usage'
 import { PeriodEvaluationRequest, DayData } from '@/lib/prompts/types'
 import { parseDateParam, validateAiDateRange } from '@/lib/dates'
 import { ApiErrors } from '@/lib/api-utils'
@@ -117,7 +118,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Вызвать Claude API для периодической оценки
-    const evaluationResponse = await evaluatePeriod(evaluationRequest)
+    const { result: evaluationResponse, usage } = await evaluatePeriodWithUsage(evaluationRequest)
+
+    await logAIUsage({
+      userId,
+      endpoint: 'evaluate-period',
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      durationMs: usage.durationMs,
+      success: true,
+    })
 
     // Сохранить периодическую оценку
     const periodEvaluation = await prisma.periodEvaluation.create({

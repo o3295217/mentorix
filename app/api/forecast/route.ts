@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { generateForecast } from '@/lib/anthropic'
+import { generateForecastWithUsage } from '@/lib/anthropic'
+import { logAIUsage } from '@/lib/ai-usage'
 import { ForecastRequest, DayDataFull } from '@/lib/prompts/types'
 import { parseDateParam, validateAiDateRange } from '@/lib/dates'
 import { buildFactFromSelection } from '@/lib/fact-utils'
@@ -216,7 +217,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Вызвать Claude API для прогноза
-    const forecastResponse = await generateForecast(forecastRequest)
+    const { result: forecastResponse, usage } = await generateForecastWithUsage(forecastRequest)
+
+    await logAIUsage({
+      userId,
+      endpoint: 'forecast',
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      durationMs: usage.durationMs,
+      success: true,
+    })
 
     return NextResponse.json({
       forecast: forecastResponse,

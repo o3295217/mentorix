@@ -433,6 +433,19 @@ export async function evaluateDay(
 export async function evaluatePeriod(
   request: PeriodEvaluationRequest
 ): Promise<PeriodEvaluationResponse> {
+  const { result } = await evaluatePeriodWithUsage(request)
+  return result
+}
+
+export interface PeriodEvaluationResultWithUsage {
+  result: PeriodEvaluationResponse
+  usage: AIUsageInfo
+}
+
+export async function evaluatePeriodWithUsage(
+  request: PeriodEvaluationRequest
+): Promise<PeriodEvaluationResultWithUsage> {
+  const startTime = Date.now()
   const model = getAiModel()
   // Построение промпта для периодической оценки
   const prompt = buildPeriodEvaluationPrompt(request)
@@ -457,6 +470,8 @@ export async function evaluatePeriod(
     })
   })
 
+  const durationMs = Date.now() - startTime
+
   // Логируем статистику кэширования
   logCacheStats('evaluatePeriod', message.usage)
 
@@ -470,10 +485,20 @@ export async function evaluatePeriod(
   )
 
   // Clamp scores to valid range
-  return {
+  const result = {
     ...parsedResponse,
     dreamProgressScore: clampScore(parsedResponse.dreamProgressScore),
     overallScore: clampScore(parsedResponse.overallScore),
+  }
+
+  return {
+    result,
+    usage: {
+      model,
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+      durationMs,
+    },
   }
 }
 
@@ -481,6 +506,19 @@ export async function evaluatePeriod(
 export async function generateForecast(
   request: ForecastRequest
 ): Promise<ForecastResponse> {
+  const { result } = await generateForecastWithUsage(request)
+  return result
+}
+
+export interface ForecastResultWithUsage {
+  result: ForecastResponse
+  usage: AIUsageInfo
+}
+
+export async function generateForecastWithUsage(
+  request: ForecastRequest
+): Promise<ForecastResultWithUsage> {
+  const startTime = Date.now()
   const model = getAiModel()
   // Построение промпта для прогноза
   const prompt = buildForecastPrompt(request)
@@ -505,17 +543,29 @@ export async function generateForecast(
     })
   })
 
+  const durationMs = Date.now() - startTime
+
   // Логируем статистику кэширования
   logCacheStats('generateForecast', message.usage)
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   // Извлечение и валидация JSON из ответа
-  return extractJsonFromAIResponse<ForecastResponse>(
+  const result = extractJsonFromAIResponse<ForecastResponse>(
     responseText,
     isForecastResponse,
     'generateForecast'
   )
+
+  return {
+    result,
+    usage: {
+      model,
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+      durationMs,
+    },
+  }
 }
 
 // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===

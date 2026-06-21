@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DEFAULT_ROUTE_AI_MODEL, getAiModel, getAnthropicClient } from '@/lib/anthropic'
+import { logAIUsage } from '@/lib/ai-usage'
 import { requireUserId } from '@/lib/get-user-id'
 import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
 import { buildGoalsValidatePrompt } from '@/lib/prompts/goals-validate'
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
     // Если меток нет — переключаемся на прямой стриминг остатка.
     // Если есть — буферизируем всё, валидируем, стримим плавно.
 
+    const startTime = Date.now()
     const stream = anthropic.messages.stream({
       model,
       max_tokens: MAX_OUTPUT_TOKENS,
@@ -195,16 +197,39 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // Финальное сообщение стрима — для подсчёта токенов
+          const streamFinal = await stream.finalMessage()
+          let totalInputTokens = streamFinal.usage.input_tokens
+          let totalOutputTokens = streamFinal.usage.output_tokens
+
           // Если так и не решили (короткий ответ < 200 символов) — это обычный ответ
           if (!decided) {
             controller.enqueue(encoder.encode(buffer))
             controller.close()
+            logAIUsage({
+              userId,
+              endpoint: 'goals-decompose',
+              model,
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+              durationMs: Date.now() - startTime,
+              success: true,
+            }).catch(() => {})
             return
           }
 
           if (!isPlan) {
             // Обычный ответ закончился — закрываем
             controller.close()
+            logAIUsage({
+              userId,
+              endpoint: 'goals-decompose',
+              model,
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+              durationMs: Date.now() - startTime,
+              success: true,
+            }).catch(() => {})
             return
           }
 
@@ -221,6 +246,9 @@ export async function POST(request: NextRequest) {
               system: validatePrompt,
               messages: [{ role: 'user', content: 'Проверь и верни исправленный план.' }],
             })
+
+            totalInputTokens += validationResponse.usage.input_tokens
+            totalOutputTokens += validationResponse.usage.output_tokens
 
             const validatedText = validationResponse.content
               .filter((block) => block.type === 'text')
@@ -244,6 +272,15 @@ export async function POST(request: NextRequest) {
           }
 
           controller.close()
+          logAIUsage({
+            userId,
+            endpoint: 'goals-decompose',
+            model,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            durationMs: Date.now() - startTime,
+            success: true,
+          }).catch(() => {})
         } catch (streamError) {
           controller.error(streamError)
         }
