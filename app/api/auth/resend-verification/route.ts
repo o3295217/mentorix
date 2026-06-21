@@ -67,18 +67,17 @@ export async function POST(request: Request) {
     const verifyUrl = `${appUrl}/verify-email?token=${token}`;
     
     const emailContent = getEmailVerificationContent(verifyUrl, user.name || undefined);
-    const emailResult = await sendEmail({
+    // Не блокируем ответ пользователю ожиданием SMTP
+    sendEmail({
       to: email,
       ...emailContent,
+    }).then((emailResult) => {
+      if (!emailResult.success) {
+        console.error('Failed to send verification email:', emailResult.error);
+      }
+    }).catch((emailError) => {
+      console.error('Failed to send verification email:', emailError);
     });
-
-    if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
-      return NextResponse.json(
-        { error: 'Ошибка отправки письма. Попробуйте позже.' },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json({
       success: true,

@@ -76,19 +76,20 @@ export async function POST(request: Request) {
     const baseUrl = getAppUrl();
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-    // Отправляем email
+    // Отправляем email — не блокируем ответ пользователю ожиданием SMTP
     const emailContent = getPasswordResetEmailContent(resetUrl, user.name || undefined);
-    const emailResult = await sendEmail({
+    sendEmail({
       to: user.email,
       subject: emailContent.subject,
       text: emailContent.text,
       html: emailContent.html,
+    }).then((emailResult) => {
+      if (!emailResult.success) {
+        console.error('Failed to send reset email:', emailResult.error);
+      }
+    }).catch((emailError) => {
+      console.error('Failed to send reset email:', emailError);
     });
-
-    if (!emailResult.success) {
-      console.error('Failed to send reset email:', emailResult.error);
-      // Всё равно отвечаем успехом (безопасность)
-    }
 
     return NextResponse.json({ message: successMessage });
   } catch (error) {

@@ -113,9 +113,12 @@ export async function POST(request: Request) {
           const verifyUrl = `${appUrl}/verify-email?token=${token}`
           const emailContent = getEmailVerificationContent(verifyUrl, existingUser.name || undefined)
 
-          await sendEmail({
+          // Не блокируем ответ пользователю ожиданием SMTP
+          sendEmail({
             to: normalizedEmail,
             ...emailContent,
+          }).catch((verificationError) => {
+            console.error('Failed to resend verification email:', verificationError)
           })
         } catch (verificationError) {
           console.error('Failed to resend verification email:', verificationError)
@@ -163,15 +166,17 @@ export async function POST(request: Request) {
       const verifyUrl = `${appUrl}/verify-email?token=${token}`;
       
       const emailContent = getEmailVerificationContent(verifyUrl, name);
-      const emailResult = await sendEmail({
+      // Не блокируем ответ пользователю ожиданием SMTP
+      sendEmail({
         to: normalizedEmail,
         ...emailContent,
+      }).then((emailResult) => {
+        if (!emailResult.success) {
+          console.error('Failed to send verification email:', emailResult.error);
+        }
+      }).catch((emailError) => {
+        console.error('Failed to send verification email:', emailError);
       });
-
-      if (!emailResult.success) {
-        console.error('Failed to send verification email:', emailResult.error);
-        // Не блокируем регистрацию, но логируем ошибку
-      }
 
       notifyTelegram(`👤 Новая регистрация\n<b>${name || 'Без имени'}</b>\n${normalizedEmail}`);
       audit({ userId: result.userId, action: 'register', resource: 'User', details: normalizedEmail, ...getAuditContext(request) })

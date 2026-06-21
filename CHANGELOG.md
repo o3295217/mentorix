@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-06-21 — rebrand+ux: remove ION from onboarding/emails, soften empty-dream state
+- 🧩 Компоненты: 1 файлов (DreamProgress)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 1 файлов (email)
+- 📝 Документация: 1 файлов
+
+
 ### 2026-06-21 — chore: reserve memory floor and CPU priority for our containers
 - 📝 Документация: 1 файлов
 - 📦 Другое: 1 файлов
