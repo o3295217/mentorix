@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-06-22 — fix: replace retired claude-sonnet-4-20250514 model id
+- 📚 Библиотеки: 3 файлов (ai-pricing, ai-usage, anthropic)
+- 🗄️ База данных: 2 файлов
+- 📝 Документация: 2 файлов
+
+
 ### 2026-06-21 — fix: log AI usage for evaluate-period, forecast, goals/decompose
 - 🔌 API: 3 файлов (route, route, route)
 - 📚 Библиотеки: 1 файлов (anthropic)

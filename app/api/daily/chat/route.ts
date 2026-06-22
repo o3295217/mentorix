@@ -251,10 +251,18 @@ export async function POST(request: NextRequest) {
       fixedMessages.unshift({ role: 'user', content: 'Привет' })
     }
 
-    // Вызов Claude API
+    // Убираем markdown-форматирование из законченной строки (**, *, #)
+    function stripMarkdown(line: string): string {
+      return line
+        .replace(/\*\*(.+?)\*\*/g, '$1')  // **жирный** → жирный
+        .replace(/\*(.+?)\*/g, '$1')       // *курсив* → курсив
+        .replace(/^#{1,6}\s+/, '')         // # заголовки → простой текст
+    }
+
+    // Вызов Claude API со стримингом — ответ идёт постепенно, без ожидания всего текста
     const startTime = Date.now()
     const model = getAiModel(DEFAULT_ROUTE_AI_MODEL)
-    const response = await getAnthropicClient().messages.create({
+    const stream = getAnthropicClient().messages.stream({
       model,
       max_tokens: 1024,
       system: [
@@ -272,46 +280,72 @@ export async function POST(request: NextRequest) {
       ],
       messages: fixedMessages,
     })
-    const durationMs = Date.now() - startTime
 
-    // Логируем использование AI
-    await logAIUsage({
-      userId,
-      endpoint: 'chat',
-      model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      durationMs,
-      success: true,
+    const encoder = new TextEncoder()
+    const readable = new ReadableStream({
+      async start(controller) {
+        let assistantMessage = ''
+        let lineBuffer = ''
+        try {
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              lineBuffer += event.delta.text
+              const newlineIndex = lineBuffer.lastIndexOf('\n')
+              if (newlineIndex !== -1) {
+                const completeChunk = stripMarkdown(lineBuffer.slice(0, newlineIndex + 1))
+                assistantMessage += completeChunk
+                controller.enqueue(encoder.encode(completeChunk))
+                lineBuffer = lineBuffer.slice(newlineIndex + 1)
+              }
+            }
+          }
+          if (lineBuffer) {
+            const tail = stripMarkdown(lineBuffer)
+            assistantMessage += tail
+            controller.enqueue(encoder.encode(tail))
+          }
+
+          const finalMessage = await stream.finalMessage()
+          const durationMs = Date.now() - startTime
+
+          await logAIUsage({
+            userId,
+            endpoint: 'chat',
+            model,
+            inputTokens: finalMessage.usage.input_tokens,
+            outputTokens: finalMessage.usage.output_tokens,
+            durationMs,
+            success: true,
+          })
+
+          console.log('[Plan Chat] Response length:', assistantMessage.length)
+
+          try {
+            await prisma.chatMessage.createMany({
+              data: [
+                { userId, date, role: 'user', content: userMessage },
+                { userId, date, role: 'assistant', content: assistantMessage },
+              ],
+            })
+          } catch (saveError) {
+            console.error('[Plan Chat] Failed to save messages to DB:', saveError)
+            // Не блокируем ответ если сохранение не удалось
+          }
+
+          controller.close()
+        } catch (streamError) {
+          console.error('Error in plan chat stream:', streamError)
+          controller.error(streamError)
+        }
+      },
     })
 
-    const rawMessage = response.content[0].type === 'text' 
-      ? response.content[0].text 
-      : ''
-
-    // Убираем markdown-форматирование из ответа (**, *, #)
-    const assistantMessage = rawMessage
-      .replace(/\*\*(.+?)\*\*/g, '$1')  // **жирный** → жирный
-      .replace(/\*(.+?)\*/g, '$1')       // *курсив* → курсив
-      .replace(/^#{1,6}\s+/gm, '')       // # заголовки → простой текст
-
-    console.log('[Plan Chat] Response length:', assistantMessage.length)
-
-    // Сохраняем оба сообщения в БД
-    try {
-      await prisma.chatMessage.createMany({
-        data: [
-          { userId, date, role: 'user', content: userMessage },
-          { userId, date, role: 'assistant', content: assistantMessage },
-        ],
-      })
-    } catch (saveError) {
-      console.error('[Plan Chat] Failed to save messages to DB:', saveError)
-      // Не блокируем ответ если сохранение не удалось
-    }
-
-    return NextResponse.json({
-      message: assistantMessage,
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Transfer-Encoding': 'chunked',
+      },
     })
   } catch (error) {
     console.error('Error in plan chat:', error)

@@ -887,7 +887,7 @@ export function useDaily(): UseDailyReturn {
       const now = new Date()
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
-      const { message: aiMessage } = await fetchJson<{ message: string }>('/api/daily/chat', {
+      const res = await fetch('/api/daily/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -900,14 +900,35 @@ export function useDaily(): UseDailyReturn {
         }),
       })
 
-      const assistantMessage: ChatMessage = { role: 'assistant', content: aiMessage }
-      const finalMessages = [
-        ...updatedMessages,
-        ...(initialMessage ? [newUserMessage] : []),
-        assistantMessage,
-      ]
-      chatMessagesRef.current = finalMessages
-      setChatMessages(finalMessages)
+      if (!res.ok) {
+        let apiError = `API error: ${res.status}`
+        try {
+          const errorPayload = await res.json()
+          if (typeof errorPayload?.error === 'string') apiError = errorPayload.error
+        } catch {
+          // Ignore non-JSON error bodies
+        }
+        throw new Error(apiError)
+      }
+
+      // Стримим ответ постепенно вместо ожидания всего текста целиком
+      const baseMessages = [...updatedMessages, ...(initialMessage ? [newUserMessage] : [])]
+      let assistantContent = ''
+      chatMessagesRef.current = [...baseMessages, { role: 'assistant', content: '' }]
+      setChatMessages(chatMessagesRef.current)
+
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          assistantContent += decoder.decode(value, { stream: true })
+          const streamedMessages = [...baseMessages, { role: 'assistant' as const, content: assistantContent }]
+          chatMessagesRef.current = streamedMessages
+          setChatMessages(streamedMessages)
+        }
+      }
     } catch (error) {
       console.error('Error sending chat message:', error)
       showMessage(`❌ Ошибка при отправке сообщения: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
