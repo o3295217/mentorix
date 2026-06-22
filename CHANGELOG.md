@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-06-21 — fix: log AI usage for evaluate-period, forecast, goals/decompose
+- 🔌 API: 3 файлов (route, route, route)
+- 📚 Библиотеки: 1 файлов (anthropic)
+- 📝 Документация: 1 файлов
+
+
 ### 2026-06-21 — fix: send verification/reset emails async, don't block auth responses
 - 🔌 API: 3 файлов (route, route, route)
 - 📝 Документация: 1 файлов

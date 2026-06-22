@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-06-21**
+> Последнее обновление: **2026-06-22**
 
 ## Общая информация
 
@@ -580,6 +580,7 @@
 | model | `String` |
 | inputTokens | `Int` |
 | outputTokens | `Int` |
+| costCents | `Int` |
 | durationMs | `Int?` |
 | success | `Boolean` |
 | errorMessage | `String?` |

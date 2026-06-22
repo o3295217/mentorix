@@ -23,7 +23,7 @@ import { notifyTelegram } from './telegram'
 let _anthropic: Anthropic | null = null
 
 export const DEFAULT_AI_MODEL = 'claude-sonnet-4-6'
-export const DEFAULT_ROUTE_AI_MODEL = 'claude-sonnet-4-20250514'
+export const DEFAULT_ROUTE_AI_MODEL = 'claude-sonnet-4-6'
 
 export function getAiModel(fallbackModel = DEFAULT_AI_MODEL): string {
   return process.env.AI_MODEL?.trim() || fallbackModel

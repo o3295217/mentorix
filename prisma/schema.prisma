@@ -602,6 +602,7 @@ model AIUsage {
   model        String   // claude-sonnet-4-20250514 etc.
   inputTokens  Int
   outputTokens Int
+  costCents    Int      @default(0) // расход в центах, посчитан по тарифу модели на момент запроса
   durationMs   Int?
   success      Boolean  @default(true)
   errorMessage String?
