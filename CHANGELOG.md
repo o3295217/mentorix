@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-06-22 — feat: stream daily plan chat responses
+- 🔌 API: 1 файлов (route)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-06-22 — fix: replace retired claude-sonnet-4-20250514 model id
 - 📚 Библиотеки: 3 файлов (ai-pricing, ai-usage, anthropic)
 - 🗄️ База данных: 2 файлов
