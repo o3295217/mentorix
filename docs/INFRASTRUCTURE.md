@@ -72,7 +72,7 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 
 ### Бэкап
 
-Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних зашифрованных файлов `pg_*.sql.gz.enc`). Ключ хранится на сервере вне проекта: `/home/ubuntu/.backup-key`.
+Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних зашифрованных файлов `pg_*.sql.gz.enc`). Контейнер собирается из `Dockerfile.backup` на базе `postgres:16-alpine` с предустановленным `openssl`, чтобы шифрование было доступно при первом запуске и в cron. Ключ хранится на сервере вне проекта: `/home/ubuntu/.backup-key`.
 
 ```bash
 # Ручной бэкап

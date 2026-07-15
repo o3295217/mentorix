@@ -1,0 +1,6 @@
+FROM postgres:16-alpine
+
+# prod-backup.sh encrypts dumps with openssl. Installing it at image build time
+# guarantees availability for the initial backup and all cron runs without
+# network/package-manager work during container startup.
+RUN apk add --no-cache openssl

@@ -129,7 +129,10 @@ services:
 
   # ---- Ежедневный бэкап PostgreSQL (03:00, хранит 30 последних) ----
   backup:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    image: ai-assistant-backup:postgres16-alpine
     container_name: ai-assistant-backup
     environment:
       - PGHOST=postgres
