@@ -874,23 +874,14 @@ export default function DailyPage() {
         {/* Plan - Left (60%) */}
         <div className="lg:col-span-3 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
           <div className="mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 pr-6 sm:items-center">
-            <div className="flex flex-shrink-0 items-baseline gap-3">
+            <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
               <h2 className="text-xl font-bold">План на день</h2>
               <span
-                className="inline-flex min-w-[4.75rem] items-center gap-1.5 rounded-full border border-gray-700/70 bg-gray-900/50 px-2.5 py-1 text-sm font-medium tabular-nums leading-none text-gray-300"
+                className="inline-block text-xl font-semibold tabular-nums leading-none tracking-tight text-gray-400"
                 aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
                 title={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
               >
-                <svg
-                  className="h-3.5 w-3.5 flex-shrink-0 text-gray-500"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M10 5.8V10l2.8 1.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span className={currentTime ? 'text-gray-300' : 'text-transparent'} suppressHydrationWarning>
+                <span className={currentTime ? undefined : 'text-transparent'} suppressHydrationWarning>
                   {currentTime ?? '00:00'}
                 </span>
               </span>
