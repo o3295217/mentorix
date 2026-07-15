@@ -6,6 +6,17 @@
 
 ## [Unreleased]
 
+### 2026-07-15 — feat: add AI-assisted daily scheduling
+- 🔌 API: 6 файлов (route, route, route...)
+- 🧩 Компоненты: 2 файлов (DailyScheduleProposalCard, DayTimeline)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 14 файлов (anthropic, daily-schedule-proposal, daily-schedule...)
+- 🗄️ База данных: 3 файлов
+- ⚙️ Конфигурация: 2 файлов
+- 📝 Документация: 18 файлов
+- 📦 Другое: 34 файлов
+
+
 ### 2026-06-22 — feat: stream daily plan chat responses
 - 🔌 API: 1 файлов (route)
 - 📝 Документация: 1 файлов
