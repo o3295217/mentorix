@@ -886,16 +886,19 @@ export default function DailyPage() {
                 </span>
               </span>
             </div>
-            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 sm:justify-end">
               {scheduleMode === 'list' && totalCount > 0 && (
-                <span className={`text-sm px-3 py-1 rounded-full ${
-                  completionPercent === 100 ? 'bg-green-500/15 text-green-400' :
-                  completionPercent >= 50 ? 'bg-yellow-500/15 text-yellow-400' :
-                  'bg-gray-800 text-gray-400'
+                <span className={`whitespace-nowrap text-base font-semibold tabular-nums leading-none tracking-tight ${
+                  completionPercent === 100 ? 'text-green-400' :
+                  completionPercent > 0 ? 'text-amber-400' :
+                  'text-gray-400'
                 }`}>
                   {completedCount}/{totalCount} ({completionPercent}%)
                   {extraDoneCount > 0 && ` +${extraDoneCount}`}
                 </span>
+              )}
+              {scheduleMode === 'list' && totalCount > 0 && (
+                <span className="text-base leading-none text-gray-600" aria-hidden="true">·</span>
               )}
               {scheduleMode === 'list' && (
                 <button
@@ -907,7 +910,7 @@ export default function DailyPage() {
                       ? 'Добавьте хотя бы одну задачу в план, чтобы расписать день по времени'
                       : 'Разместить задачи на временной шкале 06:00–24:00'
                   }
-                  className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="whitespace-nowrap text-base font-semibold leading-none text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:underline focus-visible:underline-offset-4 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300"
                 >
                   {scheduleEntering || scheduleLoading ? 'Открываю…' : 'Расписать по времени'}
                 </button>
@@ -917,7 +920,7 @@ export default function DailyPage() {
                   type="button"
                   onClick={handleExitTimeline}
                   disabled={scheduleExiting}
-                  className="btn-secondary text-sm"
+                  className="whitespace-nowrap text-base font-semibold leading-none text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:underline focus-visible:underline-offset-4 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300"
                 >
                   {scheduleExiting ? 'Сохраняю…' : '← Назад к списку'}
                 </button>
