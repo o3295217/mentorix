@@ -80,8 +80,11 @@ npm run dev -- -p 3003
 ### AI и прокси
 
 - `ANTHROPIC_API_KEY` - обязателен для всех AI-сценариев.
-- `ANTHROPIC_PROXY_URL` - URL Cloudflare Worker proxy для Anthropic.
-- `ANTHROPIC_PROXY_SECRET` - секрет, который отправляется заголовком `x-proxy-secret`.
+- `AI_MODEL` - общий override модели Claude для обоих уровней (обратная совместимость). Если задан, используется обоими уровнями, если для уровня не установлена собственная переменная. Примеры: `claude-sonnet-4-6`, `claude-haiku-4-5`.
+- `AI_MODEL_SMART` - модель для сложных задач (декомпозиция целей, оценка периода, прогноз). Приоритет: `AI_MODEL_SMART` → `AI_MODEL` → `claude-sonnet-4-6` (встроенный fallback).
+- `AI_MODEL_FAST` - модель для простых/частых задач (оценка дня, чат, проверка плана, обновление insights). Приоритет: `AI_MODEL_FAST` → `AI_MODEL` → `claude-haiku-4-5` (встроенный fallback).
+- `ANTHROPIC_PROXY_URL` - URL Cloudflare Worker proxy для Anthropic (опционально, для обхода гео-блокировки).
+- `ANTHROPIC_PROXY_SECRET` - секрет, который отправляется заголовком `x-proxy-secret` при использовании прокси.
 
 ### Шифрование и email
 

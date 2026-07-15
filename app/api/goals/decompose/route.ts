@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { DEFAULT_ROUTE_AI_MODEL, getAiModel, getAnthropicClient } from '@/lib/anthropic'
+import { getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { logAIUsage } from '@/lib/ai-usage'
 import { requireUserId } from '@/lib/get-user-id'
 import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
@@ -136,7 +136,8 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = buildGoalsDecomposePrompt(sanitizedContext, planningProfile, userProfile, profileBlocks)
     const anthropic = getAnthropicClient()
-    const model = getAiModel(DEFAULT_ROUTE_AI_MODEL)
+    // Декомпозиция и валидация плана — сложная задача, используем SMART-модель
+    const model = getAiModel('smart')
 
     const messages = [
       ...sanitizedHistory,

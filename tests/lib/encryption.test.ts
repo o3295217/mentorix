@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assertEncryptionConfig, decrypt, encrypt, isEncrypted, isEncryptionEnabled } from '@/lib/encryption'
+import { ENCRYPTED_JSON_FIELDS, assertEncryptionConfig, decrypt, encrypt, isEncrypted, isEncryptionEnabled } from '@/lib/encryption'
 
 const VALID_KEY = 'a'.repeat(64)
 
@@ -34,5 +34,9 @@ describe('encryption helpers', () => {
 
     vi.stubEnv('ENCRYPTION_KEY', VALID_KEY)
     expect(isEncryptionEnabled()).toBe(true)
+  })
+
+  it('marks ChatMessage metadataJson as encrypted JSON', () => {
+    expect(ENCRYPTED_JSON_FIELDS.ChatMessage).toContain('metadataJson')
   })
 })

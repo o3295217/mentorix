@@ -31,6 +31,7 @@ ai-assistant-spec/
 │   │   │   ├── route.ts      # CRUD для DailyEntry
 │   │   │   ├── chat/         # Чат с AI о плане
 │   │   │   ├── check-plan/   # Проверка плана AI
+│   │   │   ├── schedule/     # Временное расписание задач дня
 │   │   │   └── indicators/   # Индикаторы календаря
 │   │   ├── evaluate/         # Оценка дня через AI
 │   │   ├── evaluate-period/  # Оценка периодов
@@ -121,7 +122,7 @@ ai-assistant-spec/
 │   ├── prisma.ts             # Prisma Client singleton
 │   ├── prisma-encryption.ts  # Prisma middleware: прозрачное шифрование полей (AES-256-GCM)
 │   ├── prisma-audit.ts       # Prisma middleware: автоматический аудит-лог write-операций
-│   ├── anthropic.ts          # Claude API integration (~575 строк)
+│   ├── anthropic.ts          # Claude API integration (~725 строк), двухуровневая модель (smart/fast)
 │   ├── api-utils.ts          # API утилиты, безопасность
 │   ├── audit.ts              # Ручной аудит-лог (auth events и т.д.)
 │   ├── auth.ts               # Аутентификация (bcrypt 12 rounds, transparent migration)
@@ -129,6 +130,7 @@ ai-assistant-spec/
 │   ├── ai-usage.ts           # Трекинг использования AI
 │   ├── completed-work.ts     # Синхронизация CompletedWork из DailyEntry
 │   ├── dates.ts              # Работа с датами
+│   ├── daily-schedule.ts     # Схема/типы расписания задач дня
 │   ├── encryption.ts         # AES-256-GCM шифрование/дешифрование текстовых полей
 │   ├── email.ts              # Отправка email
 │   ├── fact-utils.ts         # Утилиты для фактов
@@ -323,7 +325,17 @@ model DailyEntry {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   evaluation        Evaluation?
+  schedule          DailySchedule?
   @@unique([userId, date])
+}
+
+model DailySchedule {
+  id            Int        @id @default(autoincrement())
+  dailyEntryId  Int        @unique
+  dailyEntry    DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
+  scheduleJson  Json       // v1 task-only или v2: kind='task' + meal/rest/buffer service blocks; шифруется
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
 model Evaluation {
@@ -349,7 +361,7 @@ model Evaluation {
   alignmentHalfYear     String
   alignmentYearDream    String
   // Флаги баланса
-  healthFlag            String?    // 'норма', 'внимание', 'критично'
+  healthFlag            String?    // 'ok' | 'warning' | 'critical'
   familyFlag            String?
   energyFlag            String?
   // Горизонтальный alignment
@@ -549,6 +561,7 @@ model ChatMessage {
   date      String
   role      String   // 'user', 'assistant'
   content   String
+  metadataJson Json?  // encrypted, typed cards (daily_schedule_proposal: currentScheduleExists/currentScheduleHash/proposal/appliedAt)
   createdAt DateTime @default(now())
 }
 
@@ -638,7 +651,9 @@ model AuditLog {
 | Endpoint | Методы | Файл | Описание |
 |----------|--------|------|----------|
 | `/api/daily` | GET, POST | `app/api/daily/route.ts` | CRUD дневных записей |
-| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане |
+| `/api/daily/schedule` | GET, PUT | `app/api/daily/schedule/route.ts` | Временное расписание задач дня; `DailyScheduleSchema` поддерживает backward-compatible v1/v2, ответ содержит `hash` |
+| `/api/daily/schedule/apply-proposal` | POST | `app/api/daily/schedule/apply-proposal/route.ts` | Подтверждает AI-proposal из `ChatMessage.metadataJson`, проверяет ownership/date/current hash, применяет v2 schedule |
+| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/done/error`, Anthropic tool `propose_daily_schedule`; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson` |
 | `/api/daily/check-plan` | POST | `app/api/daily/check-plan/route.ts` | Проверка плана AI |
 | `/api/daily/indicators` | GET | `app/api/daily/indicators/route.ts` | Индикаторы для календаря |
 | `/api/evaluate` | POST | `app/api/evaluate/route.ts` | Оценка дня через AI |
@@ -817,7 +832,7 @@ const processingLockRef = useRef<Set<string>>(new Set())
 
 ## 6. БИБЛИОТЕЧНЫЙ КОД (lib/)
 
-### lib/anthropic.ts (~600 строк)
+### lib/anthropic.ts (~730 строк)
 
 **Назначение:** Интеграция с Claude API
 
@@ -826,6 +841,12 @@ const processingLockRef = useRef<Set<string>>(new Set())
 // Lazy initialization клиента
 let _anthropic: Anthropic | null = null
 function getAnthropicClient(): Anthropic { ... }
+
+// Двухуровневая конфигурация модели (см. раздел "Двухуровневая конфигурация модели" ниже)
+export type AiModelTier = 'smart' | 'fast'
+export function getAiModel(tier: AiModelTier = 'smart'): string
+export function getSmartModel(): string
+export function getFastModel(): string
 
 // Retry logic
 async function withRetry<T>(operation: () => Promise<T>, options?: RetryOptions): Promise<T>
@@ -836,6 +857,24 @@ export async function evaluatePeriod(request: PeriodEvaluationRequest): Promise<
 export async function generateForecast(request: ForecastRequest): Promise<ForecastResponse>
 export async function updateUserInsights(request: UpdateInsightsRequest): Promise<UpdateInsightsResponse>
 // UpdateInsightsResponse = { profile: UserInsightsUpdate, entries: InsightEntryData[] }
+// Промпт и построение текста запроса для updateUserInsights — в lib/prompts/insights.ts
+```
+
+### Двухуровневая конфигурация модели
+
+Задачи разной сложности используют разные уровни модели Claude:
+
+| Уровень | Env-переменная | Fallback-цепочка | Задачи |
+|---|---|---|---|
+| **SMART** (сложные) | `AI_MODEL_SMART` | `AI_MODEL_SMART` → `AI_MODEL` → `'claude-sonnet-4-6'` | декомпозиция целей (`POST /api/goals/decompose`, оба вызова: генерация + валидация плана), оценка периода (`evaluatePeriodWithUsage`), прогноз (`generateForecastWithUsage`) |
+| **FAST** (простые/частые) | `AI_MODEL_FAST` | `AI_MODEL_FAST` → `AI_MODEL` → `'claude-haiku-4-5'` | оценка дня (`evaluateDayNewWithUsage`), чат о плане (`POST /api/daily/chat`), проверка плана (`POST /api/daily/check-plan`), обновление профиля понимания (`updateUserInsights`) |
+
+Обратная совместимость: если задан только `AI_MODEL` (без `AI_MODEL_SMART`/`AI_MODEL_FAST`) — оба уровня используют это значение, поведение не меняется относительно предыдущей однодуровневой схемы.
+
+```typescript
+getAiModel('smart')  // AI_MODEL_SMART → AI_MODEL → 'claude-sonnet-4-6'
+getAiModel('fast')   // AI_MODEL_FAST  → AI_MODEL → 'claude-haiku-4-5'
+getAiModel()         // tier по умолчанию — 'smart'
 ```
 
 **Retry с exponential backoff:**
@@ -1015,14 +1054,15 @@ export async function getUserStatsForAI(): Promise<string>
 
 | Файл | Содержимое |
 |------|------------|
-| `core.ts` | Базовые константы |
-| `types.ts` | Типы для промптов |
-| `daily.ts` | `DAILY_EVALUATION_SYSTEM_PROMPT`, `buildUserDataPrompt()` |
+| `core.ts` | Базовые константы, fallback-ответы (NO_DREAM_RESPONSE, getNoGoalsResponse) с английскими значениями флагов |
+| `types.ts` | Типы для промптов; BalanceFlags с значениями `'ok' \| 'warning' \| 'critical'` |
+| `daily.ts` | `DAILY_EVALUATION_SYSTEM_PROMPT` (13 инструкций, КАЛИБРОВОЧНЫЕ ПРИМЕРЫ: 3 эталонных дня), `buildUserDataPrompt()`, `validateGoals()` |
 | `check-plan.ts` | `CHECK_PLAN_SYSTEM_PROMPT`, `buildCheckPlanPrompt()` |
 | `plan-chat.ts` | `PLAN_CHAT_SYSTEM_PROMPT`, `buildPlanChatContext()` |
-| `forecast.ts` | `buildForecastPrompt()` |
-| `period.ts` | `buildPeriodEvaluationPrompt()` |
-| `goals-decompose.ts` | `buildGoalsDecomposePrompt(context, planningProfile?, userProfile?, profileBlocks?)` — промпт декомпозиции целей с персонализацией по профилю и ограничением длинного контекста |
+| `forecast.ts` | `buildForecastPrompt()`, `calculateExecutionQuality()` (расчёт на сервере), `mergeExecutionQuality()` (мерж результатов) |
+| `period.ts` | `buildPeriodEvaluationPrompt()`, `calculatePeriodAverages()` (средние показатели рассчитываются на сервере) |
+| `goals-decompose.ts` | `buildGoalsDecomposePrompt(context, planningProfile?, userProfile?, profileBlocks?)` — промпт декомпозиции целей с персонализацией по профилю и ограничением контекста |
+| `insights.ts` | `buildUpdateInsightsPrompt(request)`, типы `UpdateInsightsRequest/UpdateInsightsResponse`, промпт и подстановка плейсхолдеров для обновления профиля понимания пользователя |
 
 ---
 
@@ -1111,43 +1151,56 @@ VK Cloud (РФ) → Cloudflare Worker (PoP) → Durable Object (US, wnam) → An
 
 ### Потоки взаимодействия с AI
 
+Каждый вызов использует модель нужного уровня через `getAiModel('smart' | 'fast')`
+(см. "Двухуровневая конфигурация модели" выше) — уровень указан в скобках у каждого шага.
+
 ```
-1. Оценка дня (POST /api/evaluate)
+1. Оценка дня (POST /api/evaluate) — модель: FAST
    ├── Собираем: мечту, годовые цели, периодические цели, план, факт, контекст
-   ├── Формируем промпт (buildUserDataPrompt)
-   ├── Вызываем Claude Sonnet через getAnthropicClient()
+   ├── Формируем промпт (buildUserDataPrompt) с КАЛИБРОВОЧНЫМИ ПРИМЕРАМИ для стабильности
+   ├── Вызываем Claude через getAnthropicClient(), getAiModel('fast')
    ├── Парсим JSON ответ
-   ├── Валидируем структуру
+   ├── Валидируем структуру (значение overall_score от модели игнорируется)
+   ├── Рассчитываем overall_score СЕРВЕРОМ (среднее 5 показателей, calculateOverallScore)
    ├── Сохраняем в Evaluation
    ├── Загружаем кэш знаний (InsightEntry, до 100 записей)
-   ├── Обновляем UserInsights (профиль понимания)
+   ├── Обновляем UserInsights (профиль понимания) — модель: FAST
+   │  └── Используется промпт из lib/prompts/insights.ts (buildUpdateInsightsPrompt)
    └── Сохраняем новые наблюдения в InsightEntry (2-5 фактов за день)
 
-2. Проверка плана (POST /api/daily/check-plan)
+2. Проверка плана (POST /api/daily/check-plan) — модель: FAST
    ├── Собираем: цели периодов, текущий план, историю
    ├── Формируем промпт (buildCheckPlanPrompt)
-   ├── Вызываем Claude Sonnet через getAnthropicClient()
+   ├── Вызываем Claude через getAnthropicClient(), getAiModel('fast')
    ├── Парсим JSON ответ
    └── Возвращаем рекомендации
 
-3. Чат о плане (POST /api/daily/chat)
+3. Чат о плане (POST /api/daily/chat) — модель: FAST
    ├── Собираем: цели, план, insights, кэш знаний (до 50 наблюдений), история сообщений
    ├── Формируем промпт (buildPlanChatContext)
-   ├── Вызываем Claude Sonnet через getAnthropicClient()
+   ├── Вызываем Claude через getAnthropicClient(), getAiModel('fast')
    └── Возвращаем ответ
 
-4. Декомпозиция целей (POST /api/goals/decompose)
+4. Декомпозиция целей (POST /api/goals/decompose) — модель: SMART (генерация и валидация плана)
   ├── Собираем: мечту, goals map, историю чата, PlanningProfile, UserProfile, ProfileBlocks
   ├── Санитизируем длинные поля (dream/message/goals/history), чтобы не падать на уже сохранённом контексте
   ├── Формируем промпт (buildGoalsDecomposePrompt) с усечением длинных profile fields и списков целей
-  ├── Вызываем Claude Sonnet через getAnthropicClient() в streaming-режиме
+  ├── Вызываем Claude через getAnthropicClient(), getAiModel('smart') в streaming-режиме
   └── Возвращаем текстовый ответ; клиент сам извлекает цели, профиль и горизонт
 
-5. Прогноз (GET /api/forecast)
-   ├── Собираем: мечту, историю оценок, текущий темп
-   ├── Формируем промпт (buildForecastPrompt)
-   ├── Вызываем Claude Sonnet через getAnthropicClient()
-   └── Возвращаем прогноз
+5. Прогноз (GET /api/forecast) — модель: SMART
+    ├── Собираем: мечту, историю оценок, текущий темп
+    ├── Формируем промпт (buildForecastPrompt)
+    ├── Вызываем Claude через getAnthropicClient(), getAiModel('smart')
+    ├── Парсим JSON (от модели берём только массив patterns, executionQuality числовые поля рассчитываются сервером)
+    ├── Рассчитываем executionQuality через calculateExecutionQuality и мержим через mergeExecutionQuality
+    └── Возвращаем прогноз с финальными quality-метриками
+
+6. Оценка периода (evaluatePeriodWithUsage, используется отчётами по неделе/месяцу/кварталу/году) — модель: SMART
+    ├── Рассчитываем средние показатели по дневным оценкам (calculatePeriodAverages)
+    ├── Формируем промпт (buildPeriodEvaluationPrompt) с готовыми средними значениями
+    ├── Вызываем Claude через getAnthropicClient(), getAiModel('smart') (модель анализирует текст, не расчёты)
+    └── dreamProgressScore/overallScore пересчитываются в коде как средние по дням периода
 ```
 
 ### Структура ответа оценки дня
@@ -1171,9 +1224,9 @@ interface DailyEvaluationResponse {
     year_to_dream: string
   }
   balance_flags: {
-    health: 'норма' | 'внимание' | 'критично'
-    family: 'норма' | 'внимание' | 'критично'
-    energy: 'норма' | 'внимание' | 'критично'
+    health: 'ok' | 'warning' | 'critical'
+    family: 'ok' | 'warning' | 'critical'
+    energy: 'ok' | 'warning' | 'critical'
   }
   horizontal_alignment: {
     work_health: number            // 1-10
@@ -1419,7 +1472,9 @@ if (!validation.success) {
 | **Текст промпта для оценки дня** | `lib/prompts/daily.ts` |
 | **Текст промпта для проверки плана** | `lib/prompts/check-plan.ts` |
 | **Текст промпта для чата** | `lib/prompts/plan-chat.ts` |
-| **Модель Claude** | `lib/anthropic.ts` (поиск `claude-`) |
+| **Модель Claude (по умолчанию)** | `lib/anthropic.ts` (`DEFAULT_AI_MODEL_SMART`, `DEFAULT_AI_MODEL_FAST`) |
+| **Модель Claude (без пересборки)** | env `AI_MODEL_SMART` / `AI_MODEL_FAST` (или общий `AI_MODEL`) |
+| **Уровень модели для конкретной AI-задачи** | вызов `getAiModel('smart' \| 'fast')` в соответствующей функции/route |
 | **Логику оценки дня** | `app/api/evaluate/route.ts` |
 | **UI страницы целей** | `app/goals/page.tsx` + `components/goals/*.tsx` |
 | **UI дневного планирования** | `app/daily/page.tsx` |

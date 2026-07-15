@@ -8,7 +8,7 @@
  */
 
 import { PrismaClient } from '@prisma/client'
-import { encrypt, isEncrypted, ENCRYPTED_FIELDS } from '../lib/encryption'
+import { encrypt, isEncrypted, ENCRYPTED_FIELDS, ENCRYPTED_JSON_FIELDS } from '../lib/encryption'
 
 const prisma = new PrismaClient()
 
@@ -28,11 +28,14 @@ async function migrateModel(modelName: string, fields: string[]) {
 
   for (const record of records) {
     const updates: Record<string, string> = {}
+    const jsonFields = new Set(ENCRYPTED_JSON_FIELDS[modelName] || [])
 
     for (const field of fields) {
       const value = record[field]
       if (typeof value === 'string' && value.length > 0 && !isEncrypted(value)) {
         updates[field] = encrypt(value)
+      } else if (jsonFields.has(field) && value !== null && value !== undefined && typeof value !== 'string') {
+        updates[field] = encrypt(JSON.stringify(value))
       }
     }
 

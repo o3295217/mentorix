@@ -15,6 +15,8 @@ import {
   remapSelectionByText as remapSelectionByTextForTasks,
   sanitizeSelectedForTotal,
 } from './task-helpers'
+import { getBrowserTimezone, normalizeChatMessageId } from './chat-helpers'
+import { consumeDailyChatSseStream, DailyChatSseError } from './stream-consumer'
 
 export function useDaily(): UseDailyReturn {
   // Всегда начинаем с текущей даты при открытии страницы
@@ -96,17 +98,16 @@ export function useDaily(): UseDailyReturn {
     // Загружаем чат из БД
     const loadChatHistory = async () => {
       try {
-        const res = await fetch(`/api/daily/chat/messages?date=${currentDate}`)
-        if (res.ok) {
-          const data = await res.json()
-          const messages = (data.messages || []).map((m: { role: string; content: string }) => ({
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-          }))
-          setChatMessages(messages)
-        } else {
-          setChatMessages([])
-        }
+        const data = await fetchJson<{ messages?: Array<{ id?: unknown; role: string; content: string; metadata?: ChatMessage['metadata'] }> }>(
+          `/api/daily/chat/messages?date=${currentDate}`,
+        )
+        const messages = (data.messages || []).map((m) => ({
+          id: normalizeChatMessageId(m.id),
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          metadata: m.metadata ?? null,
+        }))
+        setChatMessages(messages)
       } catch {
         // Fallback на localStorage для обратной совместимости
         if (typeof window !== 'undefined') {
@@ -801,7 +802,7 @@ export function useDaily(): UseDailyReturn {
     setHasUnsavedChanges(true)
   }, [draggedTaskId, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
-  const savePlan = useCallback(async () => {
+  const savePlan = useCallback(async (): Promise<boolean> => {
     setSaving(true)
     try {
       const saved = await savePlanWithTasks()
@@ -809,6 +810,7 @@ export function useDaily(): UseDailyReturn {
         setHasUnsavedChanges(false)
         showMessage('✅ План сохранен!')
       }
+      return saved
     } finally {
       setSaving(false)
     }
@@ -886,6 +888,7 @@ export function useDaily(): UseDailyReturn {
       // Получаем текущее время пользователя
       const now = new Date()
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      const timezone = getBrowserTimezone()
 
       const res = await fetch('/api/daily/chat', {
         method: 'POST',
@@ -893,6 +896,7 @@ export function useDaily(): UseDailyReturn {
         body: JSON.stringify({
           date: selectedDate,
           currentTime,
+          timezone,
           planTasks,
           completedTasks,
           messages: currentMessages,
@@ -911,31 +915,56 @@ export function useDaily(): UseDailyReturn {
         throw new Error(apiError)
       }
 
-      // Стримим ответ постепенно вместо ожидания всего текста целиком
       const baseMessages = [...updatedMessages, ...(initialMessage ? [newUserMessage] : [])]
-      let assistantContent = ''
-      chatMessagesRef.current = [...baseMessages, { role: 'assistant', content: '' }]
-      setChatMessages(chatMessagesRef.current)
+      const tempAssistantId = `pending-${Date.now()}`
+      const assistantMessage: ChatMessage = { id: tempAssistantId, role: 'assistant', content: '', metadata: null }
+      const messagesWithAssistant = [...baseMessages, assistantMessage]
+      chatMessagesRef.current = messagesWithAssistant
+      setChatMessages(messagesWithAssistant)
 
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          assistantContent += decoder.decode(value, { stream: true })
-          const streamedMessages = [...baseMessages, { role: 'assistant' as const, content: assistantContent }]
-          chatMessagesRef.current = streamedMessages
-          setChatMessages(streamedMessages)
-        }
+      const updateAssistant = (patch: Partial<ChatMessage>) => {
+        const streamedMessages = chatMessagesRef.current.map((message, index) => {
+          const isTarget = index === chatMessagesRef.current.length - 1 && message.role === 'assistant'
+          return isTarget ? { ...message, ...patch } : message
+        })
+        chatMessagesRef.current = streamedMessages
+        setChatMessages(streamedMessages)
       }
+
+      await consumeDailyChatSseStream(res.body, {
+        onText: (_frameText, assistantContent) => {
+          updateAssistant({ content: assistantContent })
+        },
+        onProposal: metadata => {
+          updateAssistant({ metadata: metadata as ChatMessage['metadata'] })
+        },
+        onDone: assistantMessageId => {
+          updateAssistant({ id: normalizeChatMessageId(assistantMessageId) })
+        },
+        onError: error => {
+          updateAssistant({ content: `${chatMessagesRef.current.at(-1)?.content ?? ''}\n\n⚠️ ${error}`.trim() })
+        },
+      })
     } catch (error) {
       console.error('Error sending chat message:', error)
-      showMessage(`❌ Ошибка при отправке сообщения: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      if (!(error instanceof DailyChatSseError)) {
+        showMessage(`❌ Ошибка при отправке сообщения: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      }
     } finally {
       setSendingChat(false)
     }
   }, [chatInput, tasks, selectedTasks, selectedDate, showMessage])
+
+  const markChatProposalApplied = useCallback((messageId: string, appliedAt: string) => {
+    setChatMessages(prev => {
+      const next = prev.map(message => {
+        if (message.id !== messageId || !message.metadata) return message
+        return { ...message, metadata: { ...message.metadata, appliedAt } }
+      })
+      chatMessagesRef.current = next
+      return next
+    })
+  }, [])
 
   const clearChat = useCallback(async () => {
     setChatMessages([])
@@ -1043,6 +1072,7 @@ export function useDaily(): UseDailyReturn {
     sendChatMessage,
     sendingChat,
     clearChat,
+    markChatProposalApplied,
     addTask,
     addExtraTask,
     removeExtraTask,

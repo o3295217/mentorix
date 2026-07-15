@@ -80,6 +80,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
     'emotionalState', 'physicalState', 'lifeEvents', 'externalFactors',
     'selectedTasksJson',
   ],
+  DailySchedule: ['scheduleJson'],
   Evaluation: [
     'feedbackText', 'planVsFactText',
     'alignmentDayWeek', 'alignmentWeekMonth', 'alignmentMonthQuarter',
@@ -111,7 +112,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   InsightEntry: ['text'],
   CompletedWork: ['text'],
   WorkSummary: ['summaryText', 'keyAchievements'],
-  ChatMessage: ['content'],
+  ChatMessage: ['content', 'metadataJson'],
   PlanningProfile: ['constraints'],
 }
 
@@ -120,6 +121,8 @@ export const ENCRYPTED_JSON_FIELDS: Record<string, string[]> = {
   PeriodGoal: ['goalsJson'],
   Goal: ['historyJson'],
   DailyEntry: ['planSnapshotJson', 'extraTasksJson', 'selectedTasksJson'],
+  DailySchedule: ['scheduleJson'],
   Evaluation: ['suggestedTasksJson'],
   WorkSummary: ['keyAchievements'],
+  ChatMessage: ['metadataJson'],
 }

@@ -1,5 +1,6 @@
 import type { DragEvent } from 'react'
 import type { DailyEntry, OpenTask } from '@/lib/types'
+import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
 
 export type DailyPlanDraft = {
   updatedAt: string
@@ -23,8 +24,10 @@ export interface CheckPlanResult {
 }
 
 export interface ChatMessage {
+  id?: string
   role: 'user' | 'assistant'
   content: string
+  metadata?: DailyScheduleProposalMetadata | null
 }
 
 export interface Habit {
@@ -91,6 +94,7 @@ export interface UseDailyReturn {
   sendChatMessage: (initialMessage?: string) => Promise<void>
   sendingChat: boolean
   clearChat: () => void
+  markChatProposalApplied: (messageId: string, appliedAt: string) => void
 
   addTask: () => void
   addExtraTask: () => void
@@ -117,6 +121,6 @@ export interface UseDailyReturn {
   handleDragOver: (e: DragEvent) => void
   handleDrop: (targetTaskId: number) => void
 
-  savePlan: () => Promise<void>
+  savePlan: () => Promise<boolean>
   evaluate: (router: { push: (path: string) => void }) => Promise<void>
 }

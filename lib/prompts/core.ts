@@ -105,9 +105,9 @@ export const NO_DREAM_RESPONSE: DailyEvaluationResponse = {
     year_to_dream: 'no - нет мечты',
   },
   balance_flags: {
-    health: 'критично',
-    family: 'критично',
-    energy: 'критично',
+    health: 'critical',
+    family: 'critical',
+    energy: 'critical',
   },
   feedback: {
     conclusion: 'Невозможно оценить день без мечты. Ты не знаешь куда идёшь.',
@@ -136,9 +136,9 @@ export function getNoGoalsResponse(dreamGoal: string): DailyEvaluationResponse {
       year_to_dream: 'partial - мечта есть, но нет плана',
     },
     balance_flags: {
-      health: 'внимание',
-      family: 'внимание',
-      energy: 'внимание',
+      health: 'warning',
+      family: 'warning',
+      energy: 'warning',
     },
     feedback: {
       conclusion: `У тебя есть мечта: "${dreamGoal}" — но нет плана как к ней прийти.`,

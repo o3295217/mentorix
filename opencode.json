@@ -1,0 +1,6 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-fable-5",
+  "default_agent": "lead",
+  "instructions": ["AGENTS.md"]
+}

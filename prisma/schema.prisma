@@ -195,11 +195,23 @@ model DailyEntry {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   evaluation       Evaluation?
+  schedule         DailySchedule?
 
   @@unique([userId, date])
   @@index([userId])
   @@index([userId, date])
   @@map("daily_entries")
+}
+
+model DailySchedule {
+  id            Int        @id @default(autoincrement())
+  dailyEntryId  Int        @unique
+  dailyEntry    DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
+  scheduleJson  Json
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("daily_schedules")
 }
 
 model Evaluation {
@@ -551,6 +563,7 @@ model ChatMessage {
   date      String
   role      String
   content   String
+  metadataJson Json?
   createdAt DateTime @default(now())
 
   @@index([userId])

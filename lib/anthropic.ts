@@ -11,8 +11,15 @@ import {
   DailyContext,
 } from './prompts/types'
 import { DAILY_EVALUATION_SYSTEM_PROMPT, buildUserDataPrompt, validateGoals } from './prompts/daily'
-import { buildPeriodEvaluationPrompt } from './prompts/period'
-import { buildForecastPrompt } from './prompts/forecast'
+import { buildPeriodEvaluationPrompt, calculatePeriodAverages } from './prompts/period'
+import { buildForecastPrompt, calculateExecutionQuality, mergeExecutionQuality } from './prompts/forecast'
+import {
+  buildUpdateInsightsPrompt,
+  UpdateInsightsRequest,
+  UpdateInsightsResponse,
+  UserInsightsUpdate,
+  InsightEntryData,
+} from './prompts/insights'
 import { extractJsonFromAIResponse, isValidScore, clampScore, sanitizeUserInput } from './api-utils'
 import { notifyTelegram } from './telegram'
 
@@ -22,11 +29,45 @@ import { notifyTelegram } from './telegram'
 
 let _anthropic: Anthropic | null = null
 
-export const DEFAULT_AI_MODEL = 'claude-sonnet-4-6'
-export const DEFAULT_ROUTE_AI_MODEL = 'claude-sonnet-4-6'
+// ============================================================================
+// MODEL SELECTION (двухуровневая конфигурация: smart / fast)
+// ============================================================================
+//
+// SMART — сложные задачи, требующие глубокого рассуждения (декомпозиция целей,
+// оценка периода, прогноз). FAST — простые/частые задачи (оценка дня, чат,
+// проверка плана, обновление insights).
+//
+// Приоритет для каждого уровня: AI_MODEL_SMART/AI_MODEL_FAST → AI_MODEL (общий
+// override, обратная совместимость) → встроенный fallback уровня.
+// Если в проде задан ТОЛЬКО AI_MODEL — оба уровня используют его, поведение
+// не меняется.
 
-export function getAiModel(fallbackModel = DEFAULT_AI_MODEL): string {
-  return process.env.AI_MODEL?.trim() || fallbackModel
+export const DEFAULT_AI_MODEL_SMART = 'claude-sonnet-4-6'
+export const DEFAULT_AI_MODEL_FAST = 'claude-haiku-4-5'
+
+export type AiModelTier = 'smart' | 'fast'
+
+export function getAiModel(tier: AiModelTier = 'smart'): string {
+  if (tier === 'fast') {
+    return (
+      process.env.AI_MODEL_FAST?.trim() ||
+      process.env.AI_MODEL?.trim() ||
+      DEFAULT_AI_MODEL_FAST
+    )
+  }
+  return (
+    process.env.AI_MODEL_SMART?.trim() ||
+    process.env.AI_MODEL?.trim() ||
+    DEFAULT_AI_MODEL_SMART
+  )
+}
+
+export function getSmartModel(): string {
+  return getAiModel('smart')
+}
+
+export function getFastModel(): string {
+  return getAiModel('fast')
 }
 
 export function getAnthropicClient(): Anthropic {
@@ -308,6 +349,27 @@ export interface EvaluationResultWithUsage {
   usage: AIUsageInfo
 }
 
+// overall_score считается в коде как среднее арифметическое 5 скоров дня,
+// а не берется из ответа модели напрямую — так исключается риск расхождения
+// между отдельными скорами и итоговой оценкой.
+export function calculateOverallScore(scores: {
+  dream_progress_score: number
+  strategic_focus_score: number
+  productivity_score: number
+  life_balance_score: number
+  discipline_score: number
+}): number {
+  const sum =
+    scores.dream_progress_score +
+    scores.strategic_focus_score +
+    scores.productivity_score +
+    scores.life_balance_score +
+    scores.discipline_score
+
+  const average = Math.round((sum / 5) * 10) / 10
+  return clampScore(average)
+}
+
 // НОВАЯ функция оценки дня с Prompt Caching
 export async function evaluateDayNew(
   request: DailyEvaluationRequest
@@ -321,7 +383,7 @@ export async function evaluateDayNewWithUsage(
   request: DailyEvaluationRequest
 ): Promise<EvaluationResultWithUsage> {
   const startTime = Date.now()
-  const model = getAiModel()
+  const model = getAiModel('fast')
   
   // Проверка наличия мечты и целей
   const validation = validateGoals(request)
@@ -382,14 +444,28 @@ export async function evaluateDayNewWithUsage(
   )
 
   // Clamp scores to valid range (safety measure)
+  const dreamProgressScore = clampScore(parsedResponse.dream_progress_score)
+  const strategicFocusScore = clampScore(parsedResponse.strategic_focus_score)
+  const productivityScore = clampScore(parsedResponse.productivity_score)
+  const lifeBalanceScore = clampScore(parsedResponse.life_balance_score)
+  const disciplineScore = clampScore(parsedResponse.discipline_score)
+
+  // overall_score всегда пересчитывается в коде как среднее 5 скоров (см. calculateOverallScore),
+  // значение из ответа модели игнорируется, чтобы избежать расхождений
   const result = {
     ...parsedResponse,
-    dream_progress_score: clampScore(parsedResponse.dream_progress_score),
-    strategic_focus_score: clampScore(parsedResponse.strategic_focus_score),
-    productivity_score: clampScore(parsedResponse.productivity_score),
-    life_balance_score: clampScore(parsedResponse.life_balance_score),
-    discipline_score: clampScore(parsedResponse.discipline_score),
-    overall_score: clampScore(parsedResponse.overall_score),
+    dream_progress_score: dreamProgressScore,
+    strategic_focus_score: strategicFocusScore,
+    productivity_score: productivityScore,
+    life_balance_score: lifeBalanceScore,
+    discipline_score: disciplineScore,
+    overall_score: calculateOverallScore({
+      dream_progress_score: dreamProgressScore,
+      strategic_focus_score: strategicFocusScore,
+      productivity_score: productivityScore,
+      life_balance_score: lifeBalanceScore,
+      discipline_score: disciplineScore,
+    }),
   }
 
   return {
@@ -446,7 +522,7 @@ export async function evaluatePeriodWithUsage(
   request: PeriodEvaluationRequest
 ): Promise<PeriodEvaluationResultWithUsage> {
   const startTime = Date.now()
-  const model = getAiModel()
+  const model = getAiModel('smart')
   // Построение промпта для периодической оценки
   const prompt = buildPeriodEvaluationPrompt(request)
 
@@ -484,11 +560,14 @@ export async function evaluatePeriodWithUsage(
     'evaluatePeriod'
   )
 
-  // Clamp scores to valid range
+  // dreamProgressScore и overallScore пересчитываются в коде как средние по дням
+  // периода (см. calculatePeriodAverages) — значения из ответа модели игнорируются,
+  // чтобы исключить расхождение с реальными данными
+  const averages = calculatePeriodAverages(request.days)
   const result = {
     ...parsedResponse,
-    dreamProgressScore: clampScore(parsedResponse.dreamProgressScore),
-    overallScore: clampScore(parsedResponse.overallScore),
+    dreamProgressScore: clampScore(averages.avgDreamProgress),
+    overallScore: clampScore(averages.avgOverall),
   }
 
   return {
@@ -519,7 +598,7 @@ export async function generateForecastWithUsage(
   request: ForecastRequest
 ): Promise<ForecastResultWithUsage> {
   const startTime = Date.now()
-  const model = getAiModel()
+  const model = getAiModel('smart')
   // Построение промпта для прогноза
   const prompt = buildForecastPrompt(request)
 
@@ -551,11 +630,25 @@ export async function generateForecastWithUsage(
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   // Извлечение и валидация JSON из ответа
-  const result = extractJsonFromAIResponse<ForecastResponse>(
+  const parsedResponse = extractJsonFromAIResponse<ForecastResponse>(
     responseText,
     isForecastResponse,
     'generateForecast'
   )
+
+  // executionQuality: числовые показатели всегда пересчитываются в коде
+  // (calculateExecutionQuality), от модели берутся только текстовые patterns —
+  // так исключается лишний расход output-токенов и риск расхождения чисел
+  const computedQuality = calculateExecutionQuality(request.baseDays)
+  const executionQuality = mergeExecutionQuality(
+    computedQuality,
+    parsedResponse.executionQuality?.patterns
+  )
+
+  const result: ForecastResponse = {
+    ...parsedResponse,
+    executionQuality,
+  }
 
   return {
     result,
@@ -569,109 +662,10 @@ export async function generateForecastWithUsage(
 }
 
 // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
+// Промпт и построение текста запроса — в lib/prompts/insights.ts
 
-export interface UserInsightsUpdate {
-  patterns?: string
-  strengths?: string
-  challenges?: string
-  preferences?: string
-  recommendations?: string
-  motivators?: string
-}
-
-export interface UpdateInsightsRequest {
-  currentInsights: UserInsightsUpdate | null
-  evaluationCount: number
-  // Данные для анализа
-  planText: string
-  factText: string
-  evaluationFeedback: string
-  dreamProgressScore: number
-  overallScore: number
-  date: string // YYYY-MM-DD дата оцениваемого дня
-  // Последние N дней для контекста
-  recentDays?: Array<{
-    date: string
-    planTasks: number
-    completedTasks: number
-    dreamScore: number
-    overallScore: number
-  }>
-  // Накопленные наблюдения из кэша
-  knowledgeCache?: Array<{
-    date: string
-    category: string
-    text: string
-  }>
-}
-
-const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивности. Твоя задача — обновить профиль понимания пользователя на основе его планов и результатов.
-
-ТЕКУЩИЙ ПРОФИЛЬ (если есть):
-{current_insights}
-
-НАКОПЛЕННЫЕ ЗНАНИЯ О ПОЛЬЗОВАТЕЛЕ:
-{knowledge_cache}
-
-ДАННЫЕ СЕГОДНЯШНЕГО ДНЯ:
-- Дата: {date}
-- План: {plan_text}
-- Выполнено: {fact_text}
-- Оценка дня: {overall_score}/10
-- Приближение к мечте: {dream_score}/10
-- Обратная связь: {feedback}
-
-ИСТОРИЯ ПОСЛЕДНИХ ДНЕЙ:
-{recent_days}
-
-КОЛИЧЕСТВО ОЦЕНЁННЫХ ДНЕЙ: {evaluation_count}
-
-ЗАДАЧА:
-1. Обнови обобщённый профиль на основе ВСЕХ накопленных знаний + нового дня
-2. Извлеки из СЕГОДНЯШНЕГО ДНЯ конкретные наблюдения-факты о пользователе
-
-Верни JSON:
-{
-  "profile": {
-    "patterns": "Обобщённые паттерны поведения на основе ВСЕХ данных",
-    "strengths": "Сильные стороны (на основе всех наблюдений)",
-    "challenges": "Сложности и зоны роста",
-    "preferences": "Предпочтения в планировании",
-    "recommendations": "Персональные рекомендации",
-    "motivators": "Что мотивирует пользователя"
-  },
-  "entries": [
-    {"category": "pattern", "text": "конкретное наблюдение из сегодняшнего дня"},
-    {"category": "strength", "text": "что получилось хорошо"},
-    {"category": "challenge", "text": "с чем были сложности"},
-    {"category": "observation", "text": "любой важный факт о пользователе"}
-  ]
-}
-
-КАТЕГОРИИ для entries:
-- pattern — замеченный паттерн поведения (откладывает, делает утром, перевыполняет)
-- strength — проявленная сильная сторона
-- challenge — проблема или сложность
-- preference — выявленное предпочтение
-- motivator — что дало энергию/мотивацию
-- observation — любой важный факт о пользователе
-
-ПРАВИЛА:
-- В entries пиши ТОЛЬКО конкретные факты из СЕГОДНЯШНЕГО дня (2-5 штук)
-- В profile обобщай ВСЕ накопленные знания + новый день
-- Будь конкретен, избегай общих фраз
-- Пиши на русском языке
-- Отвечай ТОЛЬКО JSON без пояснений`
-
-export interface InsightEntryData {
-  category: string
-  text: string
-}
-
-export interface UpdateInsightsResponse {
-  profile: UserInsightsUpdate
-  entries: InsightEntryData[]
-}
+// Экспорт типов для обратной совместимости (импортируются из lib/prompts/insights)
+export type { UserInsightsUpdate, UpdateInsightsRequest, InsightEntryData, UpdateInsightsResponse }
 
 function isUpdateInsightsResponse(obj: unknown): obj is UpdateInsightsResponse {
   if (typeof obj !== 'object' || obj === null) return false
@@ -699,35 +693,10 @@ function normalizeInsightsResponse(raw: UpdateInsightsResponse | UserInsightsUpd
 export async function updateUserInsights(
   request: UpdateInsightsRequest
 ): Promise<UpdateInsightsResponse> {
-  const model = getAiModel()
-  const currentInsightsText = request.currentInsights
-    ? JSON.stringify(request.currentInsights, null, 2)
-    : 'Профиль пока не сформирован'
+  // Простая, часто вызываемая задача — используем FAST-модель
+  const model = getAiModel('fast')
+  const prompt = buildUpdateInsightsPrompt(request)
 
-  const recentDaysText = request.recentDays && request.recentDays.length > 0
-    ? request.recentDays.map(d =>
-        `- ${d.date}: ${d.completedTasks}/${d.planTasks} задач, мечта: ${d.dreamScore}/10, день: ${d.overallScore}/10`
-      ).join('\n')
-    : 'Нет данных'
-
-  const knowledgeCacheText = request.knowledgeCache && request.knowledgeCache.length > 0
-    ? request.knowledgeCache.map(e => `- [${e.date}] (${e.category}) ${e.text}`).join('\n')
-    : 'Пока нет накопленных наблюдений'
-
-  // Sanitize user inputs and use function replacement to avoid double replacement attacks
-  const prompt = UPDATE_INSIGHTS_PROMPT
-    .replace('{current_insights}', () => sanitizeUserInput(currentInsightsText))
-    .replace('{knowledge_cache}', () => sanitizeUserInput(knowledgeCacheText))
-    .replace('{date}', () => sanitizeUserInput(request.date))
-    .replace('{plan_text}', () => sanitizeUserInput(request.planText))
-    .replace('{fact_text}', () => sanitizeUserInput(request.factText))
-    .replace('{overall_score}', () => String(request.overallScore))
-    .replace('{dream_score}', () => String(request.dreamProgressScore))
-    .replace('{feedback}', () => sanitizeUserInput(request.evaluationFeedback))
-    .replace('{recent_days}', () => sanitizeUserInput(recentDaysText))
-    .replace('{evaluation_count}', () => String(request.evaluationCount))
-
-  // Используем Haiku с retry логикой
   const message = await withRetry(async () => {
     return getAnthropicClient().messages.create({
       model,

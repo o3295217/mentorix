@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { encryptionMiddleware } from '@/lib/prisma-encryption'
-import { decrypt, isEncrypted } from '@/lib/encryption'
+import { decrypt, encrypt, isEncrypted } from '@/lib/encryption'
 
 const VALID_KEY = 'b'.repeat(64)
 
@@ -65,5 +65,48 @@ describe('prisma encryption middleware', () => {
       summaryText: 'plain summary',
       keyAchievements: ['script achievement'],
     })
+  })
+
+  it('encrypts and decrypts DailySchedule JSON through DailyEntry relation', async () => {
+    vi.stubEnv('ENCRYPTION_KEY', VALID_KEY)
+
+    const scheduleJson = {
+      version: 1,
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 480,
+      dayEndMinutes: 1080,
+      blocks: [{ id: 'task-1', taskIndex: 1, taskText: 'Sensitive task', startMinutes: 540, durationMinutes: 60 }],
+    }
+
+    const params: Prisma.MiddlewareParams = {
+      model: 'DailySchedule',
+      action: 'create',
+      args: { data: { scheduleJson } },
+      dataPath: [],
+      runInTransaction: false,
+    }
+
+    const result = await encryptionMiddleware(params, async (nextParams) => {
+      const data = nextParams.args.data as Record<string, unknown>
+      expect(isEncrypted(data.scheduleJson as string)).toBe(true)
+      expect(JSON.parse(decrypt(data.scheduleJson as string))).toEqual(scheduleJson)
+
+      return { scheduleJson: data.scheduleJson }
+    })
+
+    expect(result).toEqual({ scheduleJson })
+
+    const relationResult = await encryptionMiddleware(
+      {
+        model: 'DailyEntry',
+        action: 'findFirst',
+        args: { include: { schedule: true } },
+        dataPath: [],
+        runInTransaction: false,
+      },
+      async () => ({ id: 1, schedule: { scheduleJson: encrypt(JSON.stringify(scheduleJson)) } })
+    )
+
+    expect(relationResult).toEqual({ id: 1, schedule: { scheduleJson } })
   })
 })

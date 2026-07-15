@@ -7,7 +7,7 @@ import { formatUserProfile } from './core'
 import { formatHorizon } from '@/lib/dates'
 
 // Расчет качества выполнения за базовый период
-function calculateExecutionQuality(days: DayDataFull[]): ExecutionQuality {
+export function calculateExecutionQuality(days: DayDataFull[]): ExecutionQuality {
   if (days.length === 0) {
     return {
       totalTasksPlanned: 0,
@@ -76,6 +76,24 @@ function calculateExecutionQuality(days: DayDataFull[]): ExecutionQuality {
   }
 }
 
+// Слияние рассчитанных в коде чисел с паттернами, которые вернула модель.
+// Числовые показатели (totalTasksPlanned, completionRate и т.д.) всегда берутся
+// из серверного расчета — модель присылает только "patterns", чтобы не тратить
+// output-токены и не рисковать расхождением чисел.
+export function mergeExecutionQuality(
+  computed: ExecutionQuality,
+  modelPatterns: unknown
+): ExecutionQuality {
+  const patterns = Array.isArray(modelPatterns)
+    ? modelPatterns.filter((p): p is string => typeof p === 'string')
+    : []
+
+  return {
+    ...computed,
+    patterns,
+  }
+}
+
 // Форматирование данных базового периода
 function formatBasePeriodData(days: DayDataFull[], quality: ExecutionQuality): string {
   return `
@@ -99,7 +117,7 @@ ${days.map((d, i) => `
   Факт: ${d.factText.substring(0, 200)}${d.factText.length > 200 ? '...' : ''}
   Задачи: ${d.tasksCompleted}/${d.tasksPlanned} выполнено (стратегических: ${d.strategicCompleted}/${d.strategicTasks})
   Оценки: Dream ${d.dreamProgressScore}/10, Overall ${d.overallScore}/10
-`).join('\\n')}
+`).join('\n')}
 `
 }
 
@@ -137,7 +155,7 @@ ${request.horizonStart && request.horizonEnd ? `Период: ${request.horizonS
 
 ЦЕЛИ ГОРИЗОНТА:
 ${request.horizonGoals.length > 0 
-  ? request.horizonGoals.map((g, i) => `${i + 1}. ${g}`).join('\\n')
+  ? request.horizonGoals.map((g, i) => `${i + 1}. ${g}`).join('\n')
   : 'Цели не указаны'}
 
 ---
@@ -166,11 +184,13 @@ ${request.horizonGoals.length > 0
    - Какой % нужен для достижения вовремя?
    - Что конкретно нужно изменить?
 
-4. ПАТТЕРНЫ ПОВЕДЕНИЯ (3-5 паттернов):
+4. ПАТТЕРНЫ ПОВЕДЕНИЯ (3-5 паттернов, в executionQuality.patterns):
    На основе анализа план/факт:
    - Позитивные паттерны (что работает)
    - Негативные паттерны (что мешает)
    - Рекомендации по каждому
+   ВАЖНО: числовые показатели (totalTasksPlanned, completionRate, avgDreamProgress и т.д.)
+   уже рассчитаны в коде — НЕ включай их в ответ, верни только текстовые паттерны.
 
 5. СЦЕНАРИИ "ЧТО ЕСЛИ" (3-5):
    - Если улучшить выполнение стратегических задач до 80%
@@ -192,15 +212,6 @@ ${request.horizonGoals.length > 0
 ФОРМАТ ОТВЕТА - СТРОГО JSON:
 {
   "executionQuality": {
-    "totalTasksPlanned": ${quality.totalTasksPlanned},
-    "totalTasksCompleted": ${quality.totalTasksCompleted},
-    "completionRate": ${quality.completionRate},
-    "strategicTasksPlanned": ${quality.strategicTasksPlanned},
-    "strategicTasksCompleted": ${quality.strategicTasksCompleted},
-    "strategicCompletionRate": ${quality.strategicCompletionRate},
-    "avgDreamProgress": ${quality.avgDreamProgress.toFixed(1)},
-    "avgOverallScore": ${quality.avgOverallScore.toFixed(1)},
-    "trend": "${quality.trend}",
     "patterns": ["паттерн 1 из анализа", "паттерн 2", ...]
   },
   "behaviorPatterns": [

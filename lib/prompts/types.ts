@@ -49,9 +49,9 @@ export interface AlignmentChain {
 }
 
 export interface BalanceFlags {
-  health: 'норма' | 'внимание' | 'критично'
-  family: 'норма' | 'внимание' | 'критично'
-  energy: 'норма' | 'внимание' | 'критично'
+  health: 'ok' | 'warning' | 'critical'
+  family: 'ok' | 'warning' | 'critical'
+  energy: 'ok' | 'warning' | 'critical'
 }
 
 export interface HorizontalAlignment {

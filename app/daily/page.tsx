@@ -5,11 +5,17 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-f
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { useDaily } from '@/hooks/useDaily'
+import { useDailySchedule } from '@/hooks/daily/useDailySchedule'
+import DayTimeline from '@/components/daily/DayTimeline'
+import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalCard'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskPostponeIcon, TaskRepeatIcon } from '@/components/icons'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 import { areTasksSimilar } from '@/lib/task-match'
-import { fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
+import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
+import type { DailySchedule } from '@/lib/daily-schedule'
+import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
+import type { ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
@@ -17,6 +23,12 @@ type FactItem = { id: number; text: string; type: string; category: string | nul
 
 const taskActionButtonBase = 'flex h-8 w-8 items-center justify-center rounded-md border transition-colors'
 const confirmButtonBase = 'flex h-7 w-7 items-center justify-center rounded-md text-sm leading-none transition-colors'
+
+function getLocalTimeHHMM(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
 
 function getNextDateKey(dateKey: string) {
   const date = new Date(`${dateKey}T00:00:00`)
@@ -42,6 +54,12 @@ type FactsResponse = {
   stats: { total: number }
 }
 
+type ApplyProposalResponse = {
+  schedule: DailySchedule | null
+  updatedAt: string | null
+  status?: string
+}
+
 export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -50,8 +68,10 @@ export default function DailyPage() {
   const habitEditorRef = useRef<HTMLDivElement | null>(null)
   const tasksContainerRef = useRef<HTMLDivElement | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [currentTime, setCurrentTime] = useState<string | null>(null)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
+  const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null)
 
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
@@ -201,6 +221,7 @@ export default function DailyPage() {
     sendChatMessage,
     sendingChat,
     clearChat,
+    markChatProposalApplied,
     addTask,
     addExtraTask,
     removeExtraTask,
@@ -235,6 +256,108 @@ export default function DailyPage() {
     updateHabit,
     deleteHabit,
   } = useDaily()
+
+  const hasStreamingAssistantResponse = sendingChat
+    && chatMessages.some((msg, index) => (
+      index === chatMessages.length - 1
+      && msg.role === 'assistant'
+      && msg.content.trim().length > 0
+    ))
+
+  // Refs для timeline-хука: нужно актуальное состояние внутри async-колбэков.
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges)
+  hasUnsavedChangesRef.current = hasUnsavedChanges
+  const dailyEntryRef = useRef(dailyEntry)
+  dailyEntryRef.current = dailyEntry
+  const savePlanRef = useRef(savePlan)
+  savePlanRef.current = savePlan
+
+  // Таймзона браузера (для записи в DailySchedule.timezone при auto-layout).
+  const scheduleTimezone = useMemo(() => {
+    if (typeof window === 'undefined') return 'UTC'
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    } catch {
+      return 'UTC'
+    }
+  }, [])
+
+  // Сохранить план существующим способом перед входом в режим расписания.
+  const ensureEntrySaved = useCallback(async () => {
+    if (dailyEntryRef.current?.id && !hasUnsavedChangesRef.current) return true
+    return savePlanRef.current()
+  }, [])
+
+  const {
+    mode: scheduleMode,
+    isEntering: scheduleEntering,
+    isExiting: scheduleExiting,
+    enterTimeline,
+    exitTimeline,
+    schedule,
+    unscheduledTaskIndexes,
+    isLoading: scheduleLoading,
+    isSaving: scheduleSaving,
+    error: scheduleError,
+    isDirty: scheduleDirty,
+    setBlockRange,
+    moveBlockByStep,
+    removeBlock,
+    scheduleUnscheduledTask,
+    applySavedSchedule,
+    appliedAnimationKey,
+  } = useDailySchedule({
+    selectedDate,
+    tasks,
+    timezone: scheduleTimezone,
+    ensureEntrySaved,
+    showMessage,
+  })
+
+  const handleEnterTimeline = useCallback(() => {
+    void enterTimeline()
+  }, [enterTimeline])
+
+  const handleExitTimeline = useCallback(() => {
+    void exitTimeline()
+  }, [exitTimeline])
+
+  const handleApplyProposal = useCallback(async (
+    messageId: string | undefined,
+    metadata: NonNullable<(typeof chatMessages)[number]['metadata']>,
+    options: ProposalApplyOptions,
+  ) => {
+    if (!messageId || applyingProposalId) return
+    setApplyingProposalId(messageId)
+    try {
+      const saved = await ensureEntrySaved()
+      if (!saved) {
+        throw new Error('Сначала сохраните текущий план, чтобы расписание совпало со списком задач')
+      }
+
+      const response = await fetchJson<ApplyProposalResponse>('/api/daily/schedule/apply-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          messageId,
+          confirmed: options.confirmed,
+          replaceExisting: options.replaceExisting,
+          expectedCurrentScheduleHash: metadata.currentScheduleHash,
+        }),
+      })
+      if (!response.schedule) throw new Error('Сервер не вернул расписание')
+      applySavedSchedule(response.schedule)
+      markChatProposalApplied(messageId, new Date().toISOString())
+    } catch (error) {
+      if (error instanceof FetchJsonError && error.status === 409) {
+        throw new Error('Расписание уже изменилось. Обновите чат или попросите ассистента собрать новый вариант.')
+      }
+      throw new Error(getFetchErrorMessage(error, 'не удалось применить расписание'))
+    } finally {
+      setApplyingProposalId(null)
+    }
+  }, [applyingProposalId, applySavedSchedule, ensureEntrySaved, markChatProposalApplied, selectedDate])
 
   // Список текстов выполненных задач для проверки целей
   const completedTaskTexts = useMemo(() => {
@@ -527,6 +650,26 @@ export default function DailyPage() {
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    let timeoutId: number | undefined
+
+    const updateClock = () => {
+      const now = new Date()
+      setCurrentTime(getLocalTimeHHMM(now))
+
+      const millisecondsToNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds())
+      timeoutId = window.setTimeout(updateClock, Math.min(millisecondsToNextMinute + 50, 60000))
+    }
+
+    updateClock()
+
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [])
+
   // Загрузка фактов недели и месяца относительно выбранной даты
   useEffect(() => {
     (async () => {
@@ -730,21 +873,70 @@ export default function DailyPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Plan - Left (60%) */}
         <div className="lg:col-span-3 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
-          <div className="flex items-center justify-between mb-4 flex-shrink-0 pr-6">
-            <h2 className="text-xl font-bold">План на день</h2>
-            {totalCount > 0 && (
-              <span className={`text-sm px-3 py-1 rounded-full ${
-                completionPercent === 100 ? 'bg-green-500/15 text-green-400' :
-                completionPercent >= 50 ? 'bg-yellow-500/15 text-yellow-400' :
-                'bg-gray-800 text-gray-400'
-              }`}>
-                {completedCount}/{totalCount} ({completionPercent}%)
-                {extraDoneCount > 0 && ` +${extraDoneCount}`}
+          <div className="mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 pr-6 sm:items-center">
+            <div className="flex flex-shrink-0 items-baseline gap-3">
+              <h2 className="text-xl font-bold">План на день</h2>
+              <span
+                className="inline-flex min-w-[4.75rem] items-center gap-1.5 rounded-full border border-gray-700/70 bg-gray-900/50 px-2.5 py-1 text-sm font-medium tabular-nums leading-none text-gray-300"
+                aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
+                title={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
+              >
+                <svg
+                  className="h-3.5 w-3.5 flex-shrink-0 text-gray-500"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M10 5.8V10l2.8 1.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className={currentTime ? 'text-gray-300' : 'text-transparent'} suppressHydrationWarning>
+                  {currentTime ?? '00:00'}
+                </span>
               </span>
-            )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+              {scheduleMode === 'list' && totalCount > 0 && (
+                <span className={`text-sm px-3 py-1 rounded-full ${
+                  completionPercent === 100 ? 'bg-green-500/15 text-green-400' :
+                  completionPercent >= 50 ? 'bg-yellow-500/15 text-yellow-400' :
+                  'bg-gray-800 text-gray-400'
+                }`}>
+                  {completedCount}/{totalCount} ({completionPercent}%)
+                  {extraDoneCount > 0 && ` +${extraDoneCount}`}
+                </span>
+              )}
+              {scheduleMode === 'list' && (
+                <button
+                  type="button"
+                  onClick={handleEnterTimeline}
+                  disabled={tasks.length === 0 || scheduleEntering || scheduleLoading}
+                  title={
+                    tasks.length === 0
+                      ? 'Добавьте хотя бы одну задачу в план, чтобы расписать день по времени'
+                      : 'Разместить задачи на временной шкале 06:00–24:00'
+                  }
+                  className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {scheduleEntering || scheduleLoading ? 'Открываю…' : 'Расписать по времени'}
+                </button>
+              )}
+              {scheduleMode === 'timeline' && (
+                <button
+                  type="button"
+                  onClick={handleExitTimeline}
+                  disabled={scheduleExiting}
+                  className="btn-secondary text-sm"
+                >
+                  {scheduleExiting ? 'Сохраняю…' : '← Назад к списку'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Добавление новой задачи */}
+          {scheduleMode === 'list' ? (
+            <>
           <div className="mb-4 flex gap-2 items-start flex-shrink-0 pr-6">
             <textarea
               ref={newTaskTextareaRef}
@@ -1548,6 +1740,33 @@ export default function DailyPage() {
               )}
             </div>
           </div>
+            </>
+          ) : scheduleMode === 'timeline' ? (
+            schedule ? (
+              <DayTimeline
+                schedule={schedule}
+                tasks={tasks}
+                selectedTasks={selectedTasks}
+                unscheduledTaskIndexes={unscheduledTaskIndexes}
+                isSaving={scheduleSaving}
+                isDirty={scheduleDirty}
+                error={scheduleError}
+                onSetBlockRange={setBlockRange}
+                onMoveBlock={moveBlockByStep}
+                onRemoveBlock={removeBlock}
+                onScheduleUnscheduled={scheduleUnscheduledTask}
+                appliedAnimationKey={appliedAnimationKey}
+              />
+            ) : scheduleLoading ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+                Загрузка расписания…
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+                Не удалось загрузить расписание.
+              </div>
+            )
+          ) : null}
         </div>
 
         {/* Chat - Right (40%) */}
@@ -1606,7 +1825,7 @@ export default function DailyPage() {
             ) : (
               chatMessages.map((msg, index) => (
                 <div
-                  key={index}
+                  key={msg.id ?? index}
                   className={msg.role === 'user'
                     ? 'flex justify-end'
                     : ''
@@ -1620,12 +1839,20 @@ export default function DailyPage() {
                     <div className="py-1">
                       <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
                       <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
+                      {msg.metadata?.type === 'daily_schedule_proposal' && (
+                        <DailyScheduleProposalCard
+                          metadata={msg.metadata}
+                          messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}
+                          isApplying={applyingProposalId === msg.id}
+                          onApply={(options) => handleApplyProposal(msg.id, msg.metadata!, options)}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
               ))
             )}
-            {sendingChat && (
+            {sendingChat && !hasStreamingAssistantResponse && (
               <div className="py-1">
                 <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
                 <span className="text-sm text-gray-500">печатает...</span>

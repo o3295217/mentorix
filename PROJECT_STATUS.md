@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-06-22**
+> Последнее обновление: **2026-07-15**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (53)
+## API Endpoints (55)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -54,6 +54,8 @@
 | `/api/daily/chat/messages` | GET, POST, DELETE |
 | `/api/daily/check-plan` | POST |
 | `/api/daily/indicators` | GET |
+| `/api/daily/schedule` | GET, PUT |
+| `/api/daily/schedule/apply-proposal` | POST |
 | `/api/evaluate` | POST |
 | `/api/evaluate/batch` | GET, POST |
 | `/api/evaluate-period` | POST |
@@ -91,7 +93,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (33)
+## Компоненты (35)
 
 - `AuthGuard`
 - `AuthProvider`
@@ -106,6 +108,8 @@
 - `Speedometer`
 - `ThemeProvider`
 - `UncompletedTasksModal`
+- `daily/DailyScheduleProposalCard`
+- `daily/DayTimeline`
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`
@@ -127,7 +131,7 @@
 - `landing/TrustSection`
 - `landing/data`
 
-## Модели БД (28)
+## Модели БД (29)
 
 ### User
 | Поле | Тип |
@@ -273,6 +277,17 @@
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
 | evaluation | `Evaluation?` |
+| schedule | `DailySchedule?` |
+
+### DailySchedule
+| Поле | Тип |
+|------|-----|
+| id | `Int` |
+| dailyEntryId | `Int` |
+| dailyEntry | `DailyEntry` |
+| scheduleJson | `Json` |
+| createdAt | `DateTime` |
+| updatedAt | `DateTime` |
 
 ### Evaluation
 | Поле | Тип |
@@ -541,6 +556,7 @@
 | date | `String` |
 | role | `String` |
 | content | `String` |
+| metadataJson | `Json?` |
 | createdAt | `DateTime` |
 
 ### PlanningProfile

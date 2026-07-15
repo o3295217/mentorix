@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { safeParseProposalMetadata } from '@/lib/daily-schedule-proposal'
 
 const ALLOWED_CHAT_ROLES = new Set(['user', 'assistant'])
 
@@ -26,11 +27,16 @@ export async function GET(request: NextRequest) {
         id: true,
         role: true,
         content: true,
+        metadataJson: true,
         createdAt: true,
       },
     })
 
-    return NextResponse.json({ messages })
+    return NextResponse.json({ messages: messages.map(message => ({
+      ...message,
+      metadata: safeParseProposalMetadata(message.metadataJson),
+      metadataJson: undefined,
+    })) })
   } catch (error) {
     console.error('Error fetching chat messages:', error)
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })

@@ -33,12 +33,63 @@ function formatDaysData(days: DayData[]): string {
     .join('\n')
 }
 
+// Средние показатели за период (рассчитаны в коде, а не моделью)
+export interface PeriodAverages {
+  avgDreamProgress: number
+  avgOverall: number
+  avgStrategicFocus: number
+  avgProductivity: number
+  avgLifeBalance: number
+  avgDiscipline: number
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10
+}
+
+export function calculatePeriodAverages(days: DayData[]): PeriodAverages {
+  if (days.length === 0) {
+    return {
+      avgDreamProgress: 0,
+      avgOverall: 0,
+      avgStrategicFocus: 0,
+      avgProductivity: 0,
+      avgLifeBalance: 0,
+      avgDiscipline: 0,
+    }
+  }
+
+  const sumOf = (fn: (d: DayData) => number) =>
+    days.reduce((acc, d) => acc + fn(d), 0)
+
+  return {
+    avgDreamProgress: round1(sumOf(d => d.dreamProgressScore) / days.length),
+    avgOverall: round1(sumOf(d => d.overallScore) / days.length),
+    avgStrategicFocus: round1(sumOf(d => d.strategicFocusScore) / days.length),
+    avgProductivity: round1(sumOf(d => d.productivityScore) / days.length),
+    avgLifeBalance: round1(sumOf(d => d.lifeBalanceScore) / days.length),
+    avgDiscipline: round1(sumOf(d => d.disciplineScore) / days.length),
+  }
+}
+
+function formatAveragesBlock(avg: PeriodAverages): string {
+  return `📐 СРЕДНИЕ ПОКАЗАТЕЛИ (уже рассчитаны, используй эти числа):
+- dreamProgressScore (среднее) → dreamProgressScore: ${avg.avgDreamProgress}
+- overallScore (среднее) → overallScore: ${avg.avgOverall}
+- strategicFocusScore (среднее) → professionalBlock.strategyAvg: ${avg.avgStrategicFocus}
+- productivityScore (среднее) → professionalBlock.operationsAvg: ${avg.avgProductivity}
+- disciplineScore (среднее) → professionalBlock.teamAvg: ${avg.avgDiscipline}
+- lifeBalanceScore (среднее, ориентир для balanceBlock.workLifeBalance): ${avg.avgLifeBalance}`
+}
+
 // Построение промпта для периодической оценки
 export function buildPeriodEvaluationPrompt(
   request: PeriodEvaluationRequest
 ): string {
   const userProfileSection = formatUserProfile(request.userProfile)
   const daysData = formatDaysData(request.days)
+  const averages = calculatePeriodAverages(request.days)
+  const averagesBlock = formatAveragesBlock(averages)
 
   const template = determinePeriodTemplate(
     new Date(request.periodStart),
@@ -74,29 +125,32 @@ ${daysData}
 
 ---
 
+${averagesBlock}
+
+---
+
 ИНСТРУКЦИИ ДЛЯ ${instructionsMap[template].toUpperCase()}:
 
-1. РАССЧИТАЙ СРЕДНИЕ ПОКАЗАТЕЛИ:
-   - Средний dreamProgressScore
-   - Средний overallScore
-   - Средние по каждому показателю (strategicFocus, productivity, lifeBalance, discipline)
+1. ИСПОЛЬЗУЙ ПРЕДОСТАВЛЕННЫЕ СРЕДНИЕ ПОКАЗАТЕЛИ (см. блок выше) — они уже рассчитаны в коде,
+   не пересчитывай их заново и не давай других чисел вместо них.
 
 2. АНАЛИЗ ПРОФЕССИОНАЛЬНОГО БЛОКА:
-   - Стратегический фокус (средний strategicFocusScore)
-   - Продуктивность (средний productivityScore)
-   - Дисциплина (средний disciplineScore)
+   - strategyAvg = среднее strategicFocusScore (бери из блока средних показателей)
+   - operationsAvg = среднее productivityScore (бери из блока средних показателей)
+   - teamAvg = среднее disciplineScore (бери из блока средних показателей)
    - Общий анализ: что работало, что нет
 
 3. АНАЛИЗ ЛИЧНОГО БЛОКА:
    - Здоровье: анализ healthFlag, сон, энергия (оценка 1-10)
    - Семья: анализ familyFlag, время с близкими (оценка 1-10)
    - Энергия: анализ energyFlag, восстановление (оценка 1-10)
-   - Баланс жизни (средний lifeBalanceScore)
+   - Баланс жизни (среднее lifeBalanceScore из блока средних показателей)
    - Что угрожает балансу
 
 4. АНАЛИЗ СОЦИАЛЬНОГО БЛОКА:
-   - Взаимодействие с людьми (оценка 1-10)
-   - Нетворкинг, командная работа
+   - В данных нет информации о нетворкинге и командном взаимодействии — НЕ придумывай её
+   - teamworkScore ставь консервативно (не выше среднего по professionalBlock)
+   - В analysis честно напиши "недостаточно данных для точной оценки"
 
 5. БАЛАНС И РИСКИ:
    - Work-Life Balance (оценка 1-10)
@@ -116,12 +170,12 @@ ${daysData}
    - Описание трендов
 
 8. ВЫПОЛНЕНИЕ ЦЕЛЕЙ ПЕРИОДА:
-   - Сколько всего целей было
-   - Сколько выполнено (анализируй план/факт)
-   - Сколько в процессе
-   - Сколько не начато
+   - Текстов плана/факта по дням в данных НЕТ — оценивай выполнение целей косвенно,
+     по списку целей периода и по средним скорам/трендам
+   - Сколько всего целей было (из списка целей периода)
+   - Оцени консервативно: сколько похоже на выполненные, сколько в процессе, сколько не начато
    - % выполнения
-   - Анализ: почему выполнено/не выполнено
+   - В analysis честно укажи, что оценка приблизительная из-за отсутствия данных план/факт по целям
 
 9. ALIGNMENT (вертикальный):
    - Работают ли дни на цели периода
@@ -150,12 +204,12 @@ ${daysData}
 
 ФОРМАТ ОТВЕТА - СТРОГО JSON:
 {
-  "dreamProgressScore": число (среднее),
-  "overallScore": число (среднее),
+  "dreamProgressScore": число (среднее — возьми из блока СРЕДНИЕ ПОКАЗАТЕЛИ выше),
+  "overallScore": число (среднее — возьми из блока СРЕДНИЕ ПОКАЗАТЕЛИ выше),
   "professionalBlock": {
-    "strategyAvg": число,
-    "operationsAvg": число,
-    "teamAvg": число,
+    "strategyAvg": число (среднее strategicFocusScore из блока СРЕДНИЕ ПОКАЗАТЕЛИ),
+    "operationsAvg": число (среднее productivityScore из блока СРЕДНИЕ ПОКАЗАТЕЛИ),
+    "teamAvg": число (среднее disciplineScore из блока СРЕДНИЕ ПОКАЗАТЕЛИ),
     "analysis": "анализ профессионального блока"
   },
   "personalBlock": {
@@ -165,8 +219,8 @@ ${daysData}
     "analysis": "анализ личного блока"
   },
   "socialBlock": {
-    "teamworkScore": число 1-10,
-    "analysis": "анализ социального блока"
+    "teamworkScore": число 1-10 (консервативно, данных о нетворкинге/команде нет),
+    "analysis": "честно укажи 'недостаточно данных для точной оценки', если данных нет"
   },
   "balanceBlock": {
     "workLifeBalance": число 1-10,

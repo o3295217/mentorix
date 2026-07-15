@@ -12,7 +12,7 @@ import {
 } from '@/lib/prompts/check-plan'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
-import { DEFAULT_ROUTE_AI_MODEL, getAiModel, getAnthropicClient } from '@/lib/anthropic'
+import { getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { getPlanUserContext } from '@/lib/user-context'
 
 const CheckPlanSchema = z.object({
@@ -101,7 +101,8 @@ export async function POST(request: NextRequest) {
 
     // Вызов Claude API
     const startTime = Date.now()
-    const model = getAiModel(DEFAULT_ROUTE_AI_MODEL)
+    // Проверка плана дня — частая простая задача, используем FAST-модель
+    const model = getAiModel('fast')
     const message = await getAnthropicClient().messages.create({
       model,
       max_tokens: 1024,

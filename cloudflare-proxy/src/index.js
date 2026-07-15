@@ -69,6 +69,54 @@ function getAnthropicApiUrl(env) {
   return rawUrl.replace(/\/+$/, '') || DEFAULT_ANTHROPIC_API_URL;
 }
 
+function copyResponseHeaders(sourceHeaders, extraHeaders = {}) {
+  const headers = new Headers();
+  for (const [key, value] of sourceHeaders.entries()) {
+    headers.set(key, value);
+  }
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    headers.set(key, value);
+  }
+  return headers;
+}
+
+export function buildAnthropicHeaders(request) {
+  const headers = new Headers();
+  const apiKey = request.headers.get('x-api-key');
+  if (apiKey) headers.set('x-api-key', apiKey);
+  const anthropicVersion = request.headers.get('anthropic-version');
+  if (anthropicVersion) headers.set('anthropic-version', anthropicVersion);
+  headers.set('content-type', request.headers.get('content-type') || 'application/json');
+  const anthropicBeta = request.headers.get('anthropic-beta');
+  if (anthropicBeta) headers.set('anthropic-beta', anthropicBeta);
+  return headers;
+}
+
+export async function proxyAnthropicRequest(request, env, fetchImpl = fetch) {
+  const url = new URL(request.url);
+  const anthropicUrl = getAnthropicApiUrl(env) + url.pathname + url.search;
+
+  return fetchImpl(anthropicUrl, {
+    method: request.method,
+    headers: request.headers,
+    body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+    duplex: 'half',
+  });
+}
+
+export async function proxyViaDurableObject(request, env) {
+  const url = new URL(request.url);
+  const id = env.ANTHROPIC_PROXY.idFromName('proxy-singleton');
+  const stub = env.ANTHROPIC_PROXY.get(id, { locationHint: 'wnam' });
+
+  return stub.fetch(new Request(`https://do-internal${url.pathname}${url.search}`, {
+    method: request.method,
+    headers: buildAnthropicHeaders(request),
+    body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+    duplex: 'half',
+  }));
+}
+
 async function checkRateLimit(request, env, namespace) {
   if (!env.RATE_LIMITER) {
     return { allowed: false, retryAfter: 60, error: 'Rate limiter not configured' };
@@ -134,29 +182,11 @@ export class AnthropicProxyDO {
   }
 
   async fetch(request) {
-    const { method, pathname, search, headers: headersList, body } = await request.json();
-
-    const cleanHeaders = new Headers();
-    for (const [key, value] of Object.entries(headersList)) {
-      cleanHeaders.set(key, value);
-    }
-
-    const anthropicUrl = getAnthropicApiUrl(this.env) + pathname + (search || '');
-
-    const response = await fetch(anthropicUrl, {
-      method,
-      headers: cleanHeaders,
-      body: body || undefined,
-    });
-
-    const responseBody = await response.text();
-    return new Response(JSON.stringify({
+    const response = await proxyAnthropicRequest(request, this.env);
+    return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseBody,
-    }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: response.headers,
     });
   }
 }
@@ -215,53 +245,14 @@ export default {
       );
     }
 
-    // Собираем заголовки для Anthropic
-    const headersList = {};
-    const apiKey = request.headers.get('x-api-key');
-    if (apiKey) headersList['x-api-key'] = apiKey;
-    const anthropicVersion = request.headers.get('anthropic-version');
-    if (anthropicVersion) headersList['anthropic-version'] = anthropicVersion;
-    headersList['content-type'] = 'application/json';
-    const anthropicBeta = request.headers.get('anthropic-beta');
-    if (anthropicBeta) headersList['anthropic-beta'] = anthropicBeta;
-
-    // Читаем тело
-    let body = null;
-    if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
-      body = await request.text();
-    }
-
     try {
       // Вызываем Durable Object с location hint "wnam" (Western North America)
-      const id = env.ANTHROPIC_PROXY.idFromName('proxy-singleton');
-      const stub = env.ANTHROPIC_PROXY.get(id, { locationHint: 'wnam' });
+      const doResponse = await proxyViaDurableObject(request, env);
+      const responseHeaders = copyResponseHeaders(doResponse.headers, corsHeaders);
 
-      const doResponse = await stub.fetch(new Request('https://do-internal/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          method: request.method,
-          pathname: url.pathname,
-          search: url.search,
-          headers: headersList,
-          body: body,
-        }),
-      }));
-
-      const result = await doResponse.json();
-
-      // Формируем ответ клиенту
-      const responseHeaders = new Headers();
-      for (const [key, value] of Object.entries(result.headers || {})) {
-        responseHeaders.set(key, value);
-      }
-      for (const [key, value] of Object.entries(corsHeaders)) {
-        responseHeaders.set(key, value);
-      }
-
-      return new Response(result.body, {
-        status: result.status,
-        statusText: result.statusText,
+      return new Response(doResponse.body, {
+        status: doResponse.status,
+        statusText: doResponse.statusText,
         headers: responseHeaders,
       });
     } catch (error) {

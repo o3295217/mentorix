@@ -34,6 +34,7 @@ const ENCRYPTED_FIELDS = {
   periodGoal: ['goalsJson'],
   goal: ['text', 'historyJson'],
   dailyEntry: ['planText', 'factText', 'planSnapshotJson', 'extraTasksJson', 'emotionalState', 'physicalState', 'lifeEvents', 'externalFactors', 'selectedTasksJson'],
+  dailySchedule: ['scheduleJson'],
   evaluation: ['feedbackText', 'planVsFactText', 'alignmentDayWeek', 'alignmentWeekMonth', 'alignmentMonthQuarter', 'alignmentQuarterHalf', 'alignmentHalfYear', 'alignmentYearDream', 'healthFlag', 'familyFlag', 'energyFlag', 'workHealthAlignment', 'workFamilyAlignment', 'workValuesAlignment', 'recommendationsText', 'suggestedTasksJson'],
   openTask: ['taskText'],
   userProfile: ['name', 'occupation', 'industry', 'maritalStatus', 'hobbies', 'sports', 'location', 'customInterests', 'education', 'workExperience', 'values', 'challenges', 'other'],
@@ -47,8 +48,19 @@ const ENCRYPTED_FIELDS = {
   insightEntry: ['text'],
   completedWork: ['text'],
   workSummary: ['summaryText', 'keyAchievements'],
-  chatMessage: ['content'],
+  chatMessage: ['content', 'metadataJson'],
   planningProfile: ['constraints'],
+};
+
+const ENCRYPTED_JSON_FIELDS = {
+  yearGoal: ['goalsJson'],
+  periodGoal: ['goalsJson'],
+  goal: ['historyJson'],
+  dailyEntry: ['planSnapshotJson', 'extraTasksJson', 'selectedTasksJson'],
+  dailySchedule: ['scheduleJson'],
+  evaluation: ['suggestedTasksJson'],
+  workSummary: ['keyAchievements'],
+  chatMessage: ['metadataJson'],
 };
 
 const prisma = new PrismaClient();
@@ -63,10 +75,13 @@ async function migrateModel(modelName, fields) {
   let enc = 0, skip = 0;
   for (const record of records) {
     const updates = {};
+    const jsonFields = new Set(ENCRYPTED_JSON_FIELDS[modelName] || []);
     for (const field of fields) {
       const v = record[field];
       if (typeof v === 'string' && v.length > 0 && !isEncrypted(v)) {
         updates[field] = encrypt(v);
+      } else if (jsonFields.has(field) && v !== null && v !== undefined && typeof v !== 'string') {
+        updates[field] = encrypt(JSON.stringify(v));
       }
     }
     if (Object.keys(updates).length > 0) {
