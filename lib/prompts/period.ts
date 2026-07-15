@@ -2,7 +2,7 @@ import {
   PeriodEvaluationRequest,
   DayData,
 } from './types'
-import { formatUserProfile, getDreamHorizonLabel } from './core'
+import { formatUserProfile, getDreamHorizonLabel, NO_EMOJI_OUTPUT_RULE } from './core'
 
 // Определение типа периода на основе длительности
 export function determinePeriodTemplate(
@@ -130,6 +130,8 @@ ${averagesBlock}
 ---
 
 ИНСТРУКЦИИ ДЛЯ ${instructionsMap[template].toUpperCase()}:
+
+${NO_EMOJI_OUTPUT_RULE}
 
 1. ИСПОЛЬЗУЙ ПРЕДОСТАВЛЕННЫЕ СРЕДНИЕ ПОКАЗАТЕЛИ (см. блок выше) — они уже рассчитаны в коде,
    не пересчитывай их заново и не давай других чисел вместо них.

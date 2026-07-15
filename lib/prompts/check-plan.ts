@@ -1,5 +1,5 @@
 import { UserProfile } from './types'
-import { formatUserProfile } from './core'
+import { formatUserProfile, NO_EMOJI_OUTPUT_RULE } from './core'
 
 // Профиль понимания пользователя
 export interface UserInsights {
@@ -52,6 +52,8 @@ export const CHECK_PLAN_SYSTEM_PROMPT = `Ты ИИ-помощник в план�
 3. Не перегружают день
 
 📋 ЧТО ТЫ ДЕЛАЕШЬ:
+
+${NO_EMOJI_OUTPUT_RULE}
 
 1. АНАЛИЗИРУЕШЬ ПЛАН:
    - Сколько задач уже есть

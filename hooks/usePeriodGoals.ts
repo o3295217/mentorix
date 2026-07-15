@@ -29,7 +29,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
       return Array.isArray(data?.years) ? data.years : []
     } catch (error) {
       console.error('Error loading year goal years:', error)
-      showMessage('❌ Ошибка загрузки истории по годам')
+      showMessage('Ошибка загрузки истории по годам')
       return []
     }
   }, [showMessage])
@@ -45,7 +45,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
       setYearGoals(prev => new Map(prev).set(year, goals))
     } catch (error) {
       console.error(`Error loading goals for ${year}:`, error)
-      showMessage(`❌ Ошибка загрузки целей на ${year} год`)
+      showMessage(`Ошибка загрузки целей на ${year} год`)
     }
   }, [showMessage])
 
@@ -61,10 +61,10 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
         typeof g === 'string' ? { id: `yg_${Math.random().toString(36).slice(2, 8)}`, text: g } : g
       )
       setYearGoals(prev => new Map(prev).set(year, saved))
-      showMessage(`✅ Цели на ${year} год сохранены!`)
+      showMessage(`Цели на ${year} год сохранены!`)
     } catch (error) {
       console.error(`Error saving goals for ${year}:`, error)
-      showMessage('❌ Ошибка при сохранении')
+      showMessage('Ошибка при сохранении')
     }
   }, [showMessage])
 
@@ -145,7 +145,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
       }
     } catch (error) {
       console.error(`Error loading period goals:`, error)
-      showMessage('❌ Ошибка загрузки целей периода')
+      showMessage('Ошибка загрузки целей периода')
     }
   }, [showMessage])
 
@@ -204,10 +204,10 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
       if (periodKey) {
         setPeriodGoals(prev => new Map(prev).set(periodKey, goals))
       }
-      showMessage(`✅ ${label} сохранён`)
+      showMessage(`${label} сохранён`)
     } catch (error) {
       console.error(`Error saving period goals:`, error)
-      showMessage('❌ Ошибка при сохранении')
+      showMessage('Ошибка при сохранении')
     }
   }, [showMessage])
 

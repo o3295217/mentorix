@@ -13,7 +13,7 @@ export function useDreamGoal(showMessage: (text: string) => void) {
       if (data) setDreamGoal(data)
     } catch (error) {
       console.error('Error loading dream:', error)
-      showMessage('❌ Ошибка загрузки мечты')
+      showMessage('Ошибка загрузки мечты')
     }
   }, [showMessage])
 
@@ -26,10 +26,10 @@ export function useDreamGoal(showMessage: (text: string) => void) {
       })
       const data = await res.json()
       setDreamGoal(data)
-      showMessage('✅ Мечта сохранена!')
+      showMessage('Мечта сохранена')
     } catch (error) {
       console.error('Error saving dream:', error)
-      showMessage('❌ Ошибка сохранения')
+      showMessage('Ошибка сохранения')
     }
   }, [showMessage])
 

@@ -441,8 +441,11 @@ export default function WeekCard({
                         ) : null
                       })()}
                       {goalDeadline && (
-                        <div className={`text-xs mt-0.5 ${isDeadlineOverdue ? 'text-red-400 font-medium' : 'text-slate-500'}`}>
-                          ⏰ {parseDateParam(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                        <div className={`inline-flex items-center gap-1.5 text-xs mt-0.5 ${isDeadlineOverdue ? 'text-red-400 font-medium' : 'text-slate-500'}`}>
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 3v3m10-3v3M4.5 9.5h15M6 5h12a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z" />
+                          </svg>
+                          <span>{parseDateParam(goalDeadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
                         </div>
                       )}
                       {/* Теги цели */}
@@ -479,11 +482,18 @@ export default function WeekCard({
                       e.stopPropagation()
                       if (!isProcessing) onSetGoalPriority(weekKey, goal, parseInt(e.target.value))
                     }}
-                    className={`text-xs px-1 py-0.5 border border-slate-700 rounded bg-slate-900 text-slate-300 ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                    aria-label="Приоритет цели"
+                    className={`text-xs px-2 py-0.5 border rounded bg-slate-900 ${
+                      goalPriority >= 2
+                        ? 'border-red-500/40 text-red-300'
+                        : goalPriority === 1
+                          ? 'border-amber-500/40 text-amber-300'
+                          : 'border-slate-700 text-slate-300'
+                    } ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                   >
-                    <option value="0">⚪</option>
-                    <option value="1">🟡</option>
-                    <option value="2">🔴</option>
+                    <option value="0">Без приоритета</option>
+                    <option value="1">Средний</option>
+                    <option value="2">Высокий</option>
                   </select>
                   <button
                     draggable={false}

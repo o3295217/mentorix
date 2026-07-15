@@ -64,7 +64,7 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
       case 'transfer': return `→ ${format(new Date(action.date), 'd MMM', { locale: ru })}`
       case 'backlog': return ' В задачи'
       case 'completed': return ' Выполнено'
-      case 'skip': return '⏭ Пропустить'
+      case 'skip': return 'Пропустить'
     }
   }
 
@@ -159,7 +159,7 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
                   onClick={() => setAction(task.id, { type: 'skip' })}
                   className={`text-xs px-2 py-1 rounded transition ${ decisions[task.id]?.type === 'skip' ? 'bg-gray-500 text-white' : 'bg-gray-700 text-gray-300 bg-gray-600 hover:bg-gray-500'}`}
                 >
-                  ⏭ Пропустить
+                  Пропустить
                 </button>
               </div>
 

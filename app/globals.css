@@ -122,6 +122,35 @@
     @apply bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 font-medium py-2 px-4 rounded-xl transition-colors;
   }
 
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500;
+  }
+
+  .feedback-block {
+    @apply relative rounded-xl border border-gray-800 bg-gray-950/40 p-4 pl-5;
+  }
+
+  .feedback-block::before {
+    content: '';
+    @apply absolute bottom-4 left-0 top-4 w-px rounded-full bg-gray-600;
+  }
+
+  .feedback-block-primary::before {
+    @apply bg-purple-400;
+  }
+
+  .feedback-block-success::before {
+    @apply bg-green-400;
+  }
+
+  .feedback-block-warning::before {
+    @apply bg-orange-400;
+  }
+
+  .status-dot {
+    @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-inset ring-white/10;
+  }
+
   .input {
     @apply w-full px-4 py-2 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-900 text-gray-100 placeholder-gray-500;
   }
@@ -780,6 +809,5 @@
   33% { transform: translate(30px, -20px) scale(1.05); }
   66% { transform: translate(-20px, 15px) scale(0.95); }
 }
-
 
 

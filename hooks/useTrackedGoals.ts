@@ -47,10 +47,10 @@ export function useTrackedGoals(
       })
       const updated = await res.json()
       setGoals(prev => prev.map(g => g.id === goalId ? { ...g, completed: updated.completed, completedAt: updated.completedAt } : g))
-      showMessage(completed ? '✅ Выполнено!' : '↩️ Возвращено в работу')
+      showMessage(completed ? 'Выполнено' : 'Возвращено в работу')
     } catch (error) {
       console.error('Error toggling goal:', error)
-      showMessage('❌ Ошибка обновления статуса')
+      showMessage('Ошибка обновления статуса')
     }
   }, [showMessage])
 
@@ -63,11 +63,11 @@ export function useTrackedGoals(
       })
       const updated = await res.json()
       setGoals(prev => prev.map(g => g.id === goalId ? { ...g, priority: updated.priority } : g))
-      const priorityIcons: Record<number, string> = { 0: '⚪', 1: '🟡', 2: '🔴' }
-      showMessage(`✅ Приоритет: ${priorityIcons[priority] || '⚪'}`)
+      const priorityNames: Record<number, string> = { 0: 'без приоритета', 1: 'средний', 2: 'высокий' }
+      showMessage(`Приоритет: ${priorityNames[priority] || 'без приоритета'}`)
     } catch (error) {
       console.error('Error updating priority:', error)
-      showMessage('❌ Ошибка обновления приоритета')
+      showMessage('Ошибка обновления приоритета')
     }
   }, [showMessage])
 
@@ -100,13 +100,13 @@ export function useTrackedGoals(
           }
           return [...prev, newGoal]
         })
-        const priorityIcons: Record<number, string> = { 0: '⚪', 1: '🟡', 2: '🔴' }
-        if (priority > 0) showMessage(`✅ Приоритет установлен: ${priorityIcons[priority]}`)
+        const priorityNames: Record<number, string> = { 0: 'без приоритета', 1: 'средний', 2: 'высокий' }
+        if (priority > 0) showMessage(`Приоритет установлен: ${priorityNames[priority]}`)
         return newGoal
       }
     } catch (error) {
       console.error('Error creating tracked goal:', error)
-      showMessage('❌ Ошибка создания цели')
+      showMessage('Ошибка создания цели')
     } finally {
       processingLockRef.current.delete(lockKey)
       setProcessingGoals(prev => {
@@ -128,7 +128,7 @@ export function useTrackedGoals(
       return true
     } catch (error) {
       console.error('Error deleting goal:', error)
-      showMessage('❌ Ошибка удаления цели')
+      showMessage('Ошибка удаления цели')
       return false
     }
   }, [showMessage])
@@ -195,7 +195,7 @@ export function useTrackedGoals(
           const parent = freshGoals.find(g => g.id === resolvedGoal.parentId)
           if (parent && !parent.completed) {
             await toggleGoalCompleted(parent.id, true)
-            showMessage(`✅ Все подцели выполнены — родительская цель "${parent.text.slice(0, 40)}${parent.text.length > 40 ? '…' : ''}" тоже завершена`)
+            showMessage(`Все подцели выполнены — родительская цель "${parent.text.slice(0, 40)}${parent.text.length > 40 ? '…' : ''}" тоже завершена`)
             await loadTrackedGoals()
           }
         }
@@ -217,7 +217,7 @@ export function useTrackedGoals(
         setGoals(prev => prev.map(g => g.id === trackedGoal.id ? { ...g, tags: updated.tags || newTags } : g))
       } catch (error) {
         console.error('Error updating goal tags:', error)
-        showMessage('❌ Ошибка обновления тегов')
+        showMessage('Ошибка обновления тегов')
       }
     } else {
       await createTrackedGoal(periodKey, text, 0, newTags)
@@ -247,10 +247,10 @@ export function useTrackedGoals(
       })
       const tag = await res.json()
       setTags(prev => [...prev, tag])
-      showMessage('✅ Тег создан')
+      showMessage('Тег создан')
     } catch (error) {
       console.error('Error creating tag:', error)
-      showMessage('❌ Ошибка создания тега')
+      showMessage('Ошибка создания тега')
     }
   }, [showMessage])
 
@@ -258,10 +258,10 @@ export function useTrackedGoals(
     try {
       await fetch(`/api/goals/tags?id=${id}`, { method: 'DELETE' })
       setTags(prev => prev.filter(t => t.id !== id))
-      showMessage('🗑️ Тег удалён')
+      showMessage('Тег удалён')
     } catch (error) {
       console.error('Error deleting tag:', error)
-      showMessage('❌ Ошибка удаления тега')
+      showMessage('Ошибка удаления тега')
     }
   }, [showMessage])
 

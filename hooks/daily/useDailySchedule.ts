@@ -200,7 +200,7 @@ export function useDailySchedule({
       if (isCurrent()) {
         setError(msg)
         errorRef.current = msg
-        showMessageRef.current(`❌ ${msg}`)
+        showMessageRef.current(`Ошибка: ${msg}`)
       }
       return false
     } finally {
@@ -414,11 +414,11 @@ export function useDailySchedule({
   const enterTimeline = useCallback(async () => {
     if (tasksRef.current.length === 0) return
     if (!hasLoadedRef.current || isLoadingRef.current) {
-      showMessageRef.current('⏳ Дождитесь загрузки расписания перед переходом к шкале')
+      showMessageRef.current('Дождитесь загрузки расписания перед переходом к шкале')
       return
     }
     if (errorRef.current) {
-      showMessageRef.current('❌ Сначала обновите страницу или дождитесь успешной загрузки расписания')
+      showMessageRef.current('Сначала обновите страницу или дождитесь успешной загрузки расписания')
       return
     }
     setIsEntering(true)
@@ -528,7 +528,7 @@ export function useDailySchedule({
         current.blocks,
       )
       if (slot === null) {
-        showMessageRef.current('ℹ️ Нет свободного слота на шкале — увеличьте диапазон или сдвиньте блоки')
+        showMessageRef.current('Нет свободного слота на шкале — увеличьте диапазон или сдвиньте блоки')
         return
       }
       const newBlock: BlockInput = {
@@ -556,7 +556,7 @@ export function useDailySchedule({
     prevTasksRef.current = tasksRef.current
     setMode('timeline')
     setAppliedAnimationKey(value => value + 1)
-    showMessageRef.current('✅ Расписание размещено на шкале')
+    showMessageRef.current('Расписание размещено на шкале')
   }, [clearPendingSaveTimer])
 
   return {

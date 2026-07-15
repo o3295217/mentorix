@@ -112,7 +112,7 @@ export function useGoals(): UseGoalsReturn {
       setArchivedYearGoalYears(context.archivedYearGoalYears)
     } catch (error) {
       console.error('Error loading goals context:', error)
-      showMessage('❌ Ошибка загрузки карты целей')
+      showMessage('Ошибка загрузки карты целей')
     }
   }, [dream.setDreamGoal, period.setYearGoalsFromRecord, period.mergePeriodGoalsFromRecord, tracked.setGoals, tracked.setTags, showMessage])
 

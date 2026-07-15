@@ -159,7 +159,7 @@ export function useGoalsChat(
       setMessages(prev => {
         const fallbackMessage: ChatMessage = {
           role: 'assistant',
-          content: `❌ Произошла ошибка при обращении к ИИ. Попробуй снова.\n(${errMsg})`,
+          content: `Произошла ошибка при обращении к ИИ. Попробуй снова.\n(${errMsg})`,
         }
 
         if (prev.length > 0) {

@@ -208,8 +208,11 @@ export default function ProgressPage() {
               </div>
             </div>
           </div>
-          <div className="mt-3 text-sm text-gray-500">
-            Наведите на показатель для подробной расшифровки. Цвет: 🟢 хорошо, 🟡 средне, 🔴 нужно улучшить.
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
+            <span>Наведите на показатель для подробной расшифровки.</span>
+            <span className="inline-flex items-center gap-1.5"><span className="status-dot bg-green-500" aria-hidden="true" /> хороший уровень</span>
+            <span className="inline-flex items-center gap-1.5"><span className="status-dot bg-amber-400" aria-hidden="true" /> средний уровень</span>
+            <span className="inline-flex items-center gap-1.5"><span className="status-dot bg-red-500" aria-hidden="true" /> нужна настройка</span>
           </div>
         </div>
       </div>
@@ -289,8 +292,8 @@ export default function ProgressPage() {
             <h3 className="font-semibold text-gray-300 mb-3">Разблокированные достижения:</h3>
             <div className="flex flex-wrap gap-2">
               {milestones.filter(m => m.achieved).map((m, idx) => (
-                <div key={idx} className="px-3 py-1 bg-green-900/30 text-green-400 rounded-full text-sm font-medium border border-green-800/40">
-                  {m.icon} {m.label}
+                <div key={idx} className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 text-green-400 rounded-full text-sm font-medium border border-green-800/40">
+                  <span className="status-dot bg-green-500" aria-hidden="true" /> {m.label}
                 </div>
               ))}
             </div>
@@ -307,7 +310,7 @@ export default function ProgressPage() {
         <div className="space-y-3">
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-green-400 font-medium">🟢 Отлично (7-10)</span>
+              <span className="inline-flex items-center gap-2 text-green-400 font-medium"><span className="status-dot bg-green-500" aria-hidden="true" /> Отлично, 7–10</span>
               <span className="text-gray-400">{stats.distribution.excellent} дней ({((stats.distribution.excellent / stats.totalDays) * 100).toFixed(1)}%)</span>
             </div>
             <div className="w-full bg-gray-700 rounded-full h-4">
@@ -320,7 +323,7 @@ export default function ProgressPage() {
 
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-yellow-400 font-medium">🟡 Средне (4-6)</span>
+              <span className="inline-flex items-center gap-2 text-yellow-400 font-medium"><span className="status-dot bg-yellow-500" aria-hidden="true" /> Средне, 4–6</span>
               <span className="text-gray-400">{stats.distribution.medium} дней ({((stats.distribution.medium / stats.totalDays) * 100).toFixed(1)}%)</span>
             </div>
             <div className="w-full bg-gray-700 rounded-full h-4">
@@ -333,7 +336,7 @@ export default function ProgressPage() {
 
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-red-400 font-medium"> Плохо (1-3)</span>
+              <span className="inline-flex items-center gap-2 text-red-400 font-medium"><span className="status-dot bg-red-500" aria-hidden="true" /> Слабо, 1–3</span>
               <span className="text-gray-400">{stats.distribution.poor} дней ({((stats.distribution.poor / stats.totalDays) * 100).toFixed(1)}%)</span>
             </div>
             <div className="w-full bg-gray-700 rounded-full h-4">

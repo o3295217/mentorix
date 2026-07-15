@@ -152,10 +152,10 @@ export default async function Image() {
           }}
         >
           {[
-            { label: 'Планирование', icon: '📋' },
-            { label: 'ИИ-оценка', icon: '🎯' },
-            { label: 'Прогноз', icon: '📈' },
-            { label: 'Аналитика', icon: '📊' },
+            { label: 'Планирование', marker: '01' },
+            { label: 'ИИ-оценка', marker: '02' },
+            { label: 'Прогноз', marker: '03' },
+            { label: 'Аналитика', marker: '04' },
           ].map((item) => (
             <div
               key={item.label}
@@ -168,7 +168,24 @@ export default async function Image() {
                 fontWeight: 500,
               }}
             >
-              <span style={{ fontSize: '22px' }}>{item.icon}</span>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(56,189,248,0.32)',
+                  background: 'rgba(14,165,233,0.10)',
+                  color: '#7dd3fc',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {item.marker}
+              </span>
               {item.label}
             </div>
           ))}

@@ -3,7 +3,7 @@ import {
   DayDataFull,
   ExecutionQuality,
 } from './types'
-import { formatUserProfile } from './core'
+import { formatUserProfile, NO_EMOJI_OUTPUT_RULE } from './core'
 import { formatHorizon } from '@/lib/dates'
 
 // Расчет качества выполнения за базовый период
@@ -161,6 +161,8 @@ ${request.horizonGoals.length > 0
 ---
 
 ИНСТРУКЦИИ ДЛЯ ПРОГНОЗА:
+
+${NO_EMOJI_OUTPUT_RULE}
 
 1. АНАЛИЗ КАЧЕСТВА ВЫПОЛНЕНИЯ (базовый период):
    - Проанализируй План vs Факт каждого дня

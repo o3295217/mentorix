@@ -501,7 +501,7 @@ export default function DailyPage() {
 
     const nextTaskText = editingHabitText.trim()
     if (!nextTaskText) {
-      showMessage('❌ Название привычки не может быть пустым')
+      showMessage('Название привычки не может быть пустым')
       return
     }
 

@@ -1,6 +1,13 @@
 import { UserProfile, GoalsHierarchy, DailyContext, DailyEvaluationResponse } from './types'
 import { formatHorizon } from '@/lib/dates'
 
+// Единое правило для пользовательских AI-ответов.
+// Внутренние emoji-маркеры в контексте допустимы, но модель не должна переносить их в output.
+export const NO_EMOJI_OUTPUT_RULE = `ПРАВИЛО ВЫВОДА БЕЗ EMOJI:
+- Не используй emoji ни в одном пользовательском текстовом поле или ответе.
+- Допускаются обычная пунктуация, цифры, тире и текстовые списки.
+- Внутренние emoji-маркеры из контекста и заголовков не копируй в ответ.`
+
 // Форматирование профиля пользователя для промпта
 export function formatUserProfile(profile?: UserProfile): string {
   if (!profile) return ''

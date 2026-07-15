@@ -293,7 +293,10 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
       {/* Feedback — 3 целевых блока */}
       <div className="card">
-        <h2 className="font-bold mb-4 text-red-100"> Обратная связь</h2>
+        <div className="mb-4">
+          <p className="eyebrow mb-1">ИИ-оценка</p>
+          <h2 className="text-xl font-semibold text-red-100">Обратная связь</h2>
+        </div>
         {(() => {
           // Пробуем распарсить структурированный feedback (новый формат)
           let feedbackBlocks: { conclusion?: string; worked?: string; blocks?: string } | null = null
@@ -308,22 +311,25 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
 
           if (feedbackBlocks) {
             return (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-purple-300 mb-1">🎯 Главный вывод</h3>
+              <div className="space-y-3">
+                <section className="feedback-block feedback-block-primary" aria-labelledby="feedback-conclusion-title">
+                  <p className="eyebrow mb-1 text-purple-300/80">Фокус</p>
+                  <h3 id="feedback-conclusion-title" className="font-semibold text-purple-200 mb-2">Главный вывод</h3>
                   <p className="text-gray-200 whitespace-pre-wrap">{feedbackBlocks.conclusion}</p>
-                </div>
+                </section>
                 {feedbackBlocks.worked && (
-                  <div>
-                    <h3 className="font-semibold text-green-300 mb-1">✅ Что сработало</h3>
+                  <section className="feedback-block feedback-block-success" aria-labelledby="feedback-worked-title">
+                    <p className="eyebrow mb-1 text-green-300/80">Опора</p>
+                    <h3 id="feedback-worked-title" className="font-semibold text-green-200 mb-2">Что сработало</h3>
                     <p className="text-gray-200 whitespace-pre-wrap">{feedbackBlocks.worked}</p>
-                  </div>
+                  </section>
                 )}
                 {feedbackBlocks.blocks && (
-                  <div>
-                    <h3 className="font-semibold text-orange-300 mb-1">⚠️ Что тормозит</h3>
+                  <section className="feedback-block feedback-block-warning" aria-labelledby="feedback-blocks-title">
+                    <p className="eyebrow mb-1 text-orange-300/80">Риск</p>
+                    <h3 id="feedback-blocks-title" className="font-semibold text-orange-200 mb-2">Что тормозит</h3>
                     <p className="text-gray-200 whitespace-pre-wrap">{feedbackBlocks.blocks}</p>
-                  </div>
+                  </section>
                 )}
               </div>
             )

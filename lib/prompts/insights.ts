@@ -1,4 +1,5 @@
 import { sanitizeUserInput } from '@/lib/api-utils'
+import { NO_EMOJI_OUTPUT_RULE } from './core'
 
 // === ОБНОВЛЕНИЕ ПРОФИЛЯ ПОНИМАНИЯ ПОЛЬЗОВАТЕЛЯ ===
 
@@ -48,6 +49,8 @@ export interface UpdateInsightsResponse {
 }
 
 const UPDATE_INSIGHTS_PROMPT = `Ты помощник по продуктивности. Твоя задача — обновить профиль понимания пользователя на основе его планов и результатов.
+
+${NO_EMOJI_OUTPUT_RULE}
 
 ТЕКУЩИЙ ПРОФИЛЬ (если есть):
 {current_insights}

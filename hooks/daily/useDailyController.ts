@@ -469,7 +469,7 @@ export function useDaily(): UseDailyReturn {
       }
 
       console.error('Error saving plan:', error)
-      showMessage(`❌ Ошибка при сохранении: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      showMessage(`Ошибка при сохранении: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
       return false
     }
 
@@ -488,7 +488,7 @@ export function useDaily(): UseDailyReturn {
       })
     } catch (error) {
       console.error('Error saving extra tasks:', error)
-      showMessage(`❌ Ошибка при сохранении: ${getFetchErrorMessage(error, 'ошибка запроса')}`, 2000)
+      showMessage(`Ошибка при сохранении: ${getFetchErrorMessage(error, 'ошибка запроса')}`, 2000)
     }
   }, [selectedDate, showMessage])
 
@@ -498,13 +498,13 @@ export function useDaily(): UseDailyReturn {
 
     // Проверяем дубликаты в extraTasks
     if (extraTasks.some(t => areTasksSimilar(t, text))) {
-      showMessage('ℹ️ Похожая задача уже добавлена во внеплан', 2000)
+      showMessage('Похожая задача уже добавлена во внеплан', 2000)
       setNewExtraTaskText('')
       return
     }
     // Также проверяем в основных задачах
     if (tasks.some(t => areTasksSimilar(t.taskText, text))) {
-      showMessage('ℹ️ Похожая задача уже есть в плане', 2000)
+      showMessage('Похожая задача уже есть в плане', 2000)
       setNewExtraTaskText('')
       return
     }
@@ -611,7 +611,7 @@ export function useDaily(): UseDailyReturn {
     const newHabitTexts = textsToAdd.filter(text => !existingTexts.has(text.toLowerCase()))
     
     if (newHabitTexts.length === 0) {
-      showMessage('ℹ️ Все привычки уже в плане')
+      showMessage('Все привычки уже в плане')
       return
     }
 
@@ -621,7 +621,7 @@ export function useDaily(): UseDailyReturn {
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
     setHasUnsavedChanges(true)
-    showMessage(`✅ Добавлено ${newHabitTexts.length} ${newHabitTexts.length === 1 ? 'привычка' : 'привычек'}`)
+    showMessage(`Добавлено ${newHabitTexts.length} ${newHabitTexts.length === 1 ? 'привычка' : 'привычек'}`)
   }, [tasks, selectedTasks, habits, buildTasksFromTexts, remapSelectionByText, showMessage])
 
   // Создать привычку из задачи
@@ -644,10 +644,10 @@ export function useDaily(): UseDailyReturn {
       setHabits(prev => [...prev, habit])
       // Убрать из предложений
       setHabitSuggestions(prev => prev.filter(s => s.text !== taskText))
-      showMessage('🔄 Привычка создана!')
+      showMessage('Привычка создана')
     } catch (error) {
       console.error('Error creating habit:', error)
-      showMessage(`❌ Ошибка при создании привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      showMessage(`Ошибка при создании привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }, [showMessage])
 
@@ -666,10 +666,10 @@ export function useDaily(): UseDailyReturn {
       })
 
       setHabits(prev => prev.map(item => item.id === habitId ? habit : item))
-      showMessage('🔄 Привычка обновлена!')
+      showMessage('Привычка обновлена')
     } catch (error) {
       console.error('Error updating habit:', error)
-      showMessage(`❌ Ошибка при обновлении привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      showMessage(`Ошибка при обновлении привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }, [showMessage])
 
@@ -682,10 +682,10 @@ export function useDaily(): UseDailyReturn {
       await expectOk(res)
 
       setHabits(prev => prev.filter(h => h.id !== habitId))
-      showMessage('🗑️ Привычка удалена')
+      showMessage('Привычка удалена')
     } catch (error) {
       console.error('Error deleting habit:', error)
-      showMessage(`❌ Ошибка при удалении привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      showMessage(`Ошибка при удалении привычки: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }, [showMessage])
 
@@ -726,10 +726,10 @@ export function useDaily(): UseDailyReturn {
       setTasks(updatedTasks)
       setSelectedTasks(updatedSelected)
       setHasUnsavedChanges(true)
-      showMessage(`➡️ Задача перенесена на ${transferDate}`)
+      showMessage(`Задача перенесена на ${transferDate}`)
     } catch (error) {
       console.error('Error postponing task:', error)
-      showMessage(`❌ Ошибка при переносе задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      showMessage(`Ошибка при переносе задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     }
   }, [selectedDate, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, showMessage])
 
@@ -808,7 +808,7 @@ export function useDaily(): UseDailyReturn {
       const saved = await savePlanWithTasks()
       if (saved) {
         setHasUnsavedChanges(false)
-        showMessage('✅ План сохранен!')
+        showMessage('План сохранен')
       }
       return saved
     } finally {
@@ -819,7 +819,7 @@ export function useDaily(): UseDailyReturn {
   // Проверка плана ИИ
   const checkPlan = useCallback(async () => {
     if (tasks.length === 0) {
-      showMessage('ℹ️ Добавьте хотя бы одну задачу')
+      showMessage('Добавьте хотя бы одну задачу')
       return
     }
 
@@ -843,7 +843,7 @@ export function useDaily(): UseDailyReturn {
       setMessage('')
     } catch (error) {
       console.error('Error checking plan:', error)
-      showMessage(`❌ Ошибка при проверке плана: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+      showMessage(`Ошибка при проверке плана: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
     } finally {
       setCheckingPlan(false)
     }
@@ -859,7 +859,7 @@ export function useDaily(): UseDailyReturn {
     if (!messageToSend) return
     
     if (tasks.length === 0) {
-      showMessage('ℹ️ Сначала добавьте задачи в план')
+      showMessage('Сначала добавьте задачи в план')
       return
     }
 
@@ -942,13 +942,13 @@ export function useDaily(): UseDailyReturn {
           updateAssistant({ id: normalizeChatMessageId(assistantMessageId) })
         },
         onError: error => {
-          updateAssistant({ content: `${chatMessagesRef.current.at(-1)?.content ?? ''}\n\n⚠️ ${error}`.trim() })
+          updateAssistant({ content: `${chatMessagesRef.current.at(-1)?.content ?? ''}\n\nОшибка: ${error}`.trim() })
         },
       })
     } catch (error) {
       console.error('Error sending chat message:', error)
       if (!(error instanceof DailyChatSseError)) {
-        showMessage(`❌ Ошибка при отправке сообщения: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
+        showMessage(`Ошибка при отправке сообщения: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
       }
     } finally {
       setSendingChat(false)

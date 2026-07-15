@@ -6,6 +6,7 @@ import {
   formatUserProfile,
   formatDailyContext,
   getDreamHorizonLabel,
+  NO_EMOJI_OUTPUT_RULE,
   NO_DREAM_RESPONSE,
 } from './core'
 
@@ -32,6 +33,8 @@ export const DAILY_EVALUATION_SYSTEM_PROMPT = `Ты строгий ИИ-коуч
 Оцени, приблизил ли ЭТОТ ДЕНЬ пользователя к его мечте.
 
 ИНСТРУКЦИИ ДЛЯ ОЦЕНКИ:
+
+${NO_EMOJI_OUTPUT_RULE}
 
 1. ГЛАВНЫЙ ВОПРОС: Приблизился ли пользователь к мечте СЕГОДНЯ?
    - Анализируй связь: день → мечта (напрямую или через промежуточные цели если они есть)
