@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
@@ -63,6 +63,7 @@ type ApplyProposalResponse = {
 export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null)
   const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
   const activeTaskActionRowRef = useRef<HTMLDivElement | null>(null)
   const habitEditorRef = useRef<HTMLDivElement | null>(null)
@@ -378,6 +379,23 @@ export default function DailyPage() {
     textarea.style.height = 'auto'
     textarea.style.height = `${textarea.scrollHeight}px`
   }, [newTaskText])
+
+  const resizeChatTextarea = useCallback((textarea: HTMLTextAreaElement, value: string) => {
+    if (value === '') {
+      textarea.style.height = '42px'
+      return
+    }
+
+    textarea.style.height = 'auto'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`
+  }, [])
+
+  useLayoutEffect(() => {
+    const textarea = chatTextareaRef.current
+    if (!textarea) return
+
+    resizeChatTextarea(textarea, chatInput)
+  }, [chatInput, resizeChatTextarea])
 
   // Заголовок для блока целей недели с датами
   const weekLabel = useMemo(() => {
@@ -1857,12 +1875,11 @@ export default function DailyPage() {
           {/* Ввод сообщения - прижато к низу */}
           <div className="flex gap-2 items-center mt-3 flex-shrink-0">
             <textarea
+              ref={chatTextareaRef}
               value={chatInput}
               onChange={(e) => {
                 setChatInput(e.target.value)
-                // Автоматическое расширение
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
+                resizeChatTextarea(e.target, e.target.value)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
