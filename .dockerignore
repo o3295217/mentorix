@@ -23,8 +23,12 @@ dist
 data/
 
 # Testing
+tests
 coverage
 .nyc_output
+
+# Dev tooling
+.opencode
 
 # IDE
 .vscode
