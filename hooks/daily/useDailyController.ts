@@ -856,11 +856,11 @@ export function useDaily(): UseDailyReturn {
   // Chat functions
   const sendChatMessage = useCallback(async (initialMessage?: string) => {
     const messageToSend = initialMessage || chatInput.trim()
-    if (!messageToSend) return
+    if (!messageToSend) return null
     
     if (tasks.length === 0) {
       showMessage('Сначала добавьте задачи в план')
-      return
+      return null
     }
 
     setSendingChat(true)
@@ -931,12 +931,22 @@ export function useDaily(): UseDailyReturn {
         setChatMessages(streamedMessages)
       }
 
-      await consumeDailyChatSseStream(res.body, {
+      const streamResult = await consumeDailyChatSseStream(res.body, {
         onText: (_frameText, assistantContent) => {
           updateAssistant({ content: assistantContent })
         },
         onProposal: metadata => {
           updateAssistant({ metadata: metadata as ChatMessage['metadata'] })
+        },
+        onScheduleApplied: event => {
+          if (event.proposalMessageId) {
+            const appliedMessages = chatMessagesRef.current.map(message => {
+              if (message.id !== event.proposalMessageId || !message.metadata) return message
+              return { ...message, metadata: { ...message.metadata, appliedAt: event.updatedAt } }
+            })
+            chatMessagesRef.current = appliedMessages
+            setChatMessages(appliedMessages)
+          }
         },
         onDone: assistantMessageId => {
           updateAssistant({ id: normalizeChatMessageId(assistantMessageId) })
@@ -945,11 +955,13 @@ export function useDaily(): UseDailyReturn {
           updateAssistant({ content: `${chatMessagesRef.current.at(-1)?.content ?? ''}\n\nОшибка: ${error}`.trim() })
         },
       })
+      return streamResult.scheduleApplied?.schedule ?? null
     } catch (error) {
       console.error('Error sending chat message:', error)
       if (!(error instanceof DailyChatSseError)) {
         showMessage(`Ошибка при отправке сообщения: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
       }
+      return null
     } finally {
       setSendingChat(false)
     }

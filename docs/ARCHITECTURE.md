@@ -653,7 +653,7 @@ model AuditLog {
 | `/api/daily` | GET, POST | `app/api/daily/route.ts` | CRUD дневных записей |
 | `/api/daily/schedule` | GET, PUT | `app/api/daily/schedule/route.ts` | Временное расписание задач дня; `DailyScheduleSchema` поддерживает backward-compatible v1/v2, ответ содержит `hash` |
 | `/api/daily/schedule/apply-proposal` | POST | `app/api/daily/schedule/apply-proposal/route.ts` | Подтверждает AI-proposal из `ChatMessage.metadataJson`, проверяет ownership/date/current hash, применяет v2 schedule |
-| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/done/error`, Anthropic tool `propose_daily_schedule`; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson` |
+| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/schedule_applied/done/error`, Anthropic tool `propose_daily_schedule`; в system data block передаётся machine-readable контекст актуального persisted schedule (v1/v2 blocks, range, timezone, updatedAt/hash) и pending proposal; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson`; короткое подтверждение pending proposal применяется без второго AI-вызова через shared apply service |
 | `/api/daily/check-plan` | POST | `app/api/daily/check-plan/route.ts` | Проверка плана AI |
 | `/api/daily/indicators` | GET | `app/api/daily/indicators/route.ts` | Индикаторы для календаря |
 | `/api/evaluate` | POST | `app/api/evaluate/route.ts` | Оценка дня через AI |
@@ -693,6 +693,8 @@ model AuditLog {
 | `/api/chat` | GET, POST, DELETE | `app/api/chat/route.ts` | Общий чат с ИИ |
 | `/api/daily/chat/messages` | GET, POST, DELETE | `app/api/daily/chat/messages/route.ts` | CRUD сообщений чата дня |
 | `/api/health` | GET | `app/api/health/route.ts` | Health check (без авторизации) |
+
+Daily schedule concurrency: manual `PUT /api/daily/schedule` and AI proposal apply both run inside a DB transaction and acquire `SELECT ... FOR UPDATE` on the stable parent `DailyEntry` row before mutating `DailySchedule`. This serializes mutations for one user/date even when the `DailySchedule` row does not exist yet; proposal apply re-reads the schedule under the lock and keeps `expectedCurrentScheduleHash` conflict semantics.
 
 ### Паттерн API route
 

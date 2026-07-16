@@ -1,15 +1,27 @@
+import type { DailySchedule, DailyScheduleBlock } from '@/lib/daily-schedule'
+
 export type TextStreamPublisher = (text: string) => void | Promise<void>
 export type FrameScheduler = () => Promise<void>
+
+export interface DailyChatScheduleAppliedEvent {
+  type: 'schedule_applied'
+  schedule: DailySchedule
+  updatedAt: string
+  status: string
+  proposalMessageId: string | null
+}
 
 export type DailyChatSseEvent =
   | { type: 'text'; text: string }
   | { type: 'proposal'; metadata: unknown }
+  | DailyChatScheduleAppliedEvent
   | { type: 'done'; assistantMessageId: string }
   | { type: 'error'; error: string }
 
 export interface DailyChatStreamCallbacks {
   onText?: (text: string, fullText: string) => void | Promise<void>
   onProposal?: (metadata: unknown) => void | Promise<void>
+  onScheduleApplied?: (event: DailyChatScheduleAppliedEvent) => void | Promise<void>
   onDone?: (assistantMessageId: string) => void | Promise<void>
   onError?: (error: string) => void | Promise<void>
   onEvent?: (event: DailyChatSseEvent) => void | Promise<void>
@@ -93,6 +105,65 @@ function parseSseData(data: string): unknown {
   }
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function normalizeNonEmptyId(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+  return null
+}
+
+function isScheduleBlock(value: unknown, version: 1 | 2): value is DailyScheduleBlock {
+  if (!isObject(value)) return false
+  if (typeof value.id !== 'string' || !Number.isInteger(value.startMinutes) || !Number.isInteger(value.durationMinutes)) return false
+  const startMinutes = value.startMinutes as number
+  const durationMinutes = value.durationMinutes as number
+  if (startMinutes < 0 || durationMinutes <= 0) return false
+  if (version === 1) {
+    return Number.isInteger(value.taskIndex) && typeof value.taskText === 'string' && value.taskText.trim().length > 0
+  }
+  if (value.kind === 'task') {
+    return Number.isInteger(value.taskIndex) && typeof value.taskText === 'string' && value.taskText.trim().length > 0
+  }
+  return (value.kind === 'meal' || value.kind === 'rest' || value.kind === 'buffer')
+    && typeof value.title === 'string'
+    && value.title.trim().length > 0
+}
+
+export function isDailySchedulePayload(value: unknown): value is DailySchedule {
+  if (!isObject(value)) return false
+  if (value.version !== 1 && value.version !== 2) return false
+  if (typeof value.timezone !== 'string' || !Number.isInteger(value.dayStartMinutes) || !Number.isInteger(value.dayEndMinutes)) return false
+  const version = value.version
+  const dayStartMinutes = value.dayStartMinutes as number
+  const dayEndMinutes = value.dayEndMinutes as number
+  if (dayStartMinutes < 0 || dayEndMinutes <= dayStartMinutes) return false
+  if (!Array.isArray(value.blocks)) return false
+  return value.blocks.every(block => isScheduleBlock(block, version))
+}
+
+function scheduleAppliedFromPayload(payload: unknown): DailyChatScheduleAppliedEvent | null {
+  if (!isObject(payload)) return null
+  if (!isDailySchedulePayload(payload.schedule)) return null
+  if (typeof payload.updatedAt !== 'string' || payload.updatedAt.trim().length === 0) return null
+  if (typeof payload.status !== 'string' || payload.status.trim().length === 0) return null
+  const proposalMessageId = normalizeNonEmptyId(payload.proposalMessageId)
+  return {
+    type: 'schedule_applied',
+    schedule: payload.schedule,
+    updatedAt: payload.updatedAt,
+    status: payload.status,
+    proposalMessageId,
+  }
+}
+
 function eventFromFrame(eventName: string, data: string): DailyChatSseEvent | null {
   const payload = parseSseData(data)
   if (eventName === 'text') {
@@ -106,6 +177,9 @@ function eventFromFrame(eventName: string, data: string): DailyChatSseEvent | nu
       ? (payload as { metadata: unknown }).metadata
       : payload
     return { type: 'proposal', metadata }
+  }
+  if (eventName === 'schedule_applied') {
+    return scheduleAppliedFromPayload(payload)
   }
   if (eventName === 'done') {
     const assistantMessageId = typeof payload === 'object' && payload !== null && 'assistantMessageId' in payload
@@ -126,8 +200,8 @@ export async function consumeDailyChatSseStream(
   stream: ReadableStream<Uint8Array> | null | undefined,
   callbacks: DailyChatStreamCallbacks,
   scheduleFrame: FrameScheduler = waitForNextBrowserFrame,
-): Promise<{ text: string; assistantMessageId: string | null; metadata: unknown | null }> {
-  if (!stream) return { text: '', assistantMessageId: null, metadata: null }
+): Promise<{ text: string; assistantMessageId: string | null; metadata: unknown | null; scheduleApplied: DailyChatScheduleAppliedEvent | null }> {
+  if (!stream) return { text: '', assistantMessageId: null, metadata: null, scheduleApplied: null }
 
   const reader = stream.getReader()
   const decoder = new TextDecoder()
@@ -135,6 +209,7 @@ export async function consumeDailyChatSseStream(
   let text = ''
   let assistantMessageId: string | null = null
   let metadata: unknown | null = null
+  let scheduleApplied: DailyChatScheduleAppliedEvent | null = null
 
   const dispatch = async (event: DailyChatSseEvent) => {
     await callbacks.onEvent?.(event)
@@ -145,6 +220,9 @@ export async function consumeDailyChatSseStream(
     } else if (event.type === 'proposal') {
       metadata = event.metadata
       await callbacks.onProposal?.(event.metadata)
+    } else if (event.type === 'schedule_applied') {
+      scheduleApplied = event
+      await callbacks.onScheduleApplied?.(event)
     } else if (event.type === 'done') {
       assistantMessageId = event.assistantMessageId
       await callbacks.onDone?.(event.assistantMessageId)
@@ -194,7 +272,7 @@ export async function consumeDailyChatSseStream(
       await processFrame(buffer)
       buffer = ''
     }
-    return { text, assistantMessageId, metadata }
+    return { text, assistantMessageId, metadata, scheduleApplied }
   } finally {
     reader.releaseLock()
   }

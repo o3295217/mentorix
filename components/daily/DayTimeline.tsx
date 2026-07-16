@@ -19,6 +19,14 @@ import {
 
 const PX_PER_MIN = 3 // 15-min block ≈ 45px (≥44px touch target)
 
+export function getScheduleBlockRenderKey(blockId: string, appliedAnimationKey: number): string {
+  return appliedAnimationKey > 0 ? `${appliedAnimationKey}:${blockId}` : blockId
+}
+
+export function canMutateTimeline(mutationLocked: boolean): boolean {
+  return !mutationLocked
+}
+
 export interface DayTimelineProps {
   schedule: DailySchedule
   tasks: OpenTask[]
@@ -32,6 +40,7 @@ export interface DayTimelineProps {
   onRemoveBlock: (blockId: string) => void
   onScheduleUnscheduled: (taskIndex: number) => void
   appliedAnimationKey?: number
+  mutationLocked?: boolean
 }
 
 type DragMode = 'move' | 'resize'
@@ -64,8 +73,10 @@ export default function DayTimeline({
   onRemoveBlock,
   onScheduleUnscheduled,
   appliedAnimationKey = 0,
+  mutationLocked = false,
 }: DayTimelineProps) {
   const { dayStartMinutes: dayStart, dayEndMinutes: dayEnd, blocks, timezone } = schedule
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const totalMinutes = Math.max(0, dayEnd - dayStart)
   const totalHeight = totalMinutes * PX_PER_MIN
 
@@ -89,8 +100,21 @@ export default function DayTimeline({
     .map(i => ({ index: i, task: tasks[i] }))
     .filter((x): x is { index: number; task: OpenTask } => Boolean(x.task))
 
+  useEffect(() => {
+    if (appliedAnimationKey <= 0) return
+    const firstBlock = sortedBlocks[0]
+    const container = scrollContainerRef.current
+    if (!firstBlock || !container) return
+    const prefersReducedMotion = typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    container.scrollTo({
+      top: Math.max(0, (firstBlock.startMinutes - dayStart) * PX_PER_MIN - 32),
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
+  }, [appliedAnimationKey, dayStart, sortedBlocks])
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2" style={{ maxHeight: '80vh' }}>
+    <div ref={scrollContainerRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2" style={{ maxHeight: '80vh' }}>
       {/* Status bar */}
       <div className="flex flex-wrap items-center gap-2 text-sm leading-5 text-gray-400">
         <span>
@@ -109,6 +133,7 @@ export default function DayTimeline({
           <span className="text-green-400" role="status" aria-live="polite">Сохранено</span>
         )}
         {error && <span className="text-red-400" role="alert">Ошибка: {error}</span>}
+        {mutationLocked && <span className="text-blue-300" role="status" aria-live="polite">Шкала временно заблокирована на время применения</span>}
       </div>
 
       {unscheduledTasks.length > 0 && (
@@ -124,8 +149,11 @@ export default function DayTimeline({
               <li key={`${index}-${task.id}`}>
                 <button
                   type="button"
-                  onClick={() => onScheduleUnscheduled(index)}
-                  className="max-w-full truncate rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1 text-sm text-gray-200 hover:border-blue-400/60 hover:bg-blue-500/10"
+                  onClick={() => {
+                    if (canMutateTimeline(mutationLocked)) onScheduleUnscheduled(index)
+                  }}
+                  disabled={mutationLocked}
+                  className="max-w-full truncate rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1 text-sm text-gray-200 hover:border-blue-400/60 hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-700 disabled:hover:bg-gray-800"
                   title={`Поставить «${task.taskText}» на шкалу`}
                   aria-label={`Поставить задачу «${task.taskText}» на шкалу`}
                 >
@@ -168,7 +196,7 @@ export default function DayTimeline({
 
           {sortedBlocks.map((block, index) => (
             <ScheduleBlock
-              key={block.id}
+              key={getScheduleBlockRenderKey(block.id, appliedAnimationKey)}
               block={block}
               dayStart={dayStart}
               dayEnd={dayEnd}
@@ -182,6 +210,7 @@ export default function DayTimeline({
               onRemove={onRemoveBlock}
               appliedAnimationKey={appliedAnimationKey}
               animationIndex={index}
+              mutationLocked={mutationLocked}
             />
           ))}
 
@@ -208,6 +237,7 @@ interface ScheduleBlockProps {
   onRemove: (blockId: string) => void
   appliedAnimationKey: number
   animationIndex: number
+  mutationLocked: boolean
 }
 
 function ScheduleBlock({
@@ -221,6 +251,7 @@ function ScheduleBlock({
   onRemove,
   appliedAnimationKey,
   animationIndex,
+  mutationLocked,
 }: ScheduleBlockProps) {
   const [editing, setEditing] = useState(false)
   const [draftStart, setDraftStart] = useState(block.startMinutes)
@@ -235,6 +266,12 @@ function ScheduleBlock({
       setDraftDuration(block.durationMinutes)
     }
   }, [editing, block.startMinutes, block.durationMinutes])
+
+  useEffect(() => {
+    if (canMutateTimeline(mutationLocked)) return
+    dragRef.current = null
+    setEditing(false)
+  }, [mutationLocked])
 
   const top = (block.startMinutes - dayStart) * PX_PER_MIN
   const height = block.durationMinutes * PX_PER_MIN
@@ -254,6 +291,7 @@ function ScheduleBlock({
           : 'border-blue-500/40 bg-blue-600/20 hover:bg-blue-600/25'
 
   const tryMove = (nextStart: number) => {
+    if (!canMutateTimeline(mutationLocked)) return
     if (nextStart < dayStart) nextStart = dayStart
     if (nextStart + block.durationMinutes > dayEnd) {
       nextStart = dayEnd - block.durationMinutes
@@ -271,6 +309,7 @@ function ScheduleBlock({
   }
 
   const tryResize = (nextDuration: number) => {
+    if (!canMutateTimeline(mutationLocked)) return
     const dur = clamp(snapToStep(nextDuration), MIN_BLOCK_DURATION_MINUTES, dayEnd - block.startMinutes)
     if (
       hasOverlapWithOthers(
@@ -286,6 +325,7 @@ function ScheduleBlock({
 
   // === Pointer handlers (move) ===
   const onBodyPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canMutateTimeline(mutationLocked)) return
     if (editing) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -301,6 +341,7 @@ function ScheduleBlock({
 
   const onBodyPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const state = dragRef.current
+    if (!canMutateTimeline(mutationLocked)) return
     if (!state || state.pointerId !== e.pointerId || state.mode !== 'move') return
     const dy = e.clientY - state.startY
     if (!state.moved && Math.abs(dy) < 4) return
@@ -322,6 +363,7 @@ function ScheduleBlock({
 
   // === Pointer handlers (resize) ===
   const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canMutateTimeline(mutationLocked)) return
     if (editing) return
     e.stopPropagation()
     if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -338,6 +380,7 @@ function ScheduleBlock({
 
   const onResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const state = dragRef.current
+    if (!canMutateTimeline(mutationLocked)) return
     if (!state || state.pointerId !== e.pointerId || state.mode !== 'resize') return
     const dy = e.clientY - state.startY
     if (!state.moved && Math.abs(dy) < 4) return
@@ -353,6 +396,10 @@ function ScheduleBlock({
         e.preventDefault()
         setEditing(false)
       }
+      return
+    }
+    if (!canMutateTimeline(mutationLocked)) {
+      e.preventDefault()
       return
     }
     const step = e.shiftKey ? 60 : 15
@@ -375,6 +422,7 @@ function ScheduleBlock({
   }
 
   const applyEdit = () => {
+    if (!canMutateTimeline(mutationLocked)) return
     onSetBlockRange(block.id, draftStart, draftDuration)
     setEditing(false)
   }
@@ -386,13 +434,14 @@ function ScheduleBlock({
       ref={rootRef}
       role="group"
       tabIndex={0}
-      aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(block.durationMinutes)}. Enter — редактировать, стрелки — сдвинуть, Delete — убрать.`}
-      className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-md border px-2 py-1 outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${kindClass} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''}`}
+      aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(block.durationMinutes)}.${mutationLocked ? ' Редактирование временно заблокировано.' : ' Enter — редактировать, стрелки — сдвинуть, Delete — убрать.'}`}
+      aria-disabled={mutationLocked}
+      className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-md border px-2 py-1 outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${kindClass} ${mutationLocked ? 'cursor-not-allowed opacity-70' : ''} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''}`}
       style={{
         top,
         height: Math.max(height, 44),
         touchAction: 'none',
-        cursor: 'grab',
+        cursor: mutationLocked ? 'not-allowed' : 'grab',
         animationDelay: appliedAnimationKey > 0 ? `${Math.min(animationIndex, 12) * 70}ms` : undefined,
       }}
       onPointerDown={onBodyPointerDown}
@@ -433,6 +482,7 @@ function ScheduleBlock({
               <span>Начало</span>
               <input
                 type="time"
+                disabled={mutationLocked}
                 className="rounded bg-gray-900 px-1.5 py-1 text-xs text-gray-100 outline-none focus:ring-1 focus:ring-blue-400"
                 value={minutesToTimeInputValue(draftStart)}
                 onChange={e => {
@@ -446,6 +496,7 @@ function ScheduleBlock({
               <span>Минут</span>
               <input
                 type="number"
+                disabled={mutationLocked}
                 min={MIN_BLOCK_DURATION_MINUTES}
                 max={1440}
                 step={15}
@@ -461,6 +512,7 @@ function ScheduleBlock({
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
+                disabled={mutationLocked}
                 className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-500"
                 onClick={applyEdit}
               >
@@ -475,6 +527,7 @@ function ScheduleBlock({
               </button>
               <button
                 type="button"
+                disabled={mutationLocked}
                 className="rounded bg-red-700/80 px-2 py-1 text-xs font-medium text-white hover:bg-red-600/80"
                 onClick={() => {
                   onRemove(block.id)

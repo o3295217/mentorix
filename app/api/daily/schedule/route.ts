@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { ApiErrors } from '@/lib/api-utils'
 import { DailySchedule, DailyScheduleResponse, DailyScheduleSchema, hashDailySchedule } from '@/lib/daily-schedule'
+import { lockDailyEntryForScheduleMutation } from '@/lib/daily-schedule-lock'
 import { isValidDateOnly, parseDateParam } from '@/lib/dates'
 import { requireUserId } from '@/lib/get-user-id'
 
@@ -84,26 +85,30 @@ export async function PUT(request: NextRequest) {
       return ApiErrors.validationFailed(validation.error.format())
     }
 
-    const entry = await prisma.dailyEntry.findFirst({
-      where: { userId, date: parseDateParam(validation.data.date) },
-      select: { id: true },
+    const schedule = await prisma.$transaction(async tx => {
+      const entry = await tx.dailyEntry.findFirst({
+        where: { userId, date: parseDateParam(validation.data.date) },
+        select: { id: true },
+      })
+
+      if (!entry) return null
+
+      await lockDailyEntryForScheduleMutation(tx, entry.id)
+
+      return tx.dailySchedule.upsert({
+        where: { dailyEntryId: entry.id },
+        create: {
+          dailyEntryId: entry.id,
+          scheduleJson: validation.data.schedule as unknown as Prisma.InputJsonValue,
+        },
+        update: {
+          scheduleJson: validation.data.schedule as unknown as Prisma.InputJsonValue,
+        },
+        select: { scheduleJson: true, updatedAt: true },
+      })
     })
 
-    if (!entry) {
-      return ApiErrors.notFound('Daily entry')
-    }
-
-    const schedule = await prisma.dailySchedule.upsert({
-      where: { dailyEntryId: entry.id },
-      create: {
-        dailyEntryId: entry.id,
-        scheduleJson: validation.data.schedule as unknown as Prisma.InputJsonValue,
-      },
-      update: {
-        scheduleJson: validation.data.schedule as unknown as Prisma.InputJsonValue,
-      },
-      select: { scheduleJson: true, updatedAt: true },
-    })
+    if (!schedule) return ApiErrors.notFound('Daily entry')
 
     return NextResponse.json(toScheduleResponse(validation.data.schedule, schedule.updatedAt))
   } catch (error) {

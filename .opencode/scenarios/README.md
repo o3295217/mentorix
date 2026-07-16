@@ -12,11 +12,11 @@
 | `lead` — очень сложные (оркестрация) | `anthropic/claude-fable-5` | `openai/gpt-5.6-sol` |
 | `architecture`, `backend`, `logic`, `specialist` — сложные | `anthropic/claude-sonnet-5` | `openai/gpt-5.5` (полный, без fast) |
 | `frontend`, `design`, `scenario` — простые | `anthropic/claude-sonnet-5` | `openai/gpt-5.5` |
-| `junior` — простые | `anthropic/claude-haiku-4-5` | `anthropic/claude-haiku-4-5` |
+| `junior` — простые | `anthropic/claude-haiku-4-5` | `openai/gpt-5.4-mini` |
 | `local` — очень простые | Ollama qwen3.6-27b | Ollama qwen3.6-27b (без изменений) |
 
-В сценарии `agent2.0_gpt56` Anthropic используется только `junior`-агентом, остальные роли используют OpenAI, `local` — Ollama.
-Модели 5.4 и fast-варианты не используются.
+В сценарии `agent2.0_gpt56` все роли кроме `local` используют OpenAI; Anthropic не используется.
+`local` остаётся на Ollama.
 
 ## Как запускать
 

@@ -34,6 +34,7 @@ export interface UseDailyScheduleParams {
   /** Saves the plan + selectedTasks (existing flow) and resolves true on success. */
   ensureEntrySaved: () => Promise<boolean>
   showMessage: (text: string, duration?: number) => void
+  mutationLocked?: boolean
 }
 
 export interface UseDailyScheduleReturn {
@@ -53,6 +54,7 @@ export interface UseDailyScheduleReturn {
   removeBlock: (blockId: string) => void
   scheduleUnscheduledTask: (taskIndex: number, durationMinutes?: number) => void
   applySavedSchedule: (next: DailySchedule) => void
+  flushScheduleChanges: () => Promise<boolean>
   appliedAnimationKey: number
 }
 
@@ -107,6 +109,7 @@ export function useDailySchedule({
   timezone,
   ensureEntrySaved,
   showMessage,
+  mutationLocked = false,
 }: UseDailyScheduleParams): UseDailyScheduleReturn {
   const [mode, setMode] = useState<ScheduleMode>('list')
   const [isEntering, setIsEntering] = useState(false)
@@ -135,6 +138,7 @@ export function useDailySchedule({
   const hasLoadedRef = useRef(false)
   const isLoadingRef = useRef(true)
   const errorRef = useRef('')
+  const mutationLockedRef = useRef(mutationLocked)
   const idGeneratorRef = useRef(createDefaultIdGenerator())
 
   scheduleRef.current = schedule
@@ -143,6 +147,7 @@ export function useDailySchedule({
   timezoneRef.current = timezone
   ensureSavedRef.current = ensureEntrySaved
   showMessageRef.current = showMessage
+  mutationLockedRef.current = mutationLocked
 
   const getCurrentRequestContext = useCallback((): ScheduleRequestContext => ({
     date: dateRef.current,
@@ -463,6 +468,7 @@ export function useDailySchedule({
 
   const setBlockRange = useCallback(
     (blockId: string, startMinutes: number, durationMinutes: number) => {
+      if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
       const block = current.blocks.find(b => b.id === blockId)
@@ -489,6 +495,7 @@ export function useDailySchedule({
 
   const moveBlockByStep = useCallback(
     (blockId: string, deltaMinutes: number) => {
+      if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
       const block = current.blocks.find(b => b.id === blockId)
@@ -502,6 +509,7 @@ export function useDailySchedule({
 
   const removeBlock = useCallback(
     (blockId: string) => {
+      if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
       const nextBlocks = current.blocks.filter(b => b.id !== blockId)
@@ -516,6 +524,7 @@ export function useDailySchedule({
 
   const scheduleUnscheduledTask = useCallback(
     (taskIndex: number, durationMinutes: number = DEFAULT_BLOCK_DURATION_MINUTES) => {
+      if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
       const task = tasksRef.current[taskIndex]
@@ -559,6 +568,14 @@ export function useDailySchedule({
     showMessageRef.current('Расписание размещено на шкале')
   }, [clearPendingSaveTimer])
 
+  const flushScheduleChanges = useCallback(async (): Promise<boolean> => {
+    const ok = await flushSave()
+    if (!ok && !errorRef.current) {
+      showMessageRef.current('Не удалось сохранить изменения расписания. Сообщение не отправлено.')
+    }
+    return ok
+  }, [flushSave])
+
   return {
     mode,
     isEntering,
@@ -576,6 +593,7 @@ export function useDailySchedule({
     removeBlock,
     scheduleUnscheduledTask,
     applySavedSchedule,
+    flushScheduleChanges,
     appliedAnimationKey,
   }
 }

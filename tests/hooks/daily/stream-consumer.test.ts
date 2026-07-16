@@ -156,4 +156,86 @@ describe('consumeDailyChatSseStream', () => {
     }, () => Promise.resolve())).rejects.toBeInstanceOf(DailyChatSseError)
     expect(visibleError).toBe('AI unavailable')
   })
+
+  it('parses schedule_applied event split across chunks with v2 schedule payload', async () => {
+    const encoder = new TextEncoder()
+    const payload = {
+      schedule: {
+        version: 2,
+        timezone: 'Europe/Moscow',
+        dayStartMinutes: 540,
+        dayEndMinutes: 1080,
+        blocks: [
+          { id: 'task-1', kind: 'task', taskIndex: 1, taskText: 'Фокус', startMinutes: 540, durationMinutes: 90 },
+          { id: 'meal-1', kind: 'meal', title: 'Обед', startMinutes: 720, durationMinutes: 45 },
+        ],
+      },
+      updatedAt: '2026-07-16T09:00:00.000Z',
+      status: 'applied',
+      proposalMessageId: 'msg-proposal',
+    }
+    const bytes = encoder.encode(`event: schedule_applied\ndata: ${JSON.stringify(payload)}\n\nevent: done\ndata: {"assistantMessageId":"msg-assistant"}\n\n`)
+    const applied: unknown[] = []
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 13))
+        controller.enqueue(bytes.slice(13, bytes.length - 5))
+        controller.enqueue(bytes.slice(bytes.length - 5))
+        controller.close()
+      },
+    })
+
+    const result = await consumeDailyChatSseStream(stream, {
+      onScheduleApplied: event => {
+        applied.push(event)
+      },
+    }, () => Promise.resolve())
+
+    expect(applied).toHaveLength(1)
+    expect(result.scheduleApplied).toMatchObject({
+      schedule: payload.schedule,
+      updatedAt: payload.updatedAt,
+      status: payload.status,
+      proposalMessageId: payload.proposalMessageId,
+    })
+    expect(result.assistantMessageId).toBe('msg-assistant')
+  })
+
+  it('normalizes numeric proposalMessageId in schedule_applied event', async () => {
+    const encoder = new TextEncoder()
+    const payload = {
+      schedule: {
+        version: 2,
+        timezone: 'Europe/Moscow',
+        dayStartMinutes: 540,
+        dayEndMinutes: 1080,
+        blocks: [],
+      },
+      updatedAt: '2026-07-16T09:00:00.000Z',
+      status: 'applied',
+      proposalMessageId: 12345,
+    }
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`event: schedule_applied\ndata: ${JSON.stringify(payload)}\n\n`))
+        controller.close()
+      },
+    })
+
+    await expect(consumeDailyChatSseStream(stream, {}, () => Promise.resolve()))
+      .resolves.toMatchObject({ scheduleApplied: { proposalMessageId: '12345' } })
+  })
+
+  it('ignores invalid schedule_applied payloads', async () => {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('event: schedule_applied\ndata: {"schedule":{"version":2,"blocks":[]},"updatedAt":"now","status":"applied"}\n\n'))
+        controller.close()
+      },
+    })
+
+    await expect(consumeDailyChatSseStream(stream, {}, () => Promise.resolve()))
+      .resolves.toMatchObject({ scheduleApplied: null })
+  })
 })

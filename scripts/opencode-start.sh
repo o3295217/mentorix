@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 echo "Выбери сценарий opencode:"
 echo "  1) base           — Anthropic (fable-5 + sonnet-5)   [расходует лимиты Anthropic]"
-echo "  2) agent2.0_gpt56 — OpenAI (gpt-5.6-sol + gpt-5.5) + GLM-5.2"
+echo "  2) agent2.0_gpt56 — OpenAI (gpt-5.6-sol + gpt-5.5 + gpt-5.4-mini)"
 printf "Сценарий [1/2]: "
 read -r choice
 

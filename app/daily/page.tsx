@@ -15,7 +15,7 @@ import { areTasksSimilar } from '@/lib/task-match'
 import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 import type { DailySchedule } from '@/lib/daily-schedule'
 import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
-import type { ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { applyDailyScheduleProposal, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
@@ -73,6 +73,9 @@ export default function DailyPage() {
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null)
+  const [isSubmittingChat, setIsSubmittingChat] = useState(false)
+  const isSubmittingChatRef = useRef(false)
+  const timelineMutationLocked = applyingProposalId !== null || isSubmittingChat
 
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
@@ -306,6 +309,7 @@ export default function DailyPage() {
     removeBlock,
     scheduleUnscheduledTask,
     applySavedSchedule,
+    flushScheduleChanges,
     appliedAnimationKey,
   } = useDailySchedule({
     selectedDate,
@@ -313,6 +317,7 @@ export default function DailyPage() {
     timezone: scheduleTimezone,
     ensureEntrySaved,
     showMessage,
+    mutationLocked: timelineMutationLocked,
   })
 
   const handleEnterTimeline = useCallback(() => {
@@ -331,25 +336,23 @@ export default function DailyPage() {
     if (!messageId || applyingProposalId) return
     setApplyingProposalId(messageId)
     try {
-      const saved = await ensureEntrySaved()
-      if (!saved) {
-        throw new Error('Сначала сохраните текущий план, чтобы расписание совпало со списком задач')
-      }
-
-      const response = await fetchJson<ApplyProposalResponse>('/api/daily/schedule/apply-proposal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: selectedDate,
-          messageId,
-          confirmed: options.confirmed,
-          replaceExisting: options.replaceExisting,
-          expectedCurrentScheduleHash: metadata.currentScheduleHash,
+      await applyDailyScheduleProposal({
+        ensureEntrySaved,
+        flushScheduleChanges,
+        applyProposalRequest: () => fetchJson<ApplyProposalResponse>('/api/daily/schedule/apply-proposal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: selectedDate,
+            messageId,
+            confirmed: options.confirmed,
+            replaceExisting: options.replaceExisting,
+            expectedCurrentScheduleHash: metadata.currentScheduleHash,
+          }),
         }),
+        applySavedSchedule,
+        markChatProposalApplied: appliedAt => markChatProposalApplied(messageId, appliedAt),
       })
-      if (!response.schedule) throw new Error('Сервер не вернул расписание')
-      applySavedSchedule(response.schedule)
-      markChatProposalApplied(messageId, new Date().toISOString())
     } catch (error) {
       if (error instanceof FetchJsonError && error.status === 409) {
         throw new Error('Расписание уже изменилось. Обновите чат или попросите ассистента собрать новый вариант.')
@@ -358,7 +361,27 @@ export default function DailyPage() {
     } finally {
       setApplyingProposalId(null)
     }
-  }, [applyingProposalId, applySavedSchedule, ensureEntrySaved, markChatProposalApplied, selectedDate])
+  }, [applyingProposalId, applySavedSchedule, ensureEntrySaved, flushScheduleChanges, markChatProposalApplied, selectedDate])
+
+  const handleSendChatMessage = useCallback(async (initialMessage?: string) => {
+    if (isSubmittingChatRef.current || sendingChat) return
+    isSubmittingChatRef.current = true
+    setIsSubmittingChat(true)
+    try {
+      const scheduleSaved = await flushScheduleChanges()
+      if (!scheduleSaved) {
+        showMessage('Не удалось сохранить изменения расписания. Сообщение не отправлено, чтобы Ассистент не увидел устаревший план.')
+        return
+      }
+      const appliedSchedule = await sendChatMessage(initialMessage)
+      if (appliedSchedule) {
+        applySavedSchedule(appliedSchedule)
+      }
+    } finally {
+      isSubmittingChatRef.current = false
+      setIsSubmittingChat(false)
+    }
+  }, [applySavedSchedule, flushScheduleChanges, sendChatMessage, sendingChat, showMessage])
 
   // Список текстов выполненных задач для проверки целей
   const completedTaskTexts = useMemo(() => {
@@ -1768,6 +1791,7 @@ export default function DailyPage() {
                 onRemoveBlock={removeBlock}
                 onScheduleUnscheduled={scheduleUnscheduledTask}
                 appliedAnimationKey={appliedAnimationKey}
+                mutationLocked={timelineMutationLocked}
               />
             ) : scheduleLoading ? (
               <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
@@ -1805,24 +1829,24 @@ export default function DailyPage() {
               <div className="py-4 space-y-3">
                 <p className="text-center text-gray-500 text-sm mb-4">Спросите Ассистента:</p>
                 <button
-                  onClick={() => sendChatMessage('Проанализируй мой план на день и дай рекомендации')}
-                  disabled={sendingChat || tasks.length === 0}
+                  onClick={() => void handleSendChatMessage('Проанализируй мой план на день и дай рекомендации')}
+                  disabled={sendingChat || isSubmittingChat || tasks.length === 0}
                   className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                 >
 
                   <span className="text-sm font-medium text-gray-200">Проанализировать план</span>
                 </button>
                 <button
-                  onClick={() => sendChatMessage('Оцени временные затраты на каждую задачу и скажи, реалистичен ли план по времени')}
-                  disabled={sendingChat || tasks.length === 0}
+                  onClick={() => void handleSendChatMessage('Оцени временные затраты на каждую задачу и скажи, реалистичен ли план по времени')}
+                  disabled={sendingChat || isSubmittingChat || tasks.length === 0}
                   className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                 >
 
                   <span className="text-sm font-medium text-gray-200">Оценить время</span>
                 </button>
                 <button
-                  onClick={() => sendChatMessage('Как мой план связан с целями недели и месяца? Какие задачи стоит добавить?')}
-                  disabled={sendingChat || tasks.length === 0}
+                  onClick={() => void handleSendChatMessage('Как мой план связан с целями недели и месяца? Какие задачи стоит добавить?')}
+                  disabled={sendingChat || isSubmittingChat || tasks.length === 0}
                   className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                 >
 
@@ -1884,18 +1908,18 @@ export default function DailyPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  sendChatMessage()
+                  void handleSendChatMessage()
                 }
               }}
               placeholder="Напишите сообщение..."
-              disabled={sendingChat}
+              disabled={sendingChat || isSubmittingChat}
               rows={1}
               className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 bg-gray-800 text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
               style={{ minHeight: '42px' }}
             />
             <button
-              onClick={() => sendChatMessage()}
-              disabled={sendingChat || !chatInput.trim()}
+              onClick={() => void handleSendChatMessage()}
+              disabled={sendingChat || isSubmittingChat || !chatInput.trim()}
               className="self-end mb-0.5 w-10 h-10 flex items-center justify-center bg-primary-500 hover:bg-primary-600 disabled:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
             >
               →
