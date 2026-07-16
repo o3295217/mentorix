@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-07-16 — feat: harden AI schedule updates and agent tooling
+- 🔌 API: 3 файлов (route, route, route)
+- 🧩 Компоненты: 1 файлов (DayTimeline)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 5 файлов (daily-schedule-apply, daily-schedule-context, daily-schedule-intent...)
+- ⚙️ Конфигурация: 1 файлов
+- 📝 Документация: 3 файлов
+- 📦 Другое: 21 файлов
+
+
 ### 2026-07-15 — feat: add AI-assisted daily scheduling
 - 🔌 API: 6 файлов (route, route, route...)
 - 🧩 Компоненты: 2 файлов (DailyScheduleProposalCard, DayTimeline)
