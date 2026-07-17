@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-07-17 — feat: improve opencode agent workflow
+- ⚙️ Конфигурация: 3 файлов
+- 📝 Документация: 5 файлов
+- 📦 Другое: 5 файлов
+
+
 ### 2026-07-17 — feat: overhaul daily schedule planning
 - 🔌 API: 3 файлов (route, route, route)
 - 🧩 Компоненты: 2 файлов (DailyScheduleProposalCard, DayTimeline)
