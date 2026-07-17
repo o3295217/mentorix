@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+### 2026-07-17 — feat: overhaul daily schedule planning
+- 🔌 API: 3 файлов (route, route, route)
+- 🧩 Компоненты: 2 файлов (DailyScheduleProposalCard, DayTimeline)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 6 файлов (daily-schedule-apply, daily-schedule-context, daily-schedule-lock...)
+- 📝 Документация: 3 файлов
+- 📦 Другое: 23 файлов
+
+
 ### 2026-07-16 — feat: harden AI schedule updates and agent tooling
 - 🔌 API: 3 файлов (route, route, route)
 - 🧩 Компоненты: 1 файлов (DayTimeline)
