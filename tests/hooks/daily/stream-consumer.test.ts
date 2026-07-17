@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { consumeDailyChatSseStream, consumeTextStream, DailyChatSseError } from '@/hooks/daily/stream-consumer'
+import { consumeDailyChatSseStream, consumeTextStream, DailyChatSseError, isDailySchedulePayload } from '@/hooks/daily/stream-consumer'
 
 function createGate() {
   let openGate: () => void = () => undefined
@@ -157,7 +157,7 @@ describe('consumeDailyChatSseStream', () => {
     expect(visibleError).toBe('AI unavailable')
   })
 
-  it('parses schedule_applied event split across chunks with v2 schedule payload', async () => {
+  it('ignores forged legacy schedule_applied events and continues the stream', async () => {
     const encoder = new TextEncoder()
     const payload = {
       schedule: {
@@ -175,7 +175,7 @@ describe('consumeDailyChatSseStream', () => {
       proposalMessageId: 'msg-proposal',
     }
     const bytes = encoder.encode(`event: schedule_applied\ndata: ${JSON.stringify(payload)}\n\nevent: done\ndata: {"assistantMessageId":"msg-assistant"}\n\n`)
-    const applied: unknown[] = []
+    const events: unknown[] = []
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(bytes.slice(0, 13))
@@ -185,57 +185,26 @@ describe('consumeDailyChatSseStream', () => {
       },
     })
 
-    const result = await consumeDailyChatSseStream(stream, {
-      onScheduleApplied: event => {
-        applied.push(event)
-      },
-    }, () => Promise.resolve())
+    const result = await consumeDailyChatSseStream(stream, { onEvent: event => { events.push(event) } }, () => Promise.resolve())
 
-    expect(applied).toHaveLength(1)
-    expect(result.scheduleApplied).toMatchObject({
-      schedule: payload.schedule,
-      updatedAt: payload.updatedAt,
-      status: payload.status,
-      proposalMessageId: payload.proposalMessageId,
-    })
+    expect(events).toEqual([{ type: 'done', assistantMessageId: 'msg-assistant' }])
     expect(result.assistantMessageId).toBe('msg-assistant')
   })
 
-  it('normalizes numeric proposalMessageId in schedule_applied event', async () => {
-    const encoder = new TextEncoder()
-    const payload = {
-      schedule: {
-        version: 2,
-        timezone: 'Europe/Moscow',
-        dayStartMinutes: 540,
-        dayEndMinutes: 1080,
-        blocks: [],
-      },
-      updatedAt: '2026-07-16T09:00:00.000Z',
-      status: 'applied',
-      proposalMessageId: 12345,
-    }
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode(`event: schedule_applied\ndata: ${JSON.stringify(payload)}\n\n`))
-        controller.close()
-      },
-    })
-
-    await expect(consumeDailyChatSseStream(stream, {}, () => Promise.resolve()))
-      .resolves.toMatchObject({ scheduleApplied: { proposalMessageId: '12345' } })
-  })
-
-  it('ignores invalid schedule_applied payloads', async () => {
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode('event: schedule_applied\ndata: {"schedule":{"version":2,"blocks":[]},"updatedAt":"now","status":"applied"}\n\n'))
-        controller.close()
-      },
-    })
-
-    await expect(consumeDailyChatSseStream(stream, {}, () => Promise.resolve()))
-      .resolves.toMatchObject({ scheduleApplied: null })
+  it('keeps a client-safe v3 structural schedule parser for non-chat callers', () => {
+    expect(isDailySchedulePayload({
+      version: 3,
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 570,
+      dayEndMinutes: 1290,
+      planningBasis: 'custom_time',
+      planningStartMinutes: 570,
+      workEndMinutes: 1080,
+      activityEndMinutes: 1290,
+      blocks: [
+        { id: 'task-1', kind: 'task', taskIndex: 1, taskText: 'Фокус', category: 'main', isFixed: false, startMinutes: 570, durationMinutes: 90 },
+        { id: 'travel-1', kind: 'buffer', title: 'Дорога', category: 'travel', isFixed: true, startMinutes: 1080, durationMinutes: 90 },
+      ],
+    })).toBe(true)
   })
 })

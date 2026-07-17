@@ -2,21 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchJson, FetchJsonError, getFetchErrorMessage } from '@/lib/fetch-json'
-import type { DailySchedule, DailyScheduleResponse, DailyScheduleV2Block } from '@/lib/daily-schedule'
+import type { DailySchedule, DailyScheduleResponse, DailyScheduleV2Block, DailyScheduleV3Block } from '@/lib/daily-schedule'
 import type { OpenTask } from '@/lib/types'
 import {
   type BlockInput,
-  DEFAULT_BLOCK_DURATION_MINUTES,
   DEFAULT_DAY_END_MINUTES,
   DEFAULT_DAY_START_MINUTES,
   MIN_BLOCK_DURATION_MINUTES,
-  autoLayoutBlocks,
-  clampBlockToRange,
+  applyCascadeScheduleEdit,
   computeUnscheduledTaskIndexes,
   createDefaultIdGenerator,
   findFreeSlot,
   getPendingSaveDateChangeAction,
-  hasOverlapWithOthers,
   isTaskScheduleBlock,
   isScheduleRequestCurrent,
   reconcileSchedule,
@@ -52,8 +49,8 @@ export interface UseDailyScheduleReturn {
   setBlockRange: (blockId: string, startMinutes: number, durationMinutes: number) => void
   moveBlockByStep: (blockId: string, deltaMinutes: number) => void
   removeBlock: (blockId: string) => void
-  scheduleUnscheduledTask: (taskIndex: number, durationMinutes?: number) => void
-  applySavedSchedule: (next: DailySchedule) => void
+  scheduleUnscheduledTask: (taskIndex: number, startMinutes?: number, durationMinutes?: number) => void
+  applySavedSchedule: (next: DailySchedule, expectedDate?: string) => boolean
   flushScheduleChanges: () => Promise<boolean>
   appliedAnimationKey: number
 }
@@ -63,6 +60,19 @@ const DEBOUNCE_MS = 800
 type PendingSave = ScheduleRequestContext & {
   schedule: DailySchedule
   timer: ReturnType<typeof setTimeout>
+}
+
+function getCascadeErrorMessage(reason: string): string {
+  switch (reason) {
+    case 'fixed-collision':
+      return 'Не удалось сдвинуть блок: он упирается в зафиксированное событие. Освободите интервал или выберите другое время.'
+    case 'overflow':
+      return 'Не удалось сдвинуть блок: расписание не помещается в активный интервал дня.'
+    case 'block-not-found':
+      return 'Блок расписания не найден. Обновите страницу и попробуйте снова.'
+    default:
+      return 'Не удалось изменить расписание: проверьте время и длительность блока.'
+  }
 }
 
 function buildEmptySchedule(timezone: string, blocks: BlockInput[]): DailySchedule {
@@ -93,14 +103,21 @@ function scheduleBlockChanged(previous: BlockInput | undefined, next: BlockInput
   return JSON.stringify(previous) !== JSON.stringify(next)
 }
 
-function withScheduleBlocks(current: DailySchedule, blocks: BlockInput[]): DailySchedule {
+export function withScheduleBlocks(current: DailySchedule, blocks: BlockInput[]): DailySchedule {
   if (current.version === 2) {
     return {
       ...current,
       blocks: blocks.map(block => isTaskScheduleBlock(block) && !('kind' in block) ? { ...block, kind: 'task' as const } : block) as DailyScheduleV2Block[],
     }
   }
+  if (current.version === 3) {
+    return { ...current, blocks: blocks.map(block => ({ ...block })) as DailyScheduleV3Block[] }
+  }
   return { ...current, blocks: blocks.filter(isTaskScheduleBlock).map(({ id, taskIndex, taskText, startMinutes, durationMinutes }) => ({ id, taskIndex, taskText, startMinutes, durationMinutes })) }
+}
+
+export function canApplySavedScheduleToCurrentDate(expectedDate: string | undefined, currentDate: string): boolean {
+  return expectedDate === undefined || expectedDate === currentDate
 }
 
 export function useDailySchedule({
@@ -432,13 +449,7 @@ export function useDailySchedule({
       if (!ok) return
 
       if (!scheduleRef.current) {
-        const { blocks } = autoLayoutBlocks(
-          tasksRef.current,
-          DEFAULT_DAY_START_MINUTES,
-          DEFAULT_DAY_END_MINUTES,
-          { generateId: idGeneratorRef.current },
-        )
-        const next = buildEmptySchedule(timezoneRef.current, blocks)
+        const next = buildEmptySchedule(timezoneRef.current, [])
         setSchedule(next)
         scheduleRef.current = next
         setServerSchedule(null)
@@ -471,21 +482,22 @@ export function useDailySchedule({
       if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
-      const block = current.blocks.find(b => b.id === blockId)
-      if (!block) return
-      const clamped = clampBlockToRange(
-        { startMinutes, durationMinutes },
-        current.dayStartMinutes,
-        current.dayEndMinutes,
-      )
-      // Не допускаем overlap — оставляем последнее валидное значение.
-      if (hasOverlapWithOthers({ id: blockId, ...clamped }, current.blocks, blockId)) {
+      const result = applyCascadeScheduleEdit(current, {
+        type: 'set',
+        blockId,
+        startMinutes: snapToStep(startMinutes),
+        durationMinutes: Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(durationMinutes)),
+      })
+      if (!result.ok) {
+        const msg = getCascadeErrorMessage(result.reason)
+        setError(msg)
+        errorRef.current = msg
+        showMessageRef.current(msg)
         return
       }
-      const nextBlocks = current.blocks.map(b =>
-        b.id === blockId ? { ...b, ...clamped } : b,
-      )
-      const next = withScheduleBlocks(current, nextBlocks)
+      const next = result.schedule
+      setError('')
+      errorRef.current = ''
       setSchedule(next)
       scheduleRef.current = next
       scheduleSave(next)
@@ -523,32 +535,45 @@ export function useDailySchedule({
   )
 
   const scheduleUnscheduledTask = useCallback(
-    (taskIndex: number, durationMinutes: number = DEFAULT_BLOCK_DURATION_MINUTES) => {
+    (taskIndex: number, startMinutes?: number, durationMinutes: number = 30) => {
       if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
       const task = tasksRef.current[taskIndex]
       if (!task) return
       const duration = Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(durationMinutes))
-      const slot = findFreeSlot(
-        duration,
-        current.dayStartMinutes,
-        current.dayEndMinutes,
-        current.blocks,
-      )
-      if (slot === null) {
+      const slot = startMinutes === undefined
+        ? findFreeSlot(
+          duration,
+          current.dayStartMinutes,
+          current.dayEndMinutes,
+          current.blocks,
+        )
+        : snapToStep(startMinutes)
+      if (slot === null || slot < current.dayStartMinutes || slot + duration > current.dayEndMinutes) {
         showMessageRef.current('Нет свободного слота на шкале — увеличьте диапазон или сдвиньте блоки')
         return
       }
       const newBlock: BlockInput = {
         id: idGeneratorRef.current(),
-        ...(current.version === 2 ? { kind: 'task' as const } : {}),
+        ...(current.version >= 2 ? { kind: 'task' as const } : {}),
+        ...(current.version === 3 ? { category: 'main' as const, isFixed: false } : {}),
         taskIndex: taskIndex + 1,
         taskText: task.taskText.trim(),
         startMinutes: slot,
         durationMinutes: duration,
       }
-      const next = withScheduleBlocks(current, [...current.blocks, newBlock])
+      const result = applyCascadeScheduleEdit(current, { type: 'insert', block: newBlock, startMinutes: slot, durationMinutes: duration })
+      if (!result.ok) {
+        const msg = getCascadeErrorMessage(result.reason)
+        setError(msg)
+        errorRef.current = msg
+        showMessageRef.current(msg)
+        return
+      }
+      const next = result.schedule
+      setError('')
+      errorRef.current = ''
       setSchedule(next)
       scheduleRef.current = next
       scheduleSave(next)
@@ -556,7 +581,11 @@ export function useDailySchedule({
     [scheduleSave],
   )
 
-  const applySavedSchedule = useCallback((next: DailySchedule) => {
+  const applySavedSchedule = useCallback((next: DailySchedule, expectedDate?: string): boolean => {
+    if (!canApplySavedScheduleToCurrentDate(expectedDate, dateRef.current)) {
+      showMessageRef.current('Расписание пришло для другой даты и не было применено')
+      return false
+    }
     clearPendingSaveTimer()
     setSchedule(next)
     scheduleRef.current = next
@@ -566,6 +595,7 @@ export function useDailySchedule({
     setMode('timeline')
     setAppliedAnimationKey(value => value + 1)
     showMessageRef.current('Расписание размещено на шкале')
+    return true
   }, [clearPendingSaveTimer])
 
   const flushScheduleChanges = useCallback(async (): Promise<boolean> => {

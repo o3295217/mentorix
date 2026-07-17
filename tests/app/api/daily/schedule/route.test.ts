@@ -45,6 +45,23 @@ const validSchedule: DailySchedule = {
   ],
 }
 
+const validScheduleV3: DailySchedule = {
+  version: 3,
+  timezone: 'Europe/Moscow',
+  dayStartMinutes: 9 * 60 + 30,
+  dayEndMinutes: 21 * 60 + 30,
+  planningBasis: 'current_time',
+  planningStartMinutes: 9 * 60 + 30,
+  workEndMinutes: 18 * 60,
+  activityEndMinutes: 21 * 60 + 30,
+  blocks: [
+    { id: 'main-1', kind: 'task', taskIndex: 1, taskText: 'Deep work 1', category: 'main', isFixed: false, startMinutes: 10 * 60, durationMinutes: 45 },
+    { id: 'main-2', kind: 'task', taskIndex: 2, taskText: 'Deep work 2', category: 'main', isFixed: false, startMinutes: 11 * 60, durationMinutes: 90 },
+    { id: 'personal-1', kind: 'buffer', title: 'Personal', category: 'personal', isFixed: true, startMinutes: 18 * 60, durationMinutes: 120 },
+    { id: 'travel-1', kind: 'buffer', title: 'Travel', category: 'travel', isFixed: true, startMinutes: 20 * 60, durationMinutes: 90 },
+  ],
+}
+
 function getRequest(date: string): NextRequest {
   return new NextRequest(`http://localhost/api/daily/schedule?date=${date}`)
 }
@@ -163,6 +180,30 @@ describe('/api/daily/schedule', () => {
       update: { scheduleJson: validSchedule },
       select: { scheduleJson: true, updatedAt: true },
     })
+  })
+
+  it('saves valid v3 schedule and returns persisted schedule with server load summary', async () => {
+    const updatedAt = new Date('2026-02-28T11:00:00.000Z')
+    const persisted = { ...validScheduleV3, blocks: [...validScheduleV3.blocks].reverse() }
+    mocks.dailyEntryFindFirst.mockResolvedValue({ id: 42 })
+    mocks.dailyScheduleUpsert.mockResolvedValue({ scheduleJson: persisted, updatedAt })
+
+    const response = await PUT(putRequest({ date: '2026-02-28', schedule: validScheduleV3 }))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.schedule).toEqual(persisted)
+    expect(body.loadSummary).toMatchObject({ scheduledMinutes: 345, scheduledPercent: 47.92, workScheduledMinutes: 135 })
+    expect(body.hash).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  it('rejects invalid v3 schedule in PUT body', async () => {
+    const response = await PUT(putRequest({ date: '2026-02-28', schedule: { ...validScheduleV3, planningStartMinutes: 571 } }))
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toBe('Validation failed')
+    expect(mocks.dailyScheduleUpsert).not.toHaveBeenCalled()
   })
 
   it('takes the DailyEntry row lock before manual schedule upsert', async () => {

@@ -13,6 +13,8 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не устраивай анкету')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Дай короткий совет')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сам расставить задачи по временной шкале')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('До первого proposal обязан установить минимум')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('откуда планировать')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Спроси только 1-3 самых важных уточнения')
   })
 
@@ -27,6 +29,18 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Выполненные задачи не ставь в будущий график')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('еду, отдых и буферы')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если всё не помещается, честно оставь часть задач вне графика')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Рекомендуй перенос/сокращение')
+  })
+
+  it('requires proposal v2 planning fields, exact 15-minute timing and fixed semantics', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Tool input всегда плоский proposal v2')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('planningBasis,planningStartMinutes,workEndMinutes,activityEndMinutes')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Точность времени строго 15 минут')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сохраняй длительности 45 и 90 минут')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('fixed=true только для жёстких событий')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("service block с kind='buffer'")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не требуй включать его в planTasks')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не добавляй loadSummary')
   })
 
   it('handles current time without dropping overdue unfinished tasks', () => {
@@ -71,8 +85,9 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
 
   it('does not contradict backend handling of natural schedule confirmations', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Естественные подтверждения «да», «размести», «замени»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('backend может обработать без AI')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('обычное «да» как ответ на твой уточняющий вопрос — это часть диалога')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('клиент обрабатывает как explicit apply конкретного messageId')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если такое подтверждение всё же дошло до AI route')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('не заявляй, что расписание применено')
   })
 
   it('treats schedule task titles as data rather than prompt instructions', () => {

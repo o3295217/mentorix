@@ -13,9 +13,11 @@ import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskPostponeIcon, TaskRepeatIcon 
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 import { areTasksSimilar } from '@/lib/task-match'
 import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
-import type { DailySchedule } from '@/lib/daily-schedule'
+import type { DailySchedule, DailyScheduleLoadSummary } from '@/lib/daily-schedule'
 import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
-import { applyDailyScheduleProposal, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
+import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
@@ -58,6 +60,7 @@ type ApplyProposalResponse = {
   schedule: DailySchedule | null
   updatedAt: string | null
   status?: string
+  loadSummary?: DailyScheduleLoadSummary | null
 }
 
 export default function DailyPage() {
@@ -73,6 +76,7 @@ export default function DailyPage() {
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null)
+  const [dismissedProposalIds, setDismissedProposalIds] = useState<Set<string>>(() => new Set())
   const [isSubmittingChat, setIsSubmittingChat] = useState(false)
   const isSubmittingChatRef = useRef(false)
   const timelineMutationLocked = applyingProposalId !== null || isSubmittingChat
@@ -334,6 +338,16 @@ export default function DailyPage() {
     options: ProposalApplyOptions,
   ) => {
     if (!messageId || applyingProposalId) return
+    const requestBody = buildApplyProposalRequestBody({
+      date: selectedDate,
+      messageId,
+      options,
+      expectedCurrentScheduleHash: metadata.currentScheduleHash,
+    })
+    if (requestBody === null) {
+      throw new Error('Не удалось применить расписание: ответ ассистента ещё не сохранён. Попробуйте обновить чат.')
+    }
+    const requestDate = selectedDate
     setApplyingProposalId(messageId)
     try {
       await applyDailyScheduleProposal({
@@ -342,15 +356,10 @@ export default function DailyPage() {
         applyProposalRequest: () => fetchJson<ApplyProposalResponse>('/api/daily/schedule/apply-proposal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            date: selectedDate,
-            messageId,
-            confirmed: options.confirmed,
-            replaceExisting: options.replaceExisting,
-            expectedCurrentScheduleHash: metadata.currentScheduleHash,
-          }),
+          body: JSON.stringify(requestBody),
         }),
         applySavedSchedule,
+        expectedDate: requestDate,
         markChatProposalApplied: appliedAt => markChatProposalApplied(messageId, appliedAt),
       })
     } catch (error) {
@@ -365,23 +374,36 @@ export default function DailyPage() {
 
   const handleSendChatMessage = useCallback(async (initialMessage?: string) => {
     if (isSubmittingChatRef.current || sendingChat) return
+    const messageText = initialMessage ?? chatInput
+    const strictProposal = selectStrictScheduleConfirmationProposal(messageText, chatMessages, dismissedProposalIds)
     isSubmittingChatRef.current = true
     setIsSubmittingChat(true)
     try {
-      const scheduleSaved = await flushScheduleChanges()
-      if (!scheduleSaved) {
-        showMessage('Не удалось сохранить изменения расписания. Сообщение не отправлено, чтобы Ассистент не увидел устаревший план.')
+      if (strictProposal) {
+        await handleApplyProposal(strictProposal.messageId, strictProposal.metadata, buildProposalApplyOptions(strictProposal.metadata))
+        setChatInput('')
+        showMessage('Расписание применено')
         return
       }
-      const appliedSchedule = await sendChatMessage(initialMessage)
-      if (appliedSchedule) {
-        applySavedSchedule(appliedSchedule)
-      }
+      await sendDailyChatWithPreconditions({
+        ensureEntrySaved,
+        flushScheduleChanges,
+        sendChatMessage,
+        showMessage,
+        initialMessage,
+      })
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : 'Не удалось применить расписание')
     } finally {
       isSubmittingChatRef.current = false
       setIsSubmittingChat(false)
     }
-  }, [applySavedSchedule, flushScheduleChanges, sendChatMessage, sendingChat, showMessage])
+  }, [chatInput, chatMessages, dismissedProposalIds, ensureEntrySaved, flushScheduleChanges, handleApplyProposal, sendChatMessage, sendingChat, setChatInput, showMessage])
+
+  const handleDismissProposal = useCallback((id: string | undefined) => {
+    if (!id) return
+    setDismissedProposalIds(prev => new Set(prev).add(id))
+  }, [])
 
   // Список текстов выполненных задач для проверки целей
   const completedTaskTexts = useMemo(() => {
@@ -412,6 +434,16 @@ export default function DailyPage() {
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`
   }, [])
+
+  const handleDiscussProposal = useCallback((text: string) => {
+    setChatInput(text)
+    window.requestAnimationFrame(() => {
+      const textarea = chatTextareaRef.current
+      if (!textarea) return
+      resizeChatTextarea(textarea, text)
+      textarea.focus()
+    })
+  }, [resizeChatTextarea, setChatInput])
 
   useLayoutEffect(() => {
     const textarea = chatTextareaRef.current
@@ -1875,12 +1907,14 @@ export default function DailyPage() {
                     <div className="py-1">
                       <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
                       <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
-                      {msg.metadata?.type === 'daily_schedule_proposal' && (
+                      {msg.metadata?.type === 'daily_schedule_proposal' && !dismissedProposalIds.has(msg.id ?? '') && (
                         <DailyScheduleProposalCard
                           metadata={msg.metadata}
                           messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}
                           isApplying={applyingProposalId === msg.id}
                           onApply={(options) => handleApplyProposal(msg.id, msg.metadata!, options)}
+                          onDiscuss={() => handleDiscussProposal('Хочу скорректировать черновик расписания: ')}
+                          onDismiss={() => handleDismissProposal(msg.id)}
                         />
                       )}
                     </div>

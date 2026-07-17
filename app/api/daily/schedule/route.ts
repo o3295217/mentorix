@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { ApiErrors } from '@/lib/api-utils'
-import { DailySchedule, DailyScheduleResponse, DailyScheduleSchema, hashDailySchedule } from '@/lib/daily-schedule'
+import { DailySchedule, DailyScheduleResponse, DailyScheduleSchema, computeDailyScheduleLoadSummary, hashDailySchedule } from '@/lib/daily-schedule'
 import { lockDailyEntryForScheduleMutation } from '@/lib/daily-schedule-lock'
 import { isValidDateOnly, parseDateParam } from '@/lib/dates'
 import { requireUserId } from '@/lib/get-user-id'
@@ -19,7 +19,7 @@ const PutScheduleSchema = z.object({
 })
 
 function emptyScheduleResponse(): DailyScheduleResponse {
-  return { schedule: null, updatedAt: null }
+  return { schedule: null, updatedAt: null, loadSummary: null }
 }
 
 function toScheduleResponse(schedule: DailySchedule, updatedAt: Date): DailyScheduleResponse {
@@ -27,6 +27,7 @@ function toScheduleResponse(schedule: DailySchedule, updatedAt: Date): DailySche
     schedule,
     updatedAt: updatedAt.toISOString(),
     hash: hashDailySchedule(schedule),
+    loadSummary: computeDailyScheduleLoadSummary(schedule),
   }
 }
 
@@ -85,7 +86,7 @@ export async function PUT(request: NextRequest) {
       return ApiErrors.validationFailed(validation.error.format())
     }
 
-    const schedule = await prisma.$transaction(async tx => {
+    const stored = await prisma.$transaction(async tx => {
       const entry = await tx.dailyEntry.findFirst({
         where: { userId, date: parseDateParam(validation.data.date) },
         select: { id: true },
@@ -108,9 +109,12 @@ export async function PUT(request: NextRequest) {
       })
     })
 
-    if (!schedule) return ApiErrors.notFound('Daily entry')
+    if (!stored) return ApiErrors.notFound('Daily entry')
 
-    return NextResponse.json(toScheduleResponse(validation.data.schedule, schedule.updatedAt))
+    const persistedSchedule = parseStoredSchedule(stored.scheduleJson)
+    if (!persistedSchedule) return ApiErrors.serverError('Failed to save daily schedule')
+
+    return NextResponse.json(toScheduleResponse(persistedSchedule, stored.updatedAt))
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse

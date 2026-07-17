@@ -1,7 +1,7 @@
 // Pure helpers for the daily schedule timeline feature.
 // No React, no DOM, no Node-only APIs — safe for tests and the client bundle.
 
-import type { DailySchedule, DailyScheduleBlock, DailyScheduleV2Block } from '@/lib/daily-schedule'
+import type { DailySchedule, DailyScheduleBlock, DailyScheduleBlockCategory, DailyScheduleLoadSummary, DailyScheduleV2Block } from '@/lib/daily-schedule'
 
 export const TIME_STEP_MINUTES = 15
 export const DEFAULT_DAY_START_MINUTES = 6 * 60 // 06:00
@@ -73,6 +73,107 @@ export function formatDurationLabel(minutes: number): string {
   return `${mins} мин`
 }
 
+const SCHEDULE_CATEGORIES: DailyScheduleBlockCategory[] = ['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer']
+
+function percent(part: number, total: number): number {
+  if (total <= 0 || part <= 0) return 0
+  return Math.round((part / total) * 10000) / 100
+}
+
+function getPlanningStartMinutes(schedule: DailySchedule): number {
+  return schedule.version === 3 ? schedule.planningStartMinutes : schedule.dayStartMinutes
+}
+
+function getActivityEndMinutes(schedule: DailySchedule): number {
+  return schedule.version === 3 ? schedule.activityEndMinutes : schedule.dayEndMinutes
+}
+
+function getWorkEndMinutes(schedule: DailySchedule): number {
+  return schedule.version === 3 ? schedule.workEndMinutes : schedule.dayEndMinutes
+}
+
+export function getScheduleBoundaryMinutes(schedule: DailySchedule): { planningStartMinutes: number; workEndMinutes: number; activityEndMinutes: number } {
+  return {
+    planningStartMinutes: getPlanningStartMinutes(schedule),
+    workEndMinutes: getWorkEndMinutes(schedule),
+    activityEndMinutes: getActivityEndMinutes(schedule),
+  }
+}
+
+export function getScheduleBlockCategory(block: DailyScheduleBlock): DailyScheduleBlockCategory {
+  if ('category' in block) return block.category
+  if ('kind' in block && block.kind !== 'task') return block.kind
+  return 'main'
+}
+
+function getClippedDuration(block: RangeLike, intervalStart: number, intervalEnd: number): number {
+  const start = Math.max(block.startMinutes, intervalStart)
+  const end = Math.min(getBlockEnd(block), intervalEnd)
+  return Math.max(0, Math.min(24 * 60, end - start))
+}
+
+function getLoadLevel(scheduledPercent: number): DailyScheduleLoadSummary['loadLevel'] {
+  if (scheduledPercent === 0) return 'empty'
+  if (scheduledPercent < 40) return 'light'
+  if (scheduledPercent < 70) return 'balanced'
+  if (scheduledPercent < 90) return 'busy'
+  return 'overloaded'
+}
+
+function getLoadRecommendation(loadLevel: DailyScheduleLoadSummary['loadLevel']): string {
+  switch (loadLevel) {
+    case 'empty': return 'Расписание пока пустое: добавьте главные задачи и обязательные блоки.'
+    case 'light': return 'Нагрузка лёгкая: можно добавить важную задачу или оставить запас.'
+    case 'balanced': return 'Нагрузка сбалансирована: есть план и буферы на непредвиденное.'
+    case 'busy': return 'День плотный: проверьте буферы и зафиксированные обязательства.'
+    case 'overloaded': return 'День перегружен: перенесите часть задач или увеличьте буферы.'
+  }
+}
+
+export function computeClientScheduleLoadSummary(schedule: DailySchedule): DailyScheduleLoadSummary {
+  const activeStart = getPlanningStartMinutes(schedule)
+  const activeEnd = getActivityEndMinutes(schedule)
+  const workStart = activeStart
+  const workEnd = getWorkEndMinutes(schedule)
+  const activeAvailable = Math.max(0, activeEnd - activeStart)
+  const workAvailable = Math.max(0, workEnd - workStart)
+  const categoryMinutes = Object.fromEntries(SCHEDULE_CATEGORIES.map(category => [category, 0])) as Record<DailyScheduleBlockCategory, number>
+  const categoryWorkMinutes = Object.fromEntries(SCHEDULE_CATEGORIES.map(category => [category, 0])) as Record<DailyScheduleBlockCategory, number>
+
+  for (const block of schedule.blocks) {
+    const category = getScheduleBlockCategory(block)
+    categoryMinutes[category] += getClippedDuration(block, activeStart, activeEnd)
+    categoryWorkMinutes[category] += getClippedDuration(block, workStart, workEnd)
+  }
+
+  const scheduledMinutes = SCHEDULE_CATEGORIES.reduce((sum, category) => sum + categoryMinutes[category], 0)
+  const workScheduledMinutes = SCHEDULE_CATEGORIES.reduce((sum, category) => sum + categoryWorkMinutes[category], 0)
+  const scheduledPercent = percent(scheduledMinutes, activeAvailable)
+  const loadLevel = getLoadLevel(scheduledPercent)
+  return {
+    activeInterval: { startMinutes: activeStart, endMinutes: activeEnd, availableMinutes: activeAvailable },
+    workInterval: { startMinutes: workStart, endMinutes: workEnd, availableMinutes: workAvailable },
+    scheduledMinutes,
+    unscheduledMinutes: Math.max(0, activeAvailable - scheduledMinutes),
+    scheduledPercent,
+    unscheduledPercent: percent(Math.max(0, activeAvailable - scheduledMinutes), activeAvailable),
+    workScheduledMinutes,
+    workUnscheduledMinutes: Math.max(0, workAvailable - workScheduledMinutes),
+    workScheduledPercent: percent(workScheduledMinutes, workAvailable),
+    categories: SCHEDULE_CATEGORIES.reduce((acc, category) => {
+      acc[category] = {
+        minutes: categoryMinutes[category],
+        percent: percent(categoryMinutes[category], activeAvailable),
+        workMinutes: categoryWorkMinutes[category],
+        workPercent: percent(categoryWorkMinutes[category], workAvailable),
+      }
+      return acc
+    }, {} as DailyScheduleLoadSummary['categories']),
+    loadLevel,
+    recommendation: getLoadRecommendation(loadLevel),
+  }
+}
+
 // === Block geometry ===
 
 export function getBlockEnd(block: RangeLike): number {
@@ -113,6 +214,262 @@ export function hasOverlapWithOthers(
     if (block.id && other.id === block.id) return false
     return blocksOverlap(block, other)
   })
+}
+
+// === Atomic cascade edits ===
+
+export type CascadeScheduleEdit =
+  | { type: 'move'; blockId: string; startMinutes: number }
+  | { type: 'resize'; blockId: string; durationMinutes: number; startMinutes?: number }
+  | { type: 'set'; blockId: string; startMinutes: number; durationMinutes: number }
+  | { type: 'insert'; block: BlockInput; startMinutes: number; durationMinutes?: number }
+
+export type CascadeScheduleFailureReason =
+  | 'block-not-found'
+  | 'duplicate-block-id'
+  | 'fixed-collision'
+  | 'invalid-input'
+  | 'overflow'
+  | 'structural-invalid'
+
+export type CascadeScheduleEditResult =
+  | { ok: true; schedule: DailySchedule; changedBlockIds: string[] }
+  | {
+      ok: false
+      reason: CascadeScheduleFailureReason
+      message: string
+      blockId?: string
+      conflictingBlockId?: string
+      limitMinutes?: number
+    }
+
+type CascadeScheduleFailureResult = Extract<CascadeScheduleEditResult, { ok: false }>
+
+type StructureValidationResult =
+  | { ok: true }
+  | { ok: false; reason: CascadeScheduleFailureReason; message: string; blockId?: string; conflictingBlockId?: string }
+
+function isFixedScheduleBlock(block: BlockInput): boolean {
+  return 'isFixed' in block && block.isFixed === true
+}
+
+function isTimeStep(value: number): boolean {
+  return Number.isInteger(value) && value % TIME_STEP_MINUTES === 0
+}
+
+function getTimelineEnd(schedule: DailySchedule): number {
+  return schedule.version === 3 ? Math.min(schedule.dayEndMinutes, schedule.activityEndMinutes) : schedule.dayEndMinutes
+}
+
+function cloneBlock(block: BlockInput): BlockInput {
+  return { ...block }
+}
+
+function cloneScheduleWithBlocks(schedule: DailySchedule, blocks: BlockInput[]): DailySchedule {
+  return { ...schedule, blocks: blocks.map(cloneBlock) } as DailySchedule
+}
+
+function sortBlocksByTimeline(blocks: BlockInput[], order: Map<string, number>): BlockInput[] {
+  return [...blocks].sort(
+    (a, b) =>
+      a.startMinutes - b.startMinutes ||
+      getBlockEnd(a) - getBlockEnd(b) ||
+      (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
+      a.id.localeCompare(b.id),
+  )
+}
+
+function validateTimelineStructure(schedule: DailySchedule): StructureValidationResult {
+  const dayStart = schedule.dayStartMinutes
+  const dayEnd = getTimelineEnd(schedule)
+  if (!Number.isFinite(dayStart) || !Number.isFinite(dayEnd) || dayEnd <= dayStart) {
+    return { ok: false, reason: 'invalid-input', message: 'Schedule day range is invalid' }
+  }
+  if (!isTimeStep(dayStart) || !isTimeStep(dayEnd)) {
+    return { ok: false, reason: 'invalid-input', message: 'Schedule day range must use 15 minute step' }
+  }
+
+  const ids = new Set<string>()
+  for (const block of schedule.blocks) {
+    if (!block.id || ids.has(block.id)) {
+      return { ok: false, reason: 'invalid-input', message: 'Schedule block ids must be unique and non-empty', blockId: block.id }
+    }
+    ids.add(block.id)
+    if (!Number.isFinite(block.startMinutes) || !Number.isFinite(block.durationMinutes)) {
+      return { ok: false, reason: 'invalid-input', message: 'Schedule block time values must be finite', blockId: block.id }
+    }
+    if (!isTimeStep(block.startMinutes) || !isTimeStep(block.durationMinutes)) {
+      return { ok: false, reason: 'invalid-input', message: 'Schedule blocks must use 15 minute step', blockId: block.id }
+    }
+    if (block.durationMinutes < MIN_BLOCK_DURATION_MINUTES) {
+      return { ok: false, reason: 'invalid-input', message: 'Schedule block duration is too short', blockId: block.id }
+    }
+    if (!isBlockInRange(block, dayStart, dayEnd)) {
+      return { ok: false, reason: 'invalid-input', message: 'Schedule block is outside day range', blockId: block.id }
+    }
+  }
+
+  const sortedBlocks = sortBlocksByTimeline(schedule.blocks, new Map(schedule.blocks.map((block, index) => [block.id, index])))
+  for (let index = 1; index < sortedBlocks.length; index += 1) {
+    const previous = sortedBlocks[index - 1]
+    const current = sortedBlocks[index]
+    if (blocksOverlap(previous, current)) {
+      return {
+        ok: false,
+        reason: 'invalid-input',
+        message: 'Schedule blocks overlap',
+        blockId: previous.id,
+        conflictingBlockId: current.id,
+      }
+    }
+  }
+
+  return { ok: true }
+}
+
+function makeOverflowResult(blockId: string, limitMinutes: number): CascadeScheduleEditResult {
+  return {
+    ok: false,
+    reason: 'overflow',
+    message: 'Cascade edit would move a block outside day/activity range',
+    blockId,
+    limitMinutes,
+  }
+}
+
+function makeFixedCollisionResult(blockId: string, fixedBlockId: string): CascadeScheduleEditResult {
+  return {
+    ok: false,
+    reason: 'fixed-collision',
+    message: 'Cascade edit would intersect a fixed block',
+    blockId,
+    conflictingBlockId: fixedBlockId,
+  }
+}
+
+function buildAnchorBlock(schedule: DailySchedule, edit: CascadeScheduleEdit): CascadeScheduleFailureResult | { ok: true; anchor: BlockInput; restBlocks: BlockInput[] } {
+  if (edit.type === 'insert') {
+    if (schedule.blocks.some(block => block.id === edit.block.id)) {
+      return { ok: false, reason: 'duplicate-block-id', message: 'Inserted block id already exists', blockId: edit.block.id }
+    }
+    const duration = edit.durationMinutes ?? edit.block.durationMinutes
+    if (!Number.isFinite(edit.startMinutes) || !Number.isFinite(duration)) {
+      return { ok: false, reason: 'invalid-input', message: 'Requested block time values must be finite', blockId: edit.block.id }
+    }
+    return {
+      ok: true,
+      anchor: {
+        ...edit.block,
+        startMinutes: snapToStep(edit.startMinutes),
+        durationMinutes: Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(duration)),
+      },
+      restBlocks: schedule.blocks.map(cloneBlock),
+    }
+  }
+
+  const block = schedule.blocks.find(candidate => candidate.id === edit.blockId)
+  if (!block) {
+    return { ok: false, reason: 'block-not-found', message: 'Schedule block was not found', blockId: edit.blockId }
+  }
+
+  let startMinutes = block.startMinutes
+  let durationMinutes = block.durationMinutes
+  if (edit.type === 'move') {
+    startMinutes = edit.startMinutes
+  } else if (edit.type === 'resize') {
+    startMinutes = edit.startMinutes ?? block.startMinutes
+    durationMinutes = edit.durationMinutes
+  } else {
+    startMinutes = edit.startMinutes
+    durationMinutes = edit.durationMinutes
+  }
+
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(durationMinutes)) {
+    return { ok: false, reason: 'invalid-input', message: 'Requested block time values must be finite', blockId: block.id }
+  }
+
+  return {
+    ok: true,
+    anchor: {
+      ...block,
+      startMinutes: snapToStep(startMinutes),
+      durationMinutes: Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(durationMinutes)),
+    },
+    restBlocks: schedule.blocks.filter(candidate => candidate.id !== block.id).map(cloneBlock),
+  }
+}
+
+/**
+ * Atomically applies a manual timeline edit with cascading displacement.
+ *
+ * Rules:
+ * - v1/v2 blocks (without isFixed) are flexible; v3 fixed blocks are hard barriers.
+ * - The edited block is removed from collision calculation and placed at the requested
+ *   snapped start; if it is fixed, the flag is preserved and it may still be moved explicitly.
+ * - Flexible blocks ending after the anchor start keep their duration and original order;
+ *   only blocks intersecting the moving cursor are shifted down, so existing gaps absorb shifts.
+ * - Other fixed blocks cannot move or be intersected. Overflow past dayEnd/activityEnd fails.
+ * - On failure no partial schedule is returned.
+ */
+export function applyCascadeScheduleEdit(schedule: DailySchedule, edit: CascadeScheduleEdit): CascadeScheduleEditResult {
+  const initialValidation = validateTimelineStructure(schedule)
+  if (!initialValidation.ok) return initialValidation
+
+  const dayStart = schedule.dayStartMinutes
+  const dayEnd = getTimelineEnd(schedule)
+  const order = new Map(schedule.blocks.map((block, index) => [block.id, index]))
+  const anchorResult = buildAnchorBlock(schedule, edit)
+  if (!anchorResult.ok) return anchorResult
+
+  const { anchor, restBlocks } = anchorResult
+  if (anchor.startMinutes < dayStart || getBlockEnd(anchor) > dayEnd) {
+    return makeOverflowResult(anchor.id, dayEnd)
+  }
+
+  const fixedBlocks = restBlocks.filter(isFixedScheduleBlock)
+  const fixedAnchorConflict = fixedBlocks.find(block => blocksOverlap(anchor, block))
+  if (fixedAnchorConflict) return makeFixedCollisionResult(anchor.id, fixedAnchorConflict.id)
+
+  const flexibleBlocks = restBlocks
+    .filter(block => !isFixedScheduleBlock(block))
+    .sort((a, b) => a.startMinutes - b.startMinutes || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0) || a.id.localeCompare(b.id))
+
+  const arrangedFlexibleBlocks: BlockInput[] = []
+  let cursor = getBlockEnd(anchor)
+  for (const block of flexibleBlocks) {
+    if (getBlockEnd(block) <= anchor.startMinutes) {
+      arrangedFlexibleBlocks.push(block)
+      continue
+    }
+
+    const nextStart = block.startMinutes < cursor ? cursor : block.startMinutes
+    const nextBlock = nextStart === block.startMinutes ? block : { ...block, startMinutes: nextStart }
+    if (getBlockEnd(nextBlock) > dayEnd) return makeOverflowResult(nextBlock.id, dayEnd)
+    const fixedConflict = fixedBlocks.find(fixedBlock => blocksOverlap(nextBlock, fixedBlock))
+    if (fixedConflict) return makeFixedCollisionResult(nextBlock.id, fixedConflict.id)
+    arrangedFlexibleBlocks.push(nextBlock)
+    cursor = getBlockEnd(nextBlock)
+  }
+
+  const nextBlocks = sortBlocksByTimeline([anchor, ...fixedBlocks, ...arrangedFlexibleBlocks], order)
+  const nextSchedule = cloneScheduleWithBlocks(schedule, nextBlocks)
+  const finalValidation = validateTimelineStructure(nextSchedule)
+  if (!finalValidation.ok) {
+    return {
+      ...finalValidation,
+      reason: finalValidation.reason === 'invalid-input' ? 'structural-invalid' : finalValidation.reason,
+    }
+  }
+
+  const beforeById = new Map(schedule.blocks.map(block => [block.id, block]))
+  const changedBlockIds = nextBlocks
+    .filter(block => {
+      const before = beforeById.get(block.id)
+      return !before || before.startMinutes !== block.startMinutes || before.durationMinutes !== block.durationMinutes
+    })
+    .map(block => block.id)
+
+  return { ok: true, schedule: nextSchedule, changedBlockIds }
 }
 
 // === Auto-layout ===
@@ -381,6 +738,10 @@ type ComparableSchedule = {
   timezone: string
   dayStartMinutes: number
   dayEndMinutes: number
+  planningBasis?: string
+  planningStartMinutes?: number
+  workEndMinutes?: number
+  activityEndMinutes?: number
   blocks: BlockInput[]
 }
 
@@ -394,6 +755,8 @@ function normalizeForCompare(schedule: ComparableSchedule): string {
           taskIndex: b.taskIndex,
           taskText: b.taskText.trim(),
           title: undefined,
+          category: 'category' in b ? b.category : undefined,
+          isFixed: 'isFixed' in b ? b.isFixed : undefined,
           startMinutes: b.startMinutes,
           durationMinutes: b.durationMinutes,
         }
@@ -405,6 +768,8 @@ function normalizeForCompare(schedule: ComparableSchedule): string {
         taskIndex: 0,
         taskText: serviceBlock.title.trim(),
         title: serviceBlock.title.trim(),
+        category: 'category' in serviceBlock ? serviceBlock.category : undefined,
+        isFixed: 'isFixed' in serviceBlock ? serviceBlock.isFixed : undefined,
         startMinutes: serviceBlock.startMinutes,
         durationMinutes: serviceBlock.durationMinutes,
       }
@@ -418,6 +783,10 @@ function normalizeForCompare(schedule: ComparableSchedule): string {
     timezone: schedule.timezone.trim(),
     dayStartMinutes: schedule.dayStartMinutes,
     dayEndMinutes: schedule.dayEndMinutes,
+    planningBasis: schedule.planningBasis,
+    planningStartMinutes: schedule.planningStartMinutes,
+    workEndMinutes: schedule.workEndMinutes,
+    activityEndMinutes: schedule.activityEndMinutes,
     blocks,
   })
 }

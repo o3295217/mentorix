@@ -11,5 +11,5 @@ export async function lockDailyEntryForScheduleMutation(
   tx: Prisma.TransactionClient,
   dailyEntryId: number,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT id FROM "DailyEntry" WHERE id = ${dailyEntryId} FOR UPDATE`
+  await tx.$queryRaw`SELECT id FROM "daily_entries" WHERE id = ${dailyEntryId} FOR UPDATE`
 }

@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { computeDailyScheduleLoadSummary, type DailySchedule } from '@/lib/daily-schedule'
 import {
   DEFAULT_DAY_END_MINUTES,
   DEFAULT_DAY_START_MINUTES,
   type BlockInput,
+  applyCascadeScheduleEdit,
   autoLayoutBlocks,
   buildSchedule,
   clamp,
   clampBlockToRange,
+  computeClientScheduleLoadSummary,
   computeUnscheduledTaskIndexes,
   findFreeSlot,
   formatDurationLabel,
@@ -24,14 +27,71 @@ import {
   snapToStep,
   timeLabelToMinutes,
 } from '@/hooks/daily/schedule-helpers'
+import { canApplySavedScheduleToCurrentDate, withScheduleBlocks } from '@/hooks/daily/useDailySchedule'
 
 const onlyTaskBlocks = (blocks: BlockInput[]) => blocks.filter(isTaskScheduleBlock)
 
 const DAY_START = 6 * 60
 const DAY_END = 24 * 60
+const at = (hours: number, minutes = 0) => hours * 60 + minutes
 const seqGen = () => {
   let i = 0
   return () => `b-${++i}`
+}
+
+const block = (id: string, startMinutes: number, durationMinutes: number, taskIndex = 1): BlockInput => ({
+  id,
+  taskIndex,
+  taskText: id.toUpperCase(),
+  startMinutes,
+  durationMinutes,
+})
+
+const v3Task = (id: string, startMinutes: number, durationMinutes: number, isFixed = false, taskIndex = 1): BlockInput => ({
+  id,
+  kind: 'task',
+  taskIndex,
+  taskText: id.toUpperCase(),
+  startMinutes,
+  durationMinutes,
+  category: 'main',
+  isFixed,
+})
+
+const v3FixedBuffer = (id: string, startMinutes: number, durationMinutes: number): BlockInput => ({
+  id,
+  kind: 'buffer',
+  title: id.toUpperCase(),
+  startMinutes,
+  durationMinutes,
+  category: 'buffer',
+  isFixed: true,
+})
+
+const schedule = (blocks: BlockInput[], dayStartMinutes = at(9), dayEndMinutes = at(18)): DailySchedule => ({
+  version: 1,
+  timezone: 'UTC',
+  dayStartMinutes,
+  dayEndMinutes,
+  blocks: blocks as Extract<DailySchedule, { version: 1 }>['blocks'],
+})
+
+const v3Schedule = (blocks: BlockInput[]): DailySchedule => ({
+  version: 3,
+  timezone: 'UTC',
+  dayStartMinutes: at(9),
+  dayEndMinutes: at(21, 30),
+  planningBasis: 'day_start',
+  planningStartMinutes: at(9),
+  workEndMinutes: at(18),
+  activityEndMinutes: at(21, 30),
+  blocks: blocks as Extract<DailySchedule, { version: 3 }>['blocks'],
+})
+
+const expectOk = (result: ReturnType<typeof applyCascadeScheduleEdit>) => {
+  expect(result.ok).toBe(true)
+  if (!result.ok) throw new Error(result.message)
+  return result
 }
 
 describe('schedule-helpers · time & numeric primitives', () => {
@@ -103,6 +163,232 @@ describe('schedule-helpers · geometry', () => {
     // duration is clamped to span, then start clamped so end <= 1440
     expect(r2.startMinutes + r2.durationMinutes).toBeLessThanOrEqual(1440)
     expect(r2.startMinutes).toBeGreaterThanOrEqual(360)
+  })
+})
+
+describe('schedule-helpers · applyCascadeScheduleEdit', () => {
+  it('inserts into an occupied block and shifts a 45/90-minute chain from 09:30', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([
+        block('a', at(9), 45, 1),
+        block('b', at(9, 45), 90, 2),
+        block('c', at(11, 15), 45, 3),
+      ], at(9), at(14)),
+      { type: 'insert', block: block('x', 0, 45, 4), startMinutes: at(9, 30) },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes, durationMinutes }) => [id, startMinutes, durationMinutes])).toEqual([
+      ['x', at(9, 30), 45],
+      ['a', at(10, 15), 45],
+      ['b', at(11), 90],
+      ['c', at(12, 30), 45],
+    ])
+    expect(result.changedBlockIds).toEqual(['x', 'a', 'b', 'c'])
+  })
+
+  it('drops a default 30-minute task at requested occupied start and cascades followers', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([block('a', at(9), 60, 1), block('b', at(10), 60, 2)], at(9), at(12)),
+      { type: 'insert', block: block('x', 0, 30, 3), startMinutes: at(9, 30), durationMinutes: 30 },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes, durationMinutes }) => [id, startMinutes, durationMinutes])).toEqual([
+      ['x', at(9, 30), 30],
+      ['a', at(10), 60],
+      ['b', at(11), 60],
+    ])
+  })
+
+  it('moves a block down and cascades following flexible blocks', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([block('a', at(9), 60, 1), block('b', at(10), 60, 2), block('c', at(11), 60, 3)], at(9), at(14)),
+      { type: 'move', blockId: 'a', startMinutes: at(10, 30) },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes }) => [id, startMinutes])).toEqual([
+      ['a', at(10, 30)],
+      ['b', at(11, 30)],
+      ['c', at(12, 30)],
+    ])
+  })
+
+  it('moves a block up, removes it from calculation, and lets the old gap absorb part of the shift', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([block('a', at(9), 60, 1), block('b', at(10), 60, 2), block('c', at(11), 60, 3)], at(9), at(13)),
+      { type: 'move', blockId: 'c', startMinutes: at(9, 30) },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes }) => [id, startMinutes])).toEqual([
+      ['c', at(9, 30)],
+      ['a', at(10, 30)],
+      ['b', at(11, 30)],
+    ])
+  })
+
+  it('uses existing gaps to stop the cascade', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([block('a', at(9), 60, 1), block('b', at(11), 60, 2), block('c', at(12), 60, 3)], at(9), at(14)),
+      { type: 'insert', block: block('x', 0, 30, 4), startMinutes: at(9, 30) },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes }) => [id, startMinutes])).toEqual([
+      ['x', at(9, 30)],
+      ['a', at(10)],
+      ['b', at(11)],
+      ['c', at(12)],
+    ])
+    expect(result.changedBlockIds).toEqual(['x', 'a'])
+  })
+
+  it('rejects a cascade that would collide with a fixed 18:00–20:00 block', () => {
+    const result = applyCascadeScheduleEdit(
+      v3Schedule([
+        v3Task('a', at(17, 30), 30, false, 1),
+        v3FixedBuffer('fixed', at(18), 120),
+      ]),
+      { type: 'insert', block: v3Task('x', 0, 30, false, 2), startMinutes: at(17, 15) },
+    )
+
+    expect(result).toMatchObject({ ok: false, reason: 'fixed-collision', blockId: 'a', conflictingBlockId: 'fixed' })
+  })
+
+  it('allows touching fixed 18:00–20:00 and 20:00–21:30 boundaries but rejects activity overflow', () => {
+    const boundary = expectOk(applyCascadeScheduleEdit(
+      v3Schedule([v3FixedBuffer('fixed', at(18), 120)]),
+      { type: 'insert', block: v3Task('x', 0, 90, false, 1), startMinutes: at(20) },
+    ))
+    expect(boundary.schedule.blocks.map(({ id, startMinutes, durationMinutes }) => [id, startMinutes, durationMinutes])).toEqual([
+      ['fixed', at(18), 120],
+      ['x', at(20), 90],
+    ])
+
+    const overflow = applyCascadeScheduleEdit(
+      v3Schedule([v3FixedBuffer('fixed', at(18), 120)]),
+      { type: 'insert', block: v3Task('late', 0, 90, false, 1), startMinutes: at(20, 15) },
+    )
+    expect(overflow).toMatchObject({ ok: false, reason: 'overflow', blockId: 'late', limitMinutes: at(21, 30) })
+  })
+
+  it('grows a block by cascading flexible followers', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([block('a', at(9), 60, 1), block('b', at(10), 45, 2), block('c', at(10, 45), 45, 3)], at(9), at(13)),
+      { type: 'resize', blockId: 'a', durationMinutes: 90 },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes, durationMinutes }) => [id, startMinutes, durationMinutes])).toEqual([
+      ['a', at(9), 90],
+      ['b', at(10, 30), 45],
+      ['c', at(11, 15), 45],
+    ])
+  })
+
+  it('shrinks a block and leaves a gap instead of pulling followers up', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([block('a', at(9), 90, 1), block('b', at(10, 30), 45, 2)], at(9), at(12)),
+      { type: 'resize', blockId: 'a', durationMinutes: 45 },
+    ))
+
+    expect(result.schedule.blocks.map(({ id, startMinutes, durationMinutes }) => [id, startMinutes, durationMinutes])).toEqual([
+      ['a', at(9), 45],
+      ['b', at(10, 30), 45],
+    ])
+    expect(result.changedBlockIds).toEqual(['a'])
+  })
+
+  it('does not mutate the input schedule', () => {
+    const input = schedule([block('a', at(9), 60, 1), block('b', at(10), 60, 2)], at(9), at(12))
+    const snapshot = JSON.parse(JSON.stringify(input)) as DailySchedule
+
+    expectOk(applyCascadeScheduleEdit(input, { type: 'move', blockId: 'a', startMinutes: at(9, 30) }))
+
+    expect(input).toEqual(snapshot)
+  })
+
+  it('snaps requested starts and durations to 15-minute intervals', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      schedule([], at(9), at(11)),
+      { type: 'insert', block: block('x', 0, 22, 1), startMinutes: at(9, 37), durationMinutes: 22 },
+    ))
+
+    expect(result.schedule.blocks[0]).toMatchObject({ startMinutes: at(9, 30), durationMinutes: 15 })
+    expect(result.schedule.blocks.every(item => item.startMinutes % 15 === 0 && item.durationMinutes % 15 === 0)).toBe(true)
+  })
+
+  it('keeps a moved fixed block fixed while treating other fixed blocks as barriers', () => {
+    const result = expectOk(applyCascadeScheduleEdit(
+      v3Schedule([v3Task('fixed-task', at(9), 60, true, 1), v3Task('flex', at(10), 60, false, 2)]),
+      { type: 'move', blockId: 'fixed-task', startMinutes: at(9, 30) },
+    ))
+
+    expect(result.schedule.blocks[0]).toMatchObject({ id: 'fixed-task', startMinutes: at(9, 30), isFixed: true })
+    expect(result.schedule.blocks[1]).toMatchObject({ id: 'flex', startMinutes: at(10, 30) })
+  })
+})
+
+describe('schedule-helpers · client load summary parity', () => {
+  it('matches server summary for 09:30–21:30 category sample with active denominator', () => {
+    const sample: DailySchedule = {
+      version: 3,
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: at(9, 30),
+      dayEndMinutes: at(21, 30),
+      planningBasis: 'custom_time',
+      planningStartMinutes: at(9, 30),
+      workEndMinutes: at(18),
+      activityEndMinutes: at(21, 30),
+      blocks: [
+        { id: 'main', kind: 'task', taskIndex: 1, taskText: 'Фокус', category: 'main', isFixed: false, startMinutes: at(9, 30), durationMinutes: 135 },
+        { id: 'personal', kind: 'task', taskIndex: 2, taskText: 'Личное', category: 'personal', isFixed: false, startMinutes: at(15), durationMinutes: 120 },
+        { id: 'travel', kind: 'buffer', title: 'Дорога', category: 'travel', isFixed: true, startMinutes: at(20), durationMinutes: 90 },
+      ],
+    }
+
+    const client = computeClientScheduleLoadSummary(sample)
+    const server = computeDailyScheduleLoadSummary(sample)
+    expect(client).toEqual(server)
+    expect(client.activeInterval.availableMinutes).toBe(720)
+    expect(client.categories.main).toMatchObject({ minutes: 135, percent: 18.75 })
+    expect(client.categories.personal).toMatchObject({ minutes: 120, percent: 16.67 })
+    expect(client.categories.travel).toMatchObject({ minutes: 90, percent: 12.5 })
+    expect(client.scheduledMinutes).toBe(345)
+    expect(client.scheduledPercent).toBe(47.92)
+  })
+})
+
+describe('schedule-helpers · v3 shape preservation and dirty detection', () => {
+  it('preserves v3 service blocks, category and fixed flags when replacing blocks', () => {
+    const current = v3Schedule([
+      v3Task('task', at(9), 60, false, 1),
+      { id: 'travel', kind: 'buffer', title: 'Дорога', category: 'travel', isFixed: true, startMinutes: at(18), durationMinutes: 90 },
+    ])
+    const next = withScheduleBlocks(current, [current.blocks[1]])
+
+    expect(next.version).toBe(3)
+    expect(next.blocks).toEqual([{ id: 'travel', kind: 'buffer', title: 'Дорога', category: 'travel', isFixed: true, startMinutes: at(18), durationMinutes: 90 }])
+  })
+
+  it('reconcile keeps v3 service blocks and task category/isFixed on task reorder', () => {
+    const current = v3Schedule([
+      { ...v3Task('a', at(9), 60, false, 1), category: 'personal' },
+      { id: 'fixed-meal', kind: 'meal', title: 'Обед', category: 'meal', isFixed: true, startMinutes: at(13), durationMinutes: 45 },
+    ])
+    const result = reconcileSchedule(current.blocks, [{ taskText: 'A' }], [{ taskText: 'A updated' }, { taskText: 'A' }])
+
+    expect(result.blocks.find(block => block.id === 'fixed-meal')).toMatchObject({ kind: 'meal', category: 'meal', isFixed: true })
+    expect(result.blocks.find(block => block.id === 'a')).toMatchObject({ taskIndex: 2, taskText: 'A', category: 'personal', isFixed: false })
+  })
+
+  it('scheduleEquals detects v3 planning fields, category and fixed differences', () => {
+    const base = v3Schedule([v3Task('a', at(9), 60, false, 1)])
+    expect(scheduleEquals(base, { ...base, workEndMinutes: at(19) })).toBe(false)
+    expect(scheduleEquals(base, { ...base, blocks: [{ ...base.blocks[0], category: 'personal' }] as Extract<DailySchedule, { version: 3 }>['blocks'] })).toBe(false)
+    expect(scheduleEquals(base, { ...base, blocks: [{ ...base.blocks[0], isFixed: true }] as Extract<DailySchedule, { version: 3 }>['blocks'] })).toBe(false)
+  })
+
+  it('guards stale apply responses when date changed from A to B', () => {
+    expect(canApplySavedScheduleToCurrentDate('2026-07-16', '2026-07-16')).toBe(true)
+    expect(canApplySavedScheduleToCurrentDate('2026-07-16', '2026-07-17')).toBe(false)
+    expect(canApplySavedScheduleToCurrentDate(undefined, '2026-07-17')).toBe(true)
   })
 })
 

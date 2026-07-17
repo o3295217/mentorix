@@ -333,7 +333,7 @@ model DailySchedule {
   id            Int        @id @default(autoincrement())
   dailyEntryId  Int        @unique
   dailyEntry    DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
-  scheduleJson  Json       // v1 task-only или v2: kind='task' + meal/rest/buffer service blocks; шифруется
+  scheduleJson  Json       // v1 task-only; v2 task + meal/rest/buffer; v3 planning window + category/isFixed blocks; шифруется
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 }
@@ -561,7 +561,7 @@ model ChatMessage {
   date      String
   role      String   // 'user', 'assistant'
   content   String
-  metadataJson Json?  // encrypted, typed cards (daily_schedule_proposal: currentScheduleExists/currentScheduleHash/proposal/appliedAt)
+  metadataJson Json?  // encrypted, typed cards (daily_schedule_proposal v1/v2: currentScheduleExists/currentScheduleHash/proposal/loadSummary/appliedAt)
   createdAt DateTime @default(now())
 }
 
@@ -651,9 +651,9 @@ model AuditLog {
 | Endpoint | Методы | Файл | Описание |
 |----------|--------|------|----------|
 | `/api/daily` | GET, POST | `app/api/daily/route.ts` | CRUD дневных записей |
-| `/api/daily/schedule` | GET, PUT | `app/api/daily/schedule/route.ts` | Временное расписание задач дня; `DailyScheduleSchema` поддерживает backward-compatible v1/v2, ответ содержит `hash` |
-| `/api/daily/schedule/apply-proposal` | POST | `app/api/daily/schedule/apply-proposal/route.ts` | Подтверждает AI-proposal из `ChatMessage.metadataJson`, проверяет ownership/date/current hash, применяет v2 schedule |
-| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/schedule_applied/done/error`, Anthropic tool `propose_daily_schedule`; в system data block передаётся machine-readable контекст актуального persisted schedule (v1/v2 blocks, range, timezone, updatedAt/hash) и pending proposal; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson`; короткое подтверждение pending proposal применяется без второго AI-вызова через shared apply service |
+| `/api/daily/schedule` | GET, PUT | `app/api/daily/schedule/route.ts` | Временное расписание задач дня; `DailyScheduleSchema` поддерживает backward-compatible v1/v2 и v3 (`planningBasis`, `planningStartMinutes`, `workEndMinutes`, `activityEndMinutes`, `category`, `isFixed`); ответ содержит `hash` и server-computed `loadSummary` |
+| `/api/daily/schedule/apply-proposal` | POST | `app/api/daily/schedule/apply-proposal/route.ts` | Подтверждает AI-proposal из `ChatMessage.metadataJson`, проверяет ownership/date/current hash, атомарно применяет v1→schedule v2 или v2→schedule v3 и возвращает persisted schedule/hash/loadSummary |
+| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/done/error`, Anthropic tool `propose_daily_schedule` принимает только proposal v2 (`planningBasis`, `planningStartMinutes`, `workEndMinutes`, `activityEndMinutes`, `category`, `isFixed`, 15-минутная сетка; `loadSummary` не принимается от AI и вычисляется сервером); в system data block передаётся machine-readable контекст актуального persisted schedule (v1/v2/v3 blocks, range/planning, timezone, updatedAt/hash) и latest pending proposal для обсуждения/коррекции; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson`; применение proposal выполняется только явным `/api/daily/schedule/apply-proposal` с конкретным `messageId` |
 | `/api/daily/check-plan` | POST | `app/api/daily/check-plan/route.ts` | Проверка плана AI |
 | `/api/daily/indicators` | GET | `app/api/daily/indicators/route.ts` | Индикаторы для календаря |
 | `/api/evaluate` | POST | `app/api/evaluate/route.ts` | Оценка дня через AI |
@@ -695,6 +695,8 @@ model AuditLog {
 | `/api/health` | GET | `app/api/health/route.ts` | Health check (без авторизации) |
 
 Daily schedule concurrency: manual `PUT /api/daily/schedule` and AI proposal apply both run inside a DB transaction and acquire `SELECT ... FOR UPDATE` on the stable parent `DailyEntry` row before mutating `DailySchedule`. This serializes mutations for one user/date even when the `DailySchedule` row does not exist yet; proposal apply re-reads the schedule under the lock and keeps `expectedCurrentScheduleHash` conflict semantics.
+
+DailySchedule v3 keeps legacy `dayStartMinutes/dayEndMinutes` aligned to the active planning interval (`dayStartMinutes === planningStartMinutes`, `dayEndMinutes === activityEndMinutes`). All planning and block times are 15-minute aligned and must satisfy `planningStartMinutes < workEndMinutes <= activityEndMinutes`. Server code computes `loadSummary` from the persisted schedule only: active denominator is `planningStartMinutes..activityEndMinutes`, work denominator is `planningStartMinutes..workEndMinutes`, category minutes do not overlap because schedule validation rejects overlapping blocks. Proposal metadata schemaVersion 2 stores the server-computed summary; metadata v1 remains readable/applicable.
 
 ### Паттерн API route
 

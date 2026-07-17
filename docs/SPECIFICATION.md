@@ -273,7 +273,7 @@ Claude API оценивает день по следующим критерия�
 | GET/POST | `/api/daily` | GET: запись за дату; POST: сохранение плана/факта |
 | GET | `/api/daily/indicators` | Индикаторы для DatePicker (оценки по дням) |
 | POST | `/api/daily/check-plan` | ИИ-проверка плана дня перед стартом |
-| POST | `/api/daily/chat` | Чат с ИИ о плане на день |
+| POST | `/api/daily/chat` | Чат с ИИ о плане на день; schedule proposal формируется коротким диалогом, до первого варианта фиксирует источник старта, `planningStart`, `workEnd`, `activityEnd` и fixed события; tool принимает proposal v2 с 15-минутной сеткой, а `loadSummary` вычисляется сервером |
 | GET/POST/DELETE | `/api/daily/chat/messages` | CRUD сообщений чата |
 
 ### 5.4. Оценки ИИ (`/api/evaluate/`)

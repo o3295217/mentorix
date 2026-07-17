@@ -18,10 +18,10 @@ import { getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { getWorkContextForAI } from '@/lib/completed-work'
 import { getPlanUserContext } from '@/lib/user-context'
 import { DailyScheduleSchema, hashDailySchedule } from '@/lib/daily-schedule'
-import { createProposalMetadata, DailyScheduleProposalSchema, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan } from '@/lib/daily-schedule-proposal'
+import { createProposalMetadata, DailyScheduleProposalV2Schema, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan } from '@/lib/daily-schedule-proposal'
 import { buildScheduleMachineContext } from '@/lib/daily-schedule-context'
-import { isStrictScheduleChangeRequest, isStrictScheduleConfirmation } from '@/lib/daily-schedule-intent'
-import { applyDailyScheduleProposal } from '@/lib/daily-schedule-apply'
+import { isStrictScheduleChangeRequest } from '@/lib/daily-schedule-intent'
+import { AuthError } from '@/lib/auth'
 
 const ChatSchema = z.object({
   date: z.string().trim().min(1).max(32),
@@ -36,24 +36,28 @@ const ChatSchema = z.object({
   userMessage: z.string().trim().min(1).max(4000), // Новое сообщение пользователя
 })
 
-function sseEvent(type: 'text' | 'proposal' | 'schedule_applied' | 'done' | 'error', data: unknown): Uint8Array {
+function sseEvent(type: 'text' | 'proposal' | 'done' | 'error', data: unknown): Uint8Array {
   return new TextEncoder().encode(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`)
 }
 
 const proposeDailyScheduleTool = {
   name: 'propose_daily_schedule',
-  description: 'Предложить расписание дня. Use exactly the timezone provided in the request context; do not guess timezone. Task blocks can only reference existing plan tasks by exact 1-based taskIndex and exact taskText; meal/rest/buffer are service blocks.',
+  description: 'Предложить расписание дня в proposal v2. Use exactly the date/timezone from the request context; do not guess timezone. All minute values and durations must be multiples of 15. Task blocks can only reference existing plan tasks by exact 1-based taskIndex and exact taskText; do not invent tasks. Do not include loadSummary: it is computed by the server.',
   input_schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['version', 'date', 'timezone', 'dayStartMinutes', 'dayEndMinutes', 'blocks'],
+    required: ['version', 'date', 'timezone', 'dayStartMinutes', 'dayEndMinutes', 'planningBasis', 'planningStartMinutes', 'workEndMinutes', 'activityEndMinutes', 'blocks'],
     properties: {
-      version: { type: 'integer', const: 1 },
+      version: { type: 'integer', const: 2 },
       date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
       timezone: { type: 'string', minLength: 1, maxLength: 100, pattern: '^([A-Za-z_]+\\/[A-Za-z0-9_+.-]+(?:\\/[A-Za-z0-9_+.-]+)*|UTC)$', description: 'Must exactly match the timezone value from the request context.' },
-      dayStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15 },
-      dayEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15 },
-      rationale: { type: 'string', maxLength: 1000 },
+      dayStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'Must equal planningStartMinutes.' },
+      dayEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'Must equal activityEndMinutes.' },
+      planningBasis: { enum: ['current_time', 'day_start', 'custom_time'], description: 'today: current_time/day_start/custom_time; future date: day_start/custom_time only.' },
+      planningStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'Start minute chosen for planning; preserve exact HH:MM such as 09:30.' },
+      workEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'End of work activity; must be > planningStartMinutes and <= activityEndMinutes.' },
+      activityEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'End of the whole active day; must be >= workEndMinutes.' },
+      rationale: { type: 'string', maxLength: 1000, description: 'Short explanation only; no load summary.' },
       blocks: {
         type: 'array',
         minItems: 1,
@@ -63,11 +67,13 @@ const proposeDailyScheduleTool = {
             {
               type: 'object',
               additionalProperties: false,
-              required: ['kind', 'taskIndex', 'taskText', 'startMinutes', 'durationMinutes'],
+              required: ['kind', 'taskIndex', 'taskText', 'category', 'isFixed', 'startMinutes', 'durationMinutes'],
               properties: {
                 kind: { const: 'task' },
                 taskIndex: { type: 'integer', minimum: 1 },
                 taskText: { type: 'string', minLength: 1, maxLength: 500 },
+                category: { enum: ['main', 'operational', 'travel', 'personal'], description: 'main for strategic/deep priority tasks; operational for routine work; travel/personal when applicable.' },
+                isFixed: { type: 'boolean', description: 'true only for hard-time events/deadlines explicitly fixed by the user or current schedule.' },
                 startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15 },
                 durationMinutes: { type: 'integer', minimum: 15, maximum: 1440, multipleOf: 15 },
               },
@@ -75,10 +81,12 @@ const proposeDailyScheduleTool = {
             {
               type: 'object',
               additionalProperties: false,
-              required: ['kind', 'title', 'startMinutes', 'durationMinutes'],
+              required: ['kind', 'title', 'category', 'isFixed', 'startMinutes', 'durationMinutes'],
               properties: {
                 kind: { enum: ['meal', 'rest', 'buffer'] },
                 title: { type: 'string', minLength: 1, maxLength: 120 },
+                category: { enum: ['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'], description: 'Semantic category. Use personal/travel for user-stated fixed commitments that are not plan tasks.' },
+                isFixed: { type: 'boolean', description: 'true only for hard-time service events explicitly fixed by the user or current schedule.' },
                 startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15 },
                 durationMinutes: { type: 'integer', minimum: 15, maximum: 1440, multipleOf: 15 },
               },
@@ -219,14 +227,11 @@ export async function POST(request: NextRequest) {
       ? `\n\n🗓️ ТЕКУЩЕЕ РАСПИСАНИЕ: есть; updatedAt=${currentEntry.schedule.updatedAt.toISOString()}; hash=${currentScheduleHash ?? 'invalid'}`
       : '\n\n🗓️ ТЕКУЩЕЕ РАСПИСАНИЕ: отсутствует'
     const timezoneContext = `\n\n🌐 TIMEZONE: ${timezone}. Любой вызов propose_daily_schedule обязан использовать ровно это значение proposal.timezone; не угадывай и не заменяй timezone.`
-    let pendingProposal: { messageId: number; metadata: NonNullable<ReturnType<typeof safeParseProposalMetadata>> } | null = null
-    for (const message of recentAssistantMessages) {
-      const metadata = safeParseProposalMetadata(message.metadataJson)
-      if (metadata && metadata.date === date && !metadata.appliedAt) {
-        pendingProposal = { messageId: message.id, metadata }
-        break
-      }
-    }
+    const latestAssistantMessage = recentAssistantMessages[0]
+    const latestAssistantMetadata = latestAssistantMessage ? safeParseProposalMetadata(latestAssistantMessage.metadataJson) : null
+    const pendingProposal: { messageId: number; metadata: NonNullable<ReturnType<typeof safeParseProposalMetadata>> } | null = latestAssistantMessage && latestAssistantMetadata && latestAssistantMetadata.date === date && !latestAssistantMetadata.appliedAt
+      ? { messageId: latestAssistantMessage.id, metadata: latestAssistantMetadata }
+      : null
     const scheduleMachineContext = buildScheduleMachineContext({
       date,
       timezone,
@@ -236,43 +241,6 @@ export async function POST(request: NextRequest) {
       pendingProposal,
     })
     const sanitizedUserMessage = sanitizeUserInput(userMessage, 4000)
-
-    if (pendingProposal && isStrictScheduleConfirmation(userMessage)) {
-      const applyResult = await applyDailyScheduleProposal({
-        userId,
-        date,
-        messageId: pendingProposal.messageId,
-        replaceExisting: true,
-        expectedCurrentScheduleHash: pendingProposal.metadata.currentScheduleHash,
-      })
-      if (applyResult.status === 409) return NextResponse.json({ error: applyResult.error ?? 'Schedule conflict' }, { status: 409 })
-      if (applyResult.status === 404) return NextResponse.json({ error: 'Schedule proposal not found' }, { status: 404 })
-      if (applyResult.status === 400) return NextResponse.json({ error: applyResult.error }, { status: 400 })
-
-      const confirmationText = 'Расписание обновлено и размещено на шкале.'
-      const readable = new ReadableStream({
-        async start(controller) {
-          try {
-            await prisma.chatMessage.create({ data: { userId, date, role: 'user', content: sanitizedUserMessage } })
-            const assistant = await prisma.chatMessage.create({ data: { userId, date, role: 'assistant', content: confirmationText }, select: { id: true } })
-            controller.enqueue(sseEvent('text', { text: confirmationText }))
-            controller.enqueue(sseEvent('schedule_applied', {
-              schedule: applyResult.schedule,
-              updatedAt: applyResult.updatedAt.toISOString(),
-              status: applyResult.applyStatus,
-              proposalMessageId: applyResult.proposalMessageId,
-            }))
-            controller.enqueue(sseEvent('done', { assistantMessageId: assistant.id }))
-          } catch (saveError) {
-            console.error('[Plan Chat] Failed to save confirmation messages:', saveError)
-            controller.enqueue(sseEvent('error', { error: 'Failed to save chat confirmation' }))
-          } finally {
-            controller.close()
-          }
-        },
-      })
-      return new Response(readable, { headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' } })
-    }
 
     // Типизация для истории
     type RecentEntry = typeof recentEntries[number]
@@ -445,7 +413,7 @@ export async function POST(request: NextRequest) {
             if (toolNames.get(index) !== 'propose_daily_schedule') continue
             try {
               const parsed = JSON.parse(inputJson)
-              const proposalParse = DailyScheduleProposalSchema.safeParse(parsed)
+              const proposalParse = DailyScheduleProposalV2Schema.safeParse(parsed)
               if (!proposalParse.success) {
                 console.warn('[Plan Chat] Invalid schedule proposal schema:', proposalParse.error.format())
                 continue
@@ -508,6 +476,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Error in plan chat:', error)
     return NextResponse.json(
       { error: 'Failed to process chat message' },

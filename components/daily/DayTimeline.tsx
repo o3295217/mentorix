@@ -6,10 +6,11 @@ import type { OpenTask } from '@/lib/types'
 import {
   type BlockInput,
   MIN_BLOCK_DURATION_MINUTES,
-  clamp,
+  computeClientScheduleLoadSummary,
   formatDurationLabel,
   getBlockDisplayTitle,
-  hasOverlapWithOthers,
+  getScheduleBoundaryMinutes,
+  getScheduleBlockCategory,
   isTaskScheduleBlock,
   minutesToTimeInputValue,
   minutesToTimeLabel,
@@ -18,6 +19,7 @@ import {
 } from '@/hooks/daily/schedule-helpers'
 
 const PX_PER_MIN = 3 // 15-min block ≈ 45px (≥44px touch target)
+const DEFAULT_UNSCHEDULED_DURATION_MINUTES = 30
 
 export function getScheduleBlockRenderKey(blockId: string, appliedAnimationKey: number): string {
   return appliedAnimationKey > 0 ? `${appliedAnimationKey}:${blockId}` : blockId
@@ -25,6 +27,67 @@ export function getScheduleBlockRenderKey(blockId: string, appliedAnimationKey: 
 
 export function canMutateTimeline(mutationLocked: boolean): boolean {
   return !mutationLocked
+}
+
+export function shouldCommitPointerDrag(eventType: 'up' | 'cancel', moved: boolean, mutationLocked: boolean): boolean {
+  return eventType === 'up' && moved && !mutationLocked
+}
+
+export function getTimelinePointerPreviewRange(
+  originalStart: number,
+  originalDuration: number,
+  deltaPixels: number,
+  mode: DragMode,
+  dayStart: number,
+  dayEnd: number,
+): { startMinutes: number; durationMinutes: number } {
+  const deltaMin = snapToStep(deltaPixels / PX_PER_MIN)
+  if (mode === 'resize') {
+    const maxDuration = Math.max(0, dayEnd - originalStart)
+    const requestedDuration = snapToStep(originalDuration + deltaMin)
+    const duration = Math.min(Math.max(MIN_BLOCK_DURATION_MINUTES, requestedDuration), maxDuration)
+    return { startMinutes: originalStart, durationMinutes: duration }
+  }
+  const requestedStart = originalStart + deltaMin
+  const duration = Math.min(Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(originalDuration)), Math.max(MIN_BLOCK_DURATION_MINUTES, dayEnd - dayStart))
+  const start = Math.min(Math.max(dayStart, snapToStep(requestedStart)), Math.max(dayStart, dayEnd - duration))
+  return { startMinutes: start, durationMinutes: Math.min(duration, dayEnd - start) }
+}
+
+export function getDropStartMinutesFromClientY(
+  clientY: number,
+  timelineTop: number,
+  dayStart: number,
+  dayEnd: number,
+  durationMinutes: number = DEFAULT_UNSCHEDULED_DURATION_MINUTES,
+): number {
+  const rawMinutes = dayStart + (clientY - timelineTop) / PX_PER_MIN
+  const snapped = snapToStep(rawMinutes)
+  return Math.min(Math.max(dayStart, snapped), Math.max(dayStart, dayEnd - durationMinutes))
+}
+
+export function getTimelineBoundaryPills(schedule: DailySchedule): string[] {
+  const boundaries = getScheduleBoundaryMinutes(schedule)
+  return [
+    `План ${minutesToTimeLabel(boundaries.planningStartMinutes)}`,
+    `Работа до ${minutesToTimeLabel(boundaries.workEndMinutes)}`,
+    `Активность до ${minutesToTimeLabel(boundaries.activityEndMinutes)}`,
+  ]
+}
+
+export function getTimelineAxisMarkerLabels(): string[] {
+  return []
+}
+
+export function getUnscheduledTrayViewConfig(): { defaultDurationMinutes: number; showsDurationControls: boolean; hint: string; chipItemClassName: string; chipButtonClassIncludes: string[]; emptyCanvasText: string | null } {
+  return {
+    defaultDurationMinutes: DEFAULT_UNSCHEDULED_DURATION_MINUTES,
+    showsDurationControls: false,
+    hint: 'Перетащите задачу на шкалу',
+    chipItemClassName: 'w-[min(76vw,240px)] flex-shrink-0 md:w-[240px]',
+    chipButtonClassIncludes: ['w-full', 'cursor-grab', 'active:cursor-grabbing', 'disabled:cursor-not-allowed'],
+    emptyCanvasText: null,
+  }
 }
 
 export interface DayTimelineProps {
@@ -38,12 +101,12 @@ export interface DayTimelineProps {
   onSetBlockRange: (blockId: string, startMinutes: number, durationMinutes: number) => void
   onMoveBlock: (blockId: string, deltaMinutes: number) => void
   onRemoveBlock: (blockId: string) => void
-  onScheduleUnscheduled: (taskIndex: number) => void
+  onScheduleUnscheduled: (taskIndex: number, startMinutes?: number, durationMinutes?: number) => void
   appliedAnimationKey?: number
   mutationLocked?: boolean
 }
 
-type DragMode = 'move' | 'resize'
+export type DragMode = 'move' | 'resize'
 
 interface DragState {
   mode: DragMode
@@ -54,10 +117,27 @@ interface DragState {
   moved: boolean
 }
 
+type PreviewRange = { startMinutes: number; durationMinutes: number } | null
+type DropPreview = { taskIndex: number; startMinutes: number } | null
+
+const categoryLabels = {
+  main: 'главное',
+  operational: 'операц.',
+  travel: 'дорога',
+  personal: 'личное',
+  meal: 'еда',
+  rest: 'отдых',
+  buffer: 'буфер',
+} as const
+
 function getTaskIdForBlock(block: BlockInput, tasks: OpenTask[]): number | null {
   if (!isTaskScheduleBlock(block)) return null
   const task = tasks[block.taskIndex - 1]
   return task ? task.id : null
+}
+
+function isFixedBlock(block: BlockInput): boolean {
+  return 'isFixed' in block && block.isFixed === true
 }
 
 export default function DayTimeline({
@@ -76,6 +156,10 @@ export default function DayTimeline({
   mutationLocked = false,
 }: DayTimelineProps) {
   const { dayStartMinutes: dayStart, dayEndMinutes: dayEnd, blocks, timezone } = schedule
+  const [draggingTaskIndex, setDraggingTaskIndex] = useState<number | null>(null)
+  const [dropPreview, setDropPreview] = useState<DropPreview>(null)
+  const loadSummary = useMemo(() => computeClientScheduleLoadSummary(schedule), [schedule])
+  const trayConfig = getUnscheduledTrayViewConfig()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const totalMinutes = Math.max(0, dayEnd - dayStart)
   const totalHeight = totalMinutes * PX_PER_MIN
@@ -117,10 +201,9 @@ export default function DayTimeline({
     <div ref={scrollContainerRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2" style={{ maxHeight: '80vh' }}>
       {/* Status bar */}
       <div className="flex flex-wrap items-center gap-2 text-sm leading-5 text-gray-400">
-        <span>
-          День: <span className="text-gray-200">{minutesToTimeLabel(dayStart)}–{minutesToTimeLabel(dayEnd)}</span>
-        </span>
-        <span aria-hidden>·</span>
+        {getTimelineBoundaryPills(schedule).map(label => (
+          <span key={label} className="rounded-full border border-gray-800/70 bg-gray-950/60 px-2 py-1 text-xs text-gray-300 tabular-nums">{label}</span>
+        ))}
         <span>
           Часовой пояс: <span className="text-gray-200">{timezone}</span>
         </span>
@@ -136,28 +219,50 @@ export default function DayTimeline({
         {mutationLocked && <span className="text-blue-300" role="status" aria-live="polite">Шкала временно заблокирована на время применения</span>}
       </div>
 
+      <div className="grid gap-2 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2 text-xs text-gray-300 sm:grid-cols-[1fr_auto]">
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <span>Занято: <b className="text-gray-100">{formatDurationLabel(loadSummary.scheduledMinutes)} ({loadSummary.scheduledPercent}%)</b></span>
+          <span>Свободно: <b className="text-gray-100">{formatDurationLabel(loadSummary.unscheduledMinutes)} ({loadSummary.unscheduledPercent}%)</b></span>
+          {Object.entries(loadSummary.categories).map(([category, value]) => value.minutes > 0 && (
+            <span key={category}>{categoryLabels[category as keyof typeof categoryLabels]}: {formatDurationLabel(value.minutes)} · {value.percent}%</span>
+          ))}
+        </div>
+        <p className="text-gray-400">{loadSummary.recommendation}</p>
+      </div>
+
       {unscheduledTasks.length > 0 && (
-        <div className="flex-shrink-0 rounded-lg border border-gray-800 bg-gray-900/60 p-2">
-          <div className="mb-1.5 flex items-center justify-between gap-3">
-            <h4 className="text-sm font-medium text-gray-300">
-              Не распределено ({unscheduledTasks.length})
-            </h4>
-            <span className="text-right text-xs text-gray-500">Нажмите, чтобы поставить на шкалу</span>
+        <div className="flex-shrink-0 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h4 className="text-sm font-medium text-gray-200">Не распределено ({unscheduledTasks.length})</h4>
+            <span className="text-right text-xs text-gray-500">{trayConfig.hint}</span>
           </div>
-          <ul className="flex flex-wrap gap-1.5">
+          <ul className="flex max-h-24 gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-y-auto md:overflow-x-hidden">
             {unscheduledTasks.map(({ index, task }) => (
-              <li key={`${index}-${task.id}`}>
+              <li key={`${index}-${task.id}`} className={trayConfig.chipItemClassName}>
                 <button
                   type="button"
                   onClick={() => {
-                    if (canMutateTimeline(mutationLocked)) onScheduleUnscheduled(index)
+                    if (canMutateTimeline(mutationLocked)) onScheduleUnscheduled(index, undefined, trayConfig.defaultDurationMinutes)
+                  }}
+                  draggable={!mutationLocked}
+                  onDragStart={event => {
+                    if (!canMutateTimeline(mutationLocked)) return
+                    setDraggingTaskIndex(index)
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', String(index))
+                  }}
+                  onDragEnd={() => {
+                    setDraggingTaskIndex(null)
+                    setDropPreview(null)
                   }}
                   disabled={mutationLocked}
-                  className="max-w-full truncate rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1 text-sm text-gray-200 hover:border-blue-400/60 hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-700 disabled:hover:bg-gray-800"
-                  title={`Поставить «${task.taskText}» на шкалу`}
-                  aria-label={`Поставить задачу «${task.taskText}» на шкалу`}
+                  className={`group flex w-full cursor-grab items-center gap-2 rounded-xl border border-gray-800/80 bg-gray-900/70 px-3 py-2 text-left text-sm text-gray-200 shadow-sm transition hover:border-blue-400/50 hover:bg-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-400 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50 ${draggingTaskIndex === index ? 'scale-[0.98] border-blue-400/70 bg-blue-500/15' : ''}`}
+                  title={`Перетащить «${task.taskText}» на шкалу или нажать для ближайшего слота`}
+                  aria-label={`Задача «${task.taskText}». Перетащите на шкалу или нажмите, чтобы поставить в ближайший свободный слот на 30 минут`}
+                  aria-grabbed={draggingTaskIndex === index}
                 >
-                  + {task.taskText}
+                  <span className="text-gray-500 group-hover:text-blue-300" aria-hidden>⋮⋮</span>
+                  <span className="truncate">{task.taskText}</span>
                 </button>
               </li>
             ))}
@@ -178,11 +283,36 @@ export default function DayTimeline({
               {minutesToTimeLabel(m)}
             </div>
           ))}
+
         </div>
 
         {/* Block area */}
         <div
-          className="relative h-full min-w-0 flex-1 rounded-lg border border-gray-800 bg-gray-900/40"
+          className="relative h-full min-w-0 flex-1 rounded-2xl border border-gray-800/70 bg-gradient-to-b from-gray-950/70 to-gray-900/30"
+          aria-label="Шкала дня. Перетащите задачу сюда, чтобы поставить её на выбранное время"
+          onDragOver={event => {
+            if (!canMutateTimeline(mutationLocked)) return
+            const rawIndex = event.dataTransfer.getData('text/plain')
+            const taskIndex = rawIndex ? Number(rawIndex) : draggingTaskIndex
+            if (typeof taskIndex !== 'number' || !Number.isInteger(taskIndex)) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'move'
+            const rect = event.currentTarget.getBoundingClientRect()
+            setDropPreview({ taskIndex, startMinutes: getDropStartMinutesFromClientY(event.clientY, rect.top, dayStart, dayEnd) })
+          }}
+          onDragLeave={event => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropPreview(null)
+          }}
+          onDrop={event => {
+            if (!canMutateTimeline(mutationLocked)) return
+            event.preventDefault()
+            const taskIndex = Number(event.dataTransfer.getData('text/plain'))
+            const rect = event.currentTarget.getBoundingClientRect()
+            const startMinutes = getDropStartMinutesFromClientY(event.clientY, rect.top, dayStart, dayEnd)
+            setDropPreview(null)
+            setDraggingTaskIndex(null)
+            if (Number.isInteger(taskIndex)) onScheduleUnscheduled(taskIndex, startMinutes, DEFAULT_UNSCHEDULED_DURATION_MINUTES)
+          }}
         >
           {/* Hour grid lines */}
           {hourMarks.map(m => (
@@ -194,13 +324,23 @@ export default function DayTimeline({
             />
           ))}
 
+          {dropPreview && (
+            <div
+              className="pointer-events-none absolute left-2 right-2 z-10 rounded-xl border border-blue-300/70 bg-blue-500/20 px-3 py-2 text-sm font-medium text-blue-50 shadow-lg shadow-blue-950/30"
+              style={{ top: (dropPreview.startMinutes - dayStart) * PX_PER_MIN, height: DEFAULT_UNSCHEDULED_DURATION_MINUTES * PX_PER_MIN }}
+              role="status"
+              aria-live="polite"
+            >
+              {minutesToTimeLabel(dropPreview.startMinutes)}–{minutesToTimeLabel(dropPreview.startMinutes + DEFAULT_UNSCHEDULED_DURATION_MINUTES)} · 30 мин
+            </div>
+          )}
+
           {sortedBlocks.map((block, index) => (
             <ScheduleBlock
               key={getScheduleBlockRenderKey(block.id, appliedAnimationKey)}
               block={block}
               dayStart={dayStart}
               dayEnd={dayEnd}
-              others={blocks}
               isCompleted={(() => {
                 const id = getTaskIdForBlock(block, tasks)
                 return id !== null && selectedTasks.has(id)
@@ -213,12 +353,6 @@ export default function DayTimeline({
               mutationLocked={mutationLocked}
             />
           ))}
-
-          {sortedBlocks.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-gray-500">
-              Все задачи в разделе «Не распределено».
-            </div>
-          )}
         </div>
       </div>
 
@@ -230,7 +364,6 @@ interface ScheduleBlockProps {
   block: BlockInput
   dayStart: number
   dayEnd: number
-  others: BlockInput[]
   isCompleted: boolean
   onSetBlockRange: (blockId: string, startMinutes: number, durationMinutes: number) => void
   onMove: (blockId: string, deltaMinutes: number) => void
@@ -244,7 +377,6 @@ function ScheduleBlock({
   block,
   dayStart,
   dayEnd,
-  others,
   isCompleted,
   onSetBlockRange,
   onMove,
@@ -256,7 +388,9 @@ function ScheduleBlock({
   const [editing, setEditing] = useState(false)
   const [draftStart, setDraftStart] = useState(block.startMinutes)
   const [draftDuration, setDraftDuration] = useState(block.durationMinutes)
+  const [previewRange, setPreviewRange] = useState<PreviewRange>(null)
   const dragRef = useRef<DragState | null>(null)
+  const previewRef = useRef<PreviewRange>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   // Keep local draft in sync when entering edit mode.
@@ -270,58 +404,32 @@ function ScheduleBlock({
   useEffect(() => {
     if (canMutateTimeline(mutationLocked)) return
     dragRef.current = null
+    previewRef.current = null
+    setPreviewRange(null)
     setEditing(false)
   }, [mutationLocked])
 
-  const top = (block.startMinutes - dayStart) * PX_PER_MIN
-  const height = block.durationMinutes * PX_PER_MIN
-  const endLabel = minutesToTimeLabel(block.startMinutes + block.durationMinutes)
+  const displayStart = previewRange?.startMinutes ?? block.startMinutes
+  const displayDuration = previewRange?.durationMinutes ?? block.durationMinutes
+  const top = (displayStart - dayStart) * PX_PER_MIN
+  const height = displayDuration * PX_PER_MIN
+  const endLabel = minutesToTimeLabel(displayStart + displayDuration)
   const title = getBlockDisplayTitle(block)
   const blockKind = 'kind' in block ? block.kind : 'task'
-  const isVeryShortBlock = block.durationMinutes <= 15
-  const isShortBlock = block.durationMinutes <= 30
+  const isVeryShortBlock = displayDuration <= 15
+  const isShortBlock = displayDuration <= 30
   const kindClass = blockKind === 'meal'
-    ? 'border-orange-400/50 bg-orange-500/20 hover:bg-orange-500/25'
+    ? 'border-orange-400/40 bg-gradient-to-br from-orange-500/20 to-orange-500/10 hover:border-orange-300/60 hover:from-orange-500/25'
     : blockKind === 'rest'
-      ? 'border-emerald-400/50 bg-emerald-500/20 hover:bg-emerald-500/25'
+      ? 'border-emerald-400/40 bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 hover:border-emerald-300/60 hover:from-emerald-500/25'
       : blockKind === 'buffer'
-        ? 'border-purple-400/50 bg-purple-500/20 hover:bg-purple-500/25'
+        ? 'border-purple-400/40 bg-gradient-to-br from-purple-500/20 to-purple-500/10 hover:border-purple-300/60 hover:from-purple-500/25'
         : isCompleted
-          ? 'border-green-500/40 bg-green-600/20'
-          : 'border-blue-500/40 bg-blue-600/20 hover:bg-blue-600/25'
+          ? 'border-green-400/35 bg-gradient-to-br from-green-500/20 to-green-500/10'
+          : 'border-blue-400/35 bg-gradient-to-br from-blue-500/20 to-blue-500/10 hover:border-blue-300/60 hover:from-blue-500/25'
 
-  const tryMove = (nextStart: number) => {
-    if (!canMutateTimeline(mutationLocked)) return
-    if (nextStart < dayStart) nextStart = dayStart
-    if (nextStart + block.durationMinutes > dayEnd) {
-      nextStart = dayEnd - block.durationMinutes
-    }
-    if (
-      hasOverlapWithOthers(
-        { id: block.id, startMinutes: nextStart, durationMinutes: block.durationMinutes },
-        others,
-        block.id,
-      )
-    ) {
-      return // ignore — keep last valid
-    }
-    onSetBlockRange(block.id, nextStart, block.durationMinutes)
-  }
-
-  const tryResize = (nextDuration: number) => {
-    if (!canMutateTimeline(mutationLocked)) return
-    const dur = clamp(snapToStep(nextDuration), MIN_BLOCK_DURATION_MINUTES, dayEnd - block.startMinutes)
-    if (
-      hasOverlapWithOthers(
-        { id: block.id, startMinutes: block.startMinutes, durationMinutes: dur },
-        others,
-        block.id,
-      )
-    ) {
-      return
-    }
-    onSetBlockRange(block.id, block.startMinutes, dur)
-  }
+  const clampPreview = (startMinutes: number, durationMinutes: number, mode: DragMode) =>
+    getTimelinePointerPreviewRange(startMinutes, durationMinutes, 0, mode, dayStart, dayEnd)
 
   // === Pointer handlers (move) ===
   const onBodyPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -347,10 +455,12 @@ function ScheduleBlock({
     if (!state.moved && Math.abs(dy) < 4) return
     state.moved = true
     const deltaMin = snapToStep(dy / PX_PER_MIN)
-    tryMove(state.originalStart + deltaMin)
+    const next = clampPreview(state.originalStart + deltaMin, state.originalDuration, 'move')
+    previewRef.current = next
+    setPreviewRange(next)
   }
 
-  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+  const finishDrag = (e: React.PointerEvent<HTMLDivElement>, eventType: 'up' | 'cancel') => {
     const state = dragRef.current
     if (!state || state.pointerId !== e.pointerId) return
     try {
@@ -359,7 +469,16 @@ function ScheduleBlock({
       // ignore
     }
     dragRef.current = null
+    if (shouldCommitPointerDrag(eventType, state.moved, mutationLocked)) {
+      const next = previewRef.current ?? clampPreview(state.originalStart, state.originalDuration, state.mode)
+      onSetBlockRange(block.id, next.startMinutes, next.durationMinutes)
+    }
+    previewRef.current = null
+    setPreviewRange(null)
   }
+
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => finishDrag(e, 'up')
+  const cancelDrag = (e: React.PointerEvent<HTMLDivElement>) => finishDrag(e, 'cancel')
 
   // === Pointer handlers (resize) ===
   const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -386,7 +505,9 @@ function ScheduleBlock({
     if (!state.moved && Math.abs(dy) < 4) return
     state.moved = true
     const deltaMin = snapToStep(dy / PX_PER_MIN)
-    tryResize(state.originalDuration + deltaMin)
+    const next = clampPreview(state.originalStart, state.originalDuration + deltaMin, 'resize')
+    previewRef.current = next
+    setPreviewRange(next)
   }
 
   // === Keyboard ===
@@ -427,16 +548,19 @@ function ScheduleBlock({
     setEditing(false)
   }
 
-  const startLabel = minutesToTimeLabel(block.startMinutes)
+  const startLabel = minutesToTimeLabel(displayStart)
+  const category = getScheduleBlockCategory(block)
+  const fixed = isFixedBlock(block)
 
   return (
     <div
       ref={rootRef}
       role="group"
       tabIndex={0}
-      aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(block.durationMinutes)}.${mutationLocked ? ' Редактирование временно заблокировано.' : ' Enter — редактировать, стрелки — сдвинуть, Delete — убрать.'}`}
+      aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(displayDuration)}.${fixed ? ' Фиксированное время.' : ''}${mutationLocked ? ' Редактирование временно заблокировано.' : ' Enter — редактировать, стрелки — сдвинуть, Delete — убрать.'}`}
+      title={fixed ? 'Фиксированное время: другие блоки не могут на него наехать' : undefined}
       aria-disabled={mutationLocked}
-      className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-md border px-2 py-1 outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${kindClass} ${mutationLocked ? 'cursor-not-allowed opacity-70' : ''} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''}`}
+      className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-xl border px-2.5 py-1.5 shadow-sm outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${kindClass} ${mutationLocked ? 'cursor-not-allowed opacity-70' : ''} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''}`}
       style={{
         top,
         height: Math.max(height, 44),
@@ -447,7 +571,7 @@ function ScheduleBlock({
       onPointerDown={onBodyPointerDown}
       onPointerMove={onBodyPointerMove}
       onPointerUp={endDrag}
-      onPointerCancel={endDrag}
+      onPointerCancel={cancelDrag}
       onKeyDown={onKeyDown}
     >
       <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
@@ -457,7 +581,8 @@ function ScheduleBlock({
               {title}
             </div>
             <div className="shrink-0 text-xs font-medium text-gray-300">
-              {startLabel}–{endLabel}
+              {startLabel}–{endLabel} · {formatDurationLabel(displayDuration)}
+              {fixed && <span className="ml-1 rounded border border-amber-400/60 bg-amber-500/15 px-1 text-[10px] font-semibold text-amber-100">фикс.</span>}
             </div>
           </div>
         ) : (
@@ -466,8 +591,9 @@ function ScheduleBlock({
               {title}
             </div>
             <div className={`${isShortBlock ? 'text-xs leading-tight' : 'text-[13px] leading-5'} text-gray-300`}>
-              {blockKind !== 'task' && <span className="mr-1 rounded bg-gray-950/30 px-1.5 py-0.5 text-[11px] uppercase tracking-wide">{blockKind === 'meal' ? 'еда' : blockKind === 'rest' ? 'отдых' : 'буфер'}</span>}
-              {startLabel}–{endLabel} · {formatDurationLabel(block.durationMinutes)}
+              <span className="mr-1 rounded bg-gray-950/30 px-1.5 py-0.5 text-[11px] uppercase tracking-wide">{categoryLabels[category]}</span>
+              {fixed && <span className="mr-1 rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-100">фикс.</span>}
+              {startLabel}–{endLabel} · {formatDurationLabel(displayDuration)}
             </div>
           </>
         )}
@@ -553,7 +679,7 @@ function ScheduleBlock({
         onPointerDown={onResizePointerDown}
         onPointerMove={onResizePointerMove}
         onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerCancel={cancelDrag}
       >
         <div className="h-1 w-8 rounded bg-gray-400/70" />
       </div>

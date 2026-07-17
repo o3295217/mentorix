@@ -1,5 +1,5 @@
 import { DailySchedule, hashDailySchedule, isServiceBlock } from '@/lib/daily-schedule'
-import { DailyScheduleProposalMetadata, proposalToDailyScheduleV2 } from '@/lib/daily-schedule-proposal'
+import { DailyScheduleProposalMetadata, proposalToDailySchedule } from '@/lib/daily-schedule-proposal'
 
 export function buildScheduleMachineContext(input: {
   date: string
@@ -18,7 +18,7 @@ export function buildScheduleMachineContext(input: {
       messageId: input.pendingProposal.messageId,
       appliedAt: input.pendingProposal.metadata.appliedAt ?? null,
       currentScheduleHash: input.pendingProposal.metadata.currentScheduleHash,
-      schedule: compactSchedule(proposalToDailyScheduleV2(input.pendingProposal.metadata.proposal), null, null),
+      schedule: compactSchedule(proposalToDailySchedule(input.pendingProposal.metadata.proposal), null, null),
     } : null,
   })
 }
@@ -29,10 +29,16 @@ function compactSchedule(schedule: DailySchedule, updatedAt: Date | null, hash: 
     timezone: schedule.timezone,
     dayStartMinutes: schedule.dayStartMinutes,
     dayEndMinutes: schedule.dayEndMinutes,
+    planning: schedule.version === 3 ? {
+      planningBasis: schedule.planningBasis,
+      planningStartMinutes: schedule.planningStartMinutes,
+      workEndMinutes: schedule.workEndMinutes,
+      activityEndMinutes: schedule.activityEndMinutes,
+    } : null,
     updatedAt: updatedAt ? updatedAt.toISOString() : null,
     hash,
     blocks: schedule.blocks.map(block => isServiceBlock(block)
-      ? { id: block.id, kind: block.kind, title: block.title, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }
-      : { id: block.id, kind: 'kind' in block ? block.kind : 'task', taskIndex: block.taskIndex, taskText: block.taskText, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }),
+      ? { id: block.id, kind: block.kind, title: block.title, category: 'category' in block ? block.category : block.kind, isFixed: 'isFixed' in block ? block.isFixed : false, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }
+      : { id: block.id, kind: 'kind' in block ? block.kind : 'task', taskIndex: block.taskIndex, taskText: block.taskText, category: 'category' in block ? block.category : 'main', isFixed: 'isFixed' in block ? block.isFixed : false, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }),
   }
 }
