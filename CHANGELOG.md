@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-07-18 — fix: route production traffic directly
+- 📚 Библиотеки: 1 файлов (anthropic)
+- ⚙️ Конфигурация: 3 файлов
+- 📝 Документация: 7 файлов
+- 📦 Другое: 13 файлов
+
+
 ### 2026-07-18 — fix: harden production domain configuration
 - ⚙️ Конфигурация: 1 файлов
 - 📝 Документация: 7 файлов
