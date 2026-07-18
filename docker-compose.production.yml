@@ -143,7 +143,7 @@ services:
     volumes:
       - ./backups:/backups
       - ./scripts/prod-backup.sh:/usr/local/bin/prod-backup.sh:ro
-      - ${BACKUP_KEY_FILE:-/home/ubuntu/.backup-key}:/run/secrets/backup-key:ro
+      - ${BACKUP_KEY_FILE:-/home/oleg/.backup-key}:/run/secrets/backup-key:ro
     depends_on:
       postgres:
         condition: service_healthy

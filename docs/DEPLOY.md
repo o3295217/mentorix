@@ -1,8 +1,8 @@
 # Деплой AI Assistant
 
-> Пошаговое руководство по развёртыванию на VK Cloud (или любом Ubuntu-сервере)
+> Пошаговое руководство по развёртыванию production на Contabo (Ubuntu-сервер)
 > 
-> Актуальность: 25 марта 2026
+> Актуальность: 18 июля 2026
 
 ---
 
@@ -11,9 +11,10 @@
 | Параметр | Значение |
 |----------|----------|
 | **URL** | https://assist.labaiion.ru |
-| **Сервер** | VK Cloud, 212.233.76.195 |
-| **SSH** | `ssh vk` |
-| **ОС** | Ubuntu, 4 vCPU, 4GB RAM, 60GB SSD |
+| **Сервер** | Contabo |
+| **SSH** | `ssh contabo` |
+| **Путь** | `/home/oleg/ai-assistant-spec` |
+| **ОС** | Ubuntu |
 | **Docker** | 29.2.1 + Compose v5.0.2 |
 | **SSL** | Let's Encrypt (nginx + certbot) |
 
@@ -39,8 +40,8 @@ docker --version
 docker compose version
 
 # Создаём директорию
-mkdir -p ~/ai-assistant
-cd ~/ai-assistant
+mkdir -p /home/oleg/ai-assistant-spec
+cd /home/oleg/ai-assistant-spec
 ```
 
 ---
@@ -52,16 +53,16 @@ cd ~/ai-assistant
 # С мака:
 rsync -avz --delete \
   -e "ssh -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
-  --exclude 'node_modules' --exclude '.next' --exclude '.git' \
-  --exclude 'data/*.db' --exclude '.env' --exclude '.env.local' \
-  --exclude '.env.production' --exclude 'backups/*' \
-  --exclude 'vkcloud-key/*.pem' --exclude 'logs/' \
-  /Users/oleggluskov/Documents/GooglDisk/ai-assistant-spec/ vk:/home/ubuntu/ai-assistant-spec/
+  --exclude 'node_modules/' --exclude '.next/' --exclude '.git/' \
+  --exclude 'data/' --exclude '*.db' --exclude '*.db-journal' \
+  --exclude '.env*' --exclude 'backups/' --exclude 'logs/' \
+  --exclude '*.pem' --exclude '*.key' --exclude 'secrets/' \
+  ./ contabo:/home/oleg/ai-assistant-spec/
 ```
 
 ### Или скрипт деплоя
 ```bash
-./deploy/deploy-vk.sh
+./deploy/deploy-contabo.sh
 ```
 
 ---
@@ -70,7 +71,7 @@ rsync -avz --delete \
 
 ```bash
 # На сервере
-cd ~/ai-assistant
+cd /home/oleg/ai-assistant-spec
 
 # Создаём файл конфигурации
 touch .env.production
@@ -80,8 +81,8 @@ AUTH_SECRET=$(openssl rand -hex 32)
 echo "AUTH_SECRET=$AUTH_SECRET"
 
 # Генерируем отдельный ключ шифрования бэкапов вне директории проекта
-openssl rand -base64 32 > /home/ubuntu/.backup-key
-chmod 600 /home/ubuntu/.backup-key
+openssl rand -base64 32 > /home/oleg/.backup-key
+chmod 600 /home/oleg/.backup-key
 
 # Редактируем конфигурацию
 nano .env.production
@@ -95,8 +96,8 @@ ANTHROPIC_API_KEY=<ваш-api-key>
 REGISTRATION_MODE=open
 COOKIE_SECURE=true
 
-# Cloudflare Worker прокси для Anthropic API (обход гео-блокировки РФ)
-# Если сервер в РФ — обязательно. С других локаций — не нужно.
+# Cloudflare Worker прокси для Anthropic API (если прямой доступ к API недоступен)
+# Включайте только для локаций/сетей, где Anthropic API блокируется.
 ANTHROPIC_PROXY_URL=https://anthropic-proxy.o3295217.workers.dev
 ANTHROPIC_PROXY_SECRET=<секрет-прокси>
 
@@ -113,7 +114,7 @@ SMTP_FROM=your@gmail.com
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
-> **Примечание:** Anthropic блокирует запросы с российских IP. Если сервер в РФ, необходимо использовать Cloudflare Worker прокси. Подробнее — см. [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
+> **Примечание:** если Anthropic API недоступен напрямую с production-сервера, используйте Cloudflare Worker прокси. Подробнее — см. [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 > **Важно:** после перехода на хеширование session token'ов при первом деплое миграции `20260401000000_invalidate_existing_sessions` все существующие сессии будут инвалидированы.
 
@@ -123,7 +124,7 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 ```bash
 # Сборка и запуск
-cd ~/ai-assistant-spec
+cd /home/oleg/ai-assistant-spec
 docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache
 docker compose --env-file .env.production -f docker-compose.production.yml up -d
 
@@ -229,7 +230,7 @@ Certbot автоматически обновит конфиг nginx для HTTP
 
 ```bash
 # Перезапуск
-cd ~/ai-assistant-spec
+cd /home/oleg/ai-assistant-spec
 docker compose --env-file .env.production -f docker-compose.production.yml restart
 
 # Остановка
@@ -242,7 +243,7 @@ docker logs -f ai-assistant-production
 docker exec ai-assistant-backup /usr/local/bin/prod-backup.sh
 
 # Обновление (с мака)
-./deploy/deploy-vk.sh
+./deploy/deploy-contabo.sh
 ```
 
 ---
@@ -263,10 +264,10 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/ubuntu/ai-assistant-spec
+WorkingDirectory=/home/oleg/ai-assistant-spec
 ExecStart=/usr/bin/docker compose --env-file .env.production -f docker-compose.production.yml up -d
 ExecStop=/usr/bin/docker compose --env-file .env.production -f docker-compose.production.yml down
-User=ubuntu
+User=oleg
 
 [Install]
 WantedBy=multi-user.target
@@ -348,13 +349,13 @@ docker exec ai-assistant-production sh -c 'echo test > /app/test'
 ### Настройка (выполнить один раз)
 ```bash
 # Добавить в crontab на сервере
-ssh vk
+ssh contabo
 crontab -e
 # Добавить строку:
-*/30 * * * * sudo /bin/sh /home/ubuntu/ai-assistant-spec/scripts/monitor.sh >> /home/ubuntu/ai-assistant-spec/logs/monitor/cron.log 2>&1
+*/30 * * * * sudo /bin/sh /home/oleg/ai-assistant-spec/scripts/monitor.sh >> /home/oleg/ai-assistant-spec/logs/monitor/cron.log 2>&1
 
 # Добавить строку для ежедневной очистки auth-токенов:
-15 4 * * * docker exec ai-assistant-production node scripts/cleanup-expired.mjs >> /home/ubuntu/ai-assistant-spec/backups/cleanup-expired.log 2>&1
+15 4 * * * docker exec ai-assistant-production node scripts/cleanup-expired.mjs >> /home/oleg/ai-assistant-spec/backups/cleanup-expired.log 2>&1
 ```
 
 ### Проверка алертов (с мака)
@@ -377,13 +378,13 @@ bash scripts/check-alerts.sh
 ### Логи мониторинга
 ```bash
 # На сервере
-ls ~/ai-assistant-spec/logs/monitor/
+ls /home/oleg/ai-assistant-spec/logs/monitor/
 
 # Алерты
-cat ~/ai-assistant-spec/logs/monitor/alerts.log
+cat /home/oleg/ai-assistant-spec/logs/monitor/alerts.log
 
 # Зафиксированные IP
-cat ~/ai-assistant-spec/logs/monitor/known_ips.txt
+cat /home/oleg/ai-assistant-spec/logs/monitor/known_ips.txt
 ```
 
 > **Важно:** папка `logs/` исключена из rsync — логи мониторинга не затираются при деплое.
@@ -394,7 +395,7 @@ cat ~/ai-assistant-spec/logs/monitor/known_ips.txt
 
 ### Ошибка "permission denied"
 ```bash
-sudo chown -R 1001:1001 ~/ai-assistant-spec/backups
+sudo chown -R 1001:1001 /home/oleg/ai-assistant-spec/backups
 ```
 
 ### Не запускается контейнер
@@ -410,9 +411,8 @@ docker logs ai-assistant-db
 # Подключаемся к БД
 docker exec -it ai-assistant-db psql -U ai_assistant
 
-# Пересоздать БД (осторожно — данные будут утеряны!)
-docker compose --env-file .env.production -f docker-compose.production.yml down -v
-docker compose --env-file .env.production -f docker-compose.production.yml up -d
+# Деструктивные операции с volume выполнять только после проверенного бэкапа.
+# Для штатного восстановления используйте процедуру из раздела «Бекапы» ниже.
 ```
 
 ---
@@ -422,7 +422,7 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 Бэкапы работают автоматически через Docker-контейнер `ai-assistant-backup` (описан в `docker-compose.production.yml`).
 Ежедневно в 03:00 делается `pg_dump + gzip + openssl enc`, хранятся последние 30 зашифрованных бэкапов в `./backups/`.
 
-Ключ шифрования хранится на сервере вне проекта: `/home/ubuntu/.backup-key`. Он монтируется в backup-контейнер read-only как `/run/secrets/backup-key`. Потеря этого файла означает, что расшифровать новые бэкапы будет невозможно.
+Ключ шифрования хранится на сервере вне проекта: `/home/oleg/.backup-key`. Он монтируется в backup-контейнер read-only как `/run/secrets/backup-key`. Потеря этого файла означает, что расшифровать новые бэкапы будет невозможно.
 
 ```bash
 # Ручной бэкап
@@ -433,7 +433,7 @@ cat backups/backup.log
 
 # Восстановление из бэкапа
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 \
-  -pass file:/home/ubuntu/.backup-key \
+  -pass file:/home/oleg/.backup-key \
   -in backups/pg_YYYY-MM-DD_HH-MM-SS.sql.gz.enc \
   | gunzip \
   | docker exec -i ai-assistant-db psql -U ai_assistant

@@ -88,5 +88,5 @@ npm run test        # vitest run
 
 ## Продакшен (для контекста)
 
-Docker (3-stage, non-root, read-only fs) + docker-compose (postgres 16, app, backup) на VK Cloud;
-Cloudflare Worker (`cloudflare-proxy/`) проксирует Anthropic API. Деплой: `deploy/deploy-vk.sh`.
+Docker (3-stage, non-root, read-only fs) + docker-compose (postgres 16, app, backup) на Contabo;
+Cloudflare Worker (`cloudflare-proxy/`) проксирует Anthropic API. Деплой: `deploy/deploy-contabo.sh`, SSH: `ssh contabo`, путь: `/home/oleg/ai-assistant-spec`.

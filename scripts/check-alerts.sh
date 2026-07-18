@@ -1,6 +1,6 @@
 #!/bin/bash
 # Быстрая проверка алертов мониторинга
-# Использование: ./scripts/check-alerts.sh [vk|contabo]
+# Использование: ./scripts/check-alerts.sh [contabo]
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -8,11 +8,10 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-SERVER="${1:-vk}"
+SERVER="${1:-contabo}"
 case "$SERVER" in
-  vk)      REMOTE_PATH="/home/ubuntu/ai-assistant-spec" ;;
   contabo) REMOTE_PATH="/home/oleg/ai-assistant-spec" ;;
-  *) echo "Неизвестный сервер: $SERVER (ожидается vk или contabo)" >&2; exit 1 ;;
+  *) echo "Неизвестный сервер: $SERVER (ожидается contabo)" >&2; exit 1 ;;
 esac
 
 echo -e "${CYAN}🔍 Проверка мониторинга ($SERVER)${NC}"

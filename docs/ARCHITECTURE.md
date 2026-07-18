@@ -1139,10 +1139,10 @@ app/page.tsx
 
 ### Cloudflare Worker прокси
 
-Anthropic блокирует API-запросы с российских IP. Для production-сервера на VK Cloud используется Cloudflare Worker + Durable Object в качестве прокси:
+Anthropic может блокировать API-запросы с отдельных локаций. Для production на Contabo при необходимости используется Cloudflare Worker + Durable Object в качестве прокси:
 
 ```
-VK Cloud (РФ) → Cloudflare Worker (PoP) → Durable Object (US, wnam) → Anthropic API
+Contabo production → Cloudflare Worker (PoP) → Durable Object (US, wnam) → Anthropic API
 ```
 
 - **Код прокси:** `cloudflare-proxy/src/index.js`

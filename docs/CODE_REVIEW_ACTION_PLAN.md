@@ -30,10 +30,10 @@
   2. Получить новый токен
   3. В обоих скриптах заменить хардкод на чтение из файла:
      ```bash
-     TG_BOT_TOKEN=$(cat /home/ubuntu/.tg-bot-token)
+     TG_BOT_TOKEN=$(cat /home/oleg/.tg-bot-token)
      ```
-  4. Положить токен в `/home/ubuntu/.tg-bot-token` на сервере (chmod 600)
-  5. Добавить `EnvironmentFile=/home/ubuntu/.tg-bot-env` в `tg-bot.service`
+  4. Положить токен в `/home/oleg/.tg-bot-token` на сервере (chmod 600)
+  5. Добавить `EnvironmentFile=/home/oleg/.tg-bot-env` в `tg-bot.service`
   6. `TG_CHAT_ID` тоже вынести туда же
 - **Оценка:** 20 мин
 
@@ -245,7 +245,7 @@
 
 ### 18. `git add -A` в deploy-скрипте
 - **Что:** Может случайно закоммитить секреты.
-- **Где:** `deploy-vk.sh:25`
+- **Где:** `deploy/deploy-contabo.sh` (исторически — старый deploy-скрипт)
 - **Как исправить:** Заменить на `git add -u` (только отслеживаемые файлы) или убрать авто-коммит из деплой-скрипта.
 - **Оценка:** 5 мин
 
@@ -337,7 +337,7 @@
 - **Где:** `scripts/prod-backup.sh`
 - **Как исправить:** Добавить gpg-шифрование:
   ```bash
-  pg_dump ... | gzip | gpg --symmetric --cipher-algo AES256 --passphrase-file /home/ubuntu/.backup-key > "$BACKUP_FILE.gpg"
+  pg_dump ... | gzip | gpg --symmetric --cipher-algo AES256 --passphrase-file /home/oleg/.backup-key > "$BACKUP_FILE.gpg"
   ```
 - **Оценка:** 15 мин
 
@@ -375,7 +375,7 @@
   .env*
   node_modules
   backups
-  vkcloud-key
+  keys
   logs
   *.md
   ```

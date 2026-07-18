@@ -1,6 +1,7 @@
 /**
  * Библиотека аутентификации
- * Использует JWT токены и bcrypt для хеширования паролей
+ * Использует opaque session tokens, HMAC-подпись cookie для middleware
+ * и bcrypt для хеширования паролей. JWT не используется.
  */
 
 import bcrypt from 'bcrypt';

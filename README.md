@@ -148,7 +148,7 @@ ai-assistant-spec/
 │   └── schema.prisma          # Схема базы данных
 ├── docs/
 │   ├── ARCHITECTURE.md        # Архитектура проекта
-│   ├── DEPLOY.md              # Деплой на VK Cloud
+│   ├── DEPLOY.md              # Деплой на Contabo
 │   ├── DEVELOPMENT.md         # Рабочий процесс разработки
 │   ├── INFRASTRUCTURE.md      # Инфраструктура и сервер
 │   ├── ROADMAP.md             # Дорожная карта
@@ -164,7 +164,7 @@ ai-assistant-spec/
 - 📘 [Руководство пользователя](docs/USER_GUIDE.md) — как пользоваться приложением
 - 📋 [Техническая спецификация](docs/SPECIFICATION.md) — детальное описание архитектуры
 - 🏗️ [Архитектура](docs/ARCHITECTURE.md) — структура проекта, БД, AI, алгоритмы
-- 🚀 [Деплой](docs/DEPLOY.md) — развёртывание на VK Cloud
+- 🚀 [Деплой](docs/DEPLOY.md) — развёртывание на Contabo
 - 🛠️ [Разработка](docs/DEVELOPMENT.md) — рабочий процесс
 - 🗺️ [Дорожная карта](docs/ROADMAP.md) — план развития
 
@@ -245,7 +245,7 @@ npx prisma migrate reset
 |------------|----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string | Да |
 | `ANTHROPIC_API_KEY` | API ключ Anthropic | Да |
-| `AUTH_SECRET` | Секрет для JWT-токенов (min 32 символа) | Да |
+| `AUTH_SECRET` | HMAC/сессионный секрет для opaque sessions (min 32 символа) | Да |
 | `REGISTRATION_MODE` | `open` / `invite` / `closed` | Нет (default: open) |
 | `INVITE_CODE` | Код приглашения (для режима invite) | Нет |
 | `COOKIE_SECURE` | `true` для HTTPS, `false` для HTTP | Нет |
@@ -259,8 +259,10 @@ npx prisma migrate reset
 ## Production
 
 - **URL:** https://assist.labaiion.ru
-- **Сервер:** VK Cloud (Ubuntu, 4 vCPU, 4GB RAM)
-- **Деплой:** `./deploy/deploy-vk.sh` (rsync + Docker build)
+- **Сервер:** Contabo (Ubuntu)
+- **SSH:** `ssh contabo`
+- **Путь:** `/home/oleg/ai-assistant-spec`
+- **Деплой:** `./deploy/deploy-contabo.sh` (rsync + Docker build)
 - **SSL:** Let's Encrypt (Nginx reverse proxy)
 - **Документация:** [docs/DEPLOY.md](docs/DEPLOY.md), [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md)
 

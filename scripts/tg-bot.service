@@ -1,6 +1,6 @@
 # Шаблон systemd-сервиса для tg-bot.sh.
-# Пути ниже — под VK Cloud (User=ubuntu). На другом сервере замените
-# /home/ubuntu и User на актуальные перед установкой в /etc/systemd/system/.
+# Пути ниже — под production на Contabo (User=oleg).
+# Перед установкой в /etc/systemd/system/ проверьте путь проекта и User.
 
 [Unit]
 Description=AI Assistant Telegram Bot
@@ -8,14 +8,14 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-EnvironmentFile=-/home/ubuntu/.tg-bot-env
-ExecStart=/usr/bin/bash /home/ubuntu/ai-assistant-spec/scripts/tg-bot.sh
+EnvironmentFile=-/home/oleg/.tg-bot-env
+ExecStart=/usr/bin/bash /home/oleg/ai-assistant-spec/scripts/tg-bot.sh
 Restart=always
 RestartSec=10
 MemoryMax=256M
 CPUQuota=25%
-User=ubuntu
-WorkingDirectory=/home/ubuntu/ai-assistant-spec
+User=oleg
+WorkingDirectory=/home/oleg/ai-assistant-spec
 StandardOutput=journal
 StandardError=journal
 

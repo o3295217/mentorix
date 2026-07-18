@@ -117,16 +117,16 @@
 - **Где:** [scripts/prod-backup.sh](../scripts/prod-backup.sh)
 - **Риск:** утечка всей БД пользователей при компрометации сервера или ошибочной публикации бэкапа.
 - **Как исправить:**
-  1. Сгенерировать ключ: `openssl rand -base64 32 > /home/ubuntu/.backup-key && chmod 600 /home/ubuntu/.backup-key`
+  1. Сгенерировать ключ: `openssl rand -base64 32 > /home/oleg/.backup-key && chmod 600 /home/oleg/.backup-key`
   2. В скрипте:
      ```bash
      pg_dump ... \
        | gzip \
-       | openssl enc -aes-256-cbc -salt -pbkdf2 -pass file:/home/ubuntu/.backup-key \
+       | openssl enc -aes-256-cbc -salt -pbkdf2 -pass file:/home/oleg/.backup-key \
        > "$BACKUP_DIR/pg_${TIMESTAMP}.sql.gz.enc"
      ```
   3. Документировать процесс расшифровки в `docs/DEPLOY.md`.
-  4. Желательно: периодически выгружать бэкапы во внешнее хранилище (S3/VK Cloud Object Storage) с отдельными credentials.
+  4. Желательно: периодически выгружать бэкапы во внешнее S3-compatible хранилище с отдельными credentials.
 - **Оценка:** 30 мин
 
 ### 2. ENCRYPTION_KEY отсутствует в .env.production.example
@@ -142,7 +142,7 @@
      ENCRYPTION_KEY=
      ```
   2. В `lib/encryption.ts` при старте: если `ENCRYPTION_KEY` пуст — `throw` с понятным сообщением (а не silent fallback).
-  3. Записать ключ в надёжное место (1Password, VK Cloud Secret Manager).
+  3. Записать ключ в надёжное место (например, 1Password или provider-neutral secret manager).
 - **Оценка:** 15 мин
 
 ### 3. Rate-limit на Cloudflare Workers (proxy + tg-proxy)

@@ -351,9 +351,9 @@
 - `BACKUP_DIR`, `BACKUP_KEY_FILE` и `MAX_BACKUPS` сделаны переопределяемыми через env для безопасной проверки и будущей эксплуатации.
 - Retention теперь удаляет только старые `pg_*.sql.gz.enc` и не трогает старые plaintext backups автоматически.
 - `docker-compose.production.yml` монтирует ключ с хоста:
-	- `${BACKUP_KEY_FILE:-/home/ubuntu/.backup-key}` -> `/run/secrets/backup-key:ro`.
+	- `${BACKUP_KEY_FILE:-/home/oleg/.backup-key}` -> `/run/secrets/backup-key:ro`.
 - Cron env теперь сохраняет `PG*` и `BACKUP_*` переменные в `/run/pg.env`.
-- `docs/DEPLOY.md` дополнен генерацией `/home/ubuntu/.backup-key`, описанием encrypted backups и командой восстановления.
+- `docs/DEPLOY.md` дополнен генерацией `/home/oleg/.backup-key`, описанием encrypted backups и командой восстановления.
 - `docs/INFRASTRUCTURE.md` синхронизирован с новой схемой backup/restore.
 
 ### Проверки
@@ -369,7 +369,7 @@
 ### Остаточные риски
 
 - Старые `backups/pg_*.sql.gz`, созданные до включения шифрования, остаются незашифрованными. Их нужно вручную удалить или зашифровать после проверки новых `.sql.gz.enc` бэкапов.
-- Перед production restart на сервере должен существовать `/home/ubuntu/.backup-key`; иначе backup-контейнер не сможет создавать новые бэкапы и запишет понятную ошибку в `backup.log`.
+- Перед production restart на сервере должен существовать `/home/oleg/.backup-key`; иначе backup-контейнер не сможет создавать новые бэкапы и запишет понятную ошибку в `backup.log`.
 
 ### Следующий шаг
 

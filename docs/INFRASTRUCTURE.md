@@ -1,29 +1,25 @@
 # Инфраструктура проекта AI Assistant
 
-> Актуальность: 25 марта 2026
+> Актуальность: 18 июля 2026
 
 ## Серверы
 
-### Production — VK Cloud
-- **IP:** 212.233.76.195
+### Production — Contabo
 - **Домен:** https://assist.labaiion.ru
-- **Пользователь:** ubuntu
-- **SSH:** `ssh vk` (алиас в ~/.ssh/config)
-- **SSH-ключ:** `vkcloud-key/ai-assistant-vk-43wvzX3E.pem`
-- **ОС:** Ubuntu Linux 6.8.0, 4 vCPU (Intel Ice Lake), 4GB RAM, 60GB SSD
-- **DNS:** ns1.reg.ru / ns2.reg.ru (A-запись assist.labaiion.ru → 212.233.76.195)
-
-### Старый сервер (домашний) — деактивирован
-- ~~192.168.2.74 (oleg_d_b) — локальная сеть~~
+- **SSH:** `ssh contabo` (алиас в `~/.ssh/config`)
+- **Пользователь:** `oleg`
+- **Путь проекта:** `/home/oleg/ai-assistant-spec`
+- **ОС:** Ubuntu
+- **DNS:** домен `assist.labaiion.ru` указывает на production-сервер; IP хранится в SSH/DNS-конфигурации, не в репозитории
 
 ## Расположение
-- **На маке:** `/Users/oleggluskov/Documents/GooglDisk/ai-assistant-spec`
-- **На сервере:** `/home/ubuntu/ai-assistant-spec`
+- **Локально:** корень текущего git-репозитория
+- **На сервере:** `/home/oleg/ai-assistant-spec`
 - **GitHub:** https://github.com/o3295217/ai-assistant-spec
 
 ## Docker
-- **Контейнеры:** `ai-assistant-production`, `ai-assistant-db`
-- **Порт:** 3000 (внутренний, проксируется через nginx)
+- **Контейнеры:** `ai-assistant-production`, `ai-assistant-db`, `ai-assistant-backup`
+- **Порт:** 3000 (только `127.0.0.1`, проксируется через nginx)
 - **URL:** https://assist.labaiion.ru
 - **Compose файл:** `docker-compose.production.yml`
 - **Env файл:** `.env.production` (на сервере, исключён из git/rsync)
@@ -32,18 +28,18 @@
 - **Nginx** — reverse proxy (порт 80/443 → localhost:3000)
 - **SSL:** Let's Encrypt (certbot, автопродление)
 - **Конфиг:** `/etc/nginx/sites-available/ai-assistant`
-- **Rate limiting:** `general_limit` — 60 запросов/сек, burst 30 (для всех `/api/` запросов). Ранее использовался `post_limit` (10 запросов/мин), который блокировал параллельные GET-запросы при загрузке страниц
+- **Rate limiting:** `general_limit` — 60 запросов/сек, burst 30 (для `/api/`). Ранее использовался `post_limit` (10 запросов/мин), который блокировал параллельные GET-запросы при загрузке страниц.
 
 ## Быстрые команды
 
 ### Деплой (с мака)
 ```bash
-./deploy/deploy-vk.sh
+./deploy/deploy-contabo.sh
 ```
 
 ### SSH на сервер
 ```bash
-ssh vk
+ssh contabo
 ```
 
 ### Проверка на сервере
@@ -58,10 +54,10 @@ docker logs -f ai-assistant-production
 docker logs -f ai-assistant-db
 
 # Перезапуск
-cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml up -d --force-recreate
+cd /home/oleg/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml up -d
 
 # Пересборка
-cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache && docker compose --env-file .env.production -f docker-compose.production.yml up -d --force-recreate
+cd /home/oleg/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache && docker compose --env-file .env.production -f docker-compose.production.yml up -d
 ```
 
 ### База данных
@@ -72,7 +68,7 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 
 ### Бэкап
 
-Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних зашифрованных файлов `pg_*.sql.gz.enc`). Контейнер собирается из `Dockerfile.backup` на базе `postgres:16-alpine` с предустановленным `openssl`, чтобы шифрование было доступно при первом запуске и в cron. Ключ хранится на сервере вне проекта: `/home/ubuntu/.backup-key`.
+Бэкап работает автоматически через Docker-контейнер `ai-assistant-backup` (ежедневно в 03:00, хранит 30 последних зашифрованных файлов `pg_*.sql.gz.enc`). Контейнер собирается из `Dockerfile.backup` на базе `postgres:16-alpine` с предустановленным `openssl`, чтобы шифрование было доступно при первом запуске и в cron. Ключ хранится на сервере вне проекта: `/home/oleg/.backup-key`.
 
 ```bash
 # Ручной бэкап
@@ -83,7 +79,7 @@ cat backups/backup.log
 
 # Расшифровка для восстановления
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 \
-  -pass file:/home/ubuntu/.backup-key \
+  -pass file:/home/oleg/.backup-key \
   -in backups/pg_YYYY-MM-DD_HH-MM-SS.sql.gz.enc \
   | gunzip \
   | docker exec -i ai-assistant-db psql -U ai_assistant
@@ -98,7 +94,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 \
 docker exec ai-assistant-production node scripts/cleanup-expired.mjs
 
 # Рекомендуемый cron на сервере
-15 4 * * * docker exec ai-assistant-production node scripts/cleanup-expired.mjs >> /home/ubuntu/ai-assistant-spec/backups/cleanup-expired.log 2>&1
+15 4 * * * docker exec ai-assistant-production node scripts/cleanup-expired.mjs >> /home/oleg/ai-assistant-spec/backups/cleanup-expired.log 2>&1
 ```
 
 ### Проверка алертов мониторинга (с мака)
@@ -108,16 +104,20 @@ bash scripts/check-alerts.sh
 
 ### Зафиксированные IP
 ```bash
-ssh vk 'cat /home/ubuntu/ai-assistant-spec/logs/monitor/known_ips.txt'
+ssh contabo 'cat /home/oleg/ai-assistant-spec/logs/monitor/known_ips.txt'
 ```
 
 ## Cloudflare Worker — прокси для Anthropic API
 
-Anthropic блокирует API-запросы с российских IP. Для обхода используется Cloudflare Worker + Durable Object:
+Anthropic может блокировать API-запросы с отдельных локаций. Для production при необходимости используется Cloudflare Worker + Durable Object:
+
+```
+Production server → Cloudflare Worker (PoP) → Durable Object (US, wnam) → Anthropic API
+```
 
 - **Worker URL:** `https://anthropic-proxy.o3295217.workers.dev`
 - **Расположение кода:** `cloudflare-proxy/` в корне проекта
-- **Механизм:** Worker принимает запрос → передаёт Durable Object (location hint: wnam/US) → DO вызывает Anthropic API с американского IP
+- **Механизм:** Worker принимает запрос → передаёт Durable Object (location hint: wnam/US) → DO вызывает Anthropic API
 - **Защита:** заголовок `x-proxy-secret` (секрет хранится в Cloudflare Secrets и в `.env.production`)
 - **Rate limit:** Durable Object `RATE_LIMITER`, по умолчанию `60 req/min` на IP (`CF-Connecting-IP`)
 - **Деплой Worker:** `cd cloudflare-proxy && wrangler deploy`
@@ -127,7 +127,7 @@ Anthropic блокирует API-запросы с российских IP. Дл
 
 ## Cloudflare Worker — прокси для Telegram Bot API
 
-Для обхода блокировок Telegram API используется отдельный Worker `cloudflare-tg-proxy/`.
+Для обхода сетевых блокировок Telegram API используется отдельный Worker `cloudflare-tg-proxy/`.
 
 - **Worker name:** `tg-proxy`
 - **Защита:** заголовок `x-tg-proxy-secret` (секрет `TG_PROXY_SECRET` хранится в Cloudflare Secrets)
@@ -137,24 +137,25 @@ Anthropic блокирует API-запросы с российских IP. Дл
 Лимит меняется в `cloudflare-tg-proxy/wrangler.toml` через `RATE_LIMIT_PER_MINUTE`. При превышении Worker возвращает `429` и header `Retry-After`, не вызывая Telegram API.
 
 ### Локальная разработка
-На маке прокси не нужен — API Anthropic работает напрямую. Переменные `ANTHROPIC_PROXY_URL` и `ANTHROPIC_PROXY_SECRET` в `.env.local` не задаются.
+На маке прокси обычно не нужен. Переменные `ANTHROPIC_PROXY_URL` и `ANTHROPIC_PROXY_SECRET` в `.env.local` не задаются, если прямой доступ к API работает.
 
 ---
 
 ## Переменные окружения (на сервере)
-Файл: `/home/ubuntu/ai-assistant-spec/.env.production`
+Файл: `/home/oleg/ai-assistant-spec/.env.production`
 
 | Переменная | Описание |
 |------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `AUTH_SECRET` | Секрет для JWT |
+| `AUTH_SECRET` | Секрет auth/session подписи |
+| `ENCRYPTION_KEY` | Ключ шифрования полей БД |
 | `ANTHROPIC_API_KEY` | Ключ API Claude |
-| `ANTHROPIC_PROXY_URL` | URL Cloudflare Worker прокси |
+| `ANTHROPIC_PROXY_URL` | URL Cloudflare Worker прокси (опционально) |
 | `ANTHROPIC_PROXY_SECRET` | Секрет для аутентификации прокси |
 | `COOKIE_SECURE` | `true` (HTTPS) |
-| `REGISTRATION_MODE` | `open` (регистрация с верификацией email) |
-| `SMTP_HOST` / `SMTP_PORT` | smtp.gmail.com:587 |
-| `SMTP_USER` / `SMTP_PASS` | Gmail App Password |
+| `REGISTRATION_MODE` | `open` / `invite` / `closed` |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP-сервер |
+| `SMTP_USER` / `SMTP_PASS` | SMTP credentials |
 | `SMTP_FROM` | Адрес отправителя |
 | `NEXT_PUBLIC_APP_URL` | https://assist.labaiion.ru |
 
@@ -163,11 +164,10 @@ Anthropic блокирует API-запросы с российских IP. Дл
 - Контейнеры запускаются автоматически при загрузке сервера
 
 ## SSH Config (на маке)
-```
-Host vk
-  HostName 212.233.76.195
-  User ubuntu
-  IdentityFile ~/Documents/GooglDisk/ai-assistant-spec/vkcloud-key/ai-assistant-vk-43wvzX3E.pem
+```sshconfig
+Host contabo
+  # HostName/User/IdentityFile настроены локально; IP не хранится в репозитории.
+  User oleg
 ```
 
 ## Безопасность
@@ -175,7 +175,7 @@ Host vk
 > Обновлено: 25 марта 2026 — после инцидента с криптомайнером TeamTNT
 
 ### Инцидент (24 марта 2026)
-Контейнер `ai-assistant-production` был заражён криптомайнером TeamTNT через открытый порт 3000 (был доступен всему интернету, минуя nginx). Малварь скачала бинарники в `/tmp/` и запустила 5 процессов-майнеров. Хост-система не пострадала — заражение ограничилось контейнером.
+Контейнер `ai-assistant-production` был заражён криптомайнером TeamTNT через открытый порт 3000 (был доступен всему интернету, минуя nginx). Малварь скачала бинарники в `/tmp/` и запустила 5 процессов-майнеров. Хост-система не пострадала — заражение ограничилось контейнером. Инцидент сохраняется как security history без привязки к текущему production-провайдеру.
 
 ### Принятые меры
 
@@ -186,14 +186,14 @@ Host vk
 | read_only: true | ✅ | Файловая система контейнера только для чтения |
 | tmpfs /tmp noexec | ✅ | /tmp — 50 МБ, флаг noexec запрещает выполнение бинарников |
 | no-new-privileges | ✅ | Запрет эскалации привилегий внутри контейнера |
-| Контейнер пересоздан | ✅ | Чистый образ собран с нуля (--no-cache) |
+| Контейнер пересоздан | ✅ | Чистый образ собран с нуля (`--no-cache`) |
 
 ### Checklist при деплое
 - [ ] Убедиться что порт 3000 привязан к `127.0.0.1` в docker-compose
 - [ ] Убедиться что `ufw` активен (`sudo ufw status`)
 - [ ] Проверить процессы в контейнере (`docker exec ai-assistant-production ps aux`)
 - [ ] Проверить `/tmp/` в контейнере (`docker exec ai-assistant-production ls -la /tmp/`)
-- [ ] Проверить что мониторинг в cron (`ssh vk 'crontab -l'`)
+- [ ] Проверить что мониторинг в cron (`ssh contabo 'crontab -l'`)
 - [ ] Проверить алерты (`bash scripts/check-alerts.sh`)
 
 ### Мониторинг безопасности
@@ -201,7 +201,7 @@ Host vk
 Автоматический скрипт `scripts/monitor.sh` запускается каждые 30 минут через cron и проверяет:
 
 | # | Проверка | Алерт при |
-|---|---------|----------|
+|---|----------|-----------|
 | 1 | Процессы контейнера | Более 3 процессов |
 | 2 | Файлы в /tmp/ | Наличие файлов |
 | 3 | Health endpoint | HTTP ≠ 200 |
@@ -218,10 +218,10 @@ Host vk
 **SSH-мониторинг** работает по отпечатку ключа (не по IP). IP владельца автоматически записываются в `known_ips.txt` — удобно при использовании VPN.
 
 **Логи:**
-- `/home/ubuntu/ai-assistant-spec/logs/monitor/YYYY-MM-DD.log` — ежедневный лог
-- `/home/ubuntu/ai-assistant-spec/logs/monitor/alerts.log` — только алерты
-- `/home/ubuntu/ai-assistant-spec/logs/monitor/known_ips.txt` — зафиксированные IP владельца
-- `/home/ubuntu/ai-assistant-spec/logs/monitor/cron.log` — вывод cron
+- `/home/oleg/ai-assistant-spec/logs/monitor/YYYY-MM-DD.log` — ежедневный лог
+- `/home/oleg/ai-assistant-spec/logs/monitor/alerts.log` — только алерты
+- `/home/oleg/ai-assistant-spec/logs/monitor/known_ips.txt` — зафиксированные IP владельца
+- `/home/oleg/ai-assistant-spec/logs/monitor/cron.log` — вывод cron
 
 **Проверка алертов (с мака):**
 ```bash
@@ -237,7 +237,7 @@ bash scripts/check-alerts.sh
 **Кнопки меню:**
 | Кнопка | Действие |
 |--------|----------|
-| 📊 Состояние сервера | Статус контейнеров, нагрузка, диск, безопасность (цветовые индикаторы 🟢🟡🔴) |
+| 📊 Состояние сервера | Статус контейнеров, нагрузка, диск, безопасность |
 | 🛡 Проверка безопасности | Запуск полной проверки (12 чеков из monitor.sh) |
 | ⚠️ Алерты за сегодня | Список сегодняшних алертов из alerts.log |
 | 👥 Пользователи | Список пользователей из базы данных |
@@ -245,22 +245,20 @@ bash scripts/check-alerts.sh
 
 **Автоматические алерты с кнопками действий:**
 
-При обнаружении проблемы мониторинг отправляет алерт с двумя кнопками (действие + «❌ Игнорировать»):
-
 | Алерт | Кнопка действия | Что делает |
 |-------|----------------|------------|
 | Сайт недоступен (health ≠ 200) | 🔄 Перезапустить контейнер | `docker compose restart app` |
 | Контейнер не запущен | 🔄 Перезапустить контейнер | `docker compose restart app` |
 | CPU контейнера > 80% | 🔄 Перезапустить контейнер | `docker compose restart app` |
 | Диск заполнен > 85% | 🧹 Очистить диск | Docker prune + удаление логов старше 7 дней |
-| Криптомайнер обнаружен | 🛑 Остановить и пересобрать | Stop → rm → build --no-cache → up (~1-2 мин) |
+| Криптомайнер обнаружен | 🛑 Остановить и пересобрать | Stop → rm → build --no-cache → up |
 
-**Безопасность:** бот отвечает только на `TG_CHAT_ID` владельца. Бот-токен больше не хранится в репозитории.
+**Безопасность:** бот отвечает только на `TG_CHAT_ID` владельца. Бот-токен не хранится в репозитории.
 
 **Хранение секретов на сервере:**
-- `/home/ubuntu/.tg-bot-token` — только `TG_BOT_TOKEN`
-- `/home/ubuntu/.tg-bot-env` — `TG_CHAT_ID=...`
-- `/home/ubuntu/ai-assistant-spec/.env.production` — `TG_BOT_TOKEN` и `TG_CHAT_ID` для контейнера приложения
+- `/home/oleg/.tg-bot-token` — только `TG_BOT_TOKEN`
+- `/home/oleg/.tg-bot-env` — `TG_CHAT_ID=...`
+- `/home/oleg/ai-assistant-spec/.env.production` — `TG_BOT_TOKEN` и `TG_CHAT_ID` для контейнера приложения
 
 **Файлы:**
 - `scripts/tg-bot.sh` — скрипт бота (bash + jq для парсинга JSON)
@@ -269,23 +267,18 @@ bash scripts/check-alerts.sh
 
 **Управление сервисом:**
 ```bash
-# Статус
 sudo systemctl status tg-bot
-
-# Перезапуск
 sudo systemctl restart tg-bot
-
-# Логи
 sudo journalctl -u tg-bot --no-pager -n 50
 ```
 
-> **Важно:** При деплое (`deploy/deploy-vk.sh`) бот перезапускается автоматически. Это необходимо, потому что при пересоздании Docker-контейнера бот может зависнуть на `docker exec`.
+> **Важно:** При деплое (`deploy/deploy-contabo.sh`) бот перезапускается автоматически best-effort. Это необходимо, потому что при пересоздании Docker-контейнера бот может зависнуть на `docker exec`.
 
 **После ротации Telegram-токена:**
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart tg-bot
-cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml up -d --force-recreate app
+cd /home/oleg/ai-assistant-spec && docker compose --env-file .env.production -f docker-compose.production.yml up -d --force-recreate app
 ```
 
 **Автоматические уведомления** (кроме кнопок):
@@ -295,8 +288,8 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 - Общая утилита: `lib/telegram.ts` (дедупликация, кулдаун 5 мин)
 
 **Cron (на сервере):**
-```
-*/30 * * * * sudo /bin/sh /home/ubuntu/ai-assistant-spec/scripts/monitor.sh >> /home/ubuntu/ai-assistant-spec/logs/monitor/cron.log 2>&1
+```cron
+*/30 * * * * sudo /bin/sh /home/oleg/ai-assistant-spec/scripts/monitor.sh >> /home/oleg/ai-assistant-spec/logs/monitor/cron.log 2>&1
 ```
 
 ### Ротация секретов
@@ -323,5 +316,5 @@ cd ~/ai-assistant-spec && docker compose --env-file .env.production -f docker-co
 - ufw включён: разрешены только 22/tcp, 80/tcp, 443/tcp
 - Контейнер app: read_only + tmpfs noexec + no-new-privileges
 - SSH может быть нестабильным при множестве параллельных сессий
-- Anthropic API блокирует запросы с IP в РФ — используется Cloudflare Worker прокси
+- Anthropic API при необходимости проксируется через Cloudflare Worker
 - Все вызовы Anthropic SDK идут через `getAnthropicClient()` из `lib/anthropic.ts` (с автоматическим проксированием)

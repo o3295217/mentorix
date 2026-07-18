@@ -27,7 +27,7 @@ if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
   exit 1
 fi
 
-# Cloudflare Worker прокси для Telegram API (обход блокировки VK Cloud)
+# Cloudflare Worker прокси для Telegram API (обход сетевых блокировок Telegram API)
 TG_API_BASE="${TG_API_BASE:-https://tg-proxy.o3295217.workers.dev}"
 
 mkdir -p "$LOG_DIR"

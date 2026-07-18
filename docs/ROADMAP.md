@@ -36,7 +36,7 @@
 ### Инфраструктура
 - [x] **Health check endpoint** — для мониторинга (`/api/health`) ✅
 - [x] **SSL сертификаты** — Let's Encrypt + nginx ✅
-- [x] **VK Cloud деплой** — Production на assist.labaiion.ru ✅
+- [x] **Contabo деплой** — Production на assist.labaiion.ru ✅
 - [x] **Systemd автозапуск** ✅
 - [ ] **Proper logging** — структурированные логи (winston/pino)
 - [ ] **Error tracking** — Sentry или аналог
@@ -144,7 +144,7 @@
   - Файлы: TimelineNav.tsx (новый), DreamSection, YearSection, QuarterSection, MonthSection, page.tsx
 
 ### Февраль 2026
-- [x] **Миграция на VK Cloud** — production-деплой на 212.233.76.195
+- [x] **Миграция production на Contabo** — production-деплой на assist.labaiion.ru
 - [x] **Домен + SSL** — assist.labaiion.ru, Let's Encrypt, nginx reverse proxy
 - [x] **Email-верификация** — SMTP через Gmail, сброс пароля
 - [x] **Открытая регистрация** — REGISTRATION_MODE=open с подтверждением email
@@ -181,7 +181,7 @@
 - baseline-browser-mapping — outdated warning
 
 ### Для деплоя
-- [x] Настроить production сервер (VK Cloud) ✅
+- [x] Настроить production сервер (Contabo) ✅
 - [x] SSL сертификаты (Let's Encrypt) ✅
 - [ ] Настроить CI/CD (GitHub Actions)
 - [ ] Docker image optimization

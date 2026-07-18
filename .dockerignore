@@ -53,7 +53,10 @@ docker-compose.production.yml
 .dockerignore
 
 # Security — never include secrets/keys in image
-vkcloud-key/
+keys/
+secrets/
+*.pem
+*.key
 backups/
 scripts/
 !scripts/cleanup-expired.mjs
