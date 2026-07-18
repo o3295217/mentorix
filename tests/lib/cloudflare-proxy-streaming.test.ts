@@ -1,5 +1,9 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import worker, { proxyAnthropicRequest } from '@/cloudflare-proxy/src/index.js'
+
+const root = process.cwd()
 
 async function readFirstChunk(response: Response): Promise<string> {
   const reader = response.body?.getReader()
@@ -55,6 +59,39 @@ describe('cloudflare anthropic proxy streaming', () => {
     await expect(readFirstChunk(response)).resolves.toBe('first')
   })
 
+  it('worker is disabled by default and does not touch auth, rate limit or upstream bindings', async () => {
+    const response = await worker.fetch(new Request('https://proxy.example/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-proxy-secret': 'wrong-secret',
+        origin: 'https://app.example',
+      },
+      body: JSON.stringify({ stream: true }),
+    }), {
+      PROXY_SECRET: 'real-secret',
+      RATE_LIMITER: {
+        idFromName: () => {
+          throw new Error('rate limiter should not be called while worker is disabled')
+        },
+      },
+      ANTHROPIC_PROXY: {
+        idFromName: () => {
+          throw new Error('upstream proxy should not be called while worker is disabled')
+        },
+      },
+      ALLOWED_ORIGINS: 'https://app.example',
+    })
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: 'Worker disabled' })
+  })
+
+  it('wrangler config keeps the archived worker disabled by default', async () => {
+    const wrangler = await readFile(join(root, 'cloudflare-proxy/wrangler.toml'), 'utf8')
+
+    expect(wrangler).toContain('WORKER_ENABLED = "false"')
+  })
+
   it('worker preserves status and headers from Durable Object streaming response', async () => {
     const env = {
       PROXY_SECRET: 'secret',
@@ -81,6 +118,7 @@ describe('cloudflare anthropic proxy streaming', () => {
       body: JSON.stringify({ stream: true }),
     }), {
       ...env,
+      WORKER_ENABLED: 'true',
       ALLOWED_ORIGINS: 'https://app.example',
     })
 

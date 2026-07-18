@@ -77,14 +77,13 @@ npm run dev -- -p 3003
 - `COOKIE_SECURE` - `true` только под HTTPS.
 - `SKIP_EMAIL_VERIFICATION=true` - опционально, если нужно убрать обязательную email-верификацию во временном окружении.
 
-### AI и прокси
+### AI
 
 - `ANTHROPIC_API_KEY` - обязателен для всех AI-сценариев.
 - `AI_MODEL` - общий override модели Claude для обоих уровней (обратная совместимость). Если задан, используется обоими уровнями, если для уровня не установлена собственная переменная. Примеры: `claude-sonnet-4-6`, `claude-haiku-4-5`.
 - `AI_MODEL_SMART` - модель для сложных задач (декомпозиция целей, оценка периода, прогноз). Приоритет: `AI_MODEL_SMART` → `AI_MODEL` → `claude-sonnet-4-6` (встроенный fallback).
 - `AI_MODEL_FAST` - модель для простых/частых задач (оценка дня, чат, проверка плана, обновление insights). Приоритет: `AI_MODEL_FAST` → `AI_MODEL` → `claude-haiku-4-5` (встроенный fallback).
-- `ANTHROPIC_PROXY_URL` - URL Cloudflare Worker proxy для Anthropic (опционально, для обхода гео-блокировки).
-- `ANTHROPIC_PROXY_SECRET` - секрет, который отправляется заголовком `x-proxy-secret` при использовании прокси.
+- Anthropic SDK всегда использует официальный endpoint напрямую; proxy env/baseURL не поддерживаются.
 
 ### Шифрование и email
 
@@ -121,7 +120,8 @@ npx prisma studio
 - `lib/` - auth, Prisma, encryption, audit, prompts, rate limiting, Anthropic client.
 - `prisma/` - schema и migrations.
 - `docs/` - спецификация, архитектура, деплой, developer docs, user guide.
-- `cloudflare-proxy/`, `cloudflare-tg-proxy/` - отдельные воркеры для прокси-сервисов.
+- `deploy/`, `scripts/` - production deploy на Contabo и operational scripts; Cloudflare/Wrangler/Workers не используются.
+- `cloudflare-proxy/`, `cloudflare-tg-proxy/` - сохранённые dormant Worker fallback-директории (`WORKER_ENABLED=false`, fail-closed 503), не production runtime.
 
 ### Ключевые страницы
 
@@ -256,7 +256,7 @@ npx prisma studio
 `lib/anthropic.ts`:
 
 - лениво инициализирует SDK;
-- умеет работать через Cloudflare Worker proxy;
+- использует официальный Anthropic SDK endpoint напрямую, без proxy/baseURL;
 - делает retry с экспоненциальной задержкой;
 - превращает `429` в доменную ошибку с понятным текстом;
 - шлёт Telegram-уведомление при финальном падении после ретраев.
@@ -281,11 +281,13 @@ npx prisma studio
 
 Если будете возвращать переключение темы в интерфейс, обновляйте и UI, и документацию.
 
-## Production и прокси
+## Production
 
 - Основной compose: `docker-compose.production.yml`.
 - Production environment ориентируется на `.env.production.example`.
-- Для серверов за geo-блокировкой Anthropic используется Cloudflare Worker proxy.
+- Единственный production — Contabo (`ssh contabo`, `/home/oleg/ai-assistant-spec`, `https://mentorix.aionlab.ru`).
+- Anthropic и Telegram вызываются напрямую; deploy script не запускает `wrangler` и перед сборкой проверяет прямую доступность `api.anthropic.com`.
+- Worker fallback-код хранится отключённым (`WORKER_ENABLED=false`) и не должен деплоиться без отдельного решения.
 - Для шифрования в production нужен отдельный `ENCRYPTION_KEY`; использовать dev-ключ нельзя.
 - При readonly-container сценарии для шифрования существующих данных применяется `scripts/encrypt-standalone.js`.
 

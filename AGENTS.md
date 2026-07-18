@@ -56,7 +56,7 @@ npm run test        # vitest run
 
 ### AI-интеграция
 
-- Клиент: `lib/anthropic.ts` — lazy init, retry с backoff на 429/5xx, модель из env `AI_MODEL`, опциональный Cloudflare-прокси (`ANTHROPIC_PROXY_URL`)
+- Клиент: `lib/anthropic.ts` — lazy init, официальный Anthropic SDK endpoint напрямую (без proxy/baseURL), retry с backoff на 429/5xx, модель из env `AI_MODEL*`. Worker-код хранится только как отключённый fallback, не подключается к runtime.
 - Вход пользователя → `sanitizeUserInput` (анти prompt-injection, `lib/api-utils.ts`)
 - Ответ AI → `extractJsonFromAIResponse` + типовые валидаторы
 - Учёт токенов/стоимости: `logAIUsage` (`lib/ai-usage.ts`), модель `AIUsage`
@@ -89,4 +89,4 @@ npm run test        # vitest run
 ## Продакшен (для контекста)
 
 Docker (3-stage, non-root, read-only fs) + docker-compose (postgres 16, app, backup) на Contabo;
-Cloudflare Worker (`cloudflare-proxy/`) проксирует Anthropic API. Деплой: `deploy/deploy-contabo.sh`, SSH: `ssh contabo`, путь: `/home/oleg/ai-assistant-spec`.
+production единственный: `https://mentorix.aionlab.ru`, SSH `ssh contabo`, путь `/home/oleg/ai-assistant-spec`. Anthropic и Telegram вызываются напрямую; Cloudflare/Wrangler/Workers в production-деплое не используются. `cloudflare-proxy/` и `cloudflare-tg-proxy/` сохранены как dormant fallback с `WORKER_ENABLED="false"` и fail-closed 503; не деплоить без отдельного решения.

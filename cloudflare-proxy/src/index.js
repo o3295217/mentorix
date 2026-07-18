@@ -53,6 +53,10 @@ function jsonResponse(payload, init = {}) {
   });
 }
 
+function isWorkerEnabled(env) {
+  return String(env.WORKER_ENABLED || 'false').trim() === 'true';
+}
+
 function getClientIp(request) {
   return request.headers.get('CF-Connecting-IP')
     || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -209,6 +213,13 @@ function validateProxySecret(request, env) {
 
 export default {
   async fetch(request, env) {
+    if (!isWorkerEnabled(env)) {
+      return jsonResponse(
+        { error: 'Worker disabled', message: 'Anthropic proxy worker is dormant and not part of production.' },
+        { status: 503 }
+      );
+    }
+
     const url = new URL(request.url);
     const corsHeaders = buildCorsHeaders(request, env);
 

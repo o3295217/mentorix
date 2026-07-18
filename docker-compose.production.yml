@@ -73,13 +73,11 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
-      # AI API
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # AI API (direct official Anthropic endpoint; no proxy env is passed)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env.production}
       - AI_MODEL=${AI_MODEL:-}
       - AI_MODEL_SMART=${AI_MODEL_SMART:-}
       - AI_MODEL_FAST=${AI_MODEL_FAST:-}
-      - ANTHROPIC_PROXY_URL=${ANTHROPIC_PROXY_URL:-}
-      - ANTHROPIC_PROXY_SECRET=${ANTHROPIC_PROXY_SECRET:-}
       # Telegram notifications
       - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
       - TG_CHAT_ID=${TG_CHAT_ID:-}

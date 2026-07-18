@@ -27,9 +27,6 @@ if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
   exit 1
 fi
 
-# Cloudflare Worker прокси для Telegram API (обход сетевых блокировок Telegram API)
-TG_API_BASE="${TG_API_BASE:-https://tg-proxy.o3295217.workers.dev}"
-
 mkdir -p "$LOG_DIR"
 
 # Безопасность: отвечаем только владельцу
@@ -39,8 +36,7 @@ is_owner() {
 
 # Отправить текстовое сообщение
 send() {
-  curl -s -X POST "${TG_API_BASE}/bot${TG_BOT_TOKEN}/sendMessage" \
-    -H "x-tg-proxy-secret: ${TG_PROXY_SECRET}" \
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     --data-urlencode "chat_id=$TG_CHAT_ID" \
     --data-urlencode "parse_mode=HTML" \
     --data-urlencode "text=$1" > /dev/null 2>&1
@@ -50,9 +46,8 @@ send() {
 send_with_buttons() {
   TEXT="$1"
   KEYBOARD="$2"
-  curl -s -X POST "${TG_API_BASE}/bot${TG_BOT_TOKEN}/sendMessage" \
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
-    -H "x-tg-proxy-secret: ${TG_PROXY_SECRET}" \
     -d "{
       \"chat_id\": $TG_CHAT_ID,
       \"parse_mode\": \"HTML\",
@@ -63,8 +58,7 @@ send_with_buttons() {
 
 # Ответить на callback_query (убрать «часики» с кнопки)
 answer_callback() {
-  curl -s -X POST "${TG_API_BASE}/bot${TG_BOT_TOKEN}/answerCallbackQuery" \
-    -H "x-tg-proxy-secret: ${TG_PROXY_SECRET}" \
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/answerCallbackQuery" \
     -d "callback_query_id=$1" > /dev/null 2>&1
 }
 
@@ -416,7 +410,7 @@ echo "$(date) Бот запущен, ожидание команд..."
 while true; do
   OFFSET=$(get_offset)
 
-  RESPONSE=$(curl -s -H "x-tg-proxy-secret: ${TG_PROXY_SECRET}" "${TG_API_BASE}/bot${TG_BOT_TOKEN}/getUpdates?offset=$OFFSET&timeout=30" 2>/dev/null)
+  RESPONSE=$(curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates?offset=$OFFSET&timeout=30" 2>/dev/null)
 
   if [ -z "$RESPONSE" ]; then
     sleep 5

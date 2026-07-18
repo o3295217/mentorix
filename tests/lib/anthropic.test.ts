@@ -45,10 +45,8 @@ describe('getAnthropicClient', () => {
     expect(() => getAnthropicClient()).toThrow(/ANTHROPIC_API_KEY/)
   })
 
-  it('configures proxy URL and secret headers when provided', async () => {
+  it('configures the official SDK endpoint directly', async () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'test-api-key')
-    vi.stubEnv('ANTHROPIC_PROXY_URL', 'https://proxy.example.com')
-    vi.stubEnv('ANTHROPIC_PROXY_SECRET', 'proxy-secret')
 
     const { getAnthropicClient } = await import('@/lib/anthropic')
     const client = getAnthropicClient()
@@ -57,8 +55,6 @@ describe('getAnthropicClient', () => {
       apiKey: 'test-api-key',
       maxRetries: 2,
       timeout: 5 * 60 * 1000,
-      baseURL: 'https://proxy.example.com',
-      defaultHeaders: { 'x-proxy-secret': 'proxy-secret' },
     })
     expect(getAnthropicClient()).toBe(client)
     expect(anthropicConstructor).toHaveBeenCalledTimes(1)

@@ -107,37 +107,25 @@ bash scripts/check-alerts.sh
 ssh contabo 'cat /home/oleg/ai-assistant-spec/logs/monitor/known_ips.txt'
 ```
 
-## Cloudflare Worker — прокси для Anthropic API
+## Внешние API (без Cloudflare)
 
-Anthropic может блокировать API-запросы с отдельных локаций. Для production при необходимости используется Cloudflare Worker + Durable Object:
+Текущая production-архитектура на Contabo использует прямые исходящие HTTPS-запросы:
 
 ```
-Production server → Cloudflare Worker (PoP) → Durable Object (US, wnam) → Anthropic API
+Contabo production → api.anthropic.com
+Contabo production → api.telegram.org
 ```
 
-- **Worker URL:** `https://anthropic-proxy.o3295217.workers.dev`
-- **Расположение кода:** `cloudflare-proxy/` в корне проекта
-- **Механизм:** Worker принимает запрос → передаёт Durable Object (location hint: wnam/US) → DO вызывает Anthropic API
-- **Защита:** заголовок `x-proxy-secret` (секрет хранится в Cloudflare Secrets и в `.env.production`)
-- **Rate limit:** Durable Object `RATE_LIMITER`, по умолчанию `60 req/min` на IP (`CF-Connecting-IP`)
-- **Деплой Worker:** `cd cloudflare-proxy && wrangler deploy`
-- **Аккаунт Cloudflare:** авторизация через `wrangler login`
+- Anthropic: `lib/anthropic.ts` лениво инициализирует официальный SDK без `baseURL` и proxy-заголовков.
+- Telegram: `lib/telegram.ts`, `scripts/monitor.sh` и `scripts/tg-bot.sh` отправляют запросы напрямую в Telegram Bot API.
+- `deploy/deploy-contabo.sh` не запускает `wrangler` и перед Docker build проверяет прямую доступность `api.anthropic.com` без API-ключа.
+- Proxy-переменные и Worker-конфиги не используются в runtime.
 
-Лимит меняется в `cloudflare-proxy/wrangler.toml` через `RATE_LIMIT_PER_MINUTE`. При превышении Worker возвращает `429` и header `Retry-After`, не вызывая Anthropic API.
+Cloudflare/Wrangler/Workers не являются частью текущей production-инфраструктуры.
 
-## Cloudflare Worker — прокси для Telegram Bot API
+### Dormant Worker fallback
 
-Для обхода сетевых блокировок Telegram API используется отдельный Worker `cloudflare-tg-proxy/`.
-
-- **Worker name:** `tg-proxy`
-- **Защита:** заголовок `x-tg-proxy-secret` (секрет `TG_PROXY_SECRET` хранится в Cloudflare Secrets)
-- **Rate limit:** Durable Object `RATE_LIMITER`, по умолчанию `30 req/min` на IP (`CF-Connecting-IP`)
-- **Деплой Worker:** `cd cloudflare-tg-proxy && wrangler deploy`
-
-Лимит меняется в `cloudflare-tg-proxy/wrangler.toml` через `RATE_LIMIT_PER_MINUTE`. При превышении Worker возвращает `429` и header `Retry-After`, не вызывая Telegram API.
-
-### Локальная разработка
-На маке прокси обычно не нужен. Переменные `ANTHROPIC_PROXY_URL` и `ANTHROPIC_PROXY_SECRET` в `.env.local` не задаются, если прямой доступ к API работает.
+Исходники `cloudflare-proxy/` и `cloudflare-tg-proxy/` сохранены только как архивный fallback. Оба Worker по умолчанию отключены через `WORKER_ENABLED = "false"` в `wrangler.toml` и отвечают 503 до проверки proxy-secret, rate limit или вызова upstream. Их нельзя деплоить или включать без отдельного operational/security решения.
 
 ---
 
@@ -149,9 +137,7 @@ Production server → Cloudflare Worker (PoP) → Durable Object (US, wnam) → 
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AUTH_SECRET` | Секрет auth/session подписи |
 | `ENCRYPTION_KEY` | Ключ шифрования полей БД |
-| `ANTHROPIC_API_KEY` | Ключ API Claude |
-| `ANTHROPIC_PROXY_URL` | URL Cloudflare Worker прокси (опционально) |
-| `ANTHROPIC_PROXY_SECRET` | Секрет для аутентификации прокси |
+| `ANTHROPIC_API_KEY` | Ключ API Claude для прямого доступа к `api.anthropic.com` |
 | `COOKIE_SECURE` | `true` (HTTPS) |
 | `REGISTRATION_MODE` | `open` / `invite` / `closed` |
 | `SMTP_HOST` / `SMTP_PORT` | SMTP-сервер |
@@ -298,7 +284,6 @@ cd /home/oleg/ai-assistant-spec && docker compose --env-file .env.production -f 
 После компрометации контейнера нужно сменить:
 - `ANTHROPIC_API_KEY` — на https://console.anthropic.com
 - `AUTH_SECRET` — сгенерировать новый: `openssl rand -hex 32`
-- `ANTHROPIC_PROXY_SECRET` — обновить в Cloudflare Secrets и `.env.production`
 - `TG_BOT_TOKEN` — перевыпустить через @BotFather и обновить в `.tg-bot-token` и `.env.production`
 
 ### Сессии после P0-фикса
@@ -318,5 +303,5 @@ cd /home/oleg/ai-assistant-spec && docker compose --env-file .env.production -f 
 - ufw включён: разрешены только 22/tcp, 80/tcp, 443/tcp
 - Контейнер app: read_only + tmpfs noexec + no-new-privileges
 - SSH может быть нестабильным при множестве параллельных сессий
-- Anthropic API при необходимости проксируется через Cloudflare Worker
-- Все вызовы Anthropic SDK идут через `getAnthropicClient()` из `lib/anthropic.ts` (с автоматическим проксированием)
+- Anthropic API вызывается напрямую через официальный SDK endpoint
+- Все вызовы Anthropic SDK идут через `getAnthropicClient()` из `lib/anthropic.ts` без proxy/baseURL

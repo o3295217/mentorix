@@ -1137,21 +1137,20 @@ app/page.tsx
 
 ## 8. AI INTEGRATION
 
-### Cloudflare Worker прокси
+### Прямой Anthropic SDK client
 
-Anthropic может блокировать API-запросы с отдельных локаций. Для production на Contabo при необходимости используется Cloudflare Worker + Durable Object в качестве прокси:
+Production на Contabo вызывает официальный Anthropic API напрямую:
 
 ```
-Contabo production → Cloudflare Worker (PoP) → Durable Object (US, wnam) → Anthropic API
+Contabo production → api.anthropic.com
 ```
 
-- **Код прокси:** `cloudflare-proxy/src/index.js`
-- **Конфигурация:** `cloudflare-proxy/wrangler.toml`
-- **URL:** `https://anthropic-proxy.o3295217.workers.dev`
-- **Защита:** заголовок `x-proxy-secret`
-- **Env-переменные:** `ANTHROPIC_PROXY_URL`, `ANTHROPIC_PROXY_SECRET`
+- **Клиент:** `lib/anthropic.ts`, lazy singleton `getAnthropicClient()`.
+- **SDK config:** `apiKey`, `maxRetries: 2`, `timeout: 5 минут`; `baseURL` и proxy headers не задаются.
+- **Env-переменные:** `ANTHROPIC_API_KEY` обязателен; `AI_MODEL`, `AI_MODEL_SMART`, `AI_MODEL_FAST` управляют моделями.
+- **Retries:** доменный wrapper сохраняет retry с exponential backoff на 429/5xx/network errors и Telegram-уведомление при финальном падении.
 
-Все вызовы Anthropic SDK идут через единый клиент `getAnthropicClient()` из `lib/anthropic.ts`, который автоматически настраивает `baseURL` и `defaultHeaders` при наличии переменных прокси.
+Cloudflare/Wrangler/Workers не являются частью текущей AI/deploy-архитектуры и не передаются в runtime-контейнер. `cloudflare-proxy/` и `cloudflare-tg-proxy/` сохранены как отключённый fallback: `WORKER_ENABLED = "false"`, ранний fail-closed 503 до обработки секретов, rate limit или upstream.
 
 ### Потоки взаимодействия с AI
 

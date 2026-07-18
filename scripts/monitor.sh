@@ -31,9 +31,6 @@ if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
   TG_NOTIFICATIONS_ENABLED=false
 fi
 
-# Cloudflare Worker прокси для Telegram API
-TG_API_BASE="${TG_API_BASE:-https://tg-proxy.o3295217.workers.dev}"
-
 mkdir -p "$LOG_DIR"
 
 log() {
@@ -42,8 +39,7 @@ log() {
 
 tg_send() {
   [ "$TG_NOTIFICATIONS_ENABLED" = "true" ] || return 0
-  curl -s -X POST "${TG_API_BASE}/bot${TG_BOT_TOKEN}/sendMessage" \
-    -H "x-tg-proxy-secret: ${TG_PROXY_SECRET}" \
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     --data-urlencode "chat_id=$TG_CHAT_ID" \
     --data-urlencode "parse_mode=HTML" \
     --data-urlencode "text=$1" > /dev/null 2>&1 || true
@@ -54,9 +50,8 @@ tg_send_action() {
   [ "$TG_NOTIFICATIONS_ENABLED" = "true" ] || return 0
   TEXT="$1"
   KEYBOARD="$2"
-  curl -s -X POST "${TG_API_BASE}/bot${TG_BOT_TOKEN}/sendMessage" \
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
-    -H "x-tg-proxy-secret: ${TG_PROXY_SECRET}" \
     -d "{
       \"chat_id\": $TG_CHAT_ID,
       \"parse_mode\": \"HTML\",

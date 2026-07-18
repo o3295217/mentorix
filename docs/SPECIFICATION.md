@@ -364,7 +364,7 @@ Claude API оценивает день по следующим критерия�
 
 ## 6. СИСТЕМА ПРОМПТОВ ДЛЯ CLAUDE API
 
-> **Модель:** claude-sonnet-4.5 (через Anthropic SDK, с опциональным Cloudflare Worker прокси).
+> **Модель:** Claude через официальный Anthropic SDK endpoint напрямую (без Cloudflare/Wrangler proxy).
 > **Промпты хранятся в:** `lib/prompts/` (daily.ts, period.ts, forecast.ts, check-plan.ts, plan-chat.ts, core.ts, types.ts).
 
 ### 6.1. Дневная оценка (`lib/prompts/daily.ts`)
@@ -665,7 +665,7 @@ Claude API оценивает день по следующим критерия�
 - `AUTH_SECRET` — ключ для HMAC подписи сессий
 - НЕ коммитить секреты в git
 - Санитизация пользовательского ввода перед отправкой в Claude (защита от prompt injection)
-- Опциональный Cloudflare Worker прокси для обхода гео-блокировки Anthropic API
+- Production на Contabo обращается к Anthropic API напрямую; proxy/baseURL не поддерживаются
 
 ### 8.3. Надежность
 - Обработка ошибок API (если Claude не отвечает)
@@ -798,10 +798,6 @@ DATABASE_URL="postgresql://ai_assistant:ai_assistant_dev@localhost:5432/ai_assis
 ANTHROPIC_API_KEY="sk-ant-..."
 AUTH_SECRET="<random-hex-32>"
 
-# Опционально: Cloudflare Worker прокси для обхода гео-блокировки Anthropic
-ANTHROPIC_PROXY_URL="https://..."
-ANTHROPIC_PROXY_SECRET="..."
-
 # Email (для сброса пароля и верификации)
 SMTP_HOST="..."
 SMTP_PORT=587
@@ -822,6 +818,8 @@ REGISTRATION_MODE=open
 ### Production
 - **Порт внутренний:** 3000 (Docker-контейнер)
 - **Nginx** проксирует 80/443 → localhost:3000
+- **Внешние API:** прямые вызовы `api.anthropic.com` и `api.telegram.org`; Cloudflare/Wrangler/Workers не участвуют
+- **Fallback Worker-код:** сохранён в репозитории отключённым (`WORKER_ENABLED=false`, fail-closed 503), не является текущей production-архитектурой
 - Подробности: `docs/DEPLOY.md`, `docs/INFRASTRUCTURE.md`
 
 ### package.json dependencies (основные)

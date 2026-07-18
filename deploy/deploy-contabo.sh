@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Деплой AI Assistant на Contabo VM (единственный production).
+# Cloudflare/Wrangler/Workers не участвуют: production ходит напрямую к Anthropic и Telegram.
 # Использование: ./deploy/deploy-contabo.sh
 
 set -Eeuo pipefail
@@ -13,6 +14,7 @@ NC='\033[0m'
 SERVER="contabo" # SSH alias из ~/.ssh/config
 REMOTE_PATH="/home/oleg/ai-assistant-spec"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mentorix.aionlab.ru/api/health}"
+ANTHROPIC_CONNECTIVITY_URL="https://api.anthropic.com/v1/messages"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -54,7 +56,15 @@ fi
 echo -e "\n${GREEN}3. Prepare remote directory${NC}"
 ssh "$SERVER" "mkdir -p '$REMOTE_PATH'"
 
-echo -e "\n${GREEN}4. Sync project to Contabo${NC}"
+echo -e "\n${GREEN}4. Remote production preflight (direct Anthropic, no Cloudflare/Wrangler)${NC}"
+ssh "$SERVER" "test -f '$REMOTE_PATH/.env.production'" || fail "Remote .env.production is missing at $SERVER:$REMOTE_PATH/.env.production"
+ANTHROPIC_STATUS="$(ssh "$SERVER" "curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 20 '$ANTHROPIC_CONNECTIVITY_URL'" 2>/dev/null || true)"
+if [ -z "$ANTHROPIC_STATUS" ] || [ "$ANTHROPIC_STATUS" = "000" ]; then
+  fail "Contabo cannot reach api.anthropic.com directly. Network connectivity is required; deploy does not use Cloudflare/Wrangler."
+fi
+echo "Direct Anthropic connectivity OK (HTTP $ANTHROPIC_STATUS, unauthenticated probe)"
+
+echo -e "\n${GREEN}5. Sync project to Contabo${NC}"
 rsync -az --delete --delete-delay \
   -e "ssh -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
   --exclude '.git/' \
@@ -87,16 +97,16 @@ rsync -az --delete --delete-delay \
   --exclude 'coverage/' \
   "$LOCAL_PATH/" "$SERVER:$REMOTE_PATH/"
 
-echo -e "\n${GREEN}5. Build production Docker image on Contabo${NC}"
+echo -e "\n${GREEN}6. Build production Docker image on Contabo${NC}"
 ssh "$SERVER" "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache"
 
-echo -e "\n${GREEN}6. Start/update production containers${NC}"
+echo -e "\n${GREEN}7. Start/update production containers${NC}"
 ssh "$SERVER" "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml up -d"
 
-echo -e "\n${GREEN}7. Best-effort Telegram bot restart${NC}"
+echo -e "\n${GREEN}8. Best-effort Telegram bot restart${NC}"
 ssh "$SERVER" "sudo systemctl restart tg-bot 2>/dev/null && echo 'tg-bot restarted' || echo 'tg-bot service not found or restart failed, skipping'"
 
-echo -e "\n${GREEN}8. Container status and health${NC}"
+echo -e "\n${GREEN}9. Container status and health${NC}"
 ssh "$SERVER" "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml ps"
 
 APP_HEALTH=""
@@ -115,7 +125,7 @@ if [ "$APP_HEALTH" != "healthy" ] && [ "$APP_HEALTH" != "running" ]; then
   fail "App container did not become healthy/running."
 fi
 
-echo -e "\n${GREEN}9. Public health check${NC}"
+echo -e "\n${GREEN}10. Public health check${NC}"
 curl -fsS --retry 5 --retry-delay 5 "$PUBLIC_HEALTH_URL" >/dev/null
 echo "Public health OK: $PUBLIC_HEALTH_URL"
 

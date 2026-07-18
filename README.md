@@ -24,7 +24,7 @@
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Backend:** Next.js API Routes
 - **Database:** PostgreSQL + Prisma ORM
-- **AI:** Anthropic Claude API
+- **AI:** Anthropic Claude API напрямую через официальный SDK (без Cloudflare/Wrangler proxy)
   - `claude-sonnet-4-5-20250929` — для оценки дней и прогнозов
   - `claude-3-5-haiku-20241022` — для чата и проверки плана (дешевле)
 - **Charts:** Recharts
@@ -264,6 +264,8 @@ npx prisma migrate reset
 - **Путь:** `/home/oleg/ai-assistant-spec`
 - **Деплой:** `./deploy/deploy-contabo.sh` (rsync + Docker build)
 - **SSL:** Let's Encrypt (Nginx reverse proxy)
+- **Внешние API:** production обращается напрямую к `api.anthropic.com` и `api.telegram.org`; Cloudflare/Wrangler/Workers не используются.
+- **Worker fallback:** `cloudflare-proxy/` и `cloudflare-tg-proxy/` сохранены как отключённый архивный fallback (`WORKER_ENABLED=false`, fail-closed 503); production deploy их не запускает.
 - **Документация:** [docs/DEPLOY.md](docs/DEPLOY.md), [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md)
 
 ## Лицензия

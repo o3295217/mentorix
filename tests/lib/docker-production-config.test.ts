@@ -123,15 +123,64 @@ describe('production Docker public URL contract', () => {
     )
   })
 
-  it('uses the same production domain in env example, deploy health URL and Cloudflare allowed origin', async () => {
+  it('uses the same production domain in env example and deploy health URL', async () => {
     const envExample = await readFile(join(root, '.env.production.example'), 'utf8')
     const deployScript = await readFile(join(root, 'deploy/deploy-contabo.sh'), 'utf8')
-    const wrangler = await readFile(join(root, 'cloudflare-proxy/wrangler.toml'), 'utf8')
 
     expect(envExample).toContain(`NEXT_PUBLIC_APP_URL=${productionUrl}`)
     expect(deployScript).toContain(`PUBLIC_HEALTH_URL="\${PUBLIC_HEALTH_URL:-${productionUrl}/api/health}"`)
     expect(deployScript).toContain(`echo "Приложение: ${productionUrl}"`)
-    expect(wrangler).toContain(`ALLOWED_ORIGINS = "${productionUrl}"`)
+  })
+
+  it('uses direct Anthropic production config without proxy env or Wrangler', async () => {
+    const compose = await readFile(join(root, 'docker-compose.production.yml'), 'utf8')
+    const envExample = await readFile(join(root, '.env.production.example'), 'utf8')
+    const localEnvExample = await readFile(join(root, '.env.example'), 'utf8')
+    const anthropic = await readFile(join(root, 'lib/anthropic.ts'), 'utf8')
+    const deployScript = await readFile(join(root, 'deploy/deploy-contabo.sh'), 'utf8')
+
+    expect(compose).toContain(
+      '- ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env.production}'
+    )
+    for (const content of [compose, envExample, localEnvExample, anthropic]) {
+      expect(content).not.toContain('ANTHROPIC_PROXY_URL')
+      expect(content).not.toContain('ANTHROPIC_PROXY_SECRET')
+      expect(content).not.toContain('x-proxy-secret')
+      expect(content).not.toContain('baseURL')
+    }
+    expect(deployScript).toContain('api.anthropic.com/v1/messages')
+    expect(deployScript).toContain('Remote production preflight (direct Anthropic, no Cloudflare/Wrangler)')
+    expect(deployScript).toContain('Remote .env.production is missing')
+    expect(deployScript).toContain('curl -sS -o /dev/null -w')
+    expect(deployScript).not.toMatch(/\bwrangler\s+(deploy|login|dev)\b/)
+  })
+
+  it('uses direct Telegram API in operational scripts without stale proxy env or headers', async () => {
+    const monitor = await readFile(join(root, 'scripts/monitor.sh'), 'utf8')
+    const tgBot = await readFile(join(root, 'scripts/tg-bot.sh'), 'utf8')
+
+    for (const script of [monitor, tgBot]) {
+      expect(script).toContain('https://api.telegram.org/bot${TG_BOT_TOKEN}/')
+      expect(script).not.toContain('TG_API_BASE')
+      expect(script).not.toContain('TG_PROXY_SECRET')
+      expect(script).not.toContain('x-tg-proxy-secret')
+      expect(script).not.toContain('workers.dev')
+    }
+  })
+
+  it('keeps dormant Worker package scripts fail-closed and free of Wrangler commands', async () => {
+    for (const workerDir of ['cloudflare-proxy', 'cloudflare-tg-proxy']) {
+      const packageJson = await readFile(join(root, workerDir, 'package.json'), 'utf8')
+      expect(packageJson).not.toMatch(/\bwrangler\b/)
+      expect(packageJson).toContain('Dormant fallback')
+
+      for (const script of ['dev', 'deploy']) {
+        expect(() => execFileSync('npm', ['run', script], {
+          cwd: join(root, workerDir),
+          stdio: 'pipe',
+        }), `${workerDir} npm run ${script} must fail closed`).toThrow()
+      }
+    }
   })
 
   it('keeps deploy rsync aligned with Docker secret and dump exclusions while preserving Prisma migration SQL', async () => {

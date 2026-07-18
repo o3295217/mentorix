@@ -1,26 +1,18 @@
-name = "anthropic-proxy"
+name = "tg-proxy"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 
-[placement]
-mode = "smart"
-
 [durable_objects]
 bindings = [
-  { name = "ANTHROPIC_PROXY", class_name = "AnthropicProxyDO" },
   { name = "RATE_LIMITER", class_name = "RateLimitDO" }
 ]
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["AnthropicProxyDO"]
-
-[[migrations]]
-tag = "v2"
 new_sqlite_classes = ["RateLimitDO"]
 
 [vars]
 WORKER_ENABLED = "false"
 ALLOWED_ORIGINS = "https://mentorix.aionlab.ru"
-ANTHROPIC_API_URL = "https://api.anthropic.com"
-RATE_LIMIT_PER_MINUTE = "60"
+TELEGRAM_API_URL = "https://api.telegram.org"
+RATE_LIMIT_PER_MINUTE = "30"

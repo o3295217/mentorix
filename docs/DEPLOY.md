@@ -17,6 +17,7 @@
 | **ОС** | Ubuntu |
 | **Docker** | 29.2.1 + Compose v5.0.2 |
 | **SSL** | Let's Encrypt (nginx + certbot) |
+| **Внешние API** | напрямую `api.anthropic.com` и `api.telegram.org`; Cloudflare/Wrangler/Workers не участвуют |
 
 ---
 
@@ -69,6 +70,15 @@ rsync -avz --delete \
 ./deploy/deploy-contabo.sh
 ```
 
+Скрипт деплоя не запускает `wrangler` и не деплоит Workers. Перед сборкой на Contabo он проверяет:
+
+- наличие `/home/oleg/ai-assistant-spec/.env.production` на сервере;
+- прямую сетевую доступность `https://api.anthropic.com/v1/messages` без API-ключа (любой HTTP-ответ означает connectivity; сетевой сбой блокирует деплой).
+
+Секреты из `.env.production` при preflight не читаются и не печатаются.
+
+В репозитории сохранены `cloudflare-proxy/` и `cloudflare-tg-proxy/` как dormant fallback. Их `wrangler.toml` содержит `WORKER_ENABLED = "false"`, а код fail-closed возвращает 503 до обработки секретов или upstream. Текущий Contabo-протокол их не использует и не деплоит.
+
 ---
 
 ## Шаг 3: Настройка переменных окружения
@@ -100,11 +110,6 @@ ANTHROPIC_API_KEY=<ваш-api-key>
 REGISTRATION_MODE=open
 COOKIE_SECURE=true
 
-# Cloudflare Worker прокси для Anthropic API (если прямой доступ к API недоступен)
-# Включайте только для локаций/сетей, где Anthropic API блокируется.
-ANTHROPIC_PROXY_URL=https://anthropic-proxy.o3295217.workers.dev
-ANTHROPIC_PROXY_SECRET=<секрет-прокси>
-
 # Telegram уведомления приложения
 TG_BOT_TOKEN=<telegram-bot-token>
 TG_CHAT_ID=<telegram-chat-id>
@@ -120,7 +125,7 @@ NEXT_PUBLIC_APP_URL=https://mentorix.aionlab.ru
 
 `NEXT_PUBLIC_APP_URL` — публичная, не секретная переменная. Она обязательна дважды: как build arg для `next build`/standalone metadata и как runtime env для email links/API helpers. Dockerfile валидирует её через Node URL parser: только `https://`, непустой hostname, без username/password. Остальные секреты (`AUTH_SECRET`, `ENCRYPTION_KEY`, API keys, SMTP password) не передаются в Docker build args.
 
-> **Примечание:** если Anthropic API недоступен напрямую с production-сервера, используйте Cloudflare Worker прокси. Подробнее — см. [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
+> **Важно:** production на Contabo использует прямой официальный Anthropic endpoint. Proxy-переменные и Cloudflare/Wrangler/Workers не настраиваются и не передаются в контейнер.
 
 > **Важно:** после перехода на хеширование session token'ов при первом деплое миграции `20260401000000_invalidate_existing_sessions` все существующие сессии будут инвалидированы.
 
