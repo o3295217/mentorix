@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-07-18 — chore: migrate production deploy to Contabo
+- 📚 Библиотеки: 3 файлов (auth, goals-decompose, goals-validate)
+- 📝 Документация: 10 файлов
+- 📦 Другое: 12 файлов
+
+
 ### 2026-07-17 — feat: improve opencode agent workflow
 - ⚙️ Конфигурация: 3 файлов
 - 📝 Документация: 5 файлов
