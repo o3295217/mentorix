@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-07-18 — fix: harden production domain configuration
+- ⚙️ Конфигурация: 1 файлов
+- 📝 Документация: 7 файлов
+- 📦 Другое: 8 файлов
+
+
 ### 2026-07-18 — chore: migrate production deploy to Contabo
 - 📚 Библиотеки: 3 файлов (auth, goals-decompose, goals-validate)
 - 📝 Документация: 10 файлов
