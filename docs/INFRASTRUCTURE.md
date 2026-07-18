@@ -5,12 +5,12 @@
 ## Серверы
 
 ### Production — Contabo
-- **Домен:** https://assist.labaiion.ru
+- **Домен:** https://mentorix.aionlab.ru
 - **SSH:** `ssh contabo` (алиас в `~/.ssh/config`)
 - **Пользователь:** `oleg`
 - **Путь проекта:** `/home/oleg/ai-assistant-spec`
 - **ОС:** Ubuntu
-- **DNS:** домен `assist.labaiion.ru` указывает на production-сервер; IP хранится в SSH/DNS-конфигурации, не в репозитории
+- **DNS:** домен `mentorix.aionlab.ru` указывает на production-сервер; IP хранится в SSH/DNS-конфигурации, не в репозитории
 
 ## Расположение
 - **Локально:** корень текущего git-репозитория
@@ -20,7 +20,7 @@
 ## Docker
 - **Контейнеры:** `ai-assistant-production`, `ai-assistant-db`, `ai-assistant-backup`
 - **Порт:** 3000 (только `127.0.0.1`, проксируется через nginx)
-- **URL:** https://assist.labaiion.ru
+- **URL:** https://mentorix.aionlab.ru
 - **Compose файл:** `docker-compose.production.yml`
 - **Env файл:** `.env.production` (на сервере, исключён из git/rsync)
 
@@ -157,7 +157,9 @@ Production server → Cloudflare Worker (PoP) → Durable Object (US, wnam) → 
 | `SMTP_HOST` / `SMTP_PORT` | SMTP-сервер |
 | `SMTP_USER` / `SMTP_PASS` | SMTP credentials |
 | `SMTP_FROM` | Адрес отправителя |
-| `NEXT_PUBLIC_APP_URL` | https://assist.labaiion.ru |
+| `NEXT_PUBLIC_APP_URL` | https://mentorix.aionlab.ru; обязательна на build-time (`app.build.args`) и runtime (`environment`), публичная не-secret переменная |
+
+`NEXT_PUBLIC_APP_URL` используется Next.js во время `next build` для standalone/metadata и остаётся в runtime env для ссылок в email/API helpers. В build args передаётся только эта публичная переменная; Dockerfile валидирует её через Node URL parser (строго `https://`, hostname обязателен, credentials запрещены). `.dockerignore` и deploy rsync рекурсивно исключают `.env*`, key/secrets/cert paths (`*.pem`, `*.key`, `*.p12`, `*.pfx`) и SQL/backup dumps; обратно включаются только `prisma/migrations/**/migration.sql`, чтобы Prisma migrations оставались в Docker build context/remote sync.
 
 ## Автозапуск
 - systemd сервис: `ai-assistant.service`

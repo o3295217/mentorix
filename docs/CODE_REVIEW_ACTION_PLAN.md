@@ -1,7 +1,7 @@
 # План работ по результатам код-ревью
 
 > Дата ревью: 27 марта 2026
-> Проект: AI Assistant (assist.labaiion.ru)
+> Проект: AI Assistant (mentorix.aionlab.ru)
 > Проверено: ~80 файлов (lib/, API routes, components, hooks, pages, prompts, инфраструктура)
 
 ---
@@ -54,7 +54,7 @@
 - **Что:** CORS разрешён для всех (`*`), а если `PROXY_SECRET` не задан — авторизация полностью пропускается. Любой сайт может использовать ваш прокси за ваш счёт Anthropic API.
 - **Где:** `cloudflare-proxy/wrangler.toml:18`, `cloudflare-proxy/src/index.js:50`
 - **Как исправить:**
-  1. В `wrangler.toml` заменить `ALLOWED_ORIGINS = "*"` на `ALLOWED_ORIGINS = "https://assist.labaiion.ru"`
+  1. В `wrangler.toml` заменить `ALLOWED_ORIGINS = "*"` на `ALLOWED_ORIGINS = "https://mentorix.aionlab.ru"`
   2. В `src/index.js` сделать fail-closed:
      ```javascript
      if (!env.PROXY_SECRET) {

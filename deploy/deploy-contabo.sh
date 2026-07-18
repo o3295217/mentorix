@@ -12,7 +12,7 @@ NC='\033[0m'
 
 SERVER="contabo" # SSH alias из ~/.ssh/config
 REMOTE_PATH="/home/oleg/ai-assistant-spec"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://assist.labaiion.ru/api/health}"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mentorix.aionlab.ru/api/health}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -61,16 +61,28 @@ rsync -az --delete --delete-delay \
   --exclude 'node_modules/' \
   --exclude '.next/' \
   --exclude '.env*' \
+  --include '/prisma/migrations/**/migration.sql' \
   --exclude 'backups/' \
+  --exclude 'backup/' \
   --exclude 'logs/' \
   --exclude 'data/' \
   --exclude '*.db' \
   --exclude '*.db-journal' \
   --exclude '*.pem' \
   --exclude '*.key' \
+  --exclude '*.p12' \
+  --exclude '*.pfx' \
+  --exclude '*.bak' \
+  --exclude '*.backup' \
+  --exclude '*.dump' \
+  --exclude '*.sql' \
+  --exclude '*.sql.gz' \
+  --exclude '*.sql.gz.enc' \
   --exclude '.tg-bot-token' \
   --exclude '.tg-bot-env' \
+  --exclude 'keys/' \
   --exclude 'secrets/' \
+  --exclude '.secrets/' \
   --exclude '.opencode/' \
   --exclude 'coverage/' \
   "$LOCAL_PATH/" "$SERVER:$REMOTE_PATH/"
@@ -108,4 +120,4 @@ curl -fsS --retry 5 --retry-delay 5 "$PUBLIC_HEALTH_URL" >/dev/null
 echo "Public health OK: $PUBLIC_HEALTH_URL"
 
 echo -e "\n${GREEN}✅ Деплой на Contabo завершён!${NC}"
-echo "Приложение: https://assist.labaiion.ru"
+echo "Приложение: https://mentorix.aionlab.ru"

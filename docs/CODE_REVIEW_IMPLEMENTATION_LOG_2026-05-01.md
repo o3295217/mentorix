@@ -608,7 +608,7 @@
 
 ### Проверка перед изменением
 
-- Проверены все совпадения `assist.labaiion.ru`, `NEXT_PUBLIC_APP_URL`, `api.anthropic.com`, `ANTHROPIC_API_URL`.
+- Проверены все совпадения `mentorix.aionlab.ru`, `NEXT_PUBLIC_APP_URL`, `api.anthropic.com`, `ANTHROPIC_API_URL`.
 - Подтверждённые runtime-точки:
 	- `app/layout.tsx`: `metadataBase` и `openGraph.url` были прибиты к production-домену.
 	- `app/opengraph-image.tsx` и `app/twitter-image.tsx`: hostname в изображении был прибит к production-домену.
@@ -635,8 +635,8 @@
 - `npm run typecheck` — успешно.
 - `npm run lint` — успешно.
 - `node --check cloudflare-proxy/src/index.js` — успешно.
-- `docker compose -f docker-compose.production.yml config --quiet` с dummy secrets и `NEXT_PUBLIC_APP_URL=https://assist.labaiion.ru` — успешно.
-- `rg` по `app/**` не нашёл оставшихся `assist.labaiion.ru`, `https://assist.labaiion.ru`, `https://api.anthropic.com` или старого fallback `process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'`.
+- `docker compose -f docker-compose.production.yml config --quiet` с dummy secrets и `NEXT_PUBLIC_APP_URL=https://mentorix.aionlab.ru` — успешно.
+- `rg` по `app/**` не нашёл оставшихся `mentorix.aionlab.ru`, `https://mentorix.aionlab.ru`, `https://api.anthropic.com` или старого fallback `process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'`.
 
 ### Остаточные риски
 

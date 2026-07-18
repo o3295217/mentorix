@@ -254,11 +254,11 @@ npx prisma migrate reset
 | `SMTP_USER` | Email отправителя | Для email |
 | `SMTP_PASS` | Пароль приложения SMTP | Для email |
 | `SMTP_FROM` | Адрес отправителя | Для email |
-| `NEXT_PUBLIC_APP_URL` | URL приложения (для ссылок в email) | Для email |
+| `NEXT_PUBLIC_APP_URL` | Публичный HTTPS URL приложения; обязателен на Docker build-time (Next metadata/standalone) и runtime (email/API helpers) | Да в production |
 
 ## Production
 
-- **URL:** https://assist.labaiion.ru
+- **URL:** https://mentorix.aionlab.ru
 - **Сервер:** Contabo (Ubuntu)
 - **SSH:** `ssh contabo`
 - **Путь:** `/home/oleg/ai-assistant-spec`

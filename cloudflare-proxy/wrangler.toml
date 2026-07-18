@@ -20,6 +20,6 @@ tag = "v2"
 new_sqlite_classes = ["RateLimitDO"]
 
 [vars]
-ALLOWED_ORIGINS = "https://assist.labaiion.ru"
+ALLOWED_ORIGINS = "https://mentorix.aionlab.ru"
 ANTHROPIC_API_URL = "https://api.anthropic.com"
 RATE_LIMIT_PER_MINUTE = "60"

@@ -9,13 +9,9 @@ yarn-error.log*
 out
 dist
 
-# Environment files
-.env
-.env.local
-.env.production
-.env.development.local
-.env.test.local
-.env.production.local
+# Environment files — fail closed: no env file or env backup enters Docker context/cache
+.env*
+**/.env*
 
 # Database
 *.db
@@ -54,12 +50,57 @@ docker-compose.production.yml
 
 # Security — never include secrets/keys in image
 keys/
+keys/**
+**/keys/
+**/keys/**
 secrets/
+secrets/**
+**/secrets/
+**/secrets/**
+.secrets/
+.secrets/**
+**/.secrets/
+**/.secrets/**
 *.pem
+**/*.pem
 *.key
+**/*.key
+*.p12
+**/*.p12
+*.pfx
+**/*.pfx
 backups/
-scripts/
+backups/**
+**/backups/
+**/backups/**
+backup/
+backup/**
+**/backup/
+**/backup/**
+logs/
+logs/**
+**/logs/
+**/logs/**
+.tg-bot-token
+**/.tg-bot-token
+.tg-bot-env
+**/.tg-bot-env
+*.bak
+**/*.bak
+*.backup
+**/*.backup
+*.dump
+**/*.dump
+*.sql
+**/*.sql
+*.sql.gz
+**/*.sql.gz
+*.sql.gz.enc
+**/*.sql.gz.enc
+!prisma/migrations/**/migration.sql
+scripts/*
 !scripts/cleanup-expired.mjs
+!scripts/validate-public-app-url.mjs
 
 # Misc
 README.md

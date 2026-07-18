@@ -48,6 +48,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Public URL is consumed by Next.js at build time for metadata/standalone output.
+        # Do not add secrets here: build args can be visible in image metadata/cache.
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env.production}
     container_name: ai-assistant-production
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"

@@ -15,6 +15,14 @@ RUN npm ci
 FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
+COPY scripts/validate-public-app-url.mjs ./scripts/validate-public-app-url.mjs
+
+# NEXT_PUBLIC_* values are compiled into Next.js output during build.
+# This is public configuration only; never pass secrets as build args.
+ARG NEXT_PUBLIC_APP_URL
+RUN node ./scripts/validate-public-app-url.mjs "$NEXT_PUBLIC_APP_URL"
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -30,6 +38,7 @@ RUN npm run build
 # Stage 3: Runner
 FROM node:20-alpine AS runner
 WORKDIR /app
+ARG NEXT_PUBLIC_APP_URL
 
 # Install OpenSSL for Prisma, then remove wget and other unnecessary tools
 RUN apk add --no-cache openssl && \
@@ -38,6 +47,7 @@ RUN apk add --no-cache openssl && \
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV BUILT_NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -56,6 +66,7 @@ COPY --from=builder /app/prisma ./prisma
 # Copy entrypoint script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --from=builder /app/scripts/cleanup-expired.mjs /app/scripts/cleanup-expired.mjs
+COPY --from=builder /app/scripts/validate-public-app-url.mjs /app/scripts/validate-public-app-url.mjs
 
 USER root
 RUN chmod +x /app/docker-entrypoint.sh && \

@@ -36,7 +36,7 @@
 ### Инфраструктура
 - [x] **Health check endpoint** — для мониторинга (`/api/health`) ✅
 - [x] **SSL сертификаты** — Let's Encrypt + nginx ✅
-- [x] **Contabo деплой** — Production на assist.labaiion.ru ✅
+- [x] **Contabo деплой** — Production на mentorix.aionlab.ru ✅
 - [x] **Systemd автозапуск** ✅
 - [ ] **Proper logging** — структурированные логи (winston/pino)
 - [ ] **Error tracking** — Sentry или аналог
@@ -144,8 +144,8 @@
   - Файлы: TimelineNav.tsx (новый), DreamSection, YearSection, QuarterSection, MonthSection, page.tsx
 
 ### Февраль 2026
-- [x] **Миграция production на Contabo** — production-деплой на assist.labaiion.ru
-- [x] **Домен + SSL** — assist.labaiion.ru, Let's Encrypt, nginx reverse proxy
+- [x] **Миграция production на Contabo** — production-деплой на mentorix.aionlab.ru
+- [x] **Домен + SSL** — mentorix.aionlab.ru, Let's Encrypt, nginx reverse proxy
 - [x] **Email-верификация** — SMTP через Gmail, сброс пароля
 - [x] **Открытая регистрация** — REGISTRATION_MODE=open с подтверждением email
 - [x] **Исправление багов** — g.trim() в useGoals, SMTP переменные в Docker

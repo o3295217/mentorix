@@ -3,7 +3,7 @@
 # План работ по результатам код-ревью
 
 > Дата ревью: 1 мая 2026
-> Проект: AI Assistant (assist.labaiion.ru)
+> Проект: AI Assistant (mentorix.aionlab.ru)
 > Предыдущий план: [CODE_REVIEW_ACTION_PLAN.md](./CODE_REVIEW_ACTION_PLAN.md) от 27.03.2026 — закрыт на ~80%
 > Этот план содержит **только новые/незакрытые задачи** на текущий момент
 
@@ -237,20 +237,20 @@
 - **Оценка:** 30 мин
 
 ### 9. Захардкоженные production-URL
-- **Статус:** выполнено 01.05.2026 — runtime metadata/email/OG URL переведены на `NEXT_PUBLIC_APP_URL`, production compose теперь требует эту переменную, Worker Anthropic base URL вынесен в `ANTHROPIC_API_URL`.
+- **Статус:** выполнено 01.05.2026; уточнено 18.07.2026 — metadata/email/OG URL переведены на `NEXT_PUBLIC_APP_URL`, production compose требует эту публичную переменную на build-time и runtime, Worker Anthropic base URL вынесен в `ANTHROPIC_API_URL`.
 - **Что:** Домен и Anthropic API URL были прибиты к коду — переезд / staging-окружение требовали правок кода.
 - **Где:**
   - [lib/app-url.ts](../lib/app-url.ts) — единый helper `getAppUrl()` / `getAppHost()`.
   - [app/layout.tsx](../app/layout.tsx) — `metadataBase` и `openGraph.url` берутся из `NEXT_PUBLIC_APP_URL`.
   - [app/opengraph-image.tsx](../app/opengraph-image.tsx), [app/twitter-image.tsx](../app/twitter-image.tsx) — отображаемый hostname берётся из `NEXT_PUBLIC_APP_URL`.
   - Auth email routes используют общий app URL helper для verification/reset links.
-  - [docker-compose.production.yml](../docker-compose.production.yml) — `NEXT_PUBLIC_APP_URL` обязателен в production compose.
+  - [docker-compose.production.yml](../docker-compose.production.yml) — `NEXT_PUBLIC_APP_URL` обязателен в production compose как build arg и runtime env.
   - [cloudflare-proxy/src/index.js](../cloudflare-proxy/src/index.js) — Anthropic base URL берётся из `env.ANTHROPIC_API_URL` с дефолтом.
 - **Риск:** staging/переезд домена могли получать production metadata/email links или требовать пересборку Worker ради смены upstream URL.
 - **Как исправлено:**
   1. Введён `NEXT_PUBLIC_APP_URL` как единый источник app URL для metadata, OG/Twitter image hostname и email links.
   2. В `.env.production.example` добавлен `NEXT_PUBLIC_APP_URL`.
-  3. В production compose убран fallback на `http://localhost:3000`, чтобы неправильный public URL не проходил молча.
+  3. В production compose убран fallback на `http://localhost:3000`, чтобы неправильный public URL не проходил молча; Dockerfile валидирует build arg как `https://` URL с hostname и без credentials.
   4. В Worker добавлен `ANTHROPIC_API_URL` env var со значением по умолчанию `https://api.anthropic.com`.
 - **Оценка:** 30 мин
 

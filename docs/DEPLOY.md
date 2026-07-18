@@ -10,7 +10,7 @@
 
 | Параметр | Значение |
 |----------|----------|
-| **URL** | https://assist.labaiion.ru |
+| **URL** | https://mentorix.aionlab.ru |
 | **Сервер** | Contabo |
 | **SSH** | `ssh contabo` |
 | **Путь** | `/home/oleg/ai-assistant-spec` |
@@ -55,8 +55,12 @@ rsync -avz --delete \
   -e "ssh -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
   --exclude 'node_modules/' --exclude '.next/' --exclude '.git/' \
   --exclude 'data/' --exclude '*.db' --exclude '*.db-journal' \
-  --exclude '.env*' --exclude 'backups/' --exclude 'logs/' \
-  --exclude '*.pem' --exclude '*.key' --exclude 'secrets/' \
+  --exclude '.env*' --include '/prisma/migrations/**/migration.sql' \
+  --exclude 'backups/' --exclude 'backup/' --exclude 'logs/' \
+  --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude '*.pfx' \
+  --exclude '*.bak' --exclude '*.backup' --exclude '*.dump' \
+  --exclude '*.sql' --exclude '*.sql.gz' --exclude '*.sql.gz.enc' \
+  --exclude 'keys/' --exclude 'secrets/' --exclude '.secrets/' \
   ./ contabo:/home/oleg/ai-assistant-spec/
 ```
 
@@ -111,8 +115,10 @@ SMTP_PORT=587
 SMTP_USER=your@gmail.com
 SMTP_PASS=<app-password>
 SMTP_FROM=your@gmail.com
-NEXT_PUBLIC_APP_URL=https://your-domain.com
+NEXT_PUBLIC_APP_URL=https://mentorix.aionlab.ru
 ```
+
+`NEXT_PUBLIC_APP_URL` — публичная, не секретная переменная. Она обязательна дважды: как build arg для `next build`/standalone metadata и как runtime env для email links/API helpers. Dockerfile валидирует её через Node URL parser: только `https://`, непустой hostname, без username/password. Остальные секреты (`AUTH_SECRET`, `ENCRYPTION_KEY`, API keys, SMTP password) не передаются в Docker build args.
 
 > **Примечание:** если Anthropic API недоступен напрямую с production-сервера, используйте Cloudflare Worker прокси. Подробнее — см. [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
@@ -139,6 +145,7 @@ docker ps --format 'table {{.Names}}\t{{.Status}}'
 ```
 
 > **Важно:** всегда указывайте `--env-file .env.production` — Docker Compose не читает его автоматически.
+> `docker-compose.production.yml` передаёт только публичный `NEXT_PUBLIC_APP_URL` в `app.build.args`; `.dockerignore` рекурсивно исключает `.env*`, ключи/cert-архивы (`*.pem`, `*.key`, `*.p12`, `*.pfx`) и SQL/backup dumps. Для Prisma обратно включены только `prisma/migrations/**/migration.sql`, чтобы миграции попадали в build context. Deploy rsync использует тот же принцип: include для migration.sql стоит до широкого `*.sql` exclude.
 
 ---
 
@@ -160,7 +167,7 @@ limit_req_zone $binary_remote_addr zone=general_limit:10m rate=60r/s;
 
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name mentorix.aionlab.ru;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -210,7 +217,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ### SSL (Let's Encrypt)
 ```bash
 sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d your-domain.com
+sudo certbot --nginx -d mentorix.aionlab.ru
 ```
 
 Certbot автоматически обновит конфиг nginx для HTTPS и настроит автопродление.
@@ -219,7 +226,7 @@ Certbot автоматически обновит конфиг nginx для HTTP
 
 ## Шаг 6: Первый пользователь
 
-1. Откройте `https://your-domain.com/register`
+1. Откройте `https://mentorix.aionlab.ru/register`
 2. Введите имя, email и пароль
 3. На почту придёт ссылка для подтверждения email
 4. Перейдите по ссылке и войдите
