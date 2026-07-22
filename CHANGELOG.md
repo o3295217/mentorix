@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### 2026-07-22 — chore: deploy current changes
+- 🧩 Компоненты: 14 файлов (AppShell, DatePickerWithIndicators, LayoutFooter...)
+- 📄 Страницы: 6 файлов
+- ⚙️ Конфигурация: 6 файлов
+- 📝 Документация: 15 файлов
+- 📦 Другое: 19 файлов
+
+
 ### 2026-07-18 — fix: route production traffic directly
 - 📚 Библиотеки: 1 файлов (anthropic)
 - ⚙️ Конфигурация: 3 файлов
