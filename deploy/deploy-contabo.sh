@@ -15,58 +15,95 @@ SERVER="contabo" # SSH alias из ~/.ssh/config
 REMOTE_PATH="/home/oleg/ai-assistant-spec"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mentorix.aionlab.ru/api/health}"
 ANTHROPIC_CONNECTIVITY_URL="https://api.anthropic.com/v1/messages"
+SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o NumberOfPasswordPrompts=0 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ServerAliveInterval=10 -o ServerAliveCountMax=3"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/false
+export SSH_ASKPASS=/bin/false
+export GIT_SSH_COMMAND="$SSH_COMMAND"
+
 fail() {
-  echo -e "${RED}ERROR: $*${NC}" >&2
+  echo -e "${RED}Ошибка: $*${NC}" >&2
   exit 1
+}
+
+ssh_batch() {
+  ssh -n \
+    -o BatchMode=yes \
+    -o StrictHostKeyChecking=yes \
+    -o NumberOfPasswordPrompts=0 \
+    -o PasswordAuthentication=no \
+    -o KbdInteractiveAuthentication=no \
+    -o ServerAliveInterval=10 \
+    -o ServerAliveCountMax=3 \
+    "$SERVER" "$@"
+}
+
+ensure_clean_worktree() {
+  local status_output=""
+
+  if ! status_output="$(git --no-pager status --porcelain)"; then
+    fail "Не удалось проверить состояние рабочей копии. Деплой заблокирован."
+  fi
+  if [ -n "$status_output" ]; then
+    fail "Рабочая копия содержит незакоммиченные изменения. Запустите commit+deploy launcher или закоммитьте изменения вручную."
+  fi
 }
 
 echo -e "${YELLOW}🚀 Деплой AI Assistant → Contabo${NC}"
 echo "================================"
-echo "Local:  $LOCAL_PATH"
-echo "Remote: $SERVER:$REMOTE_PATH"
+echo "Сервер: $SERVER"
 
-echo -e "\n${GREEN}1. Git safety check${NC}"
+echo -e "\n${GREEN}1. Проверка git перед деплоем${NC}"
 cd "$LOCAL_PATH"
 
-if [ -n "$(git status --porcelain)" ]; then
-  git status --short
-  fail "Worktree is dirty. Commit/stash changes before deploy; deploy script never commits interactively."
-fi
+ensure_clean_worktree
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 if [ "$BRANCH" = "HEAD" ]; then
-  fail "Detached HEAD is not supported for production deploy."
+  fail "Detached HEAD не поддерживается для production deploy."
 fi
 
 if [ "${DEPLOY_SKIP_PUSH:-0}" = "1" ]; then
-  echo "Push skipped because DEPLOY_SKIP_PUSH=1"
+  echo "Отправка ветки пропущена: DEPLOY_SKIP_PUSH=1"
 else
-  UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
-  if [ -z "$UPSTREAM" ]; then
-    fail "Current branch '$BRANCH' has no upstream. Set upstream or run with DEPLOY_SKIP_PUSH=1."
+  UPSTREAM_REMOTE="$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)"
+  UPSTREAM_MERGE="$(git config --get "branch.$BRANCH.merge" 2>/dev/null || true)"
+  if [ -z "$UPSTREAM_REMOTE" ] || [ -z "$UPSTREAM_MERGE" ]; then
+    fail "Текущая ветка не имеет upstream. Настройте upstream или используйте DEPLOY_SKIP_PUSH=1."
   fi
-  echo -e "\n${GREEN}2. Push current branch ($BRANCH → $UPSTREAM)${NC}"
-  git push
+  if [ "$UPSTREAM_REMOTE" = "." ]; then
+    fail "Локальный upstream remote '.' запрещён для production deploy."
+  fi
+  case "$UPSTREAM_MERGE" in
+    refs/heads/*) ;;
+    *) fail "Upstream merge ref должен быть refs/heads/... для production deploy." ;;
+  esac
+  if ! git remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1; then
+    fail "Upstream remote не найден в git config."
+  fi
+  UPSTREAM_DISPLAY="$UPSTREAM_REMOTE/${UPSTREAM_MERGE#refs/heads/}"
+  echo -e "\n${GREEN}2. Отправка текущей ветки ($BRANCH → $UPSTREAM_DISPLAY)${NC}"
+  git -c core.askPass=/bin/false -c push.gpgSign=false push -- "$UPSTREAM_REMOTE" "HEAD:$UPSTREAM_MERGE" </dev/null || fail "Не удалось выполнить git push без интерактивного ввода. Проверьте SSH key auth, passphrase agent и права upstream."
 fi
 
-echo -e "\n${GREEN}3. Prepare remote directory${NC}"
-ssh "$SERVER" "mkdir -p '$REMOTE_PATH'"
+echo -e "\n${GREEN}3. Подготовка директории на сервере${NC}"
+ssh_batch "mkdir -p '$REMOTE_PATH'" || fail "Не удалось подключиться к серверу без интерактивного ввода. Проверьте SSH alias, known_hosts и key auth."
 
-echo -e "\n${GREEN}4. Remote production preflight (direct Anthropic, no Cloudflare/Wrangler)${NC}"
-ssh "$SERVER" "test -f '$REMOTE_PATH/.env.production'" || fail "Remote .env.production is missing at $SERVER:$REMOTE_PATH/.env.production"
-ANTHROPIC_STATUS="$(ssh "$SERVER" "curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 20 '$ANTHROPIC_CONNECTIVITY_URL'" 2>/dev/null || true)"
+echo -e "\n${GREEN}4. Production preflight на сервере: прямой Anthropic, без Cloudflare/Wrangler${NC}"
+ssh_batch "test -f '$REMOTE_PATH/.env.production'" || fail ".env.production не найден на сервере."
+ANTHROPIC_STATUS="$(ssh_batch "curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 20 '$ANTHROPIC_CONNECTIVITY_URL'" 2>/dev/null || true)"
 if [ -z "$ANTHROPIC_STATUS" ] || [ "$ANTHROPIC_STATUS" = "000" ]; then
-  fail "Contabo cannot reach api.anthropic.com directly. Network connectivity is required; deploy does not use Cloudflare/Wrangler."
+  fail "Contabo не может напрямую подключиться к api.anthropic.com. Сеть обязательна; deploy не использует Cloudflare/Wrangler."
 fi
-echo "Direct Anthropic connectivity OK (HTTP $ANTHROPIC_STATUS, unauthenticated probe)"
+echo "Прямая доступность Anthropic подтверждена (HTTP $ANTHROPIC_STATUS, запрос без API-ключа)"
 
-echo -e "\n${GREEN}5. Sync project to Contabo${NC}"
+echo -e "\n${GREEN}5. Синхронизация проекта на Contabo${NC}"
 rsync -az --delete --delete-delay \
-  -e "ssh -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
+  -e "$SSH_COMMAND" \
   --exclude '.git/' \
   --exclude 'node_modules/' \
   --exclude '.next/' \
@@ -95,39 +132,39 @@ rsync -az --delete --delete-delay \
   --exclude '.secrets/' \
   --exclude '.opencode/' \
   --exclude 'coverage/' \
-  "$LOCAL_PATH/" "$SERVER:$REMOTE_PATH/"
+  "$LOCAL_PATH/" "$SERVER:$REMOTE_PATH/" || fail "rsync не смог синхронизировать проект без интерактивного SSH. Проверьте known_hosts и key auth."
 
-echo -e "\n${GREEN}6. Build production Docker image on Contabo${NC}"
-ssh "$SERVER" "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache"
+echo -e "\n${GREEN}6. Сборка production Docker image на Contabo${NC}"
+ssh_batch "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml build --no-cache"
 
-echo -e "\n${GREEN}7. Start/update production containers${NC}"
-ssh "$SERVER" "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml up -d"
+echo -e "\n${GREEN}7. Запуск/обновление production containers${NC}"
+ssh_batch "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml up -d"
 
-echo -e "\n${GREEN}8. Best-effort Telegram bot restart${NC}"
-ssh "$SERVER" "sudo systemctl restart tg-bot 2>/dev/null && echo 'tg-bot restarted' || echo 'tg-bot service not found or restart failed, skipping'"
+echo -e "\n${GREEN}8. Best-effort перезапуск Telegram-бота${NC}"
+ssh_batch "sudo -n systemctl restart tg-bot 2>/dev/null && echo 'tg-bot restarted' || echo 'tg-bot service not found or restart failed, skipping'"
 
-echo -e "\n${GREEN}9. Container status and health${NC}"
-ssh "$SERVER" "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml ps"
+echo -e "\n${GREEN}9. Статус контейнеров и health${NC}"
+ssh_batch "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml ps"
 
 APP_HEALTH=""
 for attempt in {1..18}; do
-  APP_HEALTH="$(ssh "$SERVER" "docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' ai-assistant-production" 2>/dev/null || true)"
+  APP_HEALTH="$(ssh_batch "docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' ai-assistant-production" 2>/dev/null || true)"
   if [ "$APP_HEALTH" = "healthy" ] || [ "$APP_HEALTH" = "running" ]; then
-    echo "ai-assistant-production status: $APP_HEALTH"
+    echo "Статус ai-assistant-production: $APP_HEALTH"
     break
   fi
-  echo "Waiting for app health ($attempt/18): ${APP_HEALTH:-unknown}"
+  echo "Ожидаю health приложения ($attempt/18): ${APP_HEALTH:-unknown}"
   sleep 10
 done
 
 if [ "$APP_HEALTH" != "healthy" ] && [ "$APP_HEALTH" != "running" ]; then
-  ssh "$SERVER" "docker logs --tail=120 ai-assistant-production" || true
-  fail "App container did not become healthy/running."
+  ssh_batch "docker logs --tail=120 ai-assistant-production" || true
+  fail "Контейнер приложения не перешёл в healthy/running."
 fi
 
-echo -e "\n${GREEN}10. Public health check${NC}"
+echo -e "\n${GREEN}10. Публичная health-проверка${NC}"
 curl -fsS --retry 5 --retry-delay 5 "$PUBLIC_HEALTH_URL" >/dev/null
-echo "Public health OK: $PUBLIC_HEALTH_URL"
+echo "Публичная health-проверка пройдена: $PUBLIC_HEALTH_URL"
 
 echo -e "\n${GREEN}✅ Деплой на Contabo завершён!${NC}"
 echo "Приложение: https://mentorix.aionlab.ru"

@@ -16,7 +16,7 @@ Each line is a standalone JSON object. Current records use `schemaVersion: 2`; t
 - `timestamp`: ISO timestamp.
 - `parentSessionId`, `callId`.
 - `description`: short sanitized description only; full prompt, command, output, task result, env and secrets are not logged.
-- `agent`, `resolvedModel`, `scenario` (`base`, `agent2.0_gpt56`, or `custom`).
+- `agent`, `resolvedModel`, `scenario` (`base`, `agent2.0_gpt56`, `agent2.0_balanced`, or `custom`).
 - `isResume`, `resumedTaskId`: `isResume: true` means the task call provided `args.task_id` and is a rework/resume attempt.
 - `returnedTaskId`, `state` (`completed`, `error`, or `unknown`), `durationMs` on `finished` events.
 - Economy fields on v2 records: `usageAvailable`, `usageMessageCount`, `inputTokens`, `outputTokens`, `reasoningTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalTokens`, `cost`, `usageModelId`, `usageProviderId`, `usageMode`, `usageVariant`.
@@ -34,10 +34,25 @@ OpenCode loads config and project plugins only at process startup. After changin
 ```bash
 node scripts/opencode-agent-stats.mjs
 node scripts/opencode-agent-stats.mjs /path/to/agent-runs.jsonl
+npm run opencode:agent-audit
+npm run opencode:agent-audit -- /path/to/agent-runs.jsonl
 ```
 
 The report aggregates by `agent + model + scenario` and shows started, finished, completed, errors, unfinished, resume attempts, completion/error rates, average duration, usage coverage, total/average cost, total/average tokens and token category sums. Before aggregation, `scripts/opencode-agent-stats.mjs` safely deduplicates historical duplicate lifecycle rows by `parentSessionId + callId + event`; rows without a reliable `callId` are kept. This corrects reports from journals written while the plugin was double-registered without rewriting evidence.
 
 Do not edit, compact, rewrite, or delete the runtime journal to "fix" old duplicates. Keep `.opencode/metrics/agent-runs.jsonl` as append-only factual history; use the stats script for corrected aggregates.
 
-Limit: first-pass acceptance cannot be determined automatically. The journal only proves starts, finishes, completion/error state, resume attempts, durations, and OpenCode-reported usage/cost when the hook event contains it. Prompt text, command text, task result, assistant output, env and secrets are not logged.
+`scripts/opencode-agent-audit.mjs` is a deterministic read-only audit report for quality governance. It groups by `agent + resolvedModel + scenario`, uses the same lifecycle deduplication approach, and prints sample size, finished/completed/errors/unfinished, error rate, `isResume` resume/rework proxy, usage coverage, duration, cost and tokens where available. It does not print journal paths, task descriptions, session ids and never reads or logs prompts/results/user content. The `agent-auditor` subagent is fail-closed (`permission: deny`) and sees only this aggregate stdout when lead passes it in a prompt.
+
+Operational event exclusion: Task calls to `agent-auditor` are intentionally not written to `agent-runs.jsonl`. This prevents the audit command itself from polluting the metrics it analyzes. Other agents are still logged normally.
+
+Audit thresholds are intentionally conservative:
+
+- `<20 finished`: `INSUFFICIENT_EVIDENCE`; no prompt/model/disable recommendation.
+- `>=20 finished`: soft investigate warnings only.
+- `>=50 finished`: `REVIEW_PROMPT` or `CONSIDER_MODEL_CHANGE` may be recommended when bad metrics are sustained.
+- `>=100 finished`: `CONSIDER_DISABLE` may be suggested for severe sustained non-provider signal, but never as an automatic action.
+
+The audit separates suspected provider/system instability from suspected quality issues with a cautious heuristic: only schema v2 `state: "error"` rows with an explicit no-usage or zero-token signal and `durationMs <= 30000` are treated as possible provider/system failure. Schema v1 rows and long no-usage errors are not classified as provider/system by default. This is not proof; check quota, availability, network and provider status before judging agent quality. A single error spike must not trigger disable.
+
+Limits: first-pass acceptance cannot be determined automatically. The journal only proves starts, finishes, completion/error state, resume attempts, durations, and OpenCode-reported usage/cost when the hook event contains it. `isResume` only proves a task call had `args.task_id`; it is a proxy for rework/resume, not proof of quality `REWORK`. Current schema cannot reliably infer lead override/escalation, final acceptance rationale, or whether a stronger agent fixed another agent's work. Prompt text, command text, task result, assistant output, env and secrets are not logged and must not be added to the runtime journal.

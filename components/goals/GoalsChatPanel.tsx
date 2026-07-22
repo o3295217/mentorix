@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useCallback, useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import type { ParsedGoal } from '@/hooks/useGoalsChat'
+import { GOALS_CHAT_DRAFT_KEY } from '@/hooks/chat-viewport-helpers'
+import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
 import { formatPeriodLabel } from '@/lib/goals-utils'
 
 interface ChatMessage {
@@ -136,7 +139,65 @@ export default function GoalsChatPanel({
   const [input, setInput] = useState('')
   // Track accepted blocks: key = "msgIndex-periodType-periodKey"
   const [acceptedBlocks, setAcceptedBlocks] = useState<Set<string>>(new Set())
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const skipInitialDraftSaveRef = useRef(true)
+
+  const {
+    viewportMetrics,
+    scrollToBottom,
+    ensureFocusTargetVisible,
+  } = useChatAutoScroll({
+    containerRef: messagesContainerRef,
+    contentDependency: messages,
+    active: isOpen,
+    scrollToBottomOnFirstActivate: true,
+    focusTargetRef: textareaRef,
+  })
+
+  const panelStyle = {
+    background: 'linear-gradient(180deg, rgba(15,23,42,0.99), rgba(2,6,23,1))',
+    ...(viewportMetrics
+      ? {
+          '--chat-visual-viewport-height': `${viewportMetrics.height}px`,
+          '--chat-keyboard-inset': `${viewportMetrics.keyboardInset}px`,
+        }
+      : {}),
+  } as CSSProperties
+
+  const resizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
+    textarea.style.height = '44px'
+    if (textarea.value) {
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (textareaRef.current) resizeTextarea(textareaRef.current)
+  }, [input, resizeTextarea])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      setInput(window.sessionStorage.getItem(GOALS_CHAT_DRAFT_KEY) ?? '')
+    } catch {
+      setInput('')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (skipInitialDraftSaveRef.current) {
+      skipInitialDraftSaveRef.current = false
+      return
+    }
+    if (typeof window === 'undefined') return
+    try {
+      if (input) window.sessionStorage.setItem(GOALS_CHAT_DRAFT_KEY, input)
+      else window.sessionStorage.removeItem(GOALS_CHAT_DRAFT_KEY)
+    } catch {
+      // Storage может быть недоступен в privacy mode.
+    }
+  }, [input])
 
   // Collect all unaccepted goals across all messages for "Accept all" button
   const allPendingGoals = useMemo(() => {
@@ -156,13 +217,15 @@ export default function GoalsChatPanel({
     return pending
   }, [messages, extractGoals, onAcceptGoals, isLoading, acceptedBlocks])
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
   const handleSend = () => {
     if (!input.trim() || isLoading) return
+    scrollToBottom()
     onSendMessage(input.trim())
+    try {
+      window.sessionStorage.removeItem(GOALS_CHAT_DRAFT_KEY)
+    } catch {
+      // Storage может быть недоступен в privacy mode.
+    }
     setInput('')
   }
 
@@ -170,25 +233,34 @@ export default function GoalsChatPanel({
     <>
       {/* Backdrop on mobile */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-35 md:hidden"
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Закрыть AI-помощника"
+          className="fixed inset-0 z-[65] cursor-default bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Panel — desktop: slide-in from right; mobile: bottom sheet */}
       <div
+        role="dialog"
+        aria-modal={isOpen ? true : undefined}
+        aria-labelledby="goals-chat-title"
+        aria-hidden={!isOpen}
+        inert={!isOpen}
         className={`
-          fixed z-40 shadow-2xl
-          transition-transform duration-300 ease-in-out flex flex-row
-          md:top-16 md:bottom-0 md:right-0 md:w-full md:max-w-md md:border-l md:border-slate-800
-          max-md:inset-x-0 max-md:bottom-0 max-md:rounded-t-2xl max-md:border-t max-md:border-slate-700 max-md:max-h-[85vh] max-md:flex-col
+          goals-chat-panel fixed z-[70] flex min-h-0 flex-col shadow-2xl
+          transition-transform duration-300 ease-in-out
+          md:right-0 md:w-full md:max-w-md md:flex-row md:border-l md:border-slate-800
+          max-md:inset-x-0 max-md:rounded-t-2xl max-md:border-t max-md:border-slate-700
           ${isOpen
-            ? 'md:translate-x-0 max-md:translate-y-0'
-            : 'md:translate-x-full max-md:translate-y-full'}
+            ? 'pointer-events-auto md:translate-x-0 max-md:translate-y-0'
+            : 'pointer-events-none md:translate-x-full max-md:translate-y-full'}
         `}
-        style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.99), rgba(2,6,23,1))' }}
+        style={panelStyle}
       >
+        <h2 id="goals-chat-title" className="sr-only">Чат с Mentorix по целям</h2>
         {/* Desktop: minimal close button on left edge */}
         <button
           onClick={onClose}
@@ -196,6 +268,7 @@ export default function GoalsChatPanel({
             bg-slate-800/40 hover:bg-slate-700/60 border-r border-slate-800/60
             text-slate-600 hover:text-slate-300 transition-colors"
           title="Скрыть Ментора"
+          aria-label="Закрыть чат с Mentorix"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -203,20 +276,21 @@ export default function GoalsChatPanel({
         </button>
 
         {/* Main chat column */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
 
         {/* Drag handle (mobile) */}
-        <div className="md:hidden flex justify-center pt-2 pb-1">
+        <div className="flex shrink-0 justify-center pb-1 pt-2 md:hidden" aria-hidden="true">
           <div className="w-10 h-1 bg-slate-700 rounded-full" />
         </div>
 
         {/* Context label (compact) */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2.5">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Контекст: {contextLabel}</p>
           {/* Mobile close */}
           <button
             onClick={onClose}
-            className="md:hidden text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 md:hidden"
+            aria-label="Закрыть чат с Mentorix"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -225,7 +299,7 @@ export default function GoalsChatPanel({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scrollbar">
+        <div ref={messagesContainerRef} className="chat-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
           {messages.length === 0 && (
             <div className="text-center py-8">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-400/10 mb-4">
@@ -244,7 +318,10 @@ export default function GoalsChatPanel({
                 ].map((hint) => (
                   <button
                     key={hint}
-                    onClick={() => onSendMessage(hint)}
+                    onClick={() => {
+                      scrollToBottom()
+                      onSendMessage(hint)
+                    }}
                     className="block w-full text-left text-xs text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-800/60 px-3.5 py-2.5 transition-colors"
                   >
                     {hint}
@@ -344,12 +421,11 @@ export default function GoalsChatPanel({
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* "Accept all" button */}
         {allPendingGoals.length > 1 && onAcceptGoals && (
-          <div className="px-4 py-2 border-t border-slate-800/60">
+          <div className="shrink-0 border-t border-slate-800/60 px-4 py-2">
             <button
               onClick={() => {
                 const allGoals = allPendingGoals.flatMap(p => p.goals)
@@ -371,35 +447,36 @@ export default function GoalsChatPanel({
         )}
 
         {/* Input */}
-        <div className="p-4 border-t border-slate-800">
+        <div className="goals-chat-composer shrink-0 border-t border-slate-800 px-4 pt-4">
           <div className="flex gap-2 items-end">
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => {
                 setInput(e.target.value)
-                // Auto-resize
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+                resizeTextarea(e.target)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   handleSend()
-                  // Reset height after send
-                  const target = e.target as HTMLTextAreaElement
-                  requestAnimationFrame(() => { target.style.height = 'auto' })
                 }
               }}
+              onFocus={ensureFocusTargetVisible}
               placeholder="Спроси что-нибудь..."
-              className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-none overflow-y-auto"
-              style={{ minHeight: '42px', maxHeight: '160px' }}
+              aria-label="Сообщение Mentorix"
+              className="min-h-11 max-h-40 flex-1 resize-none overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/50 px-4 py-2.5 text-base text-slate-200 placeholder-slate-600 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50 md:text-sm"
+              style={{ height: '44px' }}
               rows={1}
               disabled={isLoading}
             />
             <button
+              type="button"
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex h-11 min-w-11 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-3 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Отправить сообщение Mentorix"
+              title="Отправить"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

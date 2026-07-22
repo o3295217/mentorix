@@ -3,6 +3,7 @@ import {
   buildTasksFromTexts,
   parseExtraTasksJson,
   parseSelectedTasksJson,
+  preserveSelectionByTaskIds,
   remapSelectionByText,
   sanitizeSelectedForTotal,
 } from '@/hooks/daily/task-helpers'
@@ -26,6 +27,24 @@ describe('daily task helpers', () => {
     const nextTasks = buildTasksFromTexts(['write', 'CALL', 'Call', 'Other'], '2026-05-02')
 
     expect(Array.from(remapSelectionByText(prevTasks, new Set([1, 3]), nextTasks))).toEqual([2, 3])
+  })
+
+  it('preserves selected task status when editing selected task text', () => {
+    const nextTasks = buildTasksFromTexts(['Edited selected', 'Active'], '2026-05-02')
+
+    expect(Array.from(preserveSelectionByTaskIds(new Set([1]), nextTasks))).toEqual([1])
+  })
+
+  it('preserves unselected task status when editing unselected task text', () => {
+    const nextTasks = buildTasksFromTexts(['Selected', 'Edited active'], '2026-05-02')
+
+    expect(Array.from(preserveSelectionByTaskIds(new Set([1]), nextTasks))).toEqual([1])
+  })
+
+  it('preserves task statuses by id when edited text duplicates another task', () => {
+    const nextTasks = buildTasksFromTexts(['Call', 'Call', 'Other'], '2026-05-02')
+
+    expect(Array.from(preserveSelectionByTaskIds(new Set([1, 3]), nextTasks))).toEqual([1, 3])
   })
 
   it('parses extra tasks defensively', () => {

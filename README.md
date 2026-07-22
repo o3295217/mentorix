@@ -263,6 +263,7 @@ npx prisma migrate reset
 - **SSH:** `ssh contabo`
 - **Путь:** `/home/oleg/ai-assistant-spec`
 - **Деплой:** `./deploy/deploy-contabo.sh` (rsync + Docker build)
+- **macOS launchers:** `Deploy Contabo.command` запускает только deploy; `Commit and Deploy Contabo.command` сначала безопасно коммитит изменения (typecheck/lint/test, staged diff confirmation, sensitive path guard, Husky CHANGELOG handling), затем вызывает тот же `deploy/deploy-contabo.sh`.
 - **SSL:** Let's Encrypt (Nginx reverse proxy)
 - **Внешние API:** production обращается напрямую к `api.anthropic.com` и `api.telegram.org`; Cloudflare/Wrangler/Workers не используются.
 - **Worker fallback:** `cloudflare-proxy/` и `cloudflare-tg-proxy/` сохранены как отключённый архивный fallback (`WORKER_ENABLED=false`, fail-closed 503); production deploy их не запускает.

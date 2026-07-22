@@ -148,15 +148,15 @@ export default function DailyScheduleProposalCard({
           type="button"
           onClick={handleClick}
           disabled={!messageId || isApplying || isApplied}
-          className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+          className="min-h-11 rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:min-h-0"
           aria-disabled={!messageId || isApplying || isApplied}
         >
           {getProposalApplyButtonLabel({ isApplied, isApplying, hasExistingSchedule })}
         </button>
-        <button type="button" onClick={onDiscuss} disabled={isApplying} className="rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-100 hover:bg-gray-800 disabled:opacity-50">
+        <button type="button" onClick={onDiscuss} disabled={isApplying} className="min-h-11 rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-100 hover:bg-gray-800 disabled:opacity-50 sm:min-h-0">
           Обсудить изменения
         </button>
-        <button type="button" onClick={onDismiss} disabled={isApplying} className="rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50 sm:col-span-2">
+        <button type="button" onClick={onDismiss} disabled={isApplying} className="min-h-11 rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50 sm:col-span-2 sm:min-h-0">
           Отменить
         </button>
       </div>

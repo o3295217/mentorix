@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "opencode:agent-audit": "node scripts/opencode-agent-audit.mjs",
     "cleanup:expired": "node scripts/cleanup-expired.mjs",
     "postinstall": "prisma generate",
     "prepare": "husky"

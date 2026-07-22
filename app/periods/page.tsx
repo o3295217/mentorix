@@ -553,7 +553,7 @@ export default function PeriodsPage() {
         </SectionCard>
 
         {message && (
-          <div className="fixed bottom-4 right-4 z-50 rounded-2xl border border-emerald-500/20 bg-gray-950/90 p-4 shadow-lg backdrop-blur-sm">
+          <div role="status" aria-live="polite" className="app-fixed-status fixed z-50 rounded-2xl border border-emerald-500/20 bg-gray-950/90 p-4 shadow-lg backdrop-blur-sm">
             <p className="font-medium text-emerald-100">{message}</p>
           </div>
         )}

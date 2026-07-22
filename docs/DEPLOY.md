@@ -53,7 +53,7 @@ cd /home/oleg/ai-assistant-spec
 ```bash
 # С мака:
 rsync -avz --delete \
-  -e "ssh -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
+  -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o NumberOfPasswordPrompts=0 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ServerAliveInterval=10 -o ServerAliveCountMax=3" \
   --exclude 'node_modules/' --exclude '.next/' --exclude '.git/' \
   --exclude 'data/' --exclude '*.db' --exclude '*.db-journal' \
   --exclude '.env*' --include '/prisma/migrations/**/migration.sql' \
@@ -76,6 +76,16 @@ rsync -avz --delete \
 - прямую сетевую доступность `https://api.anthropic.com/v1/messages` без API-ключа (любой HTTP-ответ означает connectivity; сетевой сбой блокирует деплой).
 
 Секреты из `.env.production` при preflight не читаются и не печатаются.
+
+### macOS launchers
+
+- `Deploy Contabo.command` — двойной клик для запуска существующего `deploy/deploy-contabo.sh`; требует clean worktree, push/upstream и все production-проверки остаются в deploy script.
+- `Commit and Deploy Contabo.command` — one-click сценарий «закоммитить и задеплоить» без ввода с клавиатуры. При dirty worktree launcher автоматически делает `git add -A`, блокирует staged sensitive paths (`.env*` кроме example, keys/secrets/backups/data/logs, ключи/дампы/SQL, tg token/env), запускает `npm run typecheck`, `npm run lint`, `npm run test`, создаёт commit без `--no-verify` с сообщением `chore: deploy current changes`, обрабатывает generated `CHANGELOG.md` от Husky и только после clean worktree вызывает `deploy/deploy-contabo.sh`. При clean worktree сразу деплоит текущий HEAD.
+- Для локального override commit message можно перед запуском задать `COMMIT_DEPLOY_MESSAGE`; значение должно быть непустой одной строкой. Launcher не спрашивает commit message, не просит подтверждений, не показывает список файлов/diff/stat и отключает git pager, чтобы в Terminal не появлялся `less`/`(END)`.
+- При запуске `.command` двойным кликом Finder может дать урезанный `PATH`; commit+deploy launcher перед commit-checks добавляет стандартные macOS-директории Homebrew/MacPorts (`/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin`, `$HOME/.local/bin`). Для нестандартной установки Node.js можно задать `COMMIT_DEPLOY_EXTRA_PATHS`.
+- End-to-end деплой работает fail-fast без интерактивного ввода: `GIT_TERMINAL_PROMPT=0`, SSH/rsync используют `BatchMode=yes` и `StrictHostKeyChecking=yes`, а best-effort restart Telegram-бота использует `sudo -n`. До запуска должны быть заранее настроены SSH alias `contabo`, known_hosts, key-based auth/ssh-agent для passphrase и права `git push`; иначе скрипт завершится русской ошибкой вместо запроса пароля/host confirmation.
+
+Launcher не делает `pull`/`rebase`/`reset`, не меняет git config, не force-push'ит и не дублирует production logic. Docker build остаётся частью Contabo deploy script.
 
 В репозитории сохранены `cloudflare-proxy/` и `cloudflare-tg-proxy/` как dormant fallback. Их `wrangler.toml` содержит `WORKER_ENABLED = "false"`, а код fail-closed возвращает 503 до обработки секретов или upstream. Текущий Contabo-протокол их не использует и не деплоит.
 

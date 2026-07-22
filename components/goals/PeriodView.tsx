@@ -35,7 +35,7 @@ const CONFIGS = {
     count: 4,
     colors: Q_COLORS,
     title: 'Кварталы',
-    gridCols: 'grid-cols-2 md:grid-cols-4',
+    gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4',
     emptyHint: 'Разбейте годовые цели по кварталам',
     keyPrefix: 'Q',
     label: (i: number) => `Q${i}`,
@@ -247,7 +247,7 @@ function PeriodCard({
       {/* Goals list */}
       <div className="space-y-1 mb-2 max-h-28 overflow-y-auto chat-scrollbar">
         {goals.map((goal, index) => (
-          <div key={index} className="group/pg flex items-start gap-1.5 text-xs">
+          <div key={index} className="goal-action-surface flex flex-wrap items-start gap-x-1.5 gap-y-1 text-xs">
             {editingIndex === index ? (
               <textarea
                 value={editingText}
@@ -259,24 +259,36 @@ function PeriodCard({
                 onBlur={() => saveEdit(index)}
                 ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
                 rows={1}
-                className="flex-1 bg-slate-950/50 border border-slate-700 rounded-lg px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none overflow-hidden"
+                className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-lg border border-slate-700 bg-slate-950/50 px-2 py-2 text-base text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 md:text-xs"
                 autoFocus
               />
             ) : (
               <>
-                <span className={`mt-[3px] h-1.5 w-1.5 rounded-full flex-shrink-0 ${color.dot}`} />
+                <span className={`mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full ${color.dot}`} />
                 <span
-                  className="text-slate-300 leading-snug flex-1 cursor-text hover:text-slate-100 transition-colors"
+                  className="min-w-0 flex-1 break-words py-1.5 text-sm leading-snug text-slate-300 transition-colors [overflow-wrap:anywhere] hover:text-slate-100 md:text-xs"
                   onClick={() => startEdit(index, goal)}
                 >
                   {goal}
                 </span>
-                <button
-                  onClick={() => onRemove(index)}
-                  className="text-slate-700 hover:text-red-400 opacity-0 group-hover/pg:opacity-100 transition-opacity flex-shrink-0"
-                >
-                  ×
-                </button>
+                <div className="goal-hover-actions flex basis-full flex-wrap justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(index, goal)}
+                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-sm text-slate-500 transition-colors hover:bg-slate-800 hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                    aria-label={`Редактировать цель «${goal}»`}
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                    aria-label={`Удалить цель «${goal}»`}
+                  >
+                    ×
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -290,7 +302,7 @@ function PeriodCard({
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd() } }}
         placeholder={`+ цель ${label}`}
         rows={1}
-        className="w-full bg-slate-950/30 border border-slate-800 rounded-xl px-2.5 py-1 text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors resize-none overflow-hidden"
+        className="min-h-11 w-full resize-none overflow-hidden rounded-xl border border-slate-800 bg-slate-950/30 px-2.5 py-2 text-base text-slate-300 placeholder-slate-600 transition-colors focus:border-slate-600 focus:outline-none md:text-xs"
       />
     </div>
   )

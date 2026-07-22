@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
@@ -18,13 +19,14 @@ import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
 import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
 import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
+import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
 type FactItem = { id: number; text: string; type: string; category: string | null }
 
-const taskActionButtonBase = 'flex h-8 w-8 items-center justify-center rounded-md border transition-colors'
-const confirmButtonBase = 'flex h-7 w-7 items-center justify-center rounded-md text-sm leading-none transition-colors'
+const taskActionButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md border transition-colors lg:h-8 lg:min-w-8 lg:w-8'
+const confirmButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md text-sm leading-none transition-colors lg:h-7 lg:min-w-7 lg:w-7'
 
 function getLocalTimeHHMM(date = new Date()) {
   const hours = String(date.getHours()).padStart(2, '0')
@@ -67,18 +69,27 @@ export default function DailyPage() {
   const router = useRouter()
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const chatFocusFrameRef = useRef<number | null>(null)
+  const mobileViewFrameRef = useRef<number | null>(null)
+  const mobilePlanTabRef = useRef<HTMLButtonElement>(null)
+  const mobileAssistantTabRef = useRef<HTMLButtonElement>(null)
   const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
   const activeTaskActionRowRef = useRef<HTMLDivElement | null>(null)
   const habitEditorRef = useRef<HTMLDivElement | null>(null)
   const tasksContainerRef = useRef<HTMLDivElement | null>(null)
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState<string | null>(null)
+  const [hasMobileTabSemantics, setHasMobileTabSemantics] = useState(false)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null)
   const [dismissedProposalIds, setDismissedProposalIds] = useState<Set<string>>(() => new Set())
   const [isSubmittingChat, setIsSubmittingChat] = useState(false)
+  const [assistantOperationError, setAssistantOperationError] = useState('')
+  const [mobileView, setMobileView] = useState<'plan' | 'assistant'>('plan')
+  const [showMobileContext, setShowMobileContext] = useState(false)
   const isSubmittingChatRef = useRef(false)
+  const directChatOperationRef = useRef<{ assistantMessageCount: number } | null>(null)
   const timelineMutationLocked = applyingProposalId !== null || isSubmittingChat
 
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
@@ -131,15 +142,20 @@ export default function DailyPage() {
     if (!showCompleted) return
     const container = tasksContainerRef.current
     if (!container) return
+    let animationFrameId: number | null = null
     const animate = (from: number, to: number, duration: number) => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        container.scrollTop = to
+        return
+      }
       const start = performance.now()
       const step = (now: number) => {
         const t = Math.min(1, (now - start) / duration)
         const eased = 1 - Math.pow(1 - t, 3)
         container.scrollTop = from + (to - from) * eased
-        if (t < 1) requestAnimationFrame(step)
+        if (t < 1) animationFrameId = requestAnimationFrame(step)
       }
-      requestAnimationFrame(step)
+      animationFrameId = requestAnimationFrame(step)
     }
     const tick = () => {
       const target = container.scrollHeight - container.clientHeight
@@ -147,7 +163,10 @@ export default function DailyPage() {
     }
     // Даём layout обновиться после раскрытия нижнего блока.
     const id = window.setTimeout(tick, 230)
-    return () => window.clearTimeout(id)
+    return () => {
+      window.clearTimeout(id)
+      if (animationFrameId !== null) window.cancelAnimationFrame(animationFrameId)
+    }
   }, [showCompleted])
 
   useEffect(() => {
@@ -272,6 +291,56 @@ export default function DailyPage() {
       && msg.content.trim().length > 0
     ))
 
+  const {
+    viewportMetrics: chatViewportMetrics,
+    scrollToBottom: scrollChatToBottom,
+    ensureFocusTargetVisible: ensureChatComposerVisible,
+  } = useChatAutoScroll({
+    containerRef: chatContainerRef,
+    contentDependency: chatMessages,
+    focusTargetRef: chatTextareaRef,
+    bottomObstructionSelector: '.mobile-bottom-nav',
+  })
+
+  const dailyChatViewportStyle = chatViewportMetrics
+    ? ({
+        '--chat-visual-viewport-height': `${chatViewportMetrics.height}px`,
+        '--chat-keyboard-inset': `${chatViewportMetrics.keyboardInset}px`,
+      } as CSSProperties)
+    : undefined
+
+  const selectMobileView = useCallback((view: 'plan' | 'assistant') => {
+    if (mobileViewFrameRef.current !== null) {
+      window.cancelAnimationFrame(mobileViewFrameRef.current)
+      mobileViewFrameRef.current = null
+    }
+
+    setMobileView(view)
+    if (view !== 'assistant') return
+
+    setShowMobileContext(false)
+    mobileViewFrameRef.current = window.requestAnimationFrame(() => {
+      mobileViewFrameRef.current = null
+      scrollChatToBottom()
+      ensureChatComposerVisible()
+    })
+  }, [ensureChatComposerVisible, scrollChatToBottom])
+
+  const handleMobileTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
+    let nextView: 'plan' | 'assistant' | null = null
+    if (event.key === 'Home') nextView = 'plan'
+    else if (event.key === 'End') nextView = 'assistant'
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextView = mobileView === 'plan' ? 'assistant' : 'plan'
+    }
+    if (!nextView) return
+
+    event.preventDefault()
+    selectMobileView(nextView)
+    if (nextView === 'plan') mobilePlanTabRef.current?.focus()
+    else mobileAssistantTabRef.current?.focus()
+  }, [mobileView, selectMobileView])
+
   // Refs для timeline-хука: нужно актуальное состояние внутри async-колбэков.
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges)
   hasUnsavedChangesRef.current = hasUnsavedChanges
@@ -338,6 +407,8 @@ export default function DailyPage() {
     options: ProposalApplyOptions,
   ) => {
     if (!messageId || applyingProposalId) return
+    setAssistantOperationError('')
+    directChatOperationRef.current = null
     const requestBody = buildApplyProposalRequestBody({
       date: selectedDate,
       messageId,
@@ -345,7 +416,9 @@ export default function DailyPage() {
       expectedCurrentScheduleHash: metadata.currentScheduleHash,
     })
     if (requestBody === null) {
-      throw new Error('Не удалось применить расписание: ответ ассистента ещё не сохранён. Попробуйте обновить чат.')
+      const operationError = new Error('Не удалось применить расписание: ответ ассистента ещё не сохранён. Попробуйте обновить чат.')
+      setAssistantOperationError(operationError.message)
+      throw operationError
     }
     const requestDate = selectedDate
     setApplyingProposalId(messageId)
@@ -363,10 +436,11 @@ export default function DailyPage() {
         markChatProposalApplied: appliedAt => markChatProposalApplied(messageId, appliedAt),
       })
     } catch (error) {
-      if (error instanceof FetchJsonError && error.status === 409) {
-        throw new Error('Расписание уже изменилось. Обновите чат или попросите ассистента собрать новый вариант.')
-      }
-      throw new Error(getFetchErrorMessage(error, 'не удалось применить расписание'))
+      const operationError = error instanceof FetchJsonError && error.status === 409
+        ? new Error('Расписание уже изменилось. Обновите чат или попросите ассистента собрать новый вариант.')
+        : new Error(getFetchErrorMessage(error, 'не удалось применить расписание'))
+      setAssistantOperationError(operationError.message)
+      throw operationError
     } finally {
       setApplyingProposalId(null)
     }
@@ -375,6 +449,10 @@ export default function DailyPage() {
   const handleSendChatMessage = useCallback(async (initialMessage?: string) => {
     if (isSubmittingChatRef.current || sendingChat) return
     const messageText = initialMessage ?? chatInput
+    if (!messageText.trim()) return
+    setAssistantOperationError('')
+    directChatOperationRef.current = null
+    scrollChatToBottom()
     const strictProposal = selectStrictScheduleConfirmationProposal(messageText, chatMessages, dismissedProposalIds)
     isSubmittingChatRef.current = true
     setIsSubmittingChat(true)
@@ -388,17 +466,38 @@ export default function DailyPage() {
       await sendDailyChatWithPreconditions({
         ensureEntrySaved,
         flushScheduleChanges,
-        sendChatMessage,
-        showMessage,
+        sendChatMessage: async (messageToSend) => {
+          directChatOperationRef.current = {
+            assistantMessageCount: chatMessages.filter(chatMessage => chatMessage.role === 'assistant').length,
+          }
+          await sendChatMessage(messageToSend)
+        },
+        showMessage: (text, duration) => {
+          setAssistantOperationError(text)
+          showMessage(text, duration)
+        },
         initialMessage,
       })
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Не удалось применить расписание')
+      const errorMessage = error instanceof Error ? error.message : 'Не удалось применить расписание'
+      setAssistantOperationError(errorMessage)
+      showMessage(errorMessage)
     } finally {
       isSubmittingChatRef.current = false
       setIsSubmittingChat(false)
     }
-  }, [chatInput, chatMessages, dismissedProposalIds, ensureEntrySaved, flushScheduleChanges, handleApplyProposal, sendChatMessage, sendingChat, setChatInput, showMessage])
+  }, [chatInput, chatMessages, dismissedProposalIds, ensureEntrySaved, flushScheduleChanges, handleApplyProposal, scrollChatToBottom, sendChatMessage, sendingChat, setChatInput, showMessage])
+
+  useEffect(() => {
+    const directOperation = directChatOperationRef.current
+    if (!directOperation || sendingChat || isSubmittingChat) return
+
+    directChatOperationRef.current = null
+    const assistantMessageCount = chatMessages.filter(chatMessage => chatMessage.role === 'assistant').length
+    if (assistantMessageCount <= directOperation.assistantMessageCount) {
+      setAssistantOperationError('Не удалось отправить сообщение Ассистенту. Попробуйте ещё раз.')
+    }
+  }, [chatMessages, isSubmittingChat, sendingChat])
 
   const handleDismissProposal = useCallback((id: string | undefined) => {
     if (!id) return
@@ -427,7 +526,7 @@ export default function DailyPage() {
 
   const resizeChatTextarea = useCallback((textarea: HTMLTextAreaElement, value: string) => {
     if (value === '') {
-      textarea.style.height = '42px'
+      textarea.style.height = '44px'
       return
     }
 
@@ -437,13 +536,27 @@ export default function DailyPage() {
 
   const handleDiscussProposal = useCallback((text: string) => {
     setChatInput(text)
-    window.requestAnimationFrame(() => {
+    if (chatFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(chatFocusFrameRef.current)
+    }
+    chatFocusFrameRef.current = window.requestAnimationFrame(() => {
+      chatFocusFrameRef.current = null
       const textarea = chatTextareaRef.current
       if (!textarea) return
       resizeChatTextarea(textarea, text)
       textarea.focus()
+      ensureChatComposerVisible()
     })
-  }, [resizeChatTextarea, setChatInput])
+  }, [ensureChatComposerVisible, resizeChatTextarea, setChatInput])
+
+  useEffect(() => () => {
+    if (chatFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(chatFocusFrameRef.current)
+    }
+    if (mobileViewFrameRef.current !== null) {
+      window.cancelAnimationFrame(mobileViewFrameRef.current)
+    }
+  }, [])
 
   useLayoutEffect(() => {
     const textarea = chatTextareaRef.current
@@ -508,6 +621,11 @@ export default function DailyPage() {
   const closeTaskAction = useCallback(() => {
     setActiveTaskAction(null)
   }, [])
+
+  const handleStartEditingTask = useCallback((taskId: number, taskText: string) => {
+    setActiveTaskAction(null)
+    startEditingTask(taskId, taskText)
+  }, [startEditingTask])
 
   const closeHabitEditor = useCallback(() => {
     setEditingHabitId(null)
@@ -631,8 +749,6 @@ export default function DailyPage() {
 
   // Обработка решений по невыполненным задачам
   const handleUncompletedDecisions = async (decisions: TaskDecision[]) => {
-    setShowUncompletedModal(false)
-    
     // Отправляем решения на сервер
     try {
       await fetchJson('/api/tasks/process-uncompleted', {
@@ -645,20 +761,15 @@ export default function DailyPage() {
       })
     } catch (error) {
       console.error('Error processing uncompleted tasks:', error)
-      showMessage(`Не удалось обработать невыполненные задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`)
-      return
+      const errorMessage = `Не удалось обработать невыполненные задачи: ${getFetchErrorMessage(error, 'ошибка запроса')}`
+      showMessage(errorMessage)
+      throw new Error(errorMessage)
     }
-    
+
+    setShowUncompletedModal(false)
     // Продолжаем оценку
     evaluate(router)
   }
-
-  // Прокрутка чата вниз при новых сообщениях
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-    }
-  }, [chatMessages])
 
   // Статистика выполнения
   const activeTasks = tasks.filter(t => !selectedTasks.has(t.id))
@@ -721,6 +832,15 @@ export default function DailyPage() {
   // Отмечаем, что компонент смонтирован на клиенте
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1023px)')
+    const syncMobileTabSemantics = () => setHasMobileTabSemantics(mediaQuery.matches)
+
+    syncMobileTabSemantics()
+    mediaQuery.addEventListener('change', syncMobileTabSemantics)
+    return () => mediaQuery.removeEventListener('change', syncMobileTabSemantics)
   }, [])
 
   useEffect(() => {
@@ -788,18 +908,33 @@ export default function DailyPage() {
   const showSavePlanAttention = hasUnsavedChanges && !saving
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Ежедневное планирование</h1>
+    <div className="min-w-0 space-y-4 lg:space-y-6">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">
+          <span className="lg:hidden">План дня</span>
+          <span className="hidden lg:inline">Ежедневное планирование</span>
+        </h1>
         <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
       </div>
 
-      <p className="text-lg text-gray-400">
+      <p className="break-words text-base text-gray-400 sm:text-lg">
         {mounted ? format(parseDateKey(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
       </p>
 
       {/* Context from periods */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <button
+        type="button"
+        onClick={() => setShowMobileContext((open) => !open)}
+        className="flex min-h-11 w-full items-center justify-between rounded-xl border border-gray-700 bg-gray-900/70 px-4 text-left font-medium text-gray-200 transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:hidden"
+        aria-expanded={showMobileContext}
+        aria-controls="daily-context"
+      >
+        <span>Контекст дня</span>
+        <span aria-hidden="true">{showMobileContext ? '−' : '+'}</span>
+      </button>
+
+      <div id="daily-context" className={`${showMobileContext ? 'space-y-4' : 'hidden'} lg:block lg:space-y-6`}>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
           <h3 className="font-semibold text-lg text-blue-200 mb-3">{weekLabel}:</h3>
           {weekGoals.length > 0 ? (
@@ -811,17 +946,17 @@ export default function DailyPage() {
                 const completedToday = isGoalCompleted(goalText)
                 const completed = completedInPeriod || completedToday
                 return (
-                  <li key={index} className="flex items-center gap-2 leading-normal">
+                  <li key={index} className="flex min-w-0 items-start gap-2 leading-normal">
                     <span className={completed ? 'text-green-400' : 'text-gray-500'}>
                       {completed ? '✓' : '•'}
                     </span>
-                    <span className={`flex-1 ${completed ? 'text-green-400' : ''}`}>
+                    <span className={`min-w-0 flex-1 break-words pt-2.5 lg:pt-0 ${completed ? 'text-green-400' : ''}`}>
                       {goalText}
                     </span>
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="text-blue-400 hover:text-blue-200 text-lg leading-none px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/20 rounded-md whitespace-nowrap font-medium"
+                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-blue-500/15 px-3 text-lg font-medium leading-none text-blue-400 hover:bg-blue-500/20 hover:text-blue-200 lg:h-auto lg:min-w-0 lg:py-1.5"
                         title="Добавить в план дня"
                         aria-label="Добавить в план дня"
                       >
@@ -848,17 +983,17 @@ export default function DailyPage() {
                 const completedToday = isGoalCompleted(goalText)
                 const completed = completedInPeriod || completedToday
                 return (
-                  <li key={index} className="flex items-center gap-2 leading-normal">
+                  <li key={index} className="flex min-w-0 items-start gap-2 leading-normal">
                     <span className={completed ? 'text-green-400' : 'text-gray-500'}>
                       {completed ? '✓' : '•'}
                     </span>
-                    <span className={`flex-1 ${completed ? 'text-green-400' : ''}`}>
+                    <span className={`min-w-0 flex-1 break-words pt-2.5 lg:pt-0 ${completed ? 'text-green-400' : ''}`}>
                       {goalText}
                     </span>
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="text-purple-400 hover:text-purple-200 text-lg leading-none px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/20 rounded-md whitespace-nowrap font-medium"
+                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple-500/15 px-3 text-lg font-medium leading-none text-purple-400 hover:bg-purple-500/20 hover:text-purple-200 lg:h-auto lg:min-w-0 lg:py-1.5"
                         title="Добавить в план дня"
                         aria-label="Добавить в план дня"
                       >
@@ -883,7 +1018,8 @@ export default function DailyPage() {
           <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4">
             <button
               onClick={() => setShowWeekFacts(!showWeekFacts)}
-              className="w-full flex items-center justify-between"
+               className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
+               aria-expanded={showWeekFacts}
             >
               <h3 className="text-sm font-medium text-blue-300">
                 Сделано за неделю: {weekFactsTotal} {getWorkNoun(weekFactsTotal)}
@@ -891,11 +1027,11 @@ export default function DailyPage() {
               <span className="text-blue-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
             </button>
             {showWeekFacts && (
-              <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+              <div className="mt-3 space-y-1 lg:max-h-48 lg:overflow-y-auto">
                 {weekFacts.map(item => (
                   <div key={item.id} className="flex items-center gap-2 text-sm">
                     <span className="text-blue-500">✓</span>
-                    <span className="text-gray-300">{item.text}</span>
+                    <span className="min-w-0 break-words text-gray-300">{item.text}</span>
                     {item.category && (
                       <span className={`text-[10px] ml-auto ${
                         item.category === 'стратегические' ? 'text-orange-400' :
@@ -914,7 +1050,8 @@ export default function DailyPage() {
           <div className="rounded-xl bg-purple-500/5 border border-purple-500/20 p-4">
             <button
               onClick={() => setShowMonthFacts(!showMonthFacts)}
-              className="w-full flex items-center justify-between"
+               className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
+               aria-expanded={showMonthFacts}
             >
               <h3 className="text-sm font-medium text-purple-300">
                 Сделано за месяц: {monthFactsTotal} {getWorkNoun(monthFactsTotal)}
@@ -922,11 +1059,11 @@ export default function DailyPage() {
               <span className="text-purple-400 text-xs">{showMonthFacts ? '▲ скрыть' : '▼ показать'}</span>
             </button>
             {showMonthFacts && (
-              <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+              <div className="mt-3 space-y-1 lg:max-h-48 lg:overflow-y-auto">
                 {monthFacts.map(item => (
                   <div key={item.id} className="flex items-center gap-2 text-sm">
                     <span className="text-purple-500">✓</span>
-                    <span className="text-gray-300">{item.text}</span>
+                    <span className="min-w-0 break-words text-gray-300">{item.text}</span>
                     {item.category && (
                       <span className={`text-[10px] ml-auto ${
                         item.category === 'стратегические' ? 'text-orange-400' :
@@ -941,12 +1078,58 @@ export default function DailyPage() {
           )}
         </div>
       )}
+      </div>
+
+      <div
+        className="daily-mobile-tabs grid grid-cols-2 rounded-xl border border-gray-700 bg-gray-900/70 p-1 lg:hidden"
+        role={hasMobileTabSemantics ? 'tablist' : undefined}
+        aria-label={hasMobileTabSemantics ? 'Раздел ежедневника' : undefined}
+        aria-orientation={hasMobileTabSemantics ? 'horizontal' : undefined}
+      >
+        <button
+          ref={mobilePlanTabRef}
+          type="button"
+          id="daily-plan-tab"
+          role={hasMobileTabSemantics ? 'tab' : undefined}
+          aria-controls={hasMobileTabSemantics ? 'daily-plan-panel' : undefined}
+          aria-selected={hasMobileTabSemantics ? mobileView === 'plan' : undefined}
+          tabIndex={hasMobileTabSemantics ? (mobileView === 'plan' ? 0 : -1) : undefined}
+          onClick={() => selectMobileView('plan')}
+          onKeyDown={handleMobileTabKeyDown}
+          className={`min-h-11 rounded-lg px-3 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${mobileView === 'plan' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+        >
+          План
+        </button>
+        <button
+          ref={mobileAssistantTabRef}
+          type="button"
+          id="daily-assistant-tab"
+          role={hasMobileTabSemantics ? 'tab' : undefined}
+          aria-controls={hasMobileTabSemantics ? 'daily-assistant-panel' : undefined}
+          aria-selected={hasMobileTabSemantics ? mobileView === 'assistant' : undefined}
+          tabIndex={hasMobileTabSemantics ? (mobileView === 'assistant' ? 0 : -1) : undefined}
+          onClick={() => selectMobileView('assistant')}
+          onKeyDown={handleMobileTabKeyDown}
+          className={`relative min-h-11 rounded-lg px-3 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${mobileView === 'assistant' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+        >
+          Ассистент
+          {mobileView !== 'assistant' && (sendingChat || isSubmittingChat) && (
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-300" aria-label="Ассистент отвечает" />
+          )}
+        </button>
+      </div>
 
       {/* Plan and Chat side by side - 60/40 */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Plan - Left (60%) */}
-        <div className="lg:col-span-3 card flex flex-col !pr-0" style={{ minHeight: '500px', maxHeight: '80vh' }}>
-          <div className="mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 pr-6 sm:items-center">
+        <div
+          id="daily-plan-panel"
+          role={hasMobileTabSemantics ? 'tabpanel' : undefined}
+          aria-labelledby={hasMobileTabSemantics ? 'daily-plan-tab' : undefined}
+          tabIndex={hasMobileTabSemantics ? 0 : undefined}
+          className={`${mobileView === 'plan' ? 'flex' : 'hidden'} card min-h-0 max-h-none min-w-0 flex-col !p-4 lg:col-span-3 lg:flex lg:min-h-[500px] lg:max-h-[80vh] lg:!p-6 lg:!pr-0`}
+        >
+          <div className="mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 lg:pr-6">
             <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
               <h2 className="text-xl font-bold">План на день</h2>
               <span
@@ -959,7 +1142,7 @@ export default function DailyPage() {
                 </span>
               </span>
             </div>
-            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 sm:justify-end">
+            <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-1 sm:w-auto sm:justify-end">
               {scheduleMode === 'list' && totalCount > 0 && (
                 <span className={`whitespace-nowrap text-base font-semibold tabular-nums leading-none tracking-tight ${
                   completionPercent === 100 ? 'text-green-400' :
@@ -983,7 +1166,7 @@ export default function DailyPage() {
                       ? 'Добавьте хотя бы одну задачу в план, чтобы расписать день по времени'
                       : 'Разместить задачи на временной шкале 06:00–24:00'
                   }
-                  className="whitespace-nowrap text-base font-semibold leading-none text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:underline focus-visible:underline-offset-4 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300"
+                  className="min-h-11 whitespace-nowrap rounded-lg px-2 text-base font-semibold text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300 lg:min-h-0 lg:px-0 lg:leading-none"
                 >
                   {scheduleEntering || scheduleLoading ? 'Открываю…' : 'Расписать по времени'}
                 </button>
@@ -993,7 +1176,7 @@ export default function DailyPage() {
                   type="button"
                   onClick={handleExitTimeline}
                   disabled={scheduleExiting}
-                  className="whitespace-nowrap text-base font-semibold leading-none text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:underline focus-visible:underline-offset-4 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300"
+                  className="min-h-11 whitespace-nowrap rounded-lg px-2 text-base font-semibold text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300 lg:min-h-0 lg:px-0 lg:leading-none"
                 >
                   {scheduleExiting ? 'Сохраняю…' : '← Назад к списку'}
                 </button>
@@ -1004,7 +1187,7 @@ export default function DailyPage() {
           {/* Добавление новой задачи */}
           {scheduleMode === 'list' ? (
             <>
-          <div className="mb-4 flex gap-2 items-start flex-shrink-0 pr-6">
+          <div className="mb-4 flex flex-shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-start lg:pr-6">
             <textarea
               ref={newTaskTextareaRef}
               value={newTaskText}
@@ -1017,8 +1200,8 @@ export default function DailyPage() {
               }}
               placeholder="Добавить задачу..."
               rows={1}
-              className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
-              style={{ minHeight: '42px', height: 'auto' }}
+              className="min-h-11 flex-1 resize-none overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              style={{ height: 'auto' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
                 target.style.height = 'auto'
@@ -1027,7 +1210,7 @@ export default function DailyPage() {
             />
             <button
               onClick={addTask}
-              className="btn-primary"
+              className="btn-primary min-h-11"
             >
               Добавить
             </button>
@@ -1039,12 +1222,12 @@ export default function DailyPage() {
             const habitsNotInPlan = habits.filter(h => !taskTextsLower.has(h.taskText.toLowerCase()))
 
             return (
-              <div className={`relative z-40 mb-4 mr-6 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 ${showHabitsExpanded ? 'shadow-[0_12px_32px_rgba(0,0,0,0.28)]' : ''}`}>
-                <div className="flex items-center gap-2">
+              <div className={`relative z-40 mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 lg:mr-6 ${showHabitsExpanded ? 'shadow-[0_12px_32px_rgba(0,0,0,0.28)]' : ''}`}>
+                <div className="flex min-w-0 items-center gap-2">
                   <span className="text-sm text-amber-300 font-medium">
                     Привычки ({habits.length})
                   </span>
-                  <div className="flex-1 flex gap-1 overflow-hidden">
+                  <div className="flex min-w-0 flex-1 gap-1 overflow-hidden">
                     {habits.slice(0, 3).map((habit) => {
                       const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
                       return (
@@ -1067,7 +1250,7 @@ export default function DailyPage() {
                   <button
                     type="button"
                     onClick={() => setShowHabitsExpanded((prev) => !prev)}
-                    className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-md bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors"
+                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-300 transition-colors hover:bg-amber-500/20 lg:h-7 lg:w-7"
                     title={showHabitsExpanded ? 'Свернуть привычки' : 'Развернуть привычки'}
                     aria-label={showHabitsExpanded ? 'Свернуть привычки' : 'Развернуть привычки'}
                     aria-expanded={showHabitsExpanded}
@@ -1077,15 +1260,15 @@ export default function DailyPage() {
                 </div>
 
                 {showHabitsExpanded && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 shadow-2xl ring-1 ring-amber-500/10 backdrop-blur-md">
-                  <div className="flex items-start gap-2">
+                <div className="relative z-50 mt-2 w-full rounded-lg border border-amber-500/20 bg-gray-900/95 p-2.5 shadow-2xl ring-1 ring-amber-500/10 backdrop-blur-md lg:absolute lg:left-0 lg:right-0 lg:top-full lg:bg-amber-500/10">
+                  <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
                     <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                       {habits.map((habit) => {
                         const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
                         return (
                           <div
                             key={habit.id}
-                            className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full ${
+                            className={`inline-flex min-w-0 items-center gap-1 rounded-xl pl-2 pr-1 text-xs lg:rounded-full ${
                               isInPlan
                                 ? 'bg-green-500/15 text-green-400'
                                 : 'bg-amber-500/15 text-amber-300'
@@ -1093,8 +1276,9 @@ export default function DailyPage() {
                           >
                             <button
                               onClick={() => !isInPlan && addHabitsToTasks([habit.taskText])}
-                              className={isInPlan ? 'cursor-default line-through opacity-60' : 'hover:text-amber-900 transition-colors'}
+                              className={`min-h-11 min-w-0 flex-1 break-words px-1 text-left transition-colors lg:min-h-0 ${isInPlan ? 'cursor-default line-through opacity-60' : 'hover:text-amber-100'}`}
                               title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
+                              aria-label={isInPlan ? `${habit.taskText}: уже в плане` : `Добавить привычку «${habit.taskText}» в план`}
                               disabled={isInPlan}
                             >
                               {isInPlan && ' '}
@@ -1106,12 +1290,13 @@ export default function DailyPage() {
                                 e.stopPropagation()
                                 startEditingHabit(habit.id)
                               }}
-                              className={`ml-1 w-5 h-5 flex items-center justify-center rounded transition-colors ${
+                              className={`ml-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded transition-colors lg:h-5 lg:w-5 ${
                                 editingHabitId === habit.id
                                   ? 'bg-amber-500 text-white'
                                   : 'text-amber-400 hover:bg-amber-500/15 hover:text-amber-200'
                               }`}
                               title="Редактировать привычку"
+                              aria-label={`Редактировать привычку «${habit.taskText}»`}
                               aria-pressed={editingHabitId === habit.id}
                             >
                               ✎
@@ -1123,7 +1308,7 @@ export default function DailyPage() {
                     {habitsNotInPlan.length > 0 && (
                       <button
                         onClick={() => addHabitsToTasks()}
-                        className="h-8 flex-shrink-0 rounded-md bg-amber-600/80 px-2.5 text-xs text-white transition-colors hover:bg-amber-600"
+                        className="min-h-11 flex-shrink-0 rounded-md bg-amber-600/80 px-3 text-sm text-white transition-colors hover:bg-amber-600 lg:h-8 lg:min-h-0 lg:px-2.5 lg:text-xs"
                       >
                         + Все в план
                       </button>
@@ -1140,7 +1325,7 @@ export default function DailyPage() {
                           type="text"
                           value={editingHabitText}
                           onChange={(e) => setEditingHabitText(e.target.value)}
-                          className="w-full rounded-lg border border-amber-500/20 bg-gray-900/70 px-3 py-2 text-sm text-amber-50 outline-none transition-colors focus:border-amber-400"
+                          className="min-h-11 w-full rounded-lg border border-amber-500/20 bg-gray-900/70 px-3 py-2 text-base text-amber-50 outline-none transition-colors focus:border-amber-400 lg:text-sm"
                           placeholder="Название привычки"
                         />
 
@@ -1157,7 +1342,7 @@ export default function DailyPage() {
                               key={option.value}
                               type="button"
                               onClick={() => setEditingHabitFrequency(option.value as FrequencyType)}
-                              className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                              className={`min-h-11 rounded-md px-3 py-2 text-sm transition-colors lg:min-h-0 lg:px-2 lg:py-1 lg:text-xs ${
                                 editingHabitFrequency === option.value
                                   ? 'bg-amber-500 text-white'
                                   : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
@@ -1183,7 +1368,7 @@ export default function DailyPage() {
                                 key={day}
                                 type="button"
                                 onClick={() => toggleEditingHabitDay(day)}
-                                className={`w-9 h-9 rounded-lg text-xs font-medium transition-colors ${
+                                className={`h-11 w-11 rounded-lg text-xs font-medium transition-colors lg:h-9 lg:w-9 ${
                                   editingHabitDays.includes(day)
                                     ? 'bg-amber-500 text-white'
                                     : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
@@ -1195,20 +1380,20 @@ export default function DailyPage() {
                           </div>
                         )}
 
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <button
                             type="button"
                             onClick={() => void handleDeleteHabitFromEditor()}
-                            className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors text-sm"
+                            className="min-h-11 rounded-lg border border-red-500/30 px-3 py-2 text-sm text-red-300 transition-colors hover:bg-red-500/10 lg:min-h-0 lg:py-1.5"
                           >
                             Удалить
                           </button>
 
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-2 gap-2 sm:flex">
                             <button
                               type="button"
                               onClick={closeHabitEditor}
-                              className="px-3 py-1.5 border border-gray-700 text-gray-200 rounded-lg hover:bg-gray-800 transition-colors text-sm"
+                              className="min-h-11 rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-gray-800 lg:min-h-0 lg:py-1.5"
                             >
                               Отмена
                             </button>
@@ -1219,7 +1404,7 @@ export default function DailyPage() {
                                 editingHabitText.trim().length === 0 ||
                                 ((editingHabitFrequency === 'weekly' || editingHabitFrequency === 'custom') && editingHabitDays.length === 0)
                               }
-                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
+                              className="min-h-11 rounded-lg bg-amber-600 px-3 py-2 text-sm text-white transition-colors hover:bg-amber-700 disabled:opacity-50 lg:min-h-0 lg:py-1.5"
                             >
                               Сохранить
                             </button>
@@ -1236,28 +1421,30 @@ export default function DailyPage() {
 
           {/* Предложения создать привычки */}
           {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).length > 0 && (
-            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mr-6">
+            <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 lg:mr-6">
               <h3 className="font-medium text-amber-200 text-sm mb-2">Сделать привычкой?</h3>
               <div className="space-y-2">
                 {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).slice(0, 3).map((suggestion, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm gap-2">
-                    <span className="text-amber-300 truncate flex-1">
+                  <div key={index} className="flex min-w-0 flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <span className="min-w-0 flex-1 break-words text-amber-300">
                       &ldquo;{suggestion.text}&rdquo; — {suggestion.totalCount} раз
                     </span>
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0">
                       <button
                         onClick={() => createHabitFromTask(suggestion.text)}
-                        className="w-6 h-6 flex items-center justify-center bg-green-600 hover:bg-green-500 text-white text-sm rounded transition-colors"
+                        className="flex min-h-11 items-center justify-center gap-1.5 rounded bg-green-600 px-3 text-sm text-white transition-colors hover:bg-green-500 sm:min-w-11 sm:px-2 lg:h-6 lg:min-h-0 lg:min-w-0"
                         title="Создать привычку"
+                        aria-label={`Создать привычку «${suggestion.text}»`}
                       >
-                        
+                        <span aria-hidden="true">✓</span><span>Создать</span>
                       </button>
                       <button
                         onClick={() => setDismissedSuggestions(prev => new Set([...prev, suggestion.text]))}
-                        className="w-6 h-6 flex items-center justify-center bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
+                        className="flex min-h-11 items-center justify-center gap-1.5 rounded bg-gray-600 px-3 text-sm text-white transition-colors hover:bg-gray-500 sm:min-w-11 sm:px-2 lg:h-6 lg:min-h-0 lg:min-w-0"
                         title="Скрыть"
+                        aria-label={`Скрыть предложение «${suggestion.text}»`}
                       >
-                        
+                        <span aria-hidden="true">×</span><span>Скрыть</span>
                       </button>
                     </div>
                   </div>
@@ -1267,7 +1454,7 @@ export default function DailyPage() {
           )}
 
           {/* Список задач */}
-          <div ref={tasksContainerRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-6 chat-scrollbar">
+          <div ref={tasksContainerRef} className="flex min-h-0 flex-none flex-col gap-2 overflow-visible lg:flex-1 lg:overflow-y-auto lg:pr-6 lg:chat-scrollbar">
             {tasks.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
                 Добавьте задачи на день...
@@ -1289,12 +1476,10 @@ export default function DailyPage() {
                       className="relative"
                     >
                       <div
-                        draggable={editingTaskId !== task.id}
-                        onDragStart={() => handleDragStart(task.id)}
                         onDragOver={handleDragOver}
                         onDrop={() => handleDrop(task.id)}
-                        className={`flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors ${
-                          editingTaskId === task.id ? 'cursor-text' : 'cursor-move'
+                        className={`flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
+                          editingTaskId === task.id ? 'cursor-text' : 'lg:cursor-move'
                         } ${
                       selectedTasks.has(task.id)
                         ? 'bg-green-500/10 border-green-500/20'
@@ -1303,12 +1488,22 @@ export default function DailyPage() {
                           : 'bg-gray-900/80 border-gray-700 hover:border-gray-600 opacity-60'
                     } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                       >
-                        <span className="text-gray-500 cursor-grab active:cursor-grabbing">⋮⋮</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedTasks.has(task.id)}
-                          onChange={() => toggleTaskSelection(task.id)}
-                        />
+                        <span
+                          draggable={editingTaskId !== task.id}
+                          onDragStart={() => handleDragStart(task.id)}
+                          className="hidden cursor-grab text-gray-500 active:cursor-grabbing lg:inline"
+                          aria-hidden="true"
+                        >
+                          ⋮⋮
+                        </span>
+                        <label className="flex h-11 w-11 flex-shrink-0 cursor-pointer items-center justify-center lg:h-auto lg:w-auto">
+                          <span className="sr-only">{`Отметить задачу «${task.taskText}» выполненной`}</span>
+                          <input
+                            type="checkbox"
+                            checked={selectedTasks.has(task.id)}
+                            onChange={() => toggleTaskSelection(task.id)}
+                          />
+                        </label>
 
                         {editingTaskId === task.id ? (
                           <textarea
@@ -1336,19 +1531,58 @@ export default function DailyPage() {
                               el.style.height = 'auto'
                               el.style.height = el.scrollHeight + 'px'
                             }}
-                            className="flex-1 px-2 py-1 text-base border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100 resize-none overflow-hidden leading-relaxed"
+                            className="min-w-0 flex-1 resize-none overflow-hidden rounded border border-primary-300 bg-gray-800 px-2 py-2 text-base leading-relaxed text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            aria-label={`Редактировать задачу «${task.taskText}»`}
                           />
                         ) : (
                           <span
-                            className={`flex-1 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
-                            onDoubleClick={() => startEditingTask(task.id, task.taskText)}
+                            className={`min-w-0 flex-1 break-words py-2 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
+                            onDoubleClick={() => handleStartEditingTask(task.id, task.taskText)}
                             title="Дважды кликните для редактирования"
                           >
                             {task.taskText}
                           </span>
                         )}
 
+                        <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:w-auto lg:flex-nowrap lg:border-0 lg:pt-0">
+                        {editingTaskId === task.id ? (
+                          <>
+                            <button
+                              type="button"
+                              onPointerDown={(event) => event.preventDefault()}
+                              onClick={() => saveEditedTask(task.id)}
+                              className={`${taskActionButtonBase} gap-1.5 border-green-500/30 px-2 text-green-300 hover:bg-green-500/10 lg:px-0`}
+                              aria-label={`Сохранить изменения задачи «${task.taskText}»`}
+                            >
+                              <CheckIcon className="h-4 w-4" />
+                              <span className="text-sm lg:sr-only">Сохранить</span>
+                            </button>
+                            <button
+                              type="button"
+                              onPointerDown={(event) => event.preventDefault()}
+                              onClick={cancelEditingTask}
+                              className={`${taskActionButtonBase} gap-1.5 border-gray-600 px-2 text-gray-300 hover:bg-gray-800 lg:px-0`}
+                              aria-label="Отменить редактирование задачи"
+                            >
+                              <CloseIcon className="h-4 w-4" />
+                              <span className="text-sm lg:sr-only">Отмена</span>
+                            </button>
+                          </>
+                        ) : (
+                          <>
                         <button
+                          type="button"
+                          onClick={() => handleStartEditingTask(task.id, task.taskText)}
+                          className={`${taskActionButtonBase} gap-1.5 border-transparent px-2 text-gray-300 hover:border-gray-500/30 hover:bg-gray-800 lg:px-0`}
+                          aria-label={`Редактировать задачу «${task.taskText}»`}
+                          title="Редактировать задачу"
+                        >
+                          <span aria-hidden="true">✎</span>
+                          <span className="text-sm lg:sr-only">Редактировать</span>
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => toggleTaskAction(task.id, 'postpone')}
                           className={`${taskActionButtonBase} ${
                             isPostponeActive
@@ -1356,12 +1590,14 @@ export default function DailyPage() {
                               : 'border-transparent text-blue-300/65 hover:border-blue-400/20 hover:bg-blue-500/5 hover:text-blue-200'
                           }`}
                           title="Перенести на дату"
+                          aria-label={`Перенести задачу «${task.taskText}» на другую дату`}
                           aria-pressed={isPostponeActive}
                         >
                           <TaskPostponeIcon className="h-[18px] w-[18px]" />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => toggleTaskAction(task.id, habit ? 'habit-remove' : 'habit-create')}
                           className={`${taskActionButtonBase} ${
                             isHabitActive
@@ -1369,12 +1605,14 @@ export default function DailyPage() {
                               : 'border-transparent text-amber-300/65 hover:border-amber-400/20 hover:bg-amber-500/5 hover:text-amber-200'
                           }`}
                           title={habit ? 'Снять цикличность' : 'Сделать привычкой'}
+                          aria-label={habit ? `Снять цикличность с задачи «${task.taskText}»` : `Сделать задачу «${task.taskText}» привычкой`}
                           aria-pressed={isHabitActive}
                         >
                           <TaskRepeatIcon className="h-[18px] w-[18px]" />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => toggleTaskAction(task.id, 'delete')}
                           className={`${taskActionButtonBase} ${
                             isDeleteActive
@@ -1382,35 +1620,39 @@ export default function DailyPage() {
                               : 'border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200'
                           }`}
                           title="Удалить задачу"
+                          aria-label={`Удалить задачу «${task.taskText}»`}
                           aria-pressed={isDeleteActive}
                         >
                           <TaskDeleteIcon className="h-[18px] w-[18px]" />
                         </button>
+                          </>
+                        )}
+                        </div>
                       </div>
 
                       {activeTaskAction?.taskId === task.id && (
-                        <div className={`absolute right-2 top-full z-30 mt-1 rounded-lg border border-gray-700/45 bg-gray-900/25 px-2.5 py-1.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm ${
+                        <div className={`relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:absolute lg:right-2 lg:top-full lg:mt-1 lg:w-auto lg:bg-gray-900/25 lg:py-1.5 ${
                           activeTaskAction.type === 'postpone'
-                            ? 'min-w-[300px]'
+                            ? 'lg:min-w-[300px]'
                             : activeTaskAction.type === 'delete'
-                              ? 'min-w-[190px]'
+                              ? 'lg:min-w-[190px]'
                               : activeTaskAction.type === 'habit-create'
-                                ? 'w-[500px] max-w-[calc(100%-3rem)]'
-                                : 'min-w-[220px]'
+                                ? 'lg:w-[500px] lg:max-w-[calc(100%-3rem)]'
+                                : 'lg:min-w-[220px]'
                         }`}>
                           {activeTaskAction.type === 'postpone' && (
-                            <div className="flex items-center justify-between gap-3">
-                              <label className="flex items-center gap-2 text-xs text-gray-300">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <label className="flex min-w-0 flex-col gap-2 text-sm text-gray-300 sm:flex-row sm:items-center lg:text-xs">
                                 <span>Перенести на</span>
                                 <input
                                   type="date"
                                   value={postponeTargetDate}
                                   min={getNextDateKey(selectedDate)}
                                   onChange={(event) => setPostponeTargetDate(event.target.value)}
-                                  className="h-8 rounded-md border border-gray-700/70 bg-transparent px-2 text-sm text-gray-100 outline-none transition-colors hover:border-gray-500/70 focus:border-gray-400/80"
+                                  className="h-11 min-w-0 rounded-md border border-gray-700/70 bg-transparent px-2 text-base text-gray-100 outline-none transition-colors hover:border-gray-500/70 focus:border-gray-400/80 lg:h-8 lg:text-sm"
                                 />
                               </label>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-end gap-1">
                                 <button
                                   onClick={() => {
                                     postponeTask(task.id, task.taskText, postponeTargetDate)
@@ -1418,12 +1660,14 @@ export default function DailyPage() {
                                   }}
                                   disabled={!postponeTargetDate}
                                   className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200 disabled:opacity-40`}
+                                  aria-label="Подтвердить перенос задачи"
                                 >
                                   <CheckIcon className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={closeTaskAction}
                                   className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
+                                  aria-label="Отменить перенос задачи"
                                 >
                                   <CloseIcon className="h-4 w-4" />
                                 </button>
@@ -1433,7 +1677,7 @@ export default function DailyPage() {
 
                           {activeTaskAction.type === 'delete' && (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-xs text-gray-300">Удалить задачу?</span>
+                              <span className="text-sm text-gray-300 lg:text-xs">Удалить задачу?</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => {
@@ -1441,12 +1685,14 @@ export default function DailyPage() {
                                     closeTaskAction()
                                   }}
                                   className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
+                                  aria-label="Подтвердить удаление задачи"
                                 >
                                   <CheckIcon className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={closeTaskAction}
                                   className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
+                                  aria-label="Отменить удаление задачи"
                                 >
                                   <CloseIcon className="h-4 w-4" />
                                 </button>
@@ -1464,12 +1710,14 @@ export default function DailyPage() {
                                     closeTaskAction()
                                   }}
                                   className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
+                                  aria-label="Подтвердить снятие цикличности"
                                 >
                                   <CheckIcon className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={closeTaskAction}
                                   className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
+                                  aria-label="Отменить снятие цикличности"
                                 >
                                   <CloseIcon className="h-4 w-4" />
                                 </button>
@@ -1492,7 +1740,7 @@ export default function DailyPage() {
                                     key={option.value}
                                     type="button"
                                     onClick={() => setHabitFrequency(option.value as FrequencyType)}
-                                    className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                                    className={`min-h-11 rounded-md border px-3 py-2 text-sm transition-colors lg:min-h-0 lg:px-2 lg:py-1 lg:text-xs ${
                                       habitFrequency === option.value
                                         ? 'border-gray-500/60 bg-gray-700/45 text-gray-100'
                                         : 'border-gray-700/60 bg-transparent text-gray-400 hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200'
@@ -1518,7 +1766,7 @@ export default function DailyPage() {
                                       key={day}
                                       type="button"
                                       onClick={() => toggleDay(day)}
-                                      className={`h-8 w-8 rounded-md border text-xs font-medium transition-colors ${
+                                      className={`h-11 w-11 rounded-md border text-xs font-medium transition-colors lg:h-8 lg:w-8 ${
                                         habitDays.includes(day)
                                           ? 'border-gray-500/60 bg-gray-700/45 text-gray-100'
                                           : 'border-gray-700/60 bg-transparent text-gray-400 hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200'
@@ -1534,7 +1782,7 @@ export default function DailyPage() {
                                 <button
                                   type="button"
                                   onClick={closeTaskAction}
-                                  className="rounded-md border border-gray-700/70 bg-transparent px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200"
+                                  className="min-h-11 rounded-md border border-gray-700/70 bg-transparent px-3 py-2 text-sm text-gray-400 transition-colors hover:border-gray-600 hover:bg-gray-800/35 hover:text-gray-200 lg:min-h-0 lg:py-1.5 lg:text-xs"
                                 >
                                   Отмена
                                 </button>
@@ -1542,7 +1790,7 @@ export default function DailyPage() {
                                   type="button"
                                   onClick={() => void handleCreateHabit(task.taskText)}
                                   disabled={(habitFrequency === 'weekly' || habitFrequency === 'custom') && habitDays.length === 0}
-                                  className="rounded-md border border-gray-500/60 bg-gray-700/45 px-3 py-1.5 text-xs text-gray-100 transition-colors hover:bg-gray-700/65 disabled:opacity-40"
+                                  className="min-h-11 rounded-md border border-gray-500/60 bg-gray-700/45 px-3 py-2 text-sm text-gray-100 transition-colors hover:bg-gray-700/65 disabled:opacity-40 lg:min-h-0 lg:py-1.5 lg:text-xs"
                                 >
                                   Создать
                                 </button>
@@ -1559,9 +1807,12 @@ export default function DailyPage() {
                 {completedTasks.length > 0 && (
                   <div className="mt-auto flex-shrink-0 space-y-2 pt-2">
                     {/* Карточка "Выполнено" в стиле задачи */}
-                    <div
+                    <button
+                      type="button"
                       onClick={() => setShowCompleted(!showCompleted)}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg border cursor-pointer transition-colors bg-green-900/20 border-green-500/20 hover:border-green-600"
+                      className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-green-500/20 bg-green-900/20 px-2 py-1 text-left transition-colors hover:border-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400"
+                      aria-expanded={showCompleted}
+                      aria-controls="completed-tasks-list"
                     >
                       <span className="text-gray-500 text-xs w-4 text-center">
                         {showCompleted ? '▼' : '▶'}
@@ -1570,10 +1821,10 @@ export default function DailyPage() {
                       <span className="flex-1 text-base text-green-400 font-medium">
                         Выполнено ({completedTasks.length})
                       </span>
-                    </div>
+                    </button>
                     
                     {/* Выполненные задачи — появляются с анимацией */}
-                    <div className={`grid transition-[grid-template-rows,opacity] duration-200 ${
+                    <div id="completed-tasks-list" className={`grid transition-[grid-template-rows,opacity] duration-200 motion-reduce:transition-none ${
                       showCompleted ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
                     }`}>
                       <div className={`min-h-0 space-y-2 ${showCompleted ? 'overflow-visible' : 'overflow-hidden'}`}>
@@ -1583,16 +1834,95 @@ export default function DailyPage() {
                             ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
                             className="relative"
                           >
-                          <div className="flex items-center gap-2 py-1 px-2 rounded-lg border transition-colors bg-gray-900/80 border-gray-700 opacity-50 hover:opacity-70">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              onChange={() => toggleTaskSelection(task.id)}
-                            />
-                            <span className="flex-1 text-base text-gray-400">
-                              {task.taskText}
-                            </span>
+                          <div className={`flex min-w-0 flex-wrap items-center gap-1 rounded-lg border bg-gray-900/80 px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
+                            editingTaskId === task.id
+                              ? 'border-primary-500/50 opacity-100'
+                              : 'border-gray-700 opacity-50 hover:opacity-70'
+                          }`}>
+                            <label className="flex h-11 w-11 flex-shrink-0 cursor-pointer items-center justify-center lg:h-auto lg:w-auto">
+                              <span className="sr-only">{`Вернуть задачу «${task.taskText}» в невыполненные`}</span>
+                              <input
+                                type="checkbox"
+                                checked={true}
+                                onChange={() => toggleTaskSelection(task.id)}
+                              />
+                            </label>
+                            {editingTaskId === task.id ? (
+                              <textarea
+                                value={editingTaskText}
+                                onChange={(event) => setEditingTaskText(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' && !event.shiftKey) {
+                                    event.preventDefault()
+                                    saveEditedTask(task.id)
+                                  } else if (event.key === 'Escape') {
+                                    cancelEditingTask()
+                                  }
+                                }}
+                                onBlur={() => saveEditedTask(task.id)}
+                                autoFocus
+                                rows={1}
+                                ref={(element) => {
+                                  if (element) {
+                                    element.style.height = 'auto'
+                                    element.style.height = `${element.scrollHeight}px`
+                                  }
+                                }}
+                                onInput={(event) => {
+                                  const element = event.currentTarget
+                                  element.style.height = 'auto'
+                                  element.style.height = `${element.scrollHeight}px`
+                                }}
+                                className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded border border-primary-300 bg-gray-800 px-2 py-2 text-base leading-relaxed text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                aria-label={`Редактировать выполненную задачу «${task.taskText}»`}
+                              />
+                            ) : (
+                              <span
+                                className="min-w-0 flex-1 break-words py-2 text-base text-gray-400"
+                                onDoubleClick={() => handleStartEditingTask(task.id, task.taskText)}
+                                title="Дважды кликните для редактирования"
+                              >
+                                {task.taskText}
+                              </span>
+                            )}
+                            <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:w-auto lg:flex-nowrap lg:border-0 lg:pt-0">
+                            {editingTaskId === task.id ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onPointerDown={(event) => event.preventDefault()}
+                                  onClick={() => saveEditedTask(task.id)}
+                                  className={`${taskActionButtonBase} gap-1.5 border-green-500/30 px-2 text-green-300 hover:bg-green-500/10 lg:px-0`}
+                                  aria-label={`Сохранить изменения выполненной задачи «${task.taskText}»`}
+                                >
+                                  <CheckIcon className="h-4 w-4" />
+                                  <span className="text-sm lg:sr-only">Сохранить</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onPointerDown={(event) => event.preventDefault()}
+                                  onClick={cancelEditingTask}
+                                  className={`${taskActionButtonBase} gap-1.5 border-gray-600 px-2 text-gray-300 hover:bg-gray-800 lg:px-0`}
+                                  aria-label="Отменить редактирование выполненной задачи"
+                                >
+                                  <CloseIcon className="h-4 w-4" />
+                                  <span className="text-sm lg:sr-only">Отмена</span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
                             <button
+                              type="button"
+                              onClick={() => handleStartEditingTask(task.id, task.taskText)}
+                              className={`${taskActionButtonBase} gap-1.5 border-transparent px-2 text-gray-300 hover:border-gray-500/30 hover:bg-gray-800 lg:px-0`}
+                              aria-label={`Редактировать выполненную задачу «${task.taskText}»`}
+                              title="Редактировать задачу"
+                            >
+                              <span aria-hidden="true">✎</span>
+                              <span className="text-sm lg:sr-only">Редактировать</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleTaskAction(task.id, 'delete')
@@ -1603,14 +1933,18 @@ export default function DailyPage() {
                                   : 'border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200'
                               }`}
                               title="Удалить задачу"
+                              aria-label={`Удалить выполненную задачу «${task.taskText}»`}
                               aria-pressed={activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'}
                             >
                               <TaskDeleteIcon className="h-[18px] w-[18px]" />
                             </button>
+                              </>
+                            )}
+                            </div>
                           </div>
 
                           {activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete' && (
-                            <div className="absolute right-2 top-full z-30 mt-1 min-w-[190px] rounded-lg border border-gray-700/45 bg-gray-900/25 px-2.5 py-1.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm">
+                            <div className="relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:absolute lg:right-2 lg:top-full lg:mt-1 lg:w-auto lg:min-w-[190px] lg:bg-gray-900/25 lg:py-1.5">
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-xs text-gray-300">Удалить задачу?</span>
                                 <div className="flex items-center gap-1">
@@ -1621,6 +1955,7 @@ export default function DailyPage() {
                                       closeTaskAction()
                                     }}
                                     className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
+                                    aria-label="Подтвердить удаление выполненной задачи"
                                   >
                                     <CheckIcon className="h-4 w-4" />
                                   </button>
@@ -1630,6 +1965,7 @@ export default function DailyPage() {
                                       closeTaskAction()
                                     }}
                                     className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
+                                    aria-label="Отменить удаление выполненной задачи"
                                   >
                                     <CloseIcon className="h-4 w-4" />
                                   </button>
@@ -1648,9 +1984,9 @@ export default function DailyPage() {
           </div>
 
           {/* Вне плана (перевыполнение) */}
-          <div className="mt-4 p-3 bg-gray-900 border border-gray-700 rounded-lg mr-6">
+          <div className="mt-4 rounded-lg border border-gray-700 bg-gray-900 p-3 lg:mr-6">
             <h3 className="font-medium text-base text-gray-300 mb-2">+ Вне плана (перевыполнение)</h3>
-            <div className="flex gap-2 mb-2">
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 value={newExtraTaskText}
@@ -1662,9 +1998,9 @@ export default function DailyPage() {
                   }
                 }}
                 placeholder="Добавить сделанное вне плана..."
-                className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100 placeholder-gray-400"
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
-              <button onClick={addExtraTask} className="btn-primary text-sm py-2">
+              <button onClick={addExtraTask} className="btn-primary min-h-11 py-2 text-sm">
                 Добавить
               </button>
             </div>
@@ -1672,7 +2008,7 @@ export default function DailyPage() {
             {extraTasks.length > 0 && (
               <div className="space-y-1">
                 {extraTasks.map((text, index) => (
-                  <div key={`${index}-${text}`} className="flex items-center justify-between gap-2 text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100">
+                  <div key={`${index}-${text}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-gray-100">
                     {editingExtraTaskIndex === index ? (
                       <input
                         type="text"
@@ -1688,19 +2024,33 @@ export default function DailyPage() {
                         }}
                         onBlur={() => saveEditedExtraTask(index)}
                         autoFocus
-                        className="flex-1 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-800 text-gray-100"
+                        className="min-h-11 min-w-0 flex-1 rounded border border-primary-300 bg-gray-800 px-2 py-1 text-base text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 lg:text-sm"
+                        aria-label={`Редактировать выполненное вне плана «${text}»`}
                       />
                     ) : (
                       <span
-                        className="flex-1 cursor-default"
+                        className="min-w-0 flex-1 cursor-default break-words py-2"
                         onDoubleClick={() => startEditingExtraTask(index, text)}
                         title="Дважды кликните для редактирования"
                       >
                         {text}
                       </span>
                     )}
+                    <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-700 pt-1 sm:w-auto sm:border-0 sm:pt-0">
+                    {editingExtraTaskIndex !== index && (
+                      <button
+                        type="button"
+                        onClick={() => startEditingExtraTask(index, text)}
+                        className={`${taskActionButtonBase} gap-1.5 border-transparent px-2 text-gray-300 hover:border-gray-500/30 hover:bg-gray-700 lg:px-0`}
+                        aria-label={`Редактировать выполненное вне плана «${text}»`}
+                        title="Редактировать"
+                      >
+                        <span aria-hidden="true">✎</span>
+                        <span className="sm:sr-only">Редактировать</span>
+                      </button>
+                    )}
                     {confirmExtraDelete === index ? (
-                      <div className="flex items-center gap-1 rounded-md border border-gray-700/45 bg-gray-900/25 px-1.5 py-0.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm">
+                      <div className="flex flex-wrap items-center justify-end gap-1 rounded-md border border-gray-700/45 bg-gray-900/25 px-1.5 py-0.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm">
                         <span className="text-xs text-gray-300">Удалить?</span>
                         <button
                           onClick={() => {
@@ -1708,25 +2058,30 @@ export default function DailyPage() {
                             setConfirmExtraDelete(null)
                           }}
                           className={`${confirmButtonBase} text-gray-300 hover:bg-gray-800/50 hover:text-green-300`}
+                          aria-label="Подтвердить удаление выполненного вне плана"
                         >
                           <CheckIcon className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setConfirmExtraDelete(null)}
                           className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
+                          aria-label="Отменить удаление выполненного вне плана"
                         >
                           <CloseIcon className="h-4 w-4" />
                         </button>
                       </div>
                     ) : (
                       <button
+                        type="button"
                         onClick={() => setConfirmExtraDelete(index)}
                         className={`${taskActionButtonBase} border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200`}
                         title="Удалить"
+                        aria-label={`Удалить выполненное вне плана «${text}»`}
                       >
                         <TaskDeleteIcon className="h-[18px] w-[18px]" />
                       </button>
                     )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1734,13 +2089,13 @@ export default function DailyPage() {
           </div>
 
           {/* Основные действия - закреплены внизу */}
-          <div className="mt-auto pt-4 flex-shrink-0 pr-6">
+          <div className="mt-auto flex-shrink-0 pt-4 lg:pr-6">
             <div className="flex flex-col gap-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <button 
                   onClick={savePlan} 
                   disabled={saving} 
-                  className={`btn-primary w-full disabled:opacity-50 sm:flex-1 ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
+                  className={`btn-primary min-h-11 w-full disabled:opacity-50 sm:flex-1 ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
                 >
                   {saving ? 'Сохранение...' : 'Сохранить план'}
                 </button>
@@ -1749,7 +2104,7 @@ export default function DailyPage() {
                   <button
                     onClick={handleEvaluateClick}
                     disabled={evaluating || selectedTasks.size === 0}
-                    className="btn-secondary flex w-full items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 sm:w-auto"
+                    className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50 sm:w-auto"
                   >
                     {evaluating ? (
                       <>
@@ -1765,14 +2120,14 @@ export default function DailyPage() {
                   <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                     <button
                       onClick={() => router.push(`/evaluation/${selectedDate}`)}
-                      className="btn-secondary w-full whitespace-nowrap sm:w-auto"
+                      className="btn-secondary min-h-11 w-full whitespace-nowrap sm:w-auto"
                     >
                       Посмотреть оценку →
                     </button>
                     <button
                       onClick={handleEvaluateClick}
                       disabled={evaluating || selectedTasks.size === 0}
-                      className={`btn-secondary flex w-full items-center justify-center gap-2 whitespace-nowrap text-sm disabled:opacity-50 sm:w-auto ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
+                      className={`btn-secondary flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap text-sm disabled:opacity-50 sm:w-auto ${planChangedAfterEval ? 'ring-2 ring-orange-400' : ''}`}
                     >
                       {evaluating ? (
                         <>
@@ -1838,13 +2193,21 @@ export default function DailyPage() {
         </div>
 
         {/* Chat - Right (40%) */}
-        <div className="lg:col-span-2 card flex flex-col" style={{ minHeight: '500px', maxHeight: '80vh' }}>
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <h2 className="text-xl font-bold">Обсуждение плана с Ассистентом</h2>
+        <div
+          id="daily-assistant-panel"
+          role={hasMobileTabSemantics ? 'tabpanel' : undefined}
+          aria-labelledby={hasMobileTabSemantics ? 'daily-assistant-tab' : undefined}
+          aria-busy={sendingChat || isSubmittingChat}
+          tabIndex={hasMobileTabSemantics ? 0 : undefined}
+          className={`${mobileView === 'assistant' ? 'flex' : 'hidden'} daily-chat-card card min-h-0 min-w-0 flex-col lg:col-span-2 lg:flex`}
+          style={dailyChatViewportStyle}
+        >
+          <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-2">
+            <h2 className="min-w-0 text-lg font-bold sm:text-xl">Обсуждение плана с Ассистентом</h2>
             {chatMessages.length > 0 && (
               <button 
                 onClick={clearChat}
-                className="text-sm text-gray-400 hover:text-gray-200"
+                className="min-h-11 rounded-lg px-2 text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 lg:min-h-0"
                 title="Очистить чат"
               >
                 Очистить
@@ -1852,10 +2215,21 @@ export default function DailyPage() {
             )}
           </div>
 
+          {assistantOperationError && (
+            <div className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200" role="alert">
+              {assistantOperationError}
+            </div>
+          )}
+          {(sendingChat || isSubmittingChat) && (
+            <div className="mb-2 text-sm text-blue-300" role="status" aria-live="polite">
+              {applyingProposalId ? 'Применяем расписание…' : 'Ассистент обрабатывает запрос…'}
+            </div>
+          )}
+
           {/* Сообщения чата - занимает всё свободное пространство */}
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto space-y-3 py-2 -mr-6 pr-3 chat-scrollbar"
+            className="-mr-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain py-2 pr-2 chat-scrollbar lg:-mr-6 lg:pr-3"
           >
             {chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
@@ -1904,7 +2278,7 @@ export default function DailyPage() {
                       <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
                     </div>
                   ) : (
-                    <div className="py-1">
+                    <div className="py-1" role={/(^|\n)Ошибка:/.test(msg.content) ? 'alert' : undefined}>
                       <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
                       <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
                       {msg.metadata?.type === 'daily_schedule_proposal' && !dismissedProposalIds.has(msg.id ?? '') && (
@@ -1931,7 +2305,7 @@ export default function DailyPage() {
           </div>
 
           {/* Ввод сообщения - прижато к низу */}
-          <div className="flex gap-2 items-center mt-3 flex-shrink-0">
+          <div className="daily-chat-composer mt-3 flex flex-shrink-0 items-end gap-2">
             <textarea
               ref={chatTextareaRef}
               value={chatInput}
@@ -1945,16 +2319,21 @@ export default function DailyPage() {
                   void handleSendChatMessage()
                 }
               }}
+              onFocus={ensureChatComposerVisible}
               placeholder="Напишите сообщение..."
+              aria-label="Сообщение Ассистенту"
               disabled={sendingChat || isSubmittingChat}
               rows={1}
-              className="flex-1 px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 bg-gray-800 text-gray-100 placeholder-gray-400 resize-none overflow-hidden"
-              style={{ minHeight: '42px' }}
+              className="min-h-11 max-h-40 flex-1 resize-none overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 md:text-sm"
+              style={{ height: '44px' }}
             />
             <button
+              type="button"
               onClick={() => void handleSendChatMessage()}
               disabled={sendingChat || isSubmittingChat || !chatInput.trim()}
-              className="self-end mb-0.5 w-10 h-10 flex items-center justify-center bg-primary-500 hover:bg-primary-600 disabled:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors flex-shrink-0"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white transition-colors hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 disabled:bg-gray-600 disabled:opacity-50"
+              aria-label="Отправить сообщение Ассистенту"
+              title="Отправить"
             >
               →
             </button>

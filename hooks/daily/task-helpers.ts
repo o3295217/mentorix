@@ -60,6 +60,14 @@ export function remapSelectionByText(
   return nextSelected
 }
 
+export function preserveSelectionByTaskIds(
+  prevSelected: Set<number>,
+  nextTasks: OpenTask[]
+): Set<number> {
+  const nextTaskIds = new Set(nextTasks.map((task) => task.id))
+  return new Set(Array.from(prevSelected).filter((taskId) => nextTaskIds.has(taskId)))
+}
+
 export function parseSelectedTasksJson(value: unknown): (string | number)[] {
   if (value === null || value === undefined || value === '') return []
   if (Array.isArray(value)) return value.filter((id): id is string | number => typeof id === 'string' || typeof id === 'number')

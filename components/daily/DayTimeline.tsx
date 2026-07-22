@@ -33,6 +33,10 @@ export function shouldCommitPointerDrag(eventType: 'up' | 'cancel', moved: boole
   return eventType === 'up' && moved && !mutationLocked
 }
 
+export function shouldStartTimelinePointerDrag(pointerType: string, startedFromTouchHandle: boolean): boolean {
+  return pointerType !== 'touch' || startedFromTouchHandle
+}
+
 export function getTimelinePointerPreviewRange(
   originalStart: number,
   originalDuration: number,
@@ -198,7 +202,7 @@ export default function DayTimeline({
   }, [appliedAnimationKey, dayStart, sortedBlocks])
 
   return (
-    <div ref={scrollContainerRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2" style={{ maxHeight: '80vh' }}>
+    <div ref={scrollContainerRef} className="day-timeline flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2" style={{ maxHeight: '80vh' }}>
       {/* Status bar */}
       <div className="flex flex-wrap items-center gap-2 text-sm leading-5 text-gray-400">
         {getTimelineBoundaryPills(schedule).map(label => (
@@ -436,6 +440,9 @@ function ScheduleBlock({
     if (!canMutateTimeline(mutationLocked)) return
     if (editing) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    const startedFromTouchHandle = e.target instanceof Element
+      && e.target.closest('[data-timeline-touch-drag-handle="true"]') !== null
+    if (!shouldStartTimelinePointerDrag(e.pointerType, startedFromTouchHandle)) return
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = {
       mode: 'move',
@@ -557,14 +564,14 @@ function ScheduleBlock({
       ref={rootRef}
       role="group"
       tabIndex={0}
-      aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(displayDuration)}.${fixed ? ' Фиксированное время.' : ''}${mutationLocked ? ' Редактирование временно заблокировано.' : ' Enter — редактировать, стрелки — сдвинуть, Delete — убрать.'}`}
+      aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(displayDuration)}.${fixed ? ' Фиксированное время.' : ''}${mutationLocked ? ' Редактирование временно заблокировано.' : ' Enter — редактировать, стрелки — сдвинуть, Delete — убрать. На сенсорном экране переносите за маркер.'}`}
       title={fixed ? 'Фиксированное время: другие блоки не могут на него наехать' : undefined}
       aria-disabled={mutationLocked}
       className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-xl border px-2.5 py-1.5 shadow-sm outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${kindClass} ${mutationLocked ? 'cursor-not-allowed opacity-70' : ''} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''}`}
       style={{
         top,
         height: Math.max(height, 44),
-        touchAction: 'none',
+        touchAction: 'pan-y',
         cursor: mutationLocked ? 'not-allowed' : 'grab',
         animationDelay: appliedAnimationKey > 0 ? `${Math.min(animationIndex, 12) * 70}ms` : undefined,
       }}
@@ -574,7 +581,17 @@ function ScheduleBlock({
       onPointerCancel={cancelDrag}
       onKeyDown={onKeyDown}
     >
-      <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+      {!editing && !mutationLocked && (
+        <span
+          data-timeline-touch-drag-handle="true"
+          className="absolute right-0 top-0 z-20 flex h-11 w-11 cursor-grab items-center justify-center text-lg text-gray-300/80 active:cursor-grabbing"
+          style={{ touchAction: 'none' }}
+          aria-hidden="true"
+        >
+          ⠿
+        </span>
+      )}
+      <div className={`min-h-0 flex-1 overflow-y-auto ${!editing && !mutationLocked ? 'pr-9' : 'pr-0.5'}`}>
         {isVeryShortBlock && !editing ? (
           <div className="flex min-w-0 items-center gap-2 leading-tight">
             <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-100 sm:text-sm">

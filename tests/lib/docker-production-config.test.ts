@@ -1,10 +1,21 @@
-import { readFile } from 'node:fs/promises'
-import { execFileSync } from 'node:child_process'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = process.cwd()
 const productionUrl = 'https://mentorix.aionlab.ru'
+
+interface DeployFixture {
+  rootDir: string
+  repoDir: string
+  fakeBinDir: string
+  deployScript: string
+  gitLog: string
+  sshLog: string
+  rsyncLog: string
+}
 
 describe('production Docker public URL contract', () => {
   it('passes exactly one public build arg and keeps NEXT_PUBLIC_APP_URL required at runtime', async () => {
@@ -149,10 +160,65 @@ describe('production Docker public URL contract', () => {
       expect(content).not.toContain('baseURL')
     }
     expect(deployScript).toContain('api.anthropic.com/v1/messages')
-    expect(deployScript).toContain('Remote production preflight (direct Anthropic, no Cloudflare/Wrangler)')
-    expect(deployScript).toContain('Remote .env.production is missing')
+    expect(deployScript).toContain('Production preflight на сервере: прямой Anthropic, без Cloudflare/Wrangler')
+    expect(deployScript).toContain('.env.production не найден на сервере')
     expect(deployScript).toContain('curl -sS -o /dev/null -w')
     expect(deployScript).not.toMatch(/\bwrangler\s+(deploy|login|dev)\b/)
+  })
+
+  it('keeps Contabo deploy transport non-interactive and fail-fast', async () => {
+    const deployScript = await readFile(join(root, 'deploy/deploy-contabo.sh'), 'utf8')
+
+    expect(deployScript).toContain('export GIT_TERMINAL_PROMPT=0')
+    expect(deployScript).toContain('export GIT_ASKPASS=/bin/false')
+    expect(deployScript).toContain('export SSH_ASKPASS=/bin/false')
+    expect(deployScript).toContain('export GIT_SSH_COMMAND="$SSH_COMMAND"')
+    expect(deployScript).toContain('-o BatchMode=yes')
+    expect(deployScript).toContain('-o StrictHostKeyChecking=yes')
+    expect(deployScript).toContain('-o NumberOfPasswordPrompts=0')
+    expect(deployScript).toContain('-o PasswordAuthentication=no')
+    expect(deployScript).toContain('-o KbdInteractiveAuthentication=no')
+    expect(deployScript).toContain('ssh -n')
+    expect(deployScript).toContain('-e "$SSH_COMMAND"')
+    expect(deployScript).toContain('sudo -n systemctl restart tg-bot')
+    expect(deployScript).toContain('git -c core.askPass=/bin/false -c push.gpgSign=false push -- "$UPSTREAM_REMOTE" "HEAD:$UPSTREAM_MERGE" </dev/null')
+    expect(deployScript).toContain('branch.$BRANCH.remote')
+    expect(deployScript).toContain('branch.$BRANCH.merge')
+    expect(deployScript).toContain('Локальный upstream remote')
+    expect(deployScript).toContain('git --no-pager status --porcelain')
+    expect(deployScript).not.toContain('StrictHostKeyChecking=accept-new')
+    expect(deployScript).not.toContain('git status --short')
+  })
+
+  it('runs the Contabo deploy script against fake transports without interactive stdin', async () => {
+    await withTempDeployFixture(async fixture => {
+      const result = runDeployFixture(fixture)
+
+      expect(result.status).toBe(0)
+      expect(result.output).not.toContain(fixture.rootDir)
+      expect(result.output).not.toContain(process.env.USER ?? '__missing_user__')
+      expect(await readFile(fixture.gitLog, 'utf8')).toContain(
+        'git|-c|core.askPass=/bin/false|-c|push.gpgSign=false|push|--|origin|HEAD:refs/heads/main|stdin=eof'
+      )
+      const sshLog = await readFile(fixture.sshLog, 'utf8')
+      expect(sshLog).toContain('BatchMode=yes')
+      expect(sshLog).toContain('StrictHostKeyChecking=yes')
+      expect(sshLog).toContain('stdin=eof')
+      const rsyncLog = await readFile(fixture.rsyncLog, 'utf8')
+      expect(rsyncLog).toContain('-e|ssh -o BatchMode=yes -o StrictHostKeyChecking=yes')
+      expect(rsyncLog).toContain('stdin=eof')
+    })
+  })
+
+  it('blocks deploy before push when git status fails in the standalone deploy script', async () => {
+    await withTempDeployFixture(async fixture => {
+      const result = runDeployFixture(fixture, { FAKE_DEPLOY_GIT_STATUS_FAIL: '1' })
+
+      expect(result.status).not.toBe(0)
+      expect(result.output).toContain('Не удалось проверить состояние рабочей копии')
+      expect(await readFile(fixture.gitLog, 'utf8')).not.toContain('|push|')
+      await expect(readFile(fixture.sshLog, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    })
   })
 
   it('uses direct Telegram API in operational scripts without stale proxy env or headers', async () => {
@@ -319,6 +385,136 @@ function indexOfRequired(value: string, search: string): number {
 
 function expectOrdered(value: string, before: string, after: string): void {
   expect(indexOfRequired(value, before)).toBeLessThan(indexOfRequired(value, after))
+}
+
+async function withTempDeployFixture(run: (fixture: DeployFixture) => Promise<void>) {
+  const rootDir = await mkdtemp(join(tmpdir(), 'contabo-deploy-test-'))
+  const repoDir = join(rootDir, 'repo')
+  const fakeBinDir = join(rootDir, 'bin')
+  const deployDir = join(repoDir, 'deploy')
+  const deployScript = join(deployDir, 'deploy-contabo.sh')
+  const gitLog = join(rootDir, 'git.log')
+  const sshLog = join(rootDir, 'ssh.log')
+  const rsyncLog = join(rootDir, 'rsync.log')
+
+  try {
+    await mkdir(repoDir)
+    await mkdir(fakeBinDir)
+    await mkdir(deployDir)
+    await copyFile(join(root, 'deploy', 'deploy-contabo.sh'), deployScript)
+    await chmod(deployScript, 0o755)
+    await installDeployFakeGit(fakeBinDir)
+    await installDeployFakeSsh(fakeBinDir)
+    await installDeployFakeRsync(fakeBinDir)
+    await installDeployFakeCurl(fakeBinDir)
+
+    await run({ rootDir, repoDir, fakeBinDir, deployScript, gitLog, sshLog, rsyncLog })
+  } finally {
+    await rm(rootDir, { recursive: true, force: true })
+  }
+}
+
+function runDeployFixture(fixture: DeployFixture, extraEnv: Record<string, string> = {}) {
+  const result = spawnSync('bash', [fixture.deployScript], {
+    cwd: fixture.repoDir,
+    input: '',
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? ''}`,
+      FAKE_DEPLOY_GIT_LOG: fixture.gitLog,
+      FAKE_DEPLOY_SSH_LOG: fixture.sshLog,
+      FAKE_DEPLOY_RSYNC_LOG: fixture.rsyncLog,
+      ...extraEnv,
+    },
+    timeout: 20_000,
+  })
+
+  return {
+    status: result.status ?? 1,
+    output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
+  }
+}
+
+async function installDeployFakeGit(fakeBinDir: string) {
+  const gitPath = join(fakeBinDir, 'git')
+  await writeFile(
+    gitPath,
+    `#!/bin/sh
+stdin_state=eof
+if IFS= read -r unexpected; then stdin_state=has-input; fi
+log_args() {
+  printf 'git' >> "$FAKE_DEPLOY_GIT_LOG"
+  for arg in "$@"; do printf '|%s' "$arg" >> "$FAKE_DEPLOY_GIT_LOG"; done
+  printf '|stdin=%s\n' "$stdin_state" >> "$FAKE_DEPLOY_GIT_LOG"
+}
+case "$*" in
+  '--no-pager status --porcelain')
+    log_args "$@"
+    [ "\${FAKE_DEPLOY_GIT_STATUS_FAIL:-0}" = "1" ] && exit 61
+    exit 0
+    ;;
+  'rev-parse --abbrev-ref HEAD') log_args "$@"; printf 'main\n'; exit 0 ;;
+  'config --get branch.main.remote') log_args "$@"; printf 'origin\n'; exit 0 ;;
+  'config --get branch.main.merge') log_args "$@"; printf 'refs/heads/main\n'; exit 0 ;;
+  'remote get-url origin') log_args "$@"; printf 'git@example.local:repo.git\n'; exit 0 ;;
+esac
+if [ "\${1:-}" = "-c" ] && [ "\${2:-}" = "core.askPass=/bin/false" ] && [ "\${3:-}" = "-c" ] && [ "\${4:-}" = "push.gpgSign=false" ] && [ "\${5:-}" = "push" ]; then
+  log_args "$@"
+  exit 0
+fi
+log_args "$@"
+exit 99
+`
+  )
+  await chmod(gitPath, 0o755)
+}
+
+async function installDeployFakeSsh(fakeBinDir: string) {
+  const sshPath = join(fakeBinDir, 'ssh')
+  await writeFile(
+    sshPath,
+    `#!/bin/sh
+stdin_state=eof
+if IFS= read -r unexpected; then stdin_state=has-input; fi
+printf 'ssh' >> "$FAKE_DEPLOY_SSH_LOG"
+for arg in "$@"; do printf '|%s' "$arg" >> "$FAKE_DEPLOY_SSH_LOG"; done
+printf '|stdin=%s\n' "$stdin_state" >> "$FAKE_DEPLOY_SSH_LOG"
+case "$*" in
+  *"curl -sS -o /dev/null -w"*) printf '401'; exit 0 ;;
+  *"docker inspect"*) printf 'healthy\n'; exit 0 ;;
+  *) exit 0 ;;
+esac
+`
+  )
+  await chmod(sshPath, 0o755)
+}
+
+async function installDeployFakeRsync(fakeBinDir: string) {
+  const rsyncPath = join(fakeBinDir, 'rsync')
+  await writeFile(
+    rsyncPath,
+    `#!/bin/sh
+stdin_state=eof
+if IFS= read -r unexpected; then stdin_state=has-input; fi
+printf 'rsync' >> "$FAKE_DEPLOY_RSYNC_LOG"
+for arg in "$@"; do printf '|%s' "$arg" >> "$FAKE_DEPLOY_RSYNC_LOG"; done
+printf '|stdin=%s\n' "$stdin_state" >> "$FAKE_DEPLOY_RSYNC_LOG"
+exit 0
+`
+  )
+  await chmod(rsyncPath, 0o755)
+}
+
+async function installDeployFakeCurl(fakeBinDir: string) {
+  const curlPath = join(fakeBinDir, 'curl')
+  await writeFile(
+    curlPath,
+    `#!/bin/sh
+exit 0
+`
+  )
+  await chmod(curlPath, 0o755)
 }
 
 function validatorPath(): string {

@@ -158,7 +158,7 @@ export default function WeekCard({
     <div
       id={`week-${weekKey}`}
       className={isGrid
-        ? `bg-slate-950/60 p-3 flex flex-col ${isDragOver ? 'ring-1 ring-blue-500/50 bg-blue-500/5' : ''}`
+        ? `flex min-w-0 flex-col rounded-xl border border-slate-800 bg-slate-950/60 p-3 lg:rounded-none lg:border-0 ${isDragOver ? 'ring-1 ring-blue-500/50 bg-blue-500/5' : ''}`
         : `rounded-2xl p-3 border transition-all ${
             isCurrentWeek
               ? 'border-blue-500/30 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.06),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]'
@@ -200,7 +200,7 @@ export default function WeekCard({
 
       {/* Добавление цели в неделю */}
       <div className="mb-2">
-        <div className="flex gap-1 items-end">
+        <div className="flex min-w-0 items-end gap-1">
           <textarea
             ref={newGoalTextareaRef}
             value={onNewGoalChange ? (newGoalValue || '') : undefined}
@@ -221,19 +221,19 @@ export default function WeekCard({
             }}
             placeholder={isGrid ? '+ задача' : 'Цель на неделю...'}
             className={isGrid
-              ? 'flex-1 px-2 py-1 text-xs border border-slate-800 rounded-lg bg-transparent text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-700 resize-none overflow-hidden leading-5'
-              : 'flex-1 px-2 py-1 text-xs border border-slate-700 rounded-xl bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600 resize-none overflow-hidden leading-5'
+              ? 'min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-lg border border-slate-800 bg-transparent px-2 py-2 text-base leading-6 text-slate-300 placeholder:text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-xs lg:leading-5'
+              : 'min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border border-slate-700 bg-slate-950/50 px-2 py-2 text-base leading-6 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-xs lg:leading-5'
             }
             rows={1}
           />
-          {!isGrid && (
-            <button
-              onClick={submitNewGoal}
-              className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-lg transition-colors"
-            >
-              +
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={submitNewGoal}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500 text-sm text-white transition-colors hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+            aria-label={`Добавить цель в неделю ${week.num}`}
+          >
+            +
+          </button>
         </div>
         {/* Теги для новой цели */}
         {tags.length > 0 && (
@@ -242,13 +242,16 @@ export default function WeekCard({
               const isSelected = selectedTags.includes(tag.name)
               return (
                 <button
+                  type="button"
                   key={tag.id}
                   onClick={() => setSelectedTags(prev =>
                     isSelected ? prev.filter(t => t !== tag.name) : [...prev, tag.name]
                   )}
-                  className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] transition-all ${
+                  className={`inline-flex min-h-11 items-center rounded-full px-3 py-2 text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:min-h-0 lg:px-1.5 lg:py-0.5 lg:text-[10px] ${
                     isSelected ? 'ring-1 ring-offset-1 ring-offset-slate-900' : 'opacity-50 hover:opacity-80'
                   }`}
+                  aria-pressed={isSelected}
+                  aria-label={`${isSelected ? 'Убрать' : 'Добавить'} тег «${tag.name}» для новой цели`}
                   style={{
                     backgroundColor: tag.color + '20',
                     color: tag.color,
@@ -260,8 +263,10 @@ export default function WeekCard({
               )
             })}
             <button
+              type="button"
               onClick={() => setShowNewTagInput(!showNewTagInput)}
-              className="text-[10px] text-slate-500 hover:text-slate-300 px-1 transition-colors"
+              className="min-h-11 rounded-lg px-3 py-2 text-xs text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:min-h-0 lg:px-1 lg:py-0 lg:text-[10px]"
+              aria-expanded={showNewTagInput}
             >
               + тег
             </button>
@@ -281,7 +286,7 @@ export default function WeekCard({
                 }
               }}
               placeholder="Новый тег..."
-              className="px-1.5 py-0.5 text-[10px] border border-slate-700 rounded w-20 bg-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-slate-600"
+              className="min-h-11 w-full min-w-0 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-base placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:w-28 lg:text-xs"
             />
             <div className="flex items-center gap-1 flex-wrap">
               {TAG_COLOR_PRESETS.map((preset) => {
@@ -291,20 +296,23 @@ export default function WeekCard({
                     key={preset}
                     type="button"
                     onClick={() => setNewTagColor(preset)}
-                    className={`h-4 w-4 rounded-full border transition-all ${isSelected ? 'ring-1 ring-offset-1 ring-offset-slate-950 border-white/60' : 'border-slate-700 hover:border-slate-500'}`}
+                    className={`h-11 w-11 rounded-full border-[12px] border-slate-900 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:h-7 lg:w-7 lg:border-[6px] ${isSelected ? 'ring-1 ring-white/60' : 'hover:ring-1 hover:ring-slate-500'}`}
                     style={{ backgroundColor: preset }}
                     aria-label={`Выбрать цвет ${preset}`}
+                    aria-pressed={isSelected}
                   />
                 )
               })}
               {newTagName.trim() && (
                 <button
+                  type="button"
                   onClick={() => {
                     onCreateTag(newTagName.trim(), newTagColor)
                     setNewTagName('')
                     setShowNewTagInput(false)
                   }}
-                  className="px-1 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  className="flex h-11 min-w-11 items-center justify-center rounded-lg bg-blue-500 px-3 text-sm text-white transition-colors hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                  aria-label={`Создать тег «${newTagName.trim()}»`}
                 >
                   +
                 </button>
@@ -390,13 +398,14 @@ export default function WeekCard({
                       }
                       if (e.key === 'Escape') { setEditingWeekGoal(null); setEditingWeekText('') }
                     }}
-                    className="w-full px-2 py-1 text-xs border border-blue-500/50 rounded bg-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none overflow-hidden leading-5"
+                    className="min-h-11 w-full resize-none overflow-hidden rounded-lg border border-blue-500/50 bg-slate-900 px-2 py-2 text-base leading-6 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-xs lg:leading-5"
                     rows={1}
                     autoFocus
                   />
                 ) : (
                   <div className="flex items-start gap-2">
                     <button
+                      type="button"
                       disabled={isProcessing}
                       draggable={false}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -404,22 +413,21 @@ export default function WeekCard({
                         e.stopPropagation()
                         if (!isProcessing) onToggleGoalCompletion(weekKey, goal, !isCompleted)
                       }}
-                      className={`flex-shrink-0 flex items-center justify-center w-4.5 h-4.5 mt-0.5 rounded-md border transition-all ${
-                        isCompleted
-                          ? 'bg-green-500 border-green-500'
-                          : 'border-slate-600 hover:border-slate-400 bg-transparent'
-                      } ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                      style={{ width: '18px', height: '18px', minWidth: '18px' }}
+                      className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${isProcessing ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
+                      aria-label={`${isCompleted ? 'Отметить невыполненной' : 'Отметить выполненной'} цель «${goal}»`}
+                      aria-pressed={isCompleted}
                     >
-                      {isCompleted && (
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+                        isCompleted ? 'border-green-500 bg-green-500' : 'border-slate-600 bg-transparent'
+                      }`} aria-hidden="true">
+                        {isCompleted && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
+                        </svg>}
+                      </span>
                     </button>
                     <div className="flex-1 min-w-0">
                       <div
-                        className={`text-sm ${isLongText ? 'cursor-pointer' : ''} ${isLongText && !isGoalExpanded ? 'line-clamp-2' : ''} ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}
+                        className={`break-words text-sm [overflow-wrap:anywhere] ${isLongText ? 'min-h-11 cursor-pointer' : ''} ${isLongText && !isGoalExpanded ? 'line-clamp-2' : ''} ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}
                         onClick={() => {
                           if (isLongText) {
                             setExpandedGoals(prev => {
@@ -472,7 +480,7 @@ export default function WeekCard({
                     </div>
                   </div>
                 )}
-                <div className="flex justify-end gap-1 mt-1">
+                <div className="mt-1 flex flex-wrap justify-end gap-1">
                   <select
                     value={goalPriority}
                     disabled={isProcessing}
@@ -483,7 +491,7 @@ export default function WeekCard({
                       if (!isProcessing) onSetGoalPriority(weekKey, goal, parseInt(e.target.value))
                     }}
                     aria-label="Приоритет цели"
-                    className={`text-xs px-2 py-0.5 border rounded bg-slate-900 ${
+                    className={`min-h-11 max-w-full rounded-lg border bg-slate-900 px-2 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:min-h-0 lg:py-0.5 lg:text-xs ${
                       goalPriority >= 2
                         ? 'border-red-500/40 text-red-300'
                         : goalPriority === 1
@@ -496,15 +504,19 @@ export default function WeekCard({
                     <option value="2">Высокий</option>
                   </select>
                   <button
+                    type="button"
                     draggable={false}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => setEditingTagsGoal(editingTagsGoal === goalKey ? null : goalKey)}
-                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded transition-colors text-[10px] font-medium ${
+                    className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:min-h-0 lg:min-w-0 lg:py-0.5 lg:text-[10px] ${
                       editingTagsGoal === goalKey
                         ? 'text-blue-400 bg-blue-500/10'
                         : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
                     }`}
                     title="Теги"
+                    aria-label={`Изменить теги цели «${goal}»`}
+                    aria-expanded={editingTagsGoal === goalKey}
+                    aria-controls={`week-goal-tags-${weekKey}-${index}`}
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -512,30 +524,35 @@ export default function WeekCard({
                     тег
                   </button>
                   <button
+                    type="button"
                     draggable={false}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => { setEditingWeekGoal({ weekKey, index }); setEditingWeekText(goal) }}
-                    className="text-slate-500 hover:text-slate-300 p-0.5 rounded hover:bg-slate-800 transition-colors text-xs"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-xs text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:h-7 lg:w-7"
+                    aria-label={`Редактировать цель «${goal}»`}
                   >
                     &#9998;
                   </button>
                   <button
+                    type="button"
                     draggable={false}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => onRemoveWeekGoal(weekKey, index)}
-                    className="text-slate-500 hover:text-red-400 px-1 rounded hover:bg-slate-800 transition-colors text-xs"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-xs text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 lg:h-7 lg:w-7"
+                    aria-label={`Удалить цель «${goal}»`}
                   >
                     &#10005;
                   </button>
                 </div>
                 {/* Выбор тегов для существующей цели */}
                 {editingTagsGoal === goalKey && tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-700/50">
+                  <div id={`week-goal-tags-${weekKey}-${index}`} className="mt-1 flex flex-wrap gap-1 border-t border-slate-700/50 pt-1">
                     {tags.map(tag => {
                       const currentTags = trackedGoal?.tags || []
                       const isActive = currentTags.includes(tag.name)
                       return (
                         <button
+                          type="button"
                           key={tag.id}
                           onClick={() => {
                             const newTags = isActive
@@ -543,9 +560,11 @@ export default function WeekCard({
                               : [...currentTags, tag.name]
                             onSetGoalTags(weekKey, goal, newTags)
                           }}
-                          className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] transition-all ${
+                          className={`inline-flex min-h-11 items-center rounded-full px-3 py-2 text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:min-h-0 lg:px-1.5 lg:py-0.5 lg:text-[10px] ${
                             isActive ? 'ring-1 ring-offset-1 ring-offset-slate-900' : 'opacity-40 hover:opacity-70'
                           }`}
+                          aria-pressed={isActive}
+                          aria-label={`${isActive ? 'Убрать' : 'Добавить'} тег «${tag.name}» у цели «${goal}»`}
                           style={{
                             backgroundColor: tag.color + '20',
                             color: tag.color,

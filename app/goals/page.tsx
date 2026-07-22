@@ -410,7 +410,7 @@ export default function GoalsPage() {
 
       {/* Toast */}
       {message && (
-        <div className="fixed bottom-4 right-4 rounded-2xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm shadow-[0_18px_60px_rgba(2,6,23,0.40)] p-4 z-50">
+        <div role="status" aria-live="polite" className="app-fixed-status fixed rounded-2xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm shadow-[0_18px_60px_rgba(2,6,23,0.40)] p-4 z-50">
           <p className="text-sm font-medium text-white">{message}</p>
         </div>
       )}

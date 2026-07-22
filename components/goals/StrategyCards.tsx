@@ -230,35 +230,39 @@ function YearCard({
               if (e.key === 'Escape') cancelEdit()
             }}
             onBlur={() => saveEdit(0)}
-            className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-2.5 py-1.5 text-lg font-bold text-white mt-1 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-slate-700 bg-slate-950/50 px-2.5 py-2 text-base font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-lg"
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <div className="group/title relative mt-1">
+          <div className="goal-action-surface mt-1 min-w-0">
             <h3
-              className={`text-lg font-bold tracking-tight leading-tight cursor-pointer pr-5 ${isPast ? 'text-slate-300' : 'text-white'} ${titleExpanded ? '' : 'line-clamp-2'}`}
+              className={`break-words text-lg font-bold leading-tight tracking-tight [overflow-wrap:anywhere] ${isPast ? 'text-slate-300' : 'text-white'} ${titleExpanded ? '' : 'line-clamp-2'}`}
               onClick={(e) => { e.stopPropagation(); setTitleExpanded(!titleExpanded) }}
               onDoubleClick={(e) => { e.stopPropagation(); startEdit(0, summaryTitle) }}
             >
               {summaryTitle}
             </h3>
-            <div className="absolute top-0 right-0 flex gap-1 opacity-0 group-hover/title:opacity-100 transition-opacity">
+            <div className="goal-hover-actions mt-1 flex flex-wrap justify-end gap-1">
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); startEdit(0, summaryTitle) }}
-                className="text-slate-600 hover:text-blue-400 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:h-8 lg:w-8"
                 title="Редактировать"
+                aria-label={`Редактировать цель «${summaryTitle}»`}
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
                 </svg>
               </button>
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); onRemoveGoal(0) }}
-                className="text-slate-600 hover:text-red-400 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 lg:h-8 lg:w-8"
                 title="Удалить"
+                aria-label={`Удалить цель «${summaryTitle}»`}
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -286,9 +290,12 @@ function YearCard({
       {/* Expand to see all goals */}
       {goals.length > 1 && (
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
-          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 mt-3 transition-colors"
-      >
+          className="mt-3 flex min-h-11 w-full items-center gap-1 rounded-lg px-2 text-left text-xs text-slate-500 transition-colors hover:bg-slate-800/60 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:min-h-0 lg:w-auto lg:px-0 lg:text-[11px]"
+          aria-expanded={expanded}
+          aria-controls={`year-goals-${year}`}
+        >
           <svg className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
@@ -297,11 +304,11 @@ function YearCard({
       )}
 
       {expanded && (
-        <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto chat-scrollbar">
+        <div id={`year-goals-${year}`} className="chat-scrollbar mt-2 max-h-48 space-y-1.5 overflow-y-auto">
           {goals.slice(1).map((goal, i) => {
             const index = i + 1
             return (
-              <div key={goal.id} className="group/goal flex items-start gap-2 text-sm">
+              <div key={goal.id} className="goal-action-surface flex flex-wrap items-start gap-x-2 gap-y-1 text-sm">
                 {editingIndex === index ? (
                   <input
                     type="text"
@@ -312,24 +319,36 @@ function YearCard({
                       if (e.key === 'Escape') cancelEdit()
                     }}
                     onBlur={() => saveEdit(index)}
-                    className="flex-1 bg-slate-950/50 border border-slate-700 rounded-lg px-2.5 py-1 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/50 px-2.5 py-2 text-base text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-sm"
                     autoFocus
                   />
                 ) : (
                   <>
-                    <span className={`mt-1 h-1.5 w-1.5 rounded-full flex-shrink-0 ${color.bg} ${color.border} border`} />
+                    <span className={`mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full border ${color.bg} ${color.border}`} />
                     <span
-                      className="text-slate-300 leading-snug flex-1 cursor-text hover:text-slate-100 transition-colors"
+                      className="min-w-0 flex-1 break-words py-1.5 leading-snug text-slate-300 transition-colors [overflow-wrap:anywhere] hover:text-slate-100"
                       onClick={(e) => { e.stopPropagation(); startEdit(index, goal.text) }}
                     >
                       {goal.text}
                     </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemoveGoal(index) }}
-                      className="text-slate-700 hover:text-red-400 opacity-0 group-hover/goal:opacity-100 transition-opacity text-xs flex-shrink-0"
-                    >
-                      ×
-                    </button>
+                    <div className="goal-hover-actions flex basis-full flex-wrap justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); startEdit(index, goal.text) }}
+                        className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-sm text-slate-500 transition-colors hover:bg-slate-800 hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 lg:h-8 lg:w-8"
+                        aria-label={`Редактировать цель «${goal.text}»`}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRemoveGoal(index) }}
+                        className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 lg:h-8 lg:w-8"
+                        aria-label={`Удалить цель «${goal.text}»`}
+                      >
+                        ×
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
@@ -339,14 +358,14 @@ function YearCard({
       )}
 
       {/* Add goal */}
-      <div className="flex gap-1.5 mt-3">
+      <div className="mt-3 flex min-w-0 gap-1.5">
         <input
           type="text"
           value={newGoal}
           onChange={(e) => setNewGoal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder="+ цель на год"
-          className="flex-1 bg-slate-950/30 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors"
+          className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-800 bg-slate-950/30 px-3 py-2 text-base text-slate-300 placeholder-slate-600 transition-colors focus:border-slate-600 focus:outline-none lg:text-xs"
           onClick={(e) => e.stopPropagation()}
         />
       </div>

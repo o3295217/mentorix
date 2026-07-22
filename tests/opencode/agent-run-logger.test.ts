@@ -58,7 +58,12 @@ describe('opencode agent run logger', () => {
   it('sanitizes description and resolves base/GPT scenarios and models', () => {
     expect(sanitizeDescription('hello\nsecret sk-1234567890abcdef user@test.com')).toBe('hello secret [redacted] [email]')
     expect(resolveScenario({ model: 'anthropic/claude-fable-5' })).toBe('base')
-    expect(resolveScenario({ model: 'openai/gpt-5.6-sol', agent: { lead: { model: 'openai/gpt-5.6-sol' } } })).toBe('agent2.0_gpt56')
+    expect(resolveScenario(fullGpt56Config())).toBe('agent2.0_gpt56')
+    expect(resolveScenario({ ...fullGpt56Config(), agent: { ...fullGpt56Config().agent, 'research-free': { model: 'opencode/nemotron-3-ultra-free' }, 'agent-auditor': { model: 'opencode/nemotron-3-ultra-free' } } })).toBe('agent2.0_gpt56')
+    expect(resolveScenario(fullBalancedConfig())).toBe('agent2.0_balanced')
+    expect(resolveScenario({ ...fullBalancedConfig(), agent: { ...fullBalancedConfig().agent, backend: { model: 'openai/gpt-5.4-mini', variant: 'high' } } })).toBe('custom')
+    expect(resolveScenario({ ...fullBalancedConfig(), agent: { ...fullBalancedConfig().agent, reviewer: { model: 'openai/gpt-5.5', variant: 'medium' } } })).toBe('custom')
+    expect(resolveScenario({ model: 'openai/gpt-5.6-sol', agent: { lead: { model: 'openai/gpt-5.6-sol' }, explore: { model: 'opencode/north-mini-code-free' }, 'research-free': { model: 'opencode/nemotron-3-ultra-free' } } })).toBe('custom')
     expect(resolveScenario({ model: 'openai/other' })).toBe('custom')
     expect(resolveModel({ model: 'default/model', agent: { backend: { model: 'agent/model' } } }, 'backend')).toBe('agent/model')
     expect(resolveModel({ model: 'default/model' }, 'backend')).toBe('default/model')
@@ -90,7 +95,7 @@ describe('opencode agent run logger', () => {
             task_id: 'previous-task',
           },
         },
-        { model: 'openai/gpt-5.6-sol', agent: { backend: { model: 'openai/gpt-5.5' }, lead: { model: 'openai/gpt-5.6-sol' } } },
+        fullGpt56Config(),
       )
       await logger.finished({ tool: 'task', callId: 'call-1' }, { output: '<task id="new-task" state="completed">', task_result: 'SECRET OUTPUT' })
       await logger.flush()
@@ -103,6 +108,105 @@ describe('opencode agent run logger', () => {
       const raw = await readFile(journalPath, 'utf8')
       expect(raw).not.toContain('must not be logged')
       expect(raw).not.toContain('SECRET OUTPUT')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('excludes agent-auditor operational audit calls from lifecycle logging', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-run-auditor-exclusion-'))
+    try {
+      const journalPath = join(dir, 'agent-runs.jsonl')
+      const logger = createAgentRunLogger({ journalPath })
+
+      await logger.started({ tool: 'task', callId: 'call-auditor', args: { description: 'audit', subagent_type: 'agent-auditor' } }, fullBalancedConfig())
+      await logger.finished({ tool: 'task', callId: 'call-auditor', args: { subagent_type: 'agent-auditor' } }, { output: '<task id="audit-task" state="completed">' })
+      await logger.flush()
+      await expect(readFile(journalPath, 'utf8')).rejects.toThrow()
+
+      await logger.started({ tool: 'task', callId: 'call-backend', args: { description: 'normal', subagent_type: 'backend' } }, fullBalancedConfig())
+      await logger.finished({ tool: 'task', callId: 'call-backend', args: { subagent_type: 'backend' } }, { output: '<task id="backend-task" state="completed">' })
+      await logger.flush()
+
+      const records = await readJournal(journalPath)
+      expect(records).toHaveLength(2)
+      expect(records[0]).toMatchObject({ event: 'started', agent: 'backend', scenario: 'agent2.0_balanced' })
+      expect(records[1]).toMatchObject({ event: 'finished', agent: 'backend', scenario: 'agent2.0_balanced' })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('excludes agent-auditor calls through plugin hooks while logging neighboring agents', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-run-auditor-hook-exclusion-'))
+    try {
+      const hooks = await createAgentRunLoggerHooks({ worktree: dir })
+      await hooks.config?.(fullBalancedConfig())
+
+      await hooks['tool.execute.before']?.({ tool: 'task', sessionID: 'parent', callID: 'call-auditor-hook' }, { args: { description: 'audit', subagent_type: 'agent-auditor' } })
+      await hooks['tool.execute.after']?.({ tool: 'task', sessionID: 'parent', callID: 'call-auditor-hook', args: { subagent_type: 'agent-auditor' } }, { title: 'task', output: '<task id="audit-hook" state="completed">', metadata: {} })
+      await expect(readFile(getDefaultJournalPath(dir), 'utf8')).rejects.toThrow()
+
+      await hooks['tool.execute.before']?.({ tool: 'task', sessionID: 'parent', callID: 'call-backend-hook' }, { args: { description: 'normal', subagent_type: 'backend' } })
+      await hooks['tool.execute.after']?.({ tool: 'task', sessionID: 'parent', callID: 'call-backend-hook', args: { subagent_type: 'backend' } }, { title: 'task', output: '<task id="backend-hook" state="completed">', metadata: {} })
+
+      const records = await readJournal(getDefaultJournalPath(dir))
+      expect(records).toHaveLength(2)
+      expect(records[0]).toMatchObject({ event: 'started', agent: 'backend', scenario: 'agent2.0_balanced' })
+      expect(records[1]).toMatchObject({ event: 'finished', agent: 'backend', scenario: 'agent2.0_balanced' })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('cleans excluded auditor child usage so bounded caches do not evict ordinary agent usage', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-run-auditor-cleanup-'))
+    try {
+      const hooks = await createAgentRunLoggerHooks({ worktree: dir })
+      await hooks.config?.(fullBalancedConfig())
+
+      await hooks['tool.execute.before']?.({ tool: 'task', sessionID: 'parent', callID: 'call-kept' }, { args: { description: 'normal kept', subagent_type: 'backend' } })
+      await hooks.event?.({ event: { type: 'session.created', properties: { info: childSession('child-kept') } } })
+      await hooks.event?.({ event: { type: 'message.updated', properties: { info: assistantMessage('child-kept', 'm-kept', { input: 7, output: 8, reasoning: 0, cache: { read: 0, write: 0 } }, 0.07) } } })
+
+      for (let index = 0; index < 300; index += 1) {
+        const childId = `audit-child-${index}`
+        await hooks['tool.execute.before']?.({ tool: 'task', sessionID: 'parent', callID: `call-audit-${index}` }, { args: { description: 'audit', subagent_type: 'agent-auditor' } })
+        await hooks.event?.({ event: { type: 'session.created', properties: { info: childSession(childId) } } })
+        await hooks.event?.({ event: { type: 'message.updated', properties: { info: assistantMessage(childId, `m-audit-${index}`, { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }, 0.001) } } })
+        await hooks['tool.execute.after']?.({ tool: 'task', sessionID: 'parent', callID: `call-audit-${index}`, args: { subagent_type: 'agent-auditor' } }, { title: 'task', output: `<task id="${childId}" state="completed">`, metadata: { task_result: 'must not be logged' } })
+      }
+
+      await hooks['tool.execute.after']?.({ tool: 'task', sessionID: 'parent', callID: 'call-kept', args: { subagent_type: 'backend' } }, { title: 'task', output: '<task id="child-kept" state="completed">', metadata: {} })
+
+      const records = await readJournal(getDefaultJournalPath(dir))
+      expect(records).toHaveLength(2)
+      expect(records[0]).toMatchObject({ event: 'started', agent: 'backend' })
+      expect(records[1]).toMatchObject({ event: 'finished', agent: 'backend', usageAvailable: true, totalTokens: 15, cost: 0.07 })
+      const raw = await readFile(getDefaultJournalPath(dir), 'utf8')
+      expect(raw).not.toContain('agent-auditor')
+      expect(raw).not.toContain('must not be logged')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('writes balanced scenario lifecycle records when overlay fingerprint is present', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-run-balanced-'))
+    try {
+      const journalPath = join(dir, 'agent-runs.jsonl')
+      const logger = createAgentRunLogger({ journalPath })
+
+      await logger.started(
+        { tool: 'task', callId: 'call-balanced', sessionId: 'session-balanced', args: { description: 'balanced scenario', subagent_type: 'backend' } },
+        fullBalancedConfig(),
+      )
+      await logger.finished({ tool: 'task', callId: 'call-balanced' }, { output: '<task id="balanced-task" state="completed">' })
+      await logger.flush()
+
+      const records = await readJournal(journalPath)
+      expect(records[0]).toMatchObject({ event: 'started', scenario: 'agent2.0_balanced', resolvedModel: 'openai/gpt-5.5' })
+      expect(records[1]).toMatchObject({ event: 'finished', scenario: 'agent2.0_balanced', state: 'completed' })
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -164,10 +268,11 @@ describe('opencode agent run logger', () => {
     }
   })
 
-  it('captures usage through plugin event hook for base, GPT overlay and custom scenarios', async () => {
+  it('captures usage through plugin event hook for base, GPT, balanced and custom scenarios', async () => {
     const scenarios = [
       { config: { model: 'anthropic/claude-fable-5' }, scenario: 'base' },
-      { config: { model: 'openai/gpt-5.6-sol', agent: { lead: { model: 'openai/gpt-5.6-sol' } } }, scenario: 'agent2.0_gpt56' },
+      { config: fullGpt56Config(), scenario: 'agent2.0_gpt56' },
+      { config: fullBalancedConfig(), scenario: 'agent2.0_balanced' },
       { config: { model: 'local/custom' }, scenario: 'custom' },
     ]
 
@@ -283,7 +388,7 @@ describe('opencode agent run logger', () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-run-hook-'))
     try {
       const hooks = await createAgentRunLoggerHooks({ worktree: dir })
-      await hooks.config?.({ model: 'openai/gpt-5.6-sol', agent: { lead: { model: 'openai/gpt-5.6-sol' }, backend: { model: 'openai/gpt-5.5' } } })
+      await hooks.config?.(fullGpt56Config())
 
       await hooks['tool.execute.before']?.(
         { tool: 'task', sessionID: 'session-real', callID: 'call-real' },
@@ -399,6 +504,22 @@ describe('opencode agent run logger', () => {
     }
   })
 
+  it('stats aggregate the balanced scenario string without special handling', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-run-stats-balanced-'))
+    try {
+      const journalPath = join(dir, 'agent-runs.jsonl')
+      await writeFile(journalPath, [
+        JSON.stringify({ schemaVersion: 2, event: 'started', parentSessionId: 'parent', callId: 'call-balanced-stats', agent: 'backend', resolvedModel: 'openai/gpt-5.5', scenario: 'agent2.0_balanced', isResume: true }),
+        JSON.stringify({ schemaVersion: 2, event: 'finished', parentSessionId: 'parent', callId: 'call-balanced-stats', agent: 'backend', resolvedModel: 'openai/gpt-5.5', scenario: 'agent2.0_balanced', state: 'completed', durationMs: 100, usageAvailable: true, totalTokens: 42, inputTokens: 10, outputTokens: 20, reasoningTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 5, cost: 0.12 }),
+      ].join('\n'))
+
+      const result = await execFileAsync('node', ['scripts/opencode-agent-stats.mjs', journalPath])
+      expect(result.stdout).toContain('backend\topenai/gpt-5.5\tagent2.0_balanced\t1\t1\t1\t0\t0\t1\t100.0%\t0.0%\t100\t100.0%\t0.12\t0.12\t42\t42\t10\t20\t3\t4\t5')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('deduplicates historical duplicated lifecycle rows before stats aggregation', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-run-stats-dedup-'))
     try {
@@ -455,6 +576,47 @@ function assistantMessage(sessionID: string, id: string, tokens: { input: number
     providerID: 'openai',
     mode: 'subagent',
     path: { cwd: '/', root: '/' },
+  }
+}
+
+function childSession(id: string) {
+  return { id, parentID: 'parent', projectID: 'p', directory: '/', title: 'child', version: '1', time: { created: 1, updated: 1 } }
+}
+
+function fullGpt56Config() {
+  return {
+    model: 'openai/gpt-5.6-sol',
+    agent: {
+      lead: { model: 'openai/gpt-5.6-sol', variant: 'high' },
+      architecture: { model: 'openai/gpt-5.5', variant: 'high' },
+      backend: { model: 'openai/gpt-5.5', variant: 'high' },
+      logic: { model: 'openai/gpt-5.5', variant: 'high' },
+      frontend: { model: 'openai/gpt-5.5', variant: 'medium' },
+      design: { model: 'openai/gpt-5.5', variant: 'medium' },
+      scenario: { model: 'openai/gpt-5.5', variant: 'medium' },
+      specialist: { model: 'openai/gpt-5.5', variant: 'medium' },
+      junior: { model: 'openai/gpt-5.4-mini', variant: 'low' },
+      explore: { model: 'openai/gpt-5.4-mini', variant: 'low' },
+      general: { model: 'openai/gpt-5.5', variant: 'medium' },
+      'creative-director': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+      'motion-game-consultant': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+      'interactive-frontend': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+      reviewer: { model: 'openai/gpt-5.5', variant: 'high' },
+      'critical-reviewer': { model: 'openai/gpt-5.6-sol', variant: 'xhigh' },
+    },
+  }
+}
+
+function fullBalancedConfig() {
+  return {
+    ...fullGpt56Config(),
+    agent: {
+      ...fullGpt56Config().agent,
+      explore: { model: 'opencode/north-mini-code-free' },
+      'research-free': { model: 'opencode/nemotron-3-ultra-free' },
+      'agent-auditor': { model: 'opencode/nemotron-3-ultra-free' },
+      local: { model: 'ollama/batiai/qwen3.6-27b:q4-32k' },
+    },
   }
 }
 

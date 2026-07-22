@@ -12,11 +12,13 @@ import {
   buildTasksFromTexts as buildTasksFromTextsForDate,
   parseExtraTasksJson,
   parseSelectedTasksJson,
+  preserveSelectionByTaskIds,
   remapSelectionByText as remapSelectionByTextForTasks,
   sanitizeSelectedForTotal,
 } from './task-helpers'
 import { getBrowserTimezone, normalizeChatMessageId } from './chat-helpers'
 import { consumeDailyChatSseStream, DailyChatSseError } from './stream-consumer'
+import { getDailyChatDraftKey } from '@/hooks/chat-viewport-helpers'
 
 export function useDaily(): UseDailyReturn {
   // Всегда начинаем с текущей даты при открытии страницы
@@ -61,6 +63,53 @@ export function useDaily(): UseDailyReturn {
 
   // Track the current date to prevent race conditions when switching dates quickly
   const currentDateRef = useRef(selectedDate)
+
+  // Черновик сообщения хранится только в рамках вкладки и отдельно для каждой даты.
+  const chatDraftDateRef = useRef(selectedDate)
+  const skipChatDraftSaveForDateRef = useRef<string | null>(selectedDate)
+
+  const clearChatDraft = useCallback((date: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.sessionStorage.removeItem(getDailyChatDraftKey(date))
+    } catch {
+      // Storage может быть недоступен в privacy mode.
+    }
+  }, [])
+
+  useEffect(() => {
+    const draftDate = selectedDate
+    chatDraftDateRef.current = draftDate
+    skipChatDraftSaveForDateRef.current = draftDate
+
+    if (typeof window === 'undefined') {
+      setChatInput('')
+      return
+    }
+
+    try {
+      setChatInput(window.sessionStorage.getItem(getDailyChatDraftKey(draftDate)) ?? '')
+    } catch {
+      setChatInput('')
+    }
+  }, [selectedDate])
+
+  useEffect(() => {
+    if (chatDraftDateRef.current !== selectedDate) return
+    if (skipChatDraftSaveForDateRef.current === selectedDate) {
+      skipChatDraftSaveForDateRef.current = null
+      return
+    }
+    if (typeof window === 'undefined') return
+
+    try {
+      const key = getDailyChatDraftKey(selectedDate)
+      if (chatInput) window.sessionStorage.setItem(key, chatInput)
+      else window.sessionStorage.removeItem(key)
+    } catch {
+      // Storage может быть недоступен в privacy mode.
+    }
+  }, [chatInput, selectedDate])
 
   // AbortController для отмены fetch при быстрой смене даты
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -759,14 +808,14 @@ export function useDaily(): UseDailyReturn {
 
     const updatedTexts = tasks.map((t) => (t.id === taskId ? editingTaskText.trim() : t.taskText))
     const updatedTasks = buildTasksFromTexts(updatedTexts)
-    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
+    const updatedSelected = preserveSelectionByTaskIds(selectedTasks, updatedTasks)
     setTasks(updatedTasks)
     setSelectedTasks(updatedSelected)
     setEditingTaskId(null)
     setEditingTaskText('')
     // Отмечаем, что есть несохранённые изменения
     setHasUnsavedChanges(true)
-  }, [editingTaskText, tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
+  }, [editingTaskText, tasks, selectedTasks, buildTasksFromTexts])
 
   const cancelEditingTask = useCallback(() => {
     setEditingTaskId(null)
@@ -876,6 +925,7 @@ export function useDaily(): UseDailyReturn {
     if (!initialMessage) {
       chatMessagesRef.current = updatedMessages
       setChatMessages(updatedMessages)
+      clearChatDraft(selectedDate)
       setChatInput('')
     }
 
@@ -956,7 +1006,7 @@ export function useDaily(): UseDailyReturn {
     } finally {
       setSendingChat(false)
     }
-  }, [chatInput, tasks, selectedTasks, selectedDate, showMessage])
+  }, [chatInput, tasks, selectedTasks, selectedDate, showMessage, clearChatDraft])
 
   const markChatProposalApplied = useCallback((messageId: string, appliedAt: string) => {
     setChatMessages(prev => {
@@ -971,6 +1021,7 @@ export function useDaily(): UseDailyReturn {
 
   const clearChat = useCallback(async () => {
     setChatMessages([])
+    clearChatDraft(selectedDate)
     setChatInput('')
     // Удаляем чат из БД
     try {
@@ -986,7 +1037,7 @@ export function useDaily(): UseDailyReturn {
         // ignore
       }
     }
-  }, [selectedDate, getChatKey])
+  }, [selectedDate, getChatKey, clearChatDraft])
 
   const evaluate = useCallback(async (router: { push: (path: string) => void }) => {
     // Факт = отмеченные задачи

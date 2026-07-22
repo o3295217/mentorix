@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { format } from 'date-fns'
+import { addDays, addMonths, format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
 interface DateIndicators {
@@ -37,57 +37,122 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
   const [isOpen, setIsOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(parseDateKey(value))
   const [indicators, setIndicators] = useState<DateIndicators>({})
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [focusedDateKey, setFocusedDateKey] = useState(value)
   const pickerRef = useRef<HTMLDivElement>(null)
-
-  // Memoized loadIndicators function
-  const loadIndicators = useCallback(async () => {
-    try {
-      const monthStr = format(currentMonth, 'yyyy-MM')
-      const res = await fetch(`/api/daily/indicators?month=${monthStr}`)
-      if (!res.ok) {
-        // Если не авторизован (или сессия истекла) — просто не показываем индикаторы
-        if (res.status === 401) {
-          setIndicators({})
-          return
-        }
-
-        console.error('Failed to load indicators:', res.status)
-        return
-      }
-      const data = await res.json()
-      setIndicators(data)
-    } catch (error) {
-      console.error('Error loading indicators:', error)
-    }
-  }, [currentMonth])
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const dayButtonRefs = useRef(new Map<string, HTMLButtonElement>())
+  const focusFrameRef = useRef<number | null>(null)
 
   // Загрузка индикаторов при изменении месяца
   useEffect(() => {
-    loadIndicators()
-  }, [loadIndicators])
+    const controller = new AbortController()
+    const monthStr = format(currentMonth, 'yyyy-MM')
+
+    setIndicators({})
+    setLoadError('')
+    setIsLoading(true)
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/daily/indicators?month=${monthStr}`, { signal: controller.signal })
+        if (!res.ok) {
+          // Если не авторизован (или сессия истекла) — просто не показываем индикаторы.
+          if (res.status === 401) return
+          throw new Error(`HTTP ${res.status}`)
+        }
+        const data = await res.json() as DateIndicators
+        if (!controller.signal.aborted) setIndicators(data)
+      } catch (error) {
+        if (controller.signal.aborted) return
+        console.error('Error loading indicators:', error)
+        setLoadError('Не удалось загрузить отметки календаря')
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false)
+      }
+    })()
+
+    return () => controller.abort()
+  }, [currentMonth])
+
+  const cancelFocusFrame = useCallback(() => {
+    if (focusFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusFrameRef.current)
+      focusFrameRef.current = null
+    }
+  }, [])
+
+  const restoreTriggerFocus = useCallback(() => {
+    cancelFocusFrame()
+    focusFrameRef.current = window.requestAnimationFrame(() => {
+      focusFrameRef.current = null
+      triggerRef.current?.focus()
+    })
+  }, [cancelFocusFrame])
+
+  const closeCalendar = useCallback((restoreFocus = true) => {
+    setIsOpen(false)
+    if (restoreFocus) restoreTriggerFocus()
+  }, [restoreTriggerFocus])
+
+  useEffect(() => {
+    if (!isOpen) return
+    cancelFocusFrame()
+    focusFrameRef.current = window.requestAnimationFrame(() => {
+      focusFrameRef.current = null
+      dayButtonRefs.current.get(focusedDateKey)?.focus()
+    })
+    return cancelFocusFrame
+  }, [cancelFocusFrame, currentMonth, focusedDateKey, isOpen])
+
+  useEffect(() => cancelFocusFrame, [cancelFocusFrame])
 
   // Закрытие при клике вне компонента
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+        closeCalendar(false)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [closeCalendar])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeCalendar()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [closeCalendar, isOpen])
 
   const handleDateSelect = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
     onChange(dateStr)
-    setIsOpen(false)
-  }, [onChange])
+    closeCalendar()
+  }, [closeCalendar, onChange])
 
   const toggleCalendar = useCallback(() => {
-    setCurrentMonth(parseDateKey(value))
-    setIsOpen((open) => !open)
-  }, [value])
+    if (isOpen) {
+      closeCalendar(false)
+      return
+    }
+    const selectedDate = parseDateKey(value)
+    setIndicators({})
+    setLoadError('')
+    setIsLoading(true)
+    setCurrentMonth(selectedDate)
+    setFocusedDateKey(value)
+    setIsOpen(true)
+  }, [closeCalendar, isOpen, value])
 
   const goToToday = () => {
     const today = new Date()
@@ -95,12 +160,20 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
     handleDateSelect(today)
   }
 
+  const showMonth = (date: Date) => {
+    setIndicators({})
+    setLoadError('')
+    setIsLoading(true)
+    setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1))
+    setFocusedDateKey(format(date, 'yyyy-MM-dd'))
+  }
+
   const goToPreviousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
+    showMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
   }
 
   const goToNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+    showMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
   }
 
   const getDaysInMonth = () => {
@@ -145,7 +218,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
 
     return {
       indicator: getIndicatorForDate(date),
-      isCurrentMonth: date.getMonth() === currentMonth.getMonth(),
+      isCurrentMonth: date.getMonth() === currentMonth.getMonth() && date.getFullYear() === currentMonth.getFullYear(),
       isFuture: dateNoTime > today,
       isPast: dateNoTime < today,
       isSelected: dateStr === value && dateNoTime.getTime() !== today.getTime(),
@@ -236,7 +309,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
   const getDayClassName = (date: Date) => {
     const state = getDateState(date)
 
-    let className = 'relative flex h-10 w-10 cursor-pointer items-center justify-center rounded text-sm transition-colors '
+    let className = 'relative flex h-11 min-w-0 w-full cursor-pointer items-center justify-center rounded text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 '
 
     if (state.isSelected) {
       className += 'bg-blue-500 text-white font-bold '
@@ -253,45 +326,96 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
     return className
   }
 
+  const getDayAccessibleName = (date: Date) => {
+    const state = getDateState(date)
+    const markerLabels: string[] = []
+    if (state.indicator?.hasPlan) markerLabels.push('есть план')
+    if (state.indicator?.hasEvaluation) {
+      markerLabels.push(state.indicator.dreamProgressScore === undefined
+        ? 'день оценён'
+        : `день оценён, прогресс ${state.indicator.dreamProgressScore} из 10`)
+    }
+    const dateLabel = format(date, 'd MMMM yyyy, EEEE', { locale: ru })
+    return markerLabels.length > 0 ? `${dateLabel}. ${markerLabels.join(', ')}` : dateLabel
+  }
+
+  const moveGridFocus = (date: Date) => {
+    const nextKey = format(date, 'yyyy-MM-dd')
+    if (date.getMonth() !== currentMonth.getMonth() || date.getFullYear() !== currentMonth.getFullYear()) {
+      showMonth(date)
+    } else {
+      setFocusedDateKey(nextKey)
+    }
+  }
+
+  const handleDayKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, date: Date) => {
+    let nextDate: Date | null = null
+    if (event.key === 'ArrowLeft') nextDate = addDays(date, -1)
+    else if (event.key === 'ArrowRight') nextDate = addDays(date, 1)
+    else if (event.key === 'ArrowUp') nextDate = addDays(date, -7)
+    else if (event.key === 'ArrowDown') nextDate = addDays(date, 7)
+    else if (event.key === 'PageUp') nextDate = addMonths(date, event.shiftKey ? -12 : -1)
+    else if (event.key === 'PageDown') nextDate = addMonths(date, event.shiftKey ? 12 : 1)
+    else if (event.key === 'Home') {
+      const mondayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1
+      nextDate = addDays(date, -mondayIndex)
+    } else if (event.key === 'End') {
+      const mondayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1
+      nextDate = addDays(date, 6 - mondayIndex)
+    }
+
+    if (!nextDate) return
+    event.preventDefault()
+    moveGridFocus(nextDate)
+  }
+
   const days = getDaysInMonth()
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
   return (
-    <div ref={pickerRef} className="relative">
-      {/* Input */}
-      <input
-        type="text"
-        value={format(parseDateKey(value), 'd MMMM yyyy', { locale: ru })}
+    <div ref={pickerRef} className="relative w-full min-w-0 sm:w-auto">
+      {/* Trigger */}
+      <button
+        ref={triggerRef}
+        type="button"
         onClick={toggleCalendar}
-        readOnly
-        className="input w-auto cursor-pointer"
-      />
+        className="input flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-between gap-2 text-left text-base sm:w-auto"
+        aria-expanded={isOpen}
+        aria-controls="daily-date-picker-calendar"
+        aria-haspopup="dialog"
+      >
+        <span className="min-w-0 truncate">{format(parseDateKey(value), 'd MMMM yyyy', { locale: ru })}</span>
+        <span aria-hidden="true" className="flex-shrink-0 text-gray-400">▾</span>
+      </button>
 
       {/* Calendar Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 bg-gray-900/80 border-2 border-gray-700 rounded-lg shadow-xl p-4 z-50 w-80">
+        <div
+          id="daily-date-picker-calendar"
+          role="dialog"
+          aria-label="Выбор даты"
+          className="daily-date-picker-dialog fixed left-1/2 z-50 w-screen max-w-[22rem] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-lg border-2 border-gray-700 bg-gray-900/95 p-0 shadow-xl sm:w-[22rem] sm:p-2 lg:absolute lg:left-auto lg:right-0 lg:top-full lg:mt-2 lg:translate-x-0 lg:overflow-visible lg:overscroll-auto lg:p-4"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={goToPreviousMonth} className="p-2 hover:bg-gray-700 rounded text-gray-300">
+          <div className="mb-2 flex items-center justify-between px-1 pt-1 sm:mb-4 sm:px-0 sm:pt-0">
+            <button type="button" onClick={goToPreviousMonth} className="flex h-11 min-w-11 items-center justify-center rounded text-gray-300 hover:bg-gray-700" aria-label="Предыдущий месяц">
               ↑
             </button>
-            <button
-              onClick={() => {
-                const newDate = new Date(currentMonth)
-                newDate.setMonth(newDate.getMonth() - 1)
-                setCurrentMonth(newDate)
-              }}
-              className="text-lg font-semibold text-white"
-            >
-              {format(currentMonth, 'LLLL yyyy', { locale: ru })} 
-            </button>
-            <button onClick={goToNextMonth} className="p-2 hover:bg-gray-700 rounded text-gray-300">
+            <h2 id="daily-date-picker-month" className="min-w-0 flex-1 px-1 text-center text-base font-semibold text-white sm:text-lg" aria-live="polite">
+              {format(currentMonth, 'LLLL yyyy', { locale: ru })}
+            </h2>
+            <button type="button" onClick={goToNextMonth} className="flex h-11 min-w-11 items-center justify-center rounded text-gray-300 hover:bg-gray-700" aria-label="Следующий месяц">
               ↓
             </button>
           </div>
 
+          <div className="min-h-5 px-1 text-center text-xs sm:px-0" aria-live="polite" aria-atomic="true">
+            {isLoading && <span className="text-gray-400" role="status">Загрузка отметок…</span>}
+            {!isLoading && loadError && <span className="text-red-300" role="alert">{loadError}</span>}
+          </div>
+
           {/* Week days */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
+          <div className="mb-1 grid grid-cols-7 gap-0 sm:mb-2 sm:gap-1">
             {weekDays.map((day) => (
               <div key={day} className="text-center text-xs font-semibold text-gray-400">
                 {day}
@@ -300,26 +424,45 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
           </div>
 
           {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((date, i) => (
-              <div key={i} className={getDayClassName(date)} onClick={() => handleDateSelect(date)}>
-                {date.getDate()}
-                {renderDayMarkers(date)}
+          <div className="grid grid-cols-7 gap-0 sm:gap-1" role="grid" aria-labelledby="daily-date-picker-month">
+            {days.map((date) => {
+              const dateKey = format(date, 'yyyy-MM-dd')
+              const todayKey = format(new Date(), 'yyyy-MM-dd')
+              return (
+              <div key={dateKey} role="gridcell" aria-selected={dateKey === value} className="min-w-0">
+                <button
+                  ref={(node) => {
+                    if (node) dayButtonRefs.current.set(dateKey, node)
+                    else dayButtonRefs.current.delete(dateKey)
+                  }}
+                  type="button"
+                  className={getDayClassName(date)}
+                  onClick={() => handleDateSelect(date)}
+                  onFocus={() => setFocusedDateKey(dateKey)}
+                  onKeyDown={(event) => handleDayKeyDown(event, date)}
+                  tabIndex={dateKey === focusedDateKey ? 0 : -1}
+                  aria-label={getDayAccessibleName(date)}
+                  aria-current={dateKey === todayKey ? 'date' : undefined}
+                >
+                  {date.getDate()}
+                  {renderDayMarkers(date)}
+                </button>
               </div>
-            ))}
+              )
+            })}
           </div>
 
-          <div className="mt-4 flex justify-between border-t border-gray-700 pt-4 text-sm">
-            <button onClick={() => setIsOpen(false)} className="text-gray-400 transition-colors hover:text-gray-200">
+          <div className="mt-2 flex justify-between border-t border-gray-700 px-1 py-1 text-sm sm:mt-4 sm:px-0 sm:pb-0 sm:pt-4">
+            <button type="button" onClick={() => closeCalendar()} className="min-h-11 rounded px-3 text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200">
               Закрыть
             </button>
-            <button onClick={goToToday} className="text-blue-400 transition-colors hover:text-blue-300">
+            <button type="button" onClick={goToToday} className="min-h-11 rounded px-3 text-blue-400 transition-colors hover:bg-gray-800 hover:text-blue-300">
               Сегодня
             </button>
           </div>
 
-          <div className="mt-3 border-t border-gray-700 pt-3 text-xs text-gray-400">
-            <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+          <div className="border-t border-gray-700 px-2 py-2 text-xs text-gray-400 sm:mt-3 sm:px-0 sm:pb-0 sm:pt-3">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-5">
               <div className="space-y-2">
                 {renderLegendHeading('День')}
                 {renderLegendItem('selected', 'Выбранный')}

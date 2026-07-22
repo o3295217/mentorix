@@ -8,24 +8,61 @@
 
 ## Матрица моделей
 
-| Роль / уровень | `base` (по умолчанию) | `agent2.0_gpt56` overlay |
-|---|---|---|
-| `lead` — orchestration/high-stakes acceptance | `anthropic/claude-fable-5`, variant не задан | `openai/gpt-5.6-sol`, `variant: high` |
-| `architecture`, `backend`, `logic` — сложные доменные изменения | `anthropic/claude-sonnet-5`, variant не задан | `openai/gpt-5.5`, `variant: high` |
-| `frontend`, `design`, `scenario`, `specialist` — доменные изменения среднего риска | `anthropic/claude-sonnet-5`, variant не задан | `openai/gpt-5.5`, `variant: medium` |
-| `junior` — простые правки | `anthropic/claude-haiku-4-5`, variant не задан | `openai/gpt-5.4-mini`, `variant: low` |
-| `local` — механические правки | `ollama/batiai/qwen3.6-27b:q4-32k`, без variant | не переопределяется, остаётся Ollama без variant |
-| встроенный `explore` — быстрый read-only поиск | `anthropic/claude-haiku-4-5`, variant не задан (inline override, не наследует Fable) | `openai/gpt-5.4-mini`, `variant: low` (явно, не наследует Sol) |
-| встроенный `general` — универсальный встроенный агент | `anthropic/claude-sonnet-5`, `variant: high` (inline override, не наследует Fable) | `openai/gpt-5.5`, `variant: medium` |
-| `reviewer` — независимая read-only приёмка | `anthropic/claude-sonnet-5`, `variant: high` | `openai/gpt-5.5`, `variant: high` |
-| `critical-reviewer` — усиленная read-only приёмка | `anthropic/claude-fable-5`, `variant: max` | `openai/gpt-5.6-sol`, `variant: xhigh` |
+| Роль / уровень | `base` (по умолчанию) | `agent2.0_gpt56` overlay | `agent2.0_balanced` overlay |
+|---|---|---|---|
+| `lead` — orchestration/high-stakes acceptance | `anthropic/claude-fable-5`, variant не задан | `openai/gpt-5.6-sol`, `variant: high` | `openai/gpt-5.6-sol`, `variant: high` |
+| `architecture`, `backend`, `logic` — сложные доменные изменения | `anthropic/claude-sonnet-5`, variant не задан | `openai/gpt-5.5`, `variant: high` | `openai/gpt-5.5`, `variant: high` |
+| `frontend`, `design`, `scenario`, `specialist` — доменные изменения среднего риска | `anthropic/claude-sonnet-5`, variant не задан | `openai/gpt-5.5`, `variant: medium` | `openai/gpt-5.5`, `variant: medium` |
+| `junior` — простые правки | `anthropic/claude-haiku-4-5`, variant не задан | `openai/gpt-5.4-mini`, `variant: low` | `openai/gpt-5.4-mini`, `variant: low` |
+| `local` — механические правки | `ollama/batiai/qwen3.6-27b:q4-32k`, без variant | не переопределяется, остаётся Ollama без variant | `ollama/batiai/qwen3.6-27b:q4-32k`, без variant |
+| встроенный `explore` — быстрый read-only поиск | `anthropic/claude-haiku-4-5`, variant не задан (inline override, не наследует Fable) | `openai/gpt-5.4-mini`, `variant: low` (явно, не наследует Sol) | `opencode/north-mini-code-free`, без variant |
+| `research-free` — вспомогательное read-only исследование | `opencode/nemotron-3-ultra-free`, без variant | `opencode/nemotron-3-ultra-free`, без variant | `opencode/nemotron-3-ultra-free`, без variant |
+| `agent-auditor` — read-only audit журнала агентов | `opencode/nemotron-3-ultra-free`, без variant | `opencode/nemotron-3-ultra-free`, без variant | `opencode/nemotron-3-ultra-free`, без variant |
+| встроенный `general` — универсальный встроенный агент | `anthropic/claude-sonnet-5`, `variant: high` (inline override, не наследует Fable) | `openai/gpt-5.5`, `variant: medium` | `openai/gpt-5.5`, `variant: medium` |
+| `creative-director` — read-only creative consultant | `anthropic/claude-fable-5`, variant не задан | `openai/gpt-5.6-sol`, `variant: high` | `openai/gpt-5.6-sol`, `variant: high` |
+| `motion-game-consultant` — read-only motion/game consultant | `anthropic/claude-fable-5`, variant не задан | `openai/gpt-5.6-sol`, `variant: high` | `openai/gpt-5.6-sol`, `variant: high` |
+| `interactive-frontend` — executor для approved creative/motion/game specs | `openai/gpt-5.6-sol`, `variant: high` | `openai/gpt-5.6-sol`, `variant: high` | `openai/gpt-5.6-sol`, `variant: high` |
+| `reviewer` — независимая read-only приёмка | `anthropic/claude-sonnet-5`, `variant: high` | `openai/gpt-5.5`, `variant: high` | `openai/gpt-5.5`, `variant: high` |
+| `critical-reviewer` — усиленная read-only приёмка | `anthropic/claude-fable-5`, `variant: max` | `openai/gpt-5.6-sol`, `variant: xhigh` | `openai/gpt-5.6-sol`, `variant: xhigh` |
 
 В base встроенные `explore` и `general` переопределяются минимально в `opencode.json`: задаются только
 `model`/`variant`, без замены built-in prompts/mode/permissions. Это нужно, чтобы они не наследовали
 дорогой default `anthropic/claude-fable-5`.
 
-В сценарии `agent2.0_gpt56` все перечисленные роли кроме `local` используют OpenAI.
+В сценарии `agent2.0_gpt56` core executors, reviewers и acceptance-роли используют OpenAI.
+Вспомогательные постоянные read-only helpers (`research-free`, `agent-auditor`) остаются на Zen Free;
 `local` остаётся на Ollama и не получает `variant`.
+
+`research-free` и `agent-auditor` — постоянные read-only agent files, поэтому доступны во всех сценариях
+через frontmatter на free-модели; guardrails lead ограничивают их вспомогательным read-only использованием.
+
+В сценарии `agent2.0_balanced` default model остаётся `openai/gpt-5.6-sol`, а все GPT-исполнители,
+reviewers и роли приёмки сохраняют те же модели/variants, что и `agent2.0_gpt56`. Free-модели
+используются только для read-only подготовки: встроенный `explore` и `research-free` собирают
+факты, ссылки и `file:line`, но не редактируют код, не ревьюят и не являются финальным основанием
+для решений. `local` явно закреплён за Ollama и не получает `variant`.
+
+Quality guardrails для `agent2.0_balanced`:
+- GPT остаётся на авторах изменений, reviewers и финальной приёмке; free-агенты только помогают собрать факты, поэтому риск качества минимизирован организационно, но качество не считается доказанным.
+- Доменный GPT-исполнитель самостоятельно проверяет релевантный код/документацию после free-подготовки.
+- Неполный, противоречивый или неуверенный free-результат сразу эскалируется на GPT без повторных free retry.
+- После запуска сценария нужны метрики/наблюдение: частота эскалаций, ошибки фактов, экономия токенов и verdict reviewers.
+
+## Audit агентов
+
+- Детерминированный отчёт: `npm run opencode:agent-audit` или команда opencode `/audit-agents`.
+- `agent-auditor` — fail-closed subagent на free-модели (`permission: deny`): не запускает tools сам; lead запускает audit script и передаёт auditor только aggregate stdout без journal path, raw IDs, JSONL, descriptions или пользовательского содержимого.
+- Пороговые gates: `<20 finished` → `INSUFFICIENT_EVIDENCE`; `>=20` → только soft investigate; `>=50` → допустимы `REVIEW_PROMPT`/`CONSIDER_MODEL_CHANGE`; `>=100` → допустимо осторожное `CONSIDER_DISABLE`, но никогда автоматическое действие.
+- `isResume` — только proxy повторной доработки, не доказательство quality REWORK. Текущая schema не позволяет точно вывести first-pass acceptance, lead override/escalation или причину resume.
+- Перед любым prompt/model/disable lead показывает evidence пользователю, отделяет provider/system instability от quality signal и получает явное approval.
+
+## Routing для creative/motion/game задач
+
+- Любая нетривиальная creative/motion/game задача: `creative-director` или `motion-game-consultant` → `interactive-frontend` → `reviewer`.
+- Только явные tiny hover/spacing/transition visual fixes без новой логики идут напрямую в существующие `frontend`/`design`/`junior` без consultant и без обязательного reviewer по правилам simple-task.
+- Parallel panel подключается только для больших или неоднозначных creative задач.
+- Consultants всегда read-only и возвращают краткий Handoff Brief: Task/context, Outcome, Scope, States, Motion, A11y, Technical constraints, Acceptance, Reviewer focus.
+- Новая interaction/game logic требует `reviewer`; `critical-reviewer` нужен только по обычным high-risk правилам плюс новая dependency, large performance-sensitive architecture или rendering/game-loop architecture.
 
 ## Правила приёмки
 
@@ -47,6 +84,8 @@
 - Меню выбора: `./scripts/opencode-start.sh`
 - Напрямую base: `opencode`
 - Напрямую agent2.0_gpt56: `./scripts/opencode-agent2.0_gpt56.sh`
+- Напрямую agent2.0_balanced: `./scripts/opencode-agent2.0_balanced.sh`
+- Audit агентов без интерактива: `npm run opencode:agent-audit`
 
 Сменить сценарий в открытой сессии нельзя — нужно выйти и запустить заново.
 

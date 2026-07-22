@@ -1,9 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Manrope, Orbitron } from 'next/font/google'
 import './globals.css'
-import Navigation from '@/components/Navigation'
-import LayoutFooter from '@/components/LayoutFooter'
-import AuthGuard from '@/components/AuthGuard'
+import AppShell from '@/components/AppShell'
 import { Providers } from '@/components/Providers'
 import { getAppUrl } from '@/lib/app-url'
 
@@ -42,22 +40,18 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" className={`dark ${manrope.variable} ${orbitron.variable}`}>
       <body className={manrope.className} suppressHydrationWarning>
         <Providers>
-          <div className="min-h-screen flex flex-col overflow-x-hidden">
-            <Navigation />
-
-            <main className="flex-1 pt-16">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <AuthGuard>{children}</AuthGuard>
-              </div>
-            </main>
-
-            <LayoutFooter />
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

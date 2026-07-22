@@ -180,16 +180,23 @@ export default function MonthSection({
       <div className="px-5 pb-5">
         {/* ── Нераспределённые цели месяца ── */}
         <div className="mb-4">
-          <div className="flex gap-2 mb-2">
+          <div className="mb-2 flex flex-wrap gap-2">
             <input
               type="text"
               value={newGoal}
               onChange={(e) => setNewGoal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="Добавить задачу на месяц..."
-              className="flex-1 bg-slate-950/50 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              className="min-h-11 min-w-0 flex-1 basis-48 rounded-xl border border-slate-700 bg-slate-950/50 px-3 py-2 text-base text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-sm"
             />
-            <button onClick={handleAdd} className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-blue-400">+</button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-2 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+              aria-label="Добавить цель на месяц"
+            >
+              +
+            </button>
           </div>
 
           {unassignedGoals.length > 0 && (
@@ -203,20 +210,23 @@ export default function MonthSection({
                 return (
                   <div
                     key={originalIndex}
-                    className={`flex items-center gap-3 py-0.5 px-3 rounded-xl transition-colors group/item ${isCompleted ? 'bg-green-500/5' : 'hover:bg-slate-800/30'}`}
+                    className={`goal-action-surface flex flex-wrap items-start gap-x-2 gap-y-1 rounded-xl px-2 py-1 transition-colors ${isCompleted ? 'bg-green-500/5' : 'hover:bg-slate-800/30'}`}
                   >
                     <button
+                      type="button"
                       disabled={isProcessing}
                       onClick={() => { if (!isProcessing) onToggleGoalCompletion(monthKey, goal, !isCompleted) }}
-                      className={`flex-shrink-0 flex items-center justify-center w-4 h-4 rounded border transition-all ${
-                        isCompleted ? 'bg-green-500 border-green-500' : 'border-slate-600 hover:border-slate-400 bg-transparent'
-                      } ${isProcessing ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                      className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${isProcessing ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
+                      aria-label={`${isCompleted ? 'Отметить невыполненной' : 'Отметить выполненной'} цель «${goal}»`}
+                      aria-pressed={isCompleted}
                     >
-                      {isCompleted && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
+                        isCompleted ? 'border-green-500 bg-green-500' : 'border-slate-600 bg-transparent'
+                      }`} aria-hidden="true">
+                        {isCompleted && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
+                        </svg>}
+                      </span>
                     </button>
                     {editingIndex === originalIndex ? (
                       <input
@@ -228,12 +238,12 @@ export default function MonthSection({
                           if (e.key === 'Enter') saveEdit(originalIndex)
                           if (e.key === 'Escape') cancelEdit()
                         }}
-                        className="flex-1 px-2 py-1 text-sm border border-slate-700 rounded-lg bg-slate-950/50 text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/50 px-2 py-2 text-base text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50 lg:text-sm"
                         autoFocus
                       />
                     ) : (
-                      <div className="flex-1 min-w-0">
-                        <span className={`${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>{goal}</span>
+                      <div className="min-w-0 flex-1 self-center">
+                        <span className={`break-words [overflow-wrap:anywhere] ${isCompleted ? 'text-slate-500' : 'text-slate-200'}`}>{goal}</span>
                         {tracked?.parentId && (() => {
                           const parentGoal = trackedGoals.find(g => g.id === tracked.parentId)
                           return parentGoal ? (
@@ -244,23 +254,28 @@ export default function MonthSection({
                         })()}
                       </div>
                     )}
-                    <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                    <div className="goal-hover-actions flex basis-full flex-wrap items-center justify-end gap-1 pl-11">
                       {weeksInMonth.length > 0 && (
                         <div className="relative" ref={copyDropdownIndex === originalIndex ? dropdownRef : null}>
                           <button
+                            type="button"
                             onClick={() => toggleDropdown(originalIndex)}
-                            className="text-slate-500 hover:text-blue-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-sm"
+                            className="min-h-11 rounded-lg px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                             title="Переместить в неделю"
+                            aria-label={`Переместить цель «${goal}» в неделю`}
+                            aria-expanded={copyDropdownIndex === originalIndex}
+                            aria-controls={`month-goal-weeks-${monthKey}-${originalIndex}`}
                           >
                             ↓ в неделю
                           </button>
                           {copyDropdownIndex === originalIndex && (
-                            <div className="absolute right-0 top-7 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl z-10 py-1 min-w-[140px]">
+                            <div id={`month-goal-weeks-${monthKey}-${originalIndex}`} className="absolute right-0 top-full z-10 min-w-[180px] rounded-xl border border-slate-700 bg-slate-900/95 py-1 shadow-2xl backdrop-blur-sm">
                               {weeksInMonth.map(w => (
                                 <button
+                                  type="button"
                                   key={w.num}
                                   onClick={() => { onCopyGoal(goal, 'week', w.key); closeDropdown() }}
-                                  className="w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors"
+                                  className="min-h-11 w-full px-3 py-2 text-left text-sm text-slate-300 transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-300"
                                 >
                                   Неделя {w.num} ({w.start.getDate()}-{w.end.getDate()})
                                 </button>
@@ -270,12 +285,16 @@ export default function MonthSection({
                         </div>
                       )}
                       <button
+                        type="button"
                         onClick={() => startEdit(originalIndex, goal)}
-                        className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-sm"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                        aria-label={`Редактировать цель «${goal}»`}
                       >✎</button>
                       <button
+                        type="button"
                         onClick={() => onRemoveGoal(originalIndex)}
-                        className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-sm"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                        aria-label={`Удалить цель «${goal}»`}
                       >✕</button>
                     </div>
                   </div>
@@ -289,8 +308,9 @@ export default function MonthSection({
         {weeksInMonth.length > 0 && (
           <div className="border-t border-slate-800/60 pt-4">
             <div
-              className="grid gap-px bg-slate-800/40 rounded-xl overflow-hidden"
-              style={{ gridTemplateColumns: `repeat(${weeksInMonth.length}, minmax(0, 1fr))` }}
+              className={`grid min-w-0 grid-cols-1 gap-3 lg:gap-px lg:overflow-hidden lg:rounded-xl lg:bg-slate-800/40 ${
+                weeksInMonth.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+              }`}
             >
               {weeksInMonth.map(week => {
                 const today = new Date()

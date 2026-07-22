@@ -313,7 +313,7 @@ export default function ProfilePage() {
 
       {/* Message Toast */}
       {message && (
-        <div className="fixed bottom-4 right-4 bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
+        <div role="status" aria-live="polite" className="app-fixed-status fixed bg-gray-900/80 shadow-lg rounded-lg p-4 border border-gray-700 z-50">
           <p className="font-medium">{message}</p>
         </div>
       )}

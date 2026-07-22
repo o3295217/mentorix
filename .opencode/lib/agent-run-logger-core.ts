@@ -12,7 +12,7 @@ const MAX_PENDING_CHILD_SESSIONS = 256
 
 export type AgentRunEventName = 'started' | 'finished'
 export type TaskState = 'completed' | 'error' | 'unknown'
-export type ScenarioName = 'base' | 'agent2.0_gpt56' | 'custom'
+export type ScenarioName = 'base' | 'agent2.0_gpt56' | 'agent2.0_balanced' | 'custom'
 
 export type AgentRunRecord = {
   schemaVersion: number
@@ -47,7 +47,7 @@ export type AgentRunRecord = {
 type ConfigLike = {
   model?: unknown
   default_agent?: unknown
-  agent?: Record<string, { model?: unknown } | undefined>
+  agent?: Record<string, { model?: unknown; variant?: unknown } | undefined>
 }
 
 type StartedCall = {
@@ -129,7 +129,11 @@ export function resolveScenario(config: ConfigLike): ScenarioName {
   const defaultModel = typeof config.model === 'string' ? config.model : null
   const leadModel = getAgentModel(config, 'lead')
 
-  if (defaultModel === 'openai/gpt-5.6-sol' && (leadModel === null || leadModel === 'openai/gpt-5.6-sol')) {
+  if (defaultModel === 'openai/gpt-5.6-sol' && matchesBalancedFingerprint(config)) {
+    return 'agent2.0_balanced'
+  }
+
+  if (defaultModel === 'openai/gpt-5.6-sol' && matchesGpt56Fingerprint(config)) {
     return 'agent2.0_gpt56'
   }
 
@@ -158,6 +162,7 @@ export function parseTaskOutput(output: unknown): Pick<AgentRunRecord, 'returned
 
 export function createAgentRunLogger(options: LoggerOptions) {
   const calls = new Map<string, StartedCall>()
+  const excludedCallIds = new Set<string>()
   const sessionUsage = new Map<string, SessionUsage>()
   const pendingChildSessions = new Map<string, number>()
   let queue = Promise.resolve()
@@ -181,8 +186,13 @@ export function createAgentRunLogger(options: LoggerOptions) {
         if (!isTaskTool(input)) return
         const args = getArgs(input)
         const agent = getString(args, ['subagent_type']) ?? getString(args, ['agent']) ?? 'unknown'
-        const resumedTaskId = getString(args, ['task_id'])
         const callId = getCallId(input) ?? `${Date.now()}-${++sequence}`
+        if (isOperationallyExcludedAgent(agent)) {
+          excludedCallIds.add(callId)
+          evictExcludedCallIds(excludedCallIds)
+          return
+        }
+        const resumedTaskId = getString(args, ['task_id'])
         const timestamp = now()
         const record: AgentRunRecord = {
           schemaVersion: JOURNAL_SCHEMA_VERSION,
@@ -213,6 +223,13 @@ export function createAgentRunLogger(options: LoggerOptions) {
       try {
         if (!isTaskTool(input)) return
         const callId = getCallId(input)
+        const args = getArgs(input)
+        const requestedAgent = getString(args, ['subagent_type']) ?? getString(args, ['agent'])
+        if ((callId && excludedCallIds.delete(callId)) || isOperationallyExcludedAgent(requestedAgent)) {
+          const returnedTaskId = parseReturnedTaskId(output)
+          if (returnedTaskId) cleanupReturnedTask(returnedTaskId)
+          return
+        }
         const started = callId ? calls.get(callId) : undefined
         const parsed = parseTaskOutput(output)
         const usage = summarizeSessionUsage(parsed.returnedTaskId ? sessionUsage.get(parsed.returnedTaskId)?.messages : undefined)
@@ -224,12 +241,12 @@ export function createAgentRunLogger(options: LoggerOptions) {
           timestamp: finishedAt.toISOString(),
           parentSessionId: base?.parentSessionId ?? getParentSessionId(input),
           callId: callId ?? `${Date.now()}-${++sequence}`,
-          description: base?.description ?? sanitizeDescription(getValue(getArgs(input), ['description'])),
-          agent: base?.agent ?? getString(getArgs(input), ['subagent_type']) ?? 'unknown',
+          description: base?.description ?? sanitizeDescription(getValue(args, ['description'])),
+          agent: base?.agent ?? requestedAgent ?? 'unknown',
           resolvedModel: base?.resolvedModel ?? null,
           scenario: base?.scenario ?? 'custom',
-          isResume: base?.isResume ?? Boolean(getString(getArgs(input), ['task_id'])),
-          resumedTaskId: base?.resumedTaskId ?? getString(getArgs(input), ['task_id']),
+          isResume: base?.isResume ?? Boolean(getString(args, ['task_id'])),
+          resumedTaskId: base?.resumedTaskId ?? getString(args, ['task_id']),
           returnedTaskId: parsed.returnedTaskId,
           state: parsed.state,
           durationMs: started ? Math.max(0, finishedAt.getTime() - started.startedAt) : null,
@@ -237,8 +254,7 @@ export function createAgentRunLogger(options: LoggerOptions) {
         }
         if (callId) calls.delete(callId)
         if (parsed.returnedTaskId) {
-          sessionUsage.delete(parsed.returnedTaskId)
-          pendingChildSessions.delete(parsed.returnedTaskId)
+          cleanupReturnedTask(parsed.returnedTaskId)
         }
         await append(record)
       } catch {
@@ -315,6 +331,18 @@ export function createAgentRunLogger(options: LoggerOptions) {
       }
     },
   }
+
+  function cleanupReturnedTask(returnedTaskId: string): void {
+    sessionUsage.delete(returnedTaskId)
+    pendingChildSessions.delete(returnedTaskId)
+  }
+}
+
+function parseReturnedTaskId(output: unknown): string | null {
+  const text = typeof output === 'string'
+    ? output
+    : getString(output, ['output']) ?? ''
+  return firstMatch(text, /<task\b[^>]*\bid=["']([^"']+)["'][^>]*>/i)
 }
 
 function emptyUsageSummary(): UsageSummary {
@@ -401,6 +429,14 @@ function evictStartedCalls(calls: Map<string, StartedCall>): void {
   evictOldest(calls, () => true, MAX_TRACKED_STARTED_CALLS)
 }
 
+function evictExcludedCallIds(callIds: Set<string>): void {
+  while (callIds.size > MAX_TRACKED_STARTED_CALLS) {
+    const [oldest] = callIds
+    if (!oldest) return
+    callIds.delete(oldest)
+  }
+}
+
 function evictTrackedSessions(sessionUsage: Map<string, SessionUsage>, pendingChildSessions: Map<string, number>): void {
   evictOldest(sessionUsage, (entry) => !entry.isChild, MAX_UNMATCHED_USAGE_SESSIONS)
   evictOldest(sessionUsage, () => true, MAX_TRACKED_USAGE_SESSIONS)
@@ -463,6 +499,64 @@ export function getDefaultJournalPath(worktree: string): string {
 function getAgentModel(config: ConfigLike, agent: string): string | null {
   const model = config.agent?.[agent]?.model
   return typeof model === 'string' ? model : null
+}
+
+function getAgentVariant(config: ConfigLike, agent: string): string | null {
+  const variant = config.agent?.[agent]?.variant
+  return typeof variant === 'string' ? variant : null
+}
+
+function matchesGpt56Fingerprint(config: ConfigLike): boolean {
+  return matchesAgentMatrix(config, GPT56_AGENT_FINGERPRINT)
+}
+
+function matchesBalancedFingerprint(config: ConfigLike): boolean {
+  return matchesAgentMatrix(config, BALANCED_AGENT_FINGERPRINT)
+}
+
+function matchesAgentMatrix(config: ConfigLike, matrix: Record<string, { model: string; variant?: string }>): boolean {
+  for (const [agent, expected] of Object.entries(matrix)) {
+    if (getAgentModel(config, agent) !== expected.model) return false
+    const variant = getAgentVariant(config, agent)
+    if ('variant' in expected) {
+      if (variant !== expected.variant) return false
+    } else if (variant !== null) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function isOperationallyExcludedAgent(agent: string | null): boolean {
+  return agent === 'agent-auditor'
+}
+
+const GPT56_AGENT_FINGERPRINT: Record<string, { model: string; variant?: string }> = {
+  lead: { model: 'openai/gpt-5.6-sol', variant: 'high' },
+  architecture: { model: 'openai/gpt-5.5', variant: 'high' },
+  backend: { model: 'openai/gpt-5.5', variant: 'high' },
+  logic: { model: 'openai/gpt-5.5', variant: 'high' },
+  frontend: { model: 'openai/gpt-5.5', variant: 'medium' },
+  design: { model: 'openai/gpt-5.5', variant: 'medium' },
+  scenario: { model: 'openai/gpt-5.5', variant: 'medium' },
+  specialist: { model: 'openai/gpt-5.5', variant: 'medium' },
+  junior: { model: 'openai/gpt-5.4-mini', variant: 'low' },
+  explore: { model: 'openai/gpt-5.4-mini', variant: 'low' },
+  general: { model: 'openai/gpt-5.5', variant: 'medium' },
+  'creative-director': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+  'motion-game-consultant': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+  'interactive-frontend': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+  reviewer: { model: 'openai/gpt-5.5', variant: 'high' },
+  'critical-reviewer': { model: 'openai/gpt-5.6-sol', variant: 'xhigh' },
+}
+
+const BALANCED_AGENT_FINGERPRINT: Record<string, { model: string; variant?: string }> = {
+  ...GPT56_AGENT_FINGERPRINT,
+  explore: { model: 'opencode/north-mini-code-free' },
+  'research-free': { model: 'opencode/nemotron-3-ultra-free' },
+  'agent-auditor': { model: 'opencode/nemotron-3-ultra-free' },
+  local: { model: 'ollama/batiai/qwen3.6-27b:q4-32k' },
 }
 
 function getArgs(input: unknown): unknown {

@@ -240,7 +240,7 @@ export default function OnboardingPage() {
 
   return (
     <div
-      className="min-h-screen bg-gray-950 -my-8 w-screen overflow-hidden flex flex-col"
+      className="app-viewport-min-height onboarding-top-safe bg-gray-950 -my-8 w-screen overflow-hidden flex flex-col"
       style={{ marginLeft: 'calc(-50vw + 50%)' }}
     >
       {/* Progress bar */}
@@ -290,7 +290,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Bottom navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-950/80 backdrop-blur-lg border-t border-gray-800/50 py-4 px-6">
+      <div className="onboarding-bottom-safe fixed bottom-0 left-0 right-0 bg-gray-950/80 backdrop-blur-lg border-t border-gray-800/50 pt-4 px-6">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <button
             onClick={handlePrev}

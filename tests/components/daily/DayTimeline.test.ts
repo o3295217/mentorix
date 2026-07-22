@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canMutateTimeline, getDropStartMinutesFromClientY, getScheduleBlockRenderKey, getTimelineAxisMarkerLabels, getTimelinePointerPreviewRange, getUnscheduledTrayViewConfig, shouldCommitPointerDrag } from '@/components/daily/DayTimeline'
+import { canMutateTimeline, getDropStartMinutesFromClientY, getScheduleBlockRenderKey, getTimelineAxisMarkerLabels, getTimelinePointerPreviewRange, getUnscheduledTrayViewConfig, shouldCommitPointerDrag, shouldStartTimelinePointerDrag } from '@/components/daily/DayTimeline'
 
 describe('getScheduleBlockRenderKey', () => {
   it('keeps stable block key before applied animation and remounts after each apply', () => {
@@ -48,6 +48,17 @@ describe('shouldCommitPointerDrag', () => {
   it('does not commit on pointercancel or while locked', () => {
     expect(shouldCommitPointerDrag('cancel', true, false)).toBe(false)
     expect(shouldCommitPointerDrag('up', true, true)).toBe(false)
+  })
+})
+
+describe('shouldStartTimelinePointerDrag', () => {
+  it('lets touch scroll on the block body and starts touch drag only from its handle', () => {
+    expect(shouldStartTimelinePointerDrag('touch', false)).toBe(false)
+    expect(shouldStartTimelinePointerDrag('touch', true)).toBe(true)
+  })
+
+  it('preserves mouse dragging from the whole block', () => {
+    expect(shouldStartTimelinePointerDrag('mouse', false)).toBe(true)
   })
 })
 
