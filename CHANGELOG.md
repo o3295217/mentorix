@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### 2026-07-25 — chore: deploy current changes
+- 🔌 API: 2 файлов (route, route)
+- 🧩 Компоненты: 6 файлов (Navigation, DailyPlanCardHeader, DailyScheduleProposalCard...)
+- 📄 Страницы: 1 файлов
+- 📚 Библиотеки: 4 файлов (daily-chat-constants, daily-schedule-apply, daily-schedule-proposal...)
+- ⚙️ Конфигурация: 5 файлов
+- 📝 Документация: 18 файлов
+- 📦 Другое: 29 файлов
+
+
 ### 2026-07-22 — chore: deploy current changes
 - 🧩 Компоненты: 14 файлов (AppShell, DatePickerWithIndicators, LayoutFooter...)
 - 📄 Страницы: 6 файлов
