@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { applyDailyScheduleProposal, buildApplyProposalRequestBody, buildProposalApplyOptions, getProposalLoadSummary, parsePersistedNumericMessageId, proposalHasExistingSchedule, proposalMetadataToSchedule } from '@/hooks/daily/proposal-helpers'
+import { applyDailyScheduleProposal, buildApplyProposalRequestBody, buildProposalApplyOptions, getProposalLoadSummary, getProposalNewTasks, parsePersistedNumericMessageId, proposalHasExistingSchedule, proposalMetadataToSchedule } from '@/hooks/daily/proposal-helpers'
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
 import type { DailySchedule } from '@/lib/daily-schedule'
 
@@ -92,6 +92,45 @@ describe('proposal-helpers', () => {
     expect(markChatProposalApplied).toHaveBeenCalledWith('2026-07-16T09:01:00.000Z')
   })
 
+  it('merges planTasks from apply response before applying schedule', async () => {
+    const applyPlanTasks = vi.fn()
+
+    await applyDailyScheduleProposal({
+      ensureEntrySaved: vi.fn(async () => true),
+      flushScheduleChanges: vi.fn(async () => true),
+      applyProposalRequest: vi.fn(async () => ({
+        schedule,
+        updatedAt: '2026-07-16T09:00:00.000Z',
+        planTasks: ['Старая задача', 'Новая задача'],
+      })),
+      applySavedSchedule: vi.fn(() => true),
+      applyPlanTasks,
+      markChatProposalApplied: vi.fn(),
+    })
+
+    expect(applyPlanTasks).toHaveBeenCalledWith(['Старая задача', 'Новая задача'])
+  })
+
+  it('treats already_applied response as a non-error without reapplying schedule', async () => {
+    const applySavedSchedule = vi.fn(() => true)
+    const markChatProposalApplied = vi.fn()
+
+    await applyDailyScheduleProposal({
+      ensureEntrySaved: vi.fn(async () => true),
+      flushScheduleChanges: vi.fn(async () => true),
+      applyProposalRequest: vi.fn(async () => ({
+        schedule: null,
+        updatedAt: null,
+        status: 'already_applied',
+      })),
+      applySavedSchedule,
+      markChatProposalApplied,
+    })
+
+    expect(applySavedSchedule).not.toHaveBeenCalled()
+    expect(markChatProposalApplied).not.toHaveBeenCalled()
+  })
+
   it('does not apply a proposal when schedule flush fails', async () => {
     const applyProposalRequest = vi.fn(async () => ({ schedule, updatedAt: '2026-07-16T09:00:00.000Z' }))
 
@@ -157,6 +196,62 @@ describe('proposal-helpers', () => {
     expect(getProposalLoadSummary(metadata).recommendation).toBe('server recommendation')
     expect(getProposalLoadSummary(metadata).categories.travel.minutes).toBe(120)
     expect(proposalMetadataToSchedule(metadata).blocks.map(block => [block.startMinutes, block.durationMinutes])).toEqual([[570, 90], [1080, 120]])
+  })
+
+  it('converts v3 new task blocks to final task indexes with current plan context', () => {
+    const metadata: DailyScheduleProposalMetadata = {
+      type: 'daily_schedule_proposal',
+      schemaVersion: 3,
+      date: '2026-07-16',
+      createdAt: '2026-07-16T08:00:00.000Z',
+      currentScheduleExists: false,
+      currentScheduleHash: null,
+      currentPlanTasksHash: 'a'.repeat(64),
+      appliedAt: null,
+      loadSummary: {
+        activeInterval: { startMinutes: 540, endMinutes: 1080, availableMinutes: 540 },
+        workInterval: { startMinutes: 540, endMinutes: 1080, availableMinutes: 540 },
+        scheduledMinutes: 90,
+        unscheduledMinutes: 450,
+        scheduledPercent: 16.67,
+        unscheduledPercent: 83.33,
+        workScheduledMinutes: 90,
+        workUnscheduledMinutes: 450,
+        workScheduledPercent: 16.67,
+        categories: {
+          main: { minutes: 90, percent: 16.67, workMinutes: 90, workPercent: 16.67 },
+          operational: { minutes: 0, percent: 0, workMinutes: 0, workPercent: 0 },
+          travel: { minutes: 0, percent: 0, workMinutes: 0, workPercent: 0 },
+          personal: { minutes: 0, percent: 0, workMinutes: 0, workPercent: 0 },
+          meal: { minutes: 0, percent: 0, workMinutes: 0, workPercent: 0 },
+          rest: { minutes: 0, percent: 0, workMinutes: 0, workPercent: 0 },
+          buffer: { minutes: 0, percent: 0, workMinutes: 0, workPercent: 0 },
+        },
+        loadLevel: 'light',
+        recommendation: 'ok',
+      },
+      proposal: {
+        version: 3,
+        date: '2026-07-16',
+        timezone: 'Europe/Moscow',
+        dayStartMinutes: 540,
+        dayEndMinutes: 1080,
+        planningBasis: 'day_start',
+        planningStartMinutes: 540,
+        workEndMinutes: 1080,
+        activityEndMinutes: 1080,
+        newTasks: ['Новая задача'],
+        blocks: [
+          { kind: 'task', taskSource: 'existing', taskIndex: 2, taskText: 'Текущая 2', category: 'main', isFixed: false, startMinutes: 540, durationMinutes: 45 },
+          { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Новая задача', category: 'operational', isFixed: false, startMinutes: 585, durationMinutes: 45 },
+        ],
+      },
+    }
+
+    const converted = proposalMetadataToSchedule(metadata, { currentPlanTaskCount: 3 })
+
+    expect(getProposalNewTasks(metadata)).toEqual(['Новая задача'])
+    expect(converted.blocks.map(block => 'taskIndex' in block ? block.taskIndex : null)).toEqual([2, 4])
   })
 
   it('falls back for v1 metadata without server load summary', () => {

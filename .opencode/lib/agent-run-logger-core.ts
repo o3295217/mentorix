@@ -12,7 +12,7 @@ const MAX_PENDING_CHILD_SESSIONS = 256
 
 export type AgentRunEventName = 'started' | 'finished'
 export type TaskState = 'completed' | 'error' | 'unknown'
-export type ScenarioName = 'base' | 'agent2.0_gpt56' | 'agent2.0_balanced' | 'custom'
+export type ScenarioName = 'base' | 'agent2.0_gpt56' | 'agent2.0_balanced' | 'agent2.0_anthropic_primary' | 'custom'
 
 export type AgentRunRecord = {
   schemaVersion: number
@@ -135,6 +135,10 @@ export function resolveScenario(config: ConfigLike): ScenarioName {
 
   if (defaultModel === 'openai/gpt-5.6-sol' && matchesGpt56Fingerprint(config)) {
     return 'agent2.0_gpt56'
+  }
+
+  if (defaultModel === 'anthropic/claude-opus-5' && matchesAnthropicPrimaryFingerprint(config)) {
+    return 'agent2.0_anthropic_primary'
   }
 
   if (defaultModel === 'anthropic/claude-fable-5' && leadModel !== 'openai/gpt-5.6-sol') {
@@ -514,6 +518,10 @@ function matchesBalancedFingerprint(config: ConfigLike): boolean {
   return matchesAgentMatrix(config, BALANCED_AGENT_FINGERPRINT)
 }
 
+function matchesAnthropicPrimaryFingerprint(config: ConfigLike): boolean {
+  return matchesAgentMatrix(config, ANTHROPIC_PRIMARY_AGENT_FINGERPRINT)
+}
+
 function matchesAgentMatrix(config: ConfigLike, matrix: Record<string, { model: string; variant?: string }>): boolean {
   for (const [agent, expected] of Object.entries(matrix)) {
     if (getAgentModel(config, agent) !== expected.model) return false
@@ -547,6 +555,7 @@ const GPT56_AGENT_FINGERPRINT: Record<string, { model: string; variant?: string 
   'creative-director': { model: 'openai/gpt-5.6-sol', variant: 'high' },
   'motion-game-consultant': { model: 'openai/gpt-5.6-sol', variant: 'high' },
   'interactive-frontend': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+  'visual-reviewer': { model: 'openai/gpt-5.6-sol', variant: 'high' },
   reviewer: { model: 'openai/gpt-5.5', variant: 'high' },
   'critical-reviewer': { model: 'openai/gpt-5.6-sol', variant: 'xhigh' },
 }
@@ -557,6 +566,29 @@ const BALANCED_AGENT_FINGERPRINT: Record<string, { model: string; variant?: stri
   'research-free': { model: 'opencode/nemotron-3-ultra-free' },
   'agent-auditor': { model: 'opencode/nemotron-3-ultra-free' },
   local: { model: 'ollama/batiai/qwen3.6-27b:q4-32k' },
+}
+
+const ANTHROPIC_PRIMARY_AGENT_FINGERPRINT: Record<string, { model: string; variant?: string }> = {
+  lead: { model: 'anthropic/claude-opus-5' },
+  architecture: { model: 'openai/gpt-5.5', variant: 'high' },
+  backend: { model: 'openai/gpt-5.5', variant: 'high' },
+  logic: { model: 'openai/gpt-5.5', variant: 'high' },
+  frontend: { model: 'openai/gpt-5.5', variant: 'medium' },
+  design: { model: 'openai/gpt-5.5', variant: 'medium' },
+  scenario: { model: 'openai/gpt-5.5', variant: 'medium' },
+  specialist: { model: 'openai/gpt-5.5', variant: 'medium' },
+  junior: { model: 'anthropic/claude-haiku-4-5' },
+  explore: { model: 'opencode/north-mini-code-free' },
+  general: { model: 'anthropic/claude-sonnet-5', variant: 'high' },
+  'creative-director': { model: 'anthropic/claude-fable-5' },
+  'motion-game-consultant': { model: 'anthropic/claude-opus-5' },
+  'interactive-frontend': { model: 'anthropic/claude-sonnet-5', variant: 'high' },
+  'visual-reviewer': { model: 'anthropic/claude-sonnet-5', variant: 'high' },
+  reviewer: { model: 'anthropic/claude-sonnet-5', variant: 'high' },
+  'critical-reviewer': { model: 'anthropic/claude-fable-5', variant: 'max' },
+  local: { model: 'ollama/batiai/qwen3.6-27b:q4-32k' },
+  'research-free': { model: 'opencode/nemotron-3-ultra-free' },
+  'agent-auditor': { model: 'opencode/nemotron-3-ultra-free' },
 }
 
 function getArgs(input: unknown): unknown {

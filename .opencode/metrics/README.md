@@ -16,7 +16,7 @@ Each line is a standalone JSON object. Current records use `schemaVersion: 2`; t
 - `timestamp`: ISO timestamp.
 - `parentSessionId`, `callId`.
 - `description`: short sanitized description only; full prompt, command, output, task result, env and secrets are not logged.
-- `agent`, `resolvedModel`, `scenario` (`base`, `agent2.0_gpt56`, `agent2.0_balanced`, or `custom`).
+- `agent`, `resolvedModel`, `scenario` (`base`, `agent2.0_gpt56`, `agent2.0_balanced`, `agent2.0_anthropic_primary`, or `custom`).
 - `isResume`, `resumedTaskId`: `isResume: true` means the task call provided `args.task_id` and is a rework/resume attempt.
 - `returnedTaskId`, `state` (`completed`, `error`, or `unknown`), `durationMs` on `finished` events.
 - Economy fields on v2 records: `usageAvailable`, `usageMessageCount`, `inputTokens`, `outputTokens`, `reasoningTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalTokens`, `cost`, `usageModelId`, `usageProviderId`, `usageMode`, `usageVariant`.

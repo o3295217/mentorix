@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { canMutateTimeline, getDropStartMinutesFromClientY, getScheduleBlockRenderKey, getTimelineAxisMarkerLabels, getTimelinePointerPreviewRange, getUnscheduledTrayViewConfig, shouldCommitPointerDrag, shouldStartTimelinePointerDrag } from '@/components/daily/DayTimeline'
+import { canMutateTimeline, getCompressedTimelineWindow, getDropStartMinutesFromClientY, getScheduleBlockRenderKey, getTimelineAxisMarkerLabels, getTimelinePointerPreviewRange, getTimelineViewportHeight, getUnscheduledTrayViewConfig, isCurrentTimeLineVisible, isTaskHighlighted, shouldCommitPointerDrag, shouldStartTimelinePointerDrag } from '@/components/daily/DayTimeline'
+import type { DailySchedule } from '@/lib/daily-schedule'
 
 describe('getScheduleBlockRenderKey', () => {
   it('keeps stable block key before applied animation and remounts after each apply', () => {
@@ -13,6 +14,16 @@ describe('canMutateTimeline', () => {
   it('blocks timeline mutations only while explicit apply/chat lock is active', () => {
     expect(canMutateTimeline(false)).toBe(true)
     expect(canMutateTimeline(true)).toBe(false)
+  })
+})
+
+describe('isTaskHighlighted', () => {
+  it('highlights only task blocks whose taskIndex is selected', () => {
+    const highlighted = new Set([2])
+
+    expect(isTaskHighlighted({ id: 'task-2', kind: 'task', taskIndex: 2, taskText: 'Фокус', category: 'main', isFixed: false, startMinutes: 540, durationMinutes: 60 }, highlighted)).toBe(true)
+    expect(isTaskHighlighted({ id: 'task-1', kind: 'task', taskIndex: 1, taskText: 'Почта', category: 'operational', isFixed: false, startMinutes: 600, durationMinutes: 30 }, highlighted)).toBe(false)
+    expect(isTaskHighlighted({ id: 'meal', kind: 'meal', title: 'Обед', category: 'meal', isFixed: true, startMinutes: 720, durationMinutes: 45 }, highlighted)).toBe(false)
   })
 })
 
@@ -81,5 +92,36 @@ describe('timeline drop and tray view helpers', () => {
 
   it('does not expose service marker labels inside timeline axis', () => {
     expect(getTimelineAxisMarkerLabels()).toEqual([])
+  })
+})
+
+describe('compressed timeline window', () => {
+  const emptySchedule: DailySchedule = {
+    version: 3,
+    timezone: 'Europe/Moscow',
+    dayStartMinutes: 360,
+    dayEndMinutes: 1440,
+    planningBasis: 'day_start',
+    planningStartMinutes: 540,
+    workEndMinutes: 1080,
+    activityEndMinutes: 1200,
+    blocks: [],
+  }
+
+  it('compresses empty timeline around planning window and can show full day', () => {
+    expect(getCompressedTimelineWindow(emptySchedule, false)).toEqual({ startMinutes: 540, endMinutes: 1080, isCompressed: true })
+    expect(getCompressedTimelineWindow(emptySchedule, true)).toEqual({ startMinutes: 360, endMinutes: 1440, isCompressed: false })
+  })
+
+  it('shows current time line only today and inside visible window', () => {
+    expect(isCurrentTimeLineVisible('2026-07-24', new Date('2026-07-24T10:15:00'), 480, 1260)).toBe(true)
+    expect(isCurrentTimeLineVisible('2026-07-23', new Date('2026-07-24T10:15:00'), 480, 1260)).toBe(false)
+    expect(isCurrentTimeLineVisible('2026-07-24', new Date('2026-07-24T23:15:00'), 480, 1260)).toBe(false)
+  })
+
+  it('caps full timeline viewport and keeps compressed empty timeline compact', () => {
+    expect(getTimelineViewportHeight(3240, false)).toBe(560)
+    expect(getTimelineViewportHeight(432, true)).toBe(432)
+    expect(getTimelineViewportHeight(120, true)).toBe(240)
   })
 })

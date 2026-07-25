@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       status: result.applyStatus,
       hash: scheduleValidation.success ? hashDailySchedule(scheduleValidation.data) : null,
       loadSummary: scheduleValidation.success ? computeDailyScheduleLoadSummary(scheduleValidation.data) : null,
+      planTasks: result.planTasks,
     })
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode

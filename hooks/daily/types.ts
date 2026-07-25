@@ -95,6 +95,9 @@ export interface UseDailyReturn {
   sendingChat: boolean
   clearChat: () => void
   markChatProposalApplied: (messageId: string, appliedAt: string) => void
+  requestPlanChatKickoff: (isSubmittingChat?: boolean) => Promise<boolean>
+  canShowPlanChatKickoffCta: boolean
+  applyPlanTasksFromProposal: (planTasks: string[]) => void
 
   addTask: () => void
   addExtraTask: () => void

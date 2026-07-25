@@ -4,10 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "Выбери сценарий opencode:"
-echo "  1) base           — Anthropic (fable-5 + sonnet-5)   [расходует лимиты Anthropic]"
-echo "  2) agent2.0_gpt56 — OpenAI (gpt-5.6-sol + gpt-5.5 + gpt-5.4-mini)"
-echo "  3) balanced       — GPT для исполнения/приёмки, free только read-only подготовка"
-printf "Сценарий [1/2/3]: "
+echo "  1) base              — Anthropic (fable-5 + sonnet-5)   [расходует лимиты Anthropic]"
+echo "  2) agent2.0_gpt56    — OpenAI (gpt-5.6-sol + gpt-5.5 + gpt-5.4-mini)"
+echo "  3) balanced          — GPT для исполнения/приёмки, free только read-only подготовка"
+echo "  4) anthropic_primary — Anthropic primary — GPT-5.5 на части ролей, free explore"
+printf "Сценарий [1/2/3/4]: "
 read -r choice
 
 case "$choice" in
@@ -18,6 +19,10 @@ case "$choice" in
   3)
     export OPENCODE_CONFIG_CONTENT="$(cat .opencode/scenarios/agent2.0_balanced.json)"
     echo "Запуск: balanced"
+    ;;
+  4)
+    export OPENCODE_CONFIG_CONTENT="$(cat .opencode/scenarios/agent2.0_anthropic_primary.json)"
+    echo "Запуск: anthropic_primary"
     ;;
   *)
     echo "Запуск: base"

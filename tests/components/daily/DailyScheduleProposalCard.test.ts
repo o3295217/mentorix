@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatProposalNewTasksCount,
   getProposalActionSemantics,
   getProposalApplyButtonLabel,
   getProposalBlockMetaLabel,
   getProposalBoundaryText,
+  getProposalSummaryText,
+  getProposalTitle,
   isProposalBlockFixed,
 } from '@/components/daily/DailyScheduleProposalCard'
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
@@ -73,6 +76,28 @@ const v1Metadata: DailyScheduleProposalMetadata = {
   },
 }
 
+const v3Metadata: DailyScheduleProposalMetadata = {
+  ...v2Metadata,
+  schemaVersion: 3,
+  currentScheduleExists: false,
+  proposal: {
+    version: 3,
+    date: '2026-07-16',
+    timezone: 'Europe/Moscow',
+    dayStartMinutes: 9 * 60,
+    dayEndMinutes: 21 * 60 + 30,
+    planningBasis: 'day_start',
+    planningStartMinutes: 9 * 60,
+    workEndMinutes: 18 * 60,
+    activityEndMinutes: 21 * 60 + 30,
+    newTasks: ['Подготовить тезисы', 'Написать письмо'],
+    blocks: [
+      { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Фокус', category: 'main', isFixed: false, startMinutes: 9 * 60 + 30, durationMinutes: 45 },
+      { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Подготовить тезисы', category: 'operational', isFixed: false, startMinutes: 11 * 60, durationMinutes: 30 },
+    ],
+  },
+}
+
 describe('DailyScheduleProposalCard view helpers', () => {
   it('builds v2 boundary and fixed block labels', () => {
     expect(getProposalBoundaryText(v2Metadata)).toBe('старт 09:00 · работа до 18:00 · активность до 21:30')
@@ -88,14 +113,32 @@ describe('DailyScheduleProposalCard view helpers', () => {
 
   it('describes apply labels before and after apply', () => {
     expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: false, hasExistingSchedule: false })).toBe('Применить')
-    expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: false, hasExistingSchedule: true })).toBe('Заменить расписание')
+    expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: false, hasExistingSchedule: true })).toBe('Применить')
+    expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: false, hasExistingSchedule: false, hasNewTasks: true })).toBe('Добавить и применить')
     expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: true, hasExistingSchedule: true })).toBe('Применяем…')
     expect(getProposalApplyButtonLabel({ isApplied: true, isApplying: false, hasExistingSchedule: true })).toBe('Применено')
   })
 
+  it('selects proposal titles and summary text for new tasks and replacement', () => {
+    expect(getProposalTitle({ hasExistingSchedule: false, newTaskCount: 0 })).toBe('Черновик расписания')
+    expect(getProposalTitle({ hasExistingSchedule: false, newTaskCount: 2 })).toBe('Черновик расписания с новыми задачами')
+    expect(getProposalTitle({ hasExistingSchedule: true, newTaskCount: 2 })).toBe('Новый вариант расписания')
+    expect(getProposalSummaryText({ boundaryText: getProposalBoundaryText(v3Metadata), blockCount: 2, newTaskCount: 2 }))
+      .toBe('старт 09:00 · работа до 18:00 · активность до 21:30 · 2 блоков · 2 новые задачи')
+  })
+
+  it('formats Russian plural forms for new task count', () => {
+    expect(formatProposalNewTasksCount(1)).toBe('1 новая задача')
+    expect(formatProposalNewTasksCount(2)).toBe('2 новые задачи')
+    expect(formatProposalNewTasksCount(4)).toBe('4 новые задачи')
+    expect(formatProposalNewTasksCount(5)).toBe('5 новых задач')
+    expect(formatProposalNewTasksCount(11)).toBe('11 новых задач')
+    expect(formatProposalNewTasksCount(21)).toBe('21 новая задача')
+  })
+
   it('keeps discuss and dismiss action semantics explicit', () => {
     expect(getProposalActionSemantics({ messageId: 'm1', isApplying: false, isApplied: false, hasExistingSchedule: true })).toEqual({
-      applyLabel: 'Заменить расписание',
+      applyLabel: 'Применить',
       applyDisabled: false,
       discussLabel: 'Обсудить изменения',
       discussDisabled: false,

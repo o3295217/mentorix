@@ -3,6 +3,7 @@
   "model": "openai/gpt-5.6-sol",
   "agent": {
     "lead":              { "model": "openai/gpt-5.6-sol", "variant": "high" },
+    "advisor":           { "model": "openai/gpt-5.5", "variant": "high" },
     "architecture":      { "model": "openai/gpt-5.5", "variant": "high" },
     "backend":           { "model": "openai/gpt-5.5", "variant": "high" },
     "logic":             { "model": "openai/gpt-5.5", "variant": "high" },
@@ -16,6 +17,7 @@
     "creative-director": { "model": "openai/gpt-5.6-sol", "variant": "high" },
     "motion-game-consultant": { "model": "openai/gpt-5.6-sol", "variant": "high" },
     "interactive-frontend": { "model": "openai/gpt-5.6-sol", "variant": "high" },
+    "visual-reviewer":  { "model": "openai/gpt-5.6-sol", "variant": "high" },
     "reviewer":          { "model": "openai/gpt-5.5", "variant": "high" },
     "critical-reviewer": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" }
   }

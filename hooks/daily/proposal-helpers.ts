@@ -9,6 +9,7 @@ export type ProposalApplyResponse = {
   updatedAt: string | null
   status?: string
   loadSummary?: DailyScheduleLoadSummary | null
+  planTasks?: string[]
 }
 
 export type ApplyDailyScheduleProposalParams = {
@@ -16,6 +17,7 @@ export type ApplyDailyScheduleProposalParams = {
   flushScheduleChanges: () => Promise<boolean>
   applyProposalRequest: () => Promise<ProposalApplyResponse>
   applySavedSchedule: (schedule: DailySchedule, expectedDate?: string) => boolean
+  applyPlanTasks?: (planTasks: string[]) => void
   markChatProposalApplied: (appliedAt: string) => void
   expectedDate?: string
   now?: () => Date
@@ -56,7 +58,12 @@ export function buildApplyProposalRequestBody(input: {
   }
 }
 
-export function proposalMetadataToSchedule(metadata: DailyScheduleProposalMetadata): DailySchedule {
+export function getProposalNewTasks(metadata: DailyScheduleProposalMetadata): string[] {
+  if (metadata.schemaVersion !== 3) return []
+  return [...metadata.proposal.newTasks]
+}
+
+export function proposalMetadataToSchedule(metadata: DailyScheduleProposalMetadata, options: { currentPlanTaskCount?: number } = {}): DailySchedule {
   const proposal = metadata.proposal
   if (proposal.version === 1) {
     return {
@@ -71,6 +78,7 @@ export function proposalMetadataToSchedule(metadata: DailyScheduleProposalMetada
       }),
     }
   }
+  const currentPlanTaskCount = options.currentPlanTaskCount ?? 0
   return {
     version: 3,
     timezone: proposal.timezone,
@@ -82,14 +90,22 @@ export function proposalMetadataToSchedule(metadata: DailyScheduleProposalMetada
     activityEndMinutes: proposal.activityEndMinutes,
     blocks: proposal.blocks.map((block, index) => {
       const id = `draft-${index}-${block.kind}-${block.startMinutes}-${block.durationMinutes}`
-      if (block.kind === 'task') return { id, kind: 'task', taskIndex: block.taskIndex, taskText: block.taskText, category: block.category, isFixed: block.isFixed, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }
+      if (block.kind === 'task') {
+        const taskIndex = proposal.version === 3 && 'taskSource' in block && block.taskSource === 'new'
+          ? currentPlanTaskCount + block.taskIndex
+          : block.taskIndex
+        const taskText = proposal.version === 3 && 'taskSource' in block && block.taskSource === 'new'
+          ? proposal.newTasks[block.taskIndex - 1] ?? block.taskText
+          : block.taskText
+        return { id, kind: 'task', taskIndex, taskText, category: block.category, isFixed: block.isFixed, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }
+      }
       return { id, kind: block.kind, title: block.title, category: block.category, isFixed: block.isFixed, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }
     }),
   }
 }
 
 export function getProposalLoadSummary(metadata: DailyScheduleProposalMetadata): DailyScheduleLoadSummary {
-  if (metadata.schemaVersion === 2) return metadata.loadSummary
+  if (metadata.schemaVersion === 2 || metadata.schemaVersion === 3) return metadata.loadSummary
   return computeClientScheduleLoadSummary(proposalMetadataToSchedule(metadata))
 }
 
@@ -98,6 +114,7 @@ export async function applyDailyScheduleProposal({
   flushScheduleChanges,
   applyProposalRequest,
   applySavedSchedule,
+  applyPlanTasks,
   markChatProposalApplied,
   expectedDate,
   now = () => new Date(),
@@ -113,7 +130,9 @@ export async function applyDailyScheduleProposal({
   }
 
   const response = await applyProposalRequest()
+  if (response.status === 'already_applied') return
   if (!response.schedule) throw new Error('Сервер не вернул расписание')
+  if (response.planTasks) applyPlanTasks?.(response.planTasks)
   const applied = applySavedSchedule(response.schedule, expectedDate)
   if (!applied) throw new Error('Расписание пришло для другой даты и не было применено')
   markChatProposalApplied(now().toISOString())

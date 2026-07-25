@@ -6,21 +6,26 @@ import { getPeriodDates } from '@/lib/dates'
 import type { DailyEntry, OpenTask } from '@/lib/types'
 import { areTasksSimilar } from '@/lib/task-match'
 import { FetchJsonError, expectOk, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
+import { useAuth } from '@/components/AuthProvider'
 import type { ChatMessage, CheckPlanResult, DailyPlanDraft, Habit, HabitSuggestion, PeriodGoalItem, UseDailyReturn } from './types'
-import { clearPlanDraftFromStorage, readPlanDraftFromStorage, writePlanDraftToStorage } from './plan-draft'
+import { clearPlanDraftFromStorage, getDailyChatStorageKey, readPlanDraftFromStorage, sweepLegacyDailyStorage, writePlanDraftToStorage } from './plan-draft'
 import {
   buildTasksFromTexts as buildTasksFromTextsForDate,
   parseExtraTasksJson,
   parseSelectedTasksJson,
   preserveSelectionByTaskIds,
   remapSelectionByText as remapSelectionByTextForTasks,
+  mergeAppliedPlanTasks,
   sanitizeSelectedForTotal,
 } from './task-helpers'
 import { getBrowserTimezone, normalizeChatMessageId } from './chat-helpers'
 import { consumeDailyChatSseStream, DailyChatSseError } from './stream-consumer'
+import { shouldKickoffPlanChat, shouldShowPlanChatKickoffCta, SYSTEM_KICKOFF_PLAN_CHAT } from './kickoff-helpers'
 import { getDailyChatDraftKey } from '@/hooks/chat-viewport-helpers'
 
 export function useDaily(): UseDailyReturn {
+  const { user } = useAuth()
+  const storageUserId = user?.id ?? null
   // Всегда начинаем с текущей даты при открытии страницы
   const [selectedDate, setSelectedDate] = useState(() => {
     return format(new Date(), 'yyyy-MM-dd')
@@ -50,9 +55,10 @@ export function useDaily(): UseDailyReturn {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [sendingChat, setSendingChat] = useState(false)
+  const [chatHistoryLoadedDate, setChatHistoryLoadedDate] = useState<string | null>(null)
   
   // Функция получения ключа чата для даты
-  const getChatKey = useCallback((date: string) => `daily:chat:${date}`, [])
+  const getChatKey = useCallback((date: string) => storageUserId ? getDailyChatStorageKey(storageUserId, date) : null, [storageUserId])
   
   // Habits state
   const [habits, setHabits] = useState<Habit[]>([])
@@ -123,6 +129,15 @@ export function useDaily(): UseDailyReturn {
     }
   }, [selectedDate])
 
+  useEffect(() => {
+    if (!storageUserId || typeof window === 'undefined') return
+    try {
+      sweepLegacyDailyStorage(window.localStorage)
+    } catch {
+      // ignore storage errors
+    }
+  }, [storageUserId])
+
   // Ref для хранения текущих сообщений (избегаем зависимости от chatMessages в useEffect)
   const chatMessagesRef = useRef<ChatMessage[]>([])
   chatMessagesRef.current = chatMessages
@@ -132,20 +147,24 @@ export function useDaily(): UseDailyReturn {
   
   // Ref чтобы пропустить первое сохранение после смены даты
   const skipNextChatSaveRef = useRef(false)
+  const kickoffAttemptedDatesRef = useRef<Set<string>>(new Set())
 
   // Единый useEffect для загрузки чата при смене даты (из БД)
   useEffect(() => {
+    if (!storageUserId) return
     const currentDate = selectedDate
+    const currentScope = `${storageUserId}:${currentDate}`
     const prevDate = prevDateForChatRef.current
     
     // Если это та же дата - ничего не делаем
-    if (prevDate === currentDate) return
+    if (prevDate === currentScope) return
     
     // Устанавливаем флаг чтобы не перезаписать загруженные данные
     skipNextChatSaveRef.current = true
     
     // Загружаем чат из БД
     const loadChatHistory = async () => {
+      setChatHistoryLoadedDate(null)
       try {
         const data = await fetchJson<{ messages?: Array<{ id?: unknown; role: string; content: string; metadata?: ChatMessage['metadata'] }> }>(
           `/api/daily/chat/messages?date=${currentDate}`,
@@ -157,18 +176,23 @@ export function useDaily(): UseDailyReturn {
           metadata: m.metadata ?? null,
         }))
         setChatMessages(messages)
+        setChatHistoryLoadedDate(currentDate)
       } catch {
         // Fallback на localStorage для обратной совместимости
         if (typeof window !== 'undefined') {
           try {
-            const saved = window.localStorage.getItem(`daily:chat:${currentDate}`)
+            const chatKey = getChatKey(currentDate)
+            const saved = chatKey ? window.localStorage.getItem(chatKey) : null
             const messages = saved ? JSON.parse(saved) : []
             setChatMessages(messages)
+            setChatHistoryLoadedDate(currentDate)
           } catch {
             setChatMessages([])
+            setChatHistoryLoadedDate(currentDate)
           }
         } else {
           setChatMessages([])
+          setChatHistoryLoadedDate(currentDate)
         }
       }
     }
@@ -176,8 +200,8 @@ export function useDaily(): UseDailyReturn {
     loadChatHistory()
     
     // Обновляем ref
-    prevDateForChatRef.current = currentDate
-  }, [selectedDate])
+    prevDateForChatRef.current = currentScope
+  }, [selectedDate, getChatKey, storageUserId])
   
   // Сообщения теперь сохраняются на сервере через API,
   // localStorage больше не нужен для этого
@@ -186,31 +210,34 @@ export function useDaily(): UseDailyReturn {
   const draftDateRef = useRef(selectedDate)
 
   const readPlanDraft = useCallback((date: string): DailyPlanDraft | null => {
+    if (!storageUserId) return null
     if (typeof window === 'undefined') return null
     try {
-      return readPlanDraftFromStorage(window.localStorage, date)
+      return readPlanDraftFromStorage(window.localStorage, storageUserId, date)
     } catch {
       return null
     }
-  }, [])
+  }, [storageUserId])
 
   const writePlanDraft = useCallback((date: string, draft: DailyPlanDraft) => {
+    if (!storageUserId) return
     if (typeof window === 'undefined') return
     try {
-      writePlanDraftToStorage(window.localStorage, date, draft)
+      writePlanDraftToStorage(window.localStorage, storageUserId, date, draft)
     } catch {
       // ignore
     }
-  }, [])
+  }, [storageUserId])
 
   const clearPlanDraft = useCallback((date: string) => {
+    if (!storageUserId) return
     if (typeof window === 'undefined') return
     try {
-      clearPlanDraftFromStorage(window.localStorage, date)
+      clearPlanDraftFromStorage(window.localStorage, storageUserId, date)
     } catch {
       // ignore
     }
-  }, [])
+  }, [storageUserId])
 
   const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -241,7 +268,6 @@ export function useDaily(): UseDailyReturn {
   const loadData = useCallback(async (signal?: AbortSignal) => {
     // Используем ref чтобы всегда иметь актуальную дату
     const loadingDate = currentDateRef.current
-    console.log('[useDaily] loadData started for:', loadingDate)
 
     try {
       // Load daily entry
@@ -249,7 +275,6 @@ export function useDaily(): UseDailyReturn {
 
       // Check if date changed during fetch - prevent race condition
       if (currentDateRef.current !== loadingDate) {
-        console.log('[useDaily] Date changed during fetch, aborting. Was:', loadingDate, 'Now:', currentDateRef.current)
         return
       }
 
@@ -288,18 +313,7 @@ export function useDaily(): UseDailyReturn {
           )
 
           setHasUnsavedChanges(shouldUseDraft)
-          
-          console.log('[useDaily] loadData for', loadingDate, {
-            hasDraft: !!draft,
-            draftHasAnything,
-            draftDiffersFromServer,
-            shouldUseDraft,
-            serverPlanText: serverPlanText.substring(0, 50),
-            draftPlanText: draftPlanText.substring(0, 50),
-            serverUpdatedAtMs,
-            draftUpdatedAtMs,
-          })
-          
+
           if (!shouldUseDraft && draft) {
             // Серверная версия новее — черновик можно смело убрать
             clearPlanDraft(loadingDate)
@@ -328,13 +342,10 @@ export function useDaily(): UseDailyReturn {
             setTasks(tasksWithIds)
 
             if (shouldUseDraft) {
-              console.log('[useDaily] Using draft, selectedTaskIds:', draft!.selectedTaskIds)
               setSelectedTasks(sanitizeSelectedForTotal(draft!.selectedTaskIds, tasksWithIds.length))
             } else if (daily.selectedTasksJson) {
               const selected = parseSelectedTasksJson(daily.selectedTasksJson)
-              console.log('[useDaily] Loaded selectedTasksJson from DB:', selected, 'tasksCount:', tasksWithIds.length)
               const sanitized = sanitizeSelectedForTotal(selected, tasksWithIds.length)
-              console.log('[useDaily] After sanitize:', Array.from(sanitized))
               setSelectedTasks(sanitized)
             } else {
               setSelectedTasks(new Set())
@@ -425,6 +436,7 @@ export function useDaily(): UseDailyReturn {
   }, [readPlanDraft, clearPlanDraft])
 
   useEffect(() => {
+    if (!storageUserId) return
     // Отменяем предыдущие запросы при смене даты
     abortControllerRef.current?.abort()
     const controller = new AbortController()
@@ -450,7 +462,7 @@ export function useDaily(): UseDailyReturn {
     return () => {
       controller.abort()
     }
-  }, [selectedDate]) // Intentionally not including loadData to prevent infinite loops
+  }, [selectedDate, storageUserId]) // Intentionally not including loadData to prevent infinite loops
 
   // Локальный черновик плана (чтобы не пропадало при refresh)
   useEffect(() => {
@@ -907,11 +919,6 @@ export function useDaily(): UseDailyReturn {
     const messageToSend = initialMessage || chatInput.trim()
     if (!messageToSend) return
     
-    if (tasks.length === 0) {
-      showMessage('Сначала добавьте задачи в план')
-      return
-    }
-
     setSendingChat(true)
     
     const currentMessages = chatMessagesRef.current
@@ -965,7 +972,7 @@ export function useDaily(): UseDailyReturn {
         throw new Error(apiError)
       }
 
-      const baseMessages = [...updatedMessages, ...(initialMessage ? [newUserMessage] : [])]
+      const baseMessages = updatedMessages
       const tempAssistantId = `pending-${Date.now()}`
       const assistantMessage: ChatMessage = { id: tempAssistantId, role: 'assistant', content: '', metadata: null }
       const messagesWithAssistant = [...baseMessages, assistantMessage]
@@ -1008,6 +1015,38 @@ export function useDaily(): UseDailyReturn {
     }
   }, [chatInput, tasks, selectedTasks, selectedDate, showMessage, clearChatDraft])
 
+  const requestPlanChatKickoff = useCallback(async (isSubmittingChat = false) => {
+    if (!shouldKickoffPlanChat({
+      selectedDate,
+      chatMessages: chatMessagesRef.current,
+      loadedDate: chatHistoryLoadedDate,
+      sendingChat,
+      isSubmittingChat,
+      attemptedDates: kickoffAttemptedDatesRef.current,
+    })) return false
+
+    kickoffAttemptedDatesRef.current.add(selectedDate)
+    await sendChatMessage(SYSTEM_KICKOFF_PLAN_CHAT)
+    return true
+  }, [chatHistoryLoadedDate, selectedDate, sendChatMessage, sendingChat])
+
+  const applyPlanTasksFromProposal = useCallback((planTasks: string[]) => {
+    setTasks(prevTasks => {
+      const nextTasks = buildTasksFromTexts(planTasks)
+      setSelectedTasks(prevSelected => mergeAppliedPlanTasks(prevTasks, prevSelected, planTasks, selectedDate).selectedTasks)
+      setHasUnsavedChanges(false)
+      return nextTasks
+    })
+  }, [buildTasksFromTexts, selectedDate])
+
+  const canShowPlanChatKickoffCta = shouldShowPlanChatKickoffCta({
+    selectedDate,
+    chatMessages,
+    loadedDate: chatHistoryLoadedDate,
+    sendingChat,
+    attemptedDates: kickoffAttemptedDatesRef.current,
+  })
+
   const markChatProposalApplied = useCallback((messageId: string, appliedAt: string) => {
     setChatMessages(prev => {
       const next = prev.map(message => {
@@ -1032,7 +1071,8 @@ export function useDaily(): UseDailyReturn {
     // Также удаляем из localStorage для совместимости
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.removeItem(getChatKey(selectedDate))
+        const chatKey = getChatKey(selectedDate)
+        if (chatKey) window.localStorage.removeItem(chatKey)
       } catch {
         // ignore
       }
@@ -1127,6 +1167,9 @@ export function useDaily(): UseDailyReturn {
     sendingChat,
     clearChat,
     markChatProposalApplied,
+    requestPlanChatKickoff,
+    canShowPlanChatKickoffCta,
+    applyPlanTasksFromProposal,
     addTask,
     addExtraTask,
     removeExtraTask,

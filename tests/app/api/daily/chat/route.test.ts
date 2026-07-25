@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { hashDailyPlanTasks } from '@/lib/daily-schedule-proposal'
 
 const proposalInput = {
   version: 2,
@@ -12,6 +13,23 @@ const proposalInput = {
   workEndMinutes: 1080,
   activityEndMinutes: 1080,
   blocks: [{ kind: 'task', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 570, durationMinutes: 45 }],
+}
+
+const proposalInputV3 = {
+  version: 3,
+  date: '2026-02-28',
+  timezone: 'Europe/Moscow',
+  dayStartMinutes: 570,
+  dayEndMinutes: 1080,
+  planningBasis: 'current_time',
+  planningStartMinutes: 570,
+  workEndMinutes: 1080,
+  activityEndMinutes: 1080,
+  newTasks: ['Prepare landing notes'],
+  blocks: [
+    { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 570, durationMinutes: 45 },
+    { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Prepare landing notes', category: 'main', isFixed: false, startMinutes: 630, durationMinutes: 60 },
+  ],
 }
 
 const proposalMetadata = {
@@ -71,10 +89,18 @@ vi.mock('@/lib/anthropic', () => ({ getAiModel: () => 'fast-model', getAnthropic
 vi.mock('@/lib/user-context', () => ({ getPlanUserContext: mocks.getPlanUserContext }))
 vi.mock('@/lib/user-stats', () => ({ getUserStatsForAI: mocks.getUserStatsForAI }))
 vi.mock('@/lib/completed-work', () => ({ getWorkContextForAI: mocks.getWorkContextForAI }))
-vi.mock('@/lib/prompts/plan-chat', () => ({
-  PLAN_CHAT_SYSTEM_PROMPT: 'system',
-  buildPlanChatContext: () => 'context',
-}))
+vi.mock('@/lib/prompts/plan-chat', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/prompts/plan-chat')>()
+  return {
+    ...actual,
+    PLAN_CHAT_SYSTEM_PROMPT: 'system',
+    buildPlanChatContext: () => 'context',
+    isPlanChatKickoffMessage: (message: string) => message.trim() === '[SYSTEM_KICKOFF_PLAN_CHAT]',
+    getPlanChatKickoffMode: actual.getPlanChatKickoffMode,
+    buildPlanChatKickoffInstruction: actual.buildPlanChatKickoffInstruction,
+    parsePlanChatScheduleProposalToolResult: actual.parsePlanChatScheduleProposalToolResult,
+  }
+})
 vi.mock('@/lib/daily-schedule-apply', () => ({ applyDailyScheduleProposal: mocks.applyDailyScheduleProposal }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -85,7 +111,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { POST } from '@/app/api/daily/chat/route'
+import { POST, getSafeScheduleProposalValidationDiagnosticsForLog, getScheduleProposalValidationDiagnostics } from '@/app/api/daily/chat/route'
 import { AuthError } from '@/lib/auth'
 
 function makeStream(events: unknown[]) {
@@ -155,10 +181,49 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledWith(expect.objectContaining({
       system: expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('TIMEZONE: Europe/Moscow') })]),
       tool_choice: { type: 'auto' },
-      tools: expect.arrayContaining([expect.objectContaining({ input_schema: expect.objectContaining({ required: expect.arrayContaining(['planningBasis', 'planningStartMinutes', 'workEndMinutes', 'activityEndMinutes']), properties: expect.objectContaining({ version: expect.objectContaining({ const: 2 }), timezone: expect.objectContaining({ description: expect.stringContaining('request context') }) }) }) })]),
+      tools: expect.arrayContaining([expect.objectContaining({ input_schema: expect.objectContaining({ required: expect.arrayContaining(['planningBasis', 'planningStartMinutes', 'workEndMinutes', 'activityEndMinutes', 'newTasks']), properties: expect.objectContaining({ version: expect.objectContaining({ const: 3 }), timezone: expect.objectContaining({ description: expect.stringContaining('request context') }) }) }) })]),
     }))
     const toolSchema = mocks.stream.mock.calls[0][0].tools[0].input_schema
+    expect(toolSchema.properties.blocks.items.oneOf[0].required).toContain('taskSource')
     expect(toolSchema.properties.blocks.items.oneOf[1].properties.category.enum).toEqual(expect.arrayContaining(['personal', 'travel', 'meal', 'rest', 'buffer']))
+    expect(mocks.stream).toHaveBeenCalledTimes(1)
+  })
+
+  it('formats schedule conversion diagnostics with bounds and overlaps', () => {
+    const invalidProposal = {
+      ...proposalInputV3,
+      dayStartMinutes: 570,
+      dayEndMinutes: 660,
+      planningStartMinutes: 570,
+      workEndMinutes: 645,
+      activityEndMinutes: 660,
+      blocks: [
+        { ...proposalInputV3.blocks[0], startMinutes: 555, durationMinutes: 45 },
+        { ...proposalInputV3.blocks[1], startMinutes: 600, durationMinutes: 90 },
+        { kind: 'buffer', title: 'Buffer', category: 'buffer', isFixed: false, startMinutes: 615, durationMinutes: 30 },
+      ],
+    } as never
+
+    expect(getScheduleProposalValidationDiagnostics(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })).toEqual(expect.arrayContaining([
+      'block 1: startMinutes 555 < dayStartMinutes 570',
+      'block 2: block end 690 > dayEndMinutes 660',
+      'blocks 2 and 3 overlap',
+    ]))
+  })
+
+  it('keeps user task text out of safe log diagnostics while model diagnostics stay specific', () => {
+    const invalidProposal = {
+      ...proposalInputV3,
+      blocks: [{ ...proposalInputV3.blocks[0], taskText: 'Sensitive user task text' }],
+    } as never
+
+    const modelDiagnostics = getScheduleProposalValidationDiagnostics(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })
+    const logDiagnostics = getSafeScheduleProposalValidationDiagnosticsForLog(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })
+
+    expect(modelDiagnostics.join('\n')).toContain('Sensitive user task text')
+    expect(logDiagnostics).toContain('block 1: taskText mismatch with current plan task 1')
+    expect(logDiagnostics.join('\n')).not.toContain('Sensitive user task text')
+    expect(logDiagnostics.join('\n')).not.toContain('Deep work')
   })
 
   it('computes proposal v2 load summary on server and ignores AI-provided loadSummary', async () => {
@@ -183,6 +248,164 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(metadata.proposal).not.toHaveProperty('loadSummary')
     expect(metadata.loadSummary.scheduledMinutes).toBe(45)
     expect(metadata.loadSummary.recommendation).not.toBe('fake from AI')
+  })
+
+  it('stores proposal v3 metadata with current plan tasks hash', async () => {
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Предлагаю добавить маленький шаг.' } },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(proposalInputV3) } },
+    ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+
+    expect(text).toContain('event: proposal')
+    const metadata = mocks.chatMessageCreate.mock.calls.at(-1)?.[0].data.metadataJson
+    expect(metadata.schemaVersion).toBe(3)
+    expect(metadata.currentPlanTasksHash).toBe(hashDailyPlanTasks(['Deep work']))
+    expect(metadata.proposal).toMatchObject({ version: 3, newTasks: ['Prepare landing notes'] })
+    expect(metadata.loadSummary.scheduledMinutes).toBe(105)
+  })
+
+  it('replaces exact kickoff marker with server instruction and does not store it as user message', async () => {
+    mocks.getPlanUserContext.mockResolvedValue({ weekGoals: ['Finish weekly goal'], monthGoals: [], dreamGoal: '', profile: null, insights: null })
+    mocks.stream.mockReturnValue(makeStream([{ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Начну с целей.' } }]))
+    mocks.chatMessageCreate.mockReset().mockResolvedValueOnce({ id: 77 })
+
+    const response = await POST(request({ planTasks: [], userMessage: '[SYSTEM_KICKOFF_PLAN_CHAT]' }))
+    const text = await response.text()
+    const call = mocks.stream.mock.calls[0][0]
+    const userContent = call.messages.at(-1).content
+
+    expect(response.headers.get('content-type')).toContain('text/event-stream')
+    expect(text).toContain('"assistantMessageId":77')
+    expect(userContent).toContain('План пустой, но есть опора: цели недели')
+    expect(userContent).toContain('tool propose_daily_schedule с newTasks')
+    expect(userContent).not.toContain('[SYSTEM_KICKOFF_PLAN_CHAT]')
+    expect(mocks.chatMessageCreate).toHaveBeenCalledTimes(1)
+    expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'assistant' }) }))
+  })
+
+  it('normalizes off-step v3 tool block times before validation and metadata creation', async () => {
+    const almostValid = {
+      ...proposalInputV3,
+      blocks: [
+        { ...proposalInputV3.blocks[0], startMinutes: 568, durationMinutes: 44 },
+        { ...proposalInputV3.blocks[1], startMinutes: 637, durationMinutes: 52 },
+      ],
+    }
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Черновик.' } },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(almostValid) } },
+    ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+
+    expect(text).toContain('event: proposal')
+    const metadata = mocks.chatMessageCreate.mock.calls.at(-1)?.[0].data.metadataJson
+    expect(metadata.schemaVersion).toBe(3)
+    expect(metadata.proposal.blocks).toMatchObject([
+      { startMinutes: 570, durationMinutes: 45 },
+      { startMinutes: 630, durationMinutes: 45 },
+    ])
+  })
+
+  it('persists fallback assistant text instead of an empty message when a tool-only proposal is invalid', async () => {
+    const invalidInput = { ...proposalInputV3, blocks: [{ ...proposalInputV3.blocks[0], taskText: 'Invented' }] }
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidInput) } },
+    ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+
+    expect(text).toContain('Я подготовил черновик расписания, но он не прошёл проверку')
+    expect(text).not.toContain('event: proposal')
+    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        role: 'assistant',
+        content: 'Я подготовил черновик расписания, но он не прошёл проверку. Попросите меня собрать расписание ещё раз.',
+      }),
+    }))
+    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.not.objectContaining({ metadataJson: expect.anything() }),
+    }))
+  })
+
+  it('sends one corrective tool_result after invalid proposal and stores valid corrected metadata', async () => {
+    const invalidProposal = {
+      ...proposalInputV3,
+      dayEndMinutes: 660,
+      activityEndMinutes: 660,
+      workEndMinutes: 645,
+      blocks: [
+        { ...proposalInputV3.blocks[0], startMinutes: 570, durationMinutes: 90 },
+        { ...proposalInputV3.blocks[1], startMinutes: 630, durationMinutes: 60 },
+      ],
+    }
+    mocks.stream
+      .mockReturnValueOnce(makeStream([
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_bad', name: 'propose_daily_schedule' } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidProposal) } },
+      ]))
+      .mockReturnValueOnce(makeStream([
+        { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Исправил черновик.' } },
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_good', name: 'propose_daily_schedule' } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(proposalInputV3) } },
+      ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+    const correctionCall = mocks.stream.mock.calls[1][0]
+    const correctionToolResult = correctionCall.messages.at(-1).content[0]
+
+    expect(mocks.stream).toHaveBeenCalledTimes(2)
+    expect(correctionCall.tool_choice).toEqual({ type: 'tool', name: 'propose_daily_schedule' })
+    expect(correctionToolResult).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_bad', is_error: true })
+    expect(correctionToolResult.content).toContain('blocks 1 and 2 overlap')
+    expect(correctionToolResult.content).toContain('block 2: block end 690 > dayEndMinutes 660')
+    expect(text).toContain('Исправил черновик.')
+    expect(text).toContain('event: proposal')
+    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: 'assistant', content: 'Исправил черновик.', metadataJson: expect.objectContaining({ schemaVersion: 3 }) }),
+    }))
+    expect(mocks.logAIUsage).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls back after exactly one failed corrective attempt', async () => {
+    const invalidProposal = {
+      ...proposalInputV3,
+      dayEndMinutes: 660,
+      activityEndMinutes: 660,
+      workEndMinutes: 645,
+      blocks: [
+        { ...proposalInputV3.blocks[0], startMinutes: 570, durationMinutes: 90 },
+        { ...proposalInputV3.blocks[1], startMinutes: 630, durationMinutes: 60 },
+      ],
+    }
+    mocks.stream
+      .mockReturnValueOnce(makeStream([
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_bad_1', name: 'propose_daily_schedule' } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidProposal) } },
+      ]))
+      .mockReturnValueOnce(makeStream([
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_bad_2', name: 'propose_daily_schedule' } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidProposal) } },
+      ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+
+    expect(mocks.stream).toHaveBeenCalledTimes(2)
+    expect(text).not.toContain('event: proposal')
+    expect(text).toContain('Я подготовил черновик расписания, но он не прошёл проверку')
+    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: 'assistant', content: 'Я подготовил черновик расписания, но он не прошёл проверку. Попросите меня собрать расписание ещё раз.' }),
+    }))
   })
 
   it('rejects proposal v2 without required planning fields', async () => {

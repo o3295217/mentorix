@@ -1,12 +1,13 @@
 # Creative/motion/frontend specialist bake-off plan
 
-Purpose: compare active specialists and challengers before replacing any persistent agent model. This is a reproducible manual/project eval design only; no executable tooling is added yet.
+Purpose: compare active specialists and challengers before replacing any persistent agent model. This is a reproducible manual/project eval design. Browser visual QA now uses the executable pinned Playwright MCP harness from `opencode.json`; this file does not add extra executable tooling.
 
 ## Candidates and role slots
 
 - `creative-director` slot: current `anthropic/claude-fable-5`; challengers compete only as creative-director consultants.
 - `motion-game-consultant` slot: current `anthropic/claude-fable-5`; challengers compete only as motion/game consultants.
 - `interactive-frontend` slot: current `openai/gpt-5.6-sol`, `variant: high`; challengers compete only as executors on fixed approved handoffs.
+- `visual-reviewer` slot: current `anthropic/claude-fable-5`; overlay `openai/gpt-5.6-sol`, `variant: high`; challengers compete only as read-only browser/screenshot QA after implementation.
 - Kimi K3 or Gemini candidates enter only after `/connect` and `opencode models <provider>` confirm the exact local ID.
 
 ## Reproducibility protocol
@@ -16,6 +17,8 @@ Purpose: compare active specialists and challengers before replacing any persist
 - Run each task exactly 3 times per candidate; randomize anonymized output IDs before scoring.
 - Record model ID, variant, date, wall-clock time, prompt/completion tokens, estimated cost and any permission/check failures.
 - Do not mix roles: consultants never edit code; executor runs only on fixed approved Handoff Briefs.
+- Visual QA candidates never edit code, never delegate and never run bash; they must use the same URL, auth approach, pages/states/viewports and browser/screenshot evidence protocol.
+- Use pinned isolated Playwright MCP (`@playwright/mcp@0.0.78`, headless, image responses allow, codegen none) and the same safe tool allow-list. Unsafe MCP tools remain denied during evals.
 
 ## Track A — `creative-director` Handoff Briefs only
 
@@ -54,7 +57,7 @@ Replacement threshold: challenger passes all hard gates, wins at least 3 of 4 ta
 
 ## Track C — `interactive-frontend` fixed-handoff implementation
 
-Executor receives fixed approved Handoff Briefs from Track A/B fixtures and must produce code only within allowed frontend paths. Every run must include `npm run typecheck`, `npm run lint`, `npm run test`; `npm run build` is required for substantial UI/motion/game or build-affecting changes. An independent `reviewer` evaluates every executor output.
+Executor receives fixed approved Handoff Briefs from Track A/B fixtures and must produce code only within allowed frontend paths. Every run must include `npm run typecheck`, `npm run lint`, `npm run test`; `npm run build` is required for substantial UI/motion/game or build-affecting changes. Independent `visual-reviewer` and `reviewer` evaluate every substantial executor output.
 
 1. Implement approved empty/loading/error/success/focus states for one existing card component.
 2. Implement approved CSS/WAAPI-first completion micro-interaction with reduced-motion fallback.
@@ -68,7 +71,25 @@ Hard gates:
 - leaks timers/RAF/listeners/observers or creates non-deterministic game-loop behavior;
 - violates Russian UI text or project frontend patterns.
 
-Replacement threshold: challenger passes all hard gates, wins at least 3 of 4 tasks across repeated blind runs, receives `VERDICT: ACCEPT` from independent reviewer on executor outputs, and demonstrates equal-or-better check pass rate plus ≥10% average quality improvement or ≥25% cost/time reduction with no quality loss.
+Replacement threshold: challenger passes all hard gates, wins at least 3 of 4 tasks across repeated blind runs, receives `VERDICT: ACCEPT` from independent visual-reviewer and reviewer on executor outputs, and demonstrates equal-or-better check pass rate plus ≥10% average quality improvement or ≥25% cost/time reduction with no quality loss.
+
+## Track D — `visual-reviewer` browser/screenshot QA only
+
+Output must start with exactly `VERDICT: ACCEPT` or `VERDICT: REWORK`; no code, diff, implementation advice beyond blockers, or author-report reasoning. Candidate receives the same task/Handoff Brief, acceptance, URL, pages/states/viewports, changed files and checks, without the executor report.
+
+1. Visual QA of a dark-theme landing/hero change across desktop and mobile.
+2. Visual QA of dense analytics/dashboard states with overflow and contrast risks.
+3. Visual QA of form focus/disabled/error/success states with keyboard/a11y snapshot.
+4. Visual QA of a motion/interaction fixture with console and reduced-motion concerns.
+
+Hard gates:
+- accepts without opening the real URL through Playwright MCP/browser;
+- omits desktop or mobile viewport, key states, dark theme, overflow, focus/keyboard/a11y snapshot or console checks;
+- no screenshot evidence/reference when the browser harness can provide it;
+- accepts when browser/MCP/URL/auth is unavailable instead of fail-closed `REWORK`;
+- logs in with unknown secrets, stores credentials/storage state, edits code, delegates or runs bash.
+
+Replacement threshold: challenger passes all hard gates, wins at least 3 of 4 tasks across repeated blind runs, catches seeded visual/a11y/overflow/runtime blockers at equal-or-better rate, and does not increase false accepts.
 
 ## Blind scoring rubric
 
@@ -77,6 +98,7 @@ Score each anonymized output 1–5; reveal model names only after scoring.
 - Role fidelity and boundary discipline.
 - Product fit, Russian tone and mentorix dark-theme consistency.
 - Implementation readiness for consultant handoffs; implementation correctness for executor outputs.
+- Browser/screenshot evidence quality and fail-closed discipline for visual-reviewer outputs.
 - A11y/reduced-motion coverage.
 - Technical correctness: cleanup, deterministic loops, CSS/WAAPI-first reasoning and performance awareness.
 - Testability: concrete acceptance, reviewer focus and checks.

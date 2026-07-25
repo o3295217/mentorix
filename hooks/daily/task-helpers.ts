@@ -60,6 +60,19 @@ export function remapSelectionByText(
   return nextSelected
 }
 
+export function mergeAppliedPlanTasks(
+  prevTasks: OpenTask[],
+  prevSelected: Set<number>,
+  planTasks: string[],
+  selectedDate: string,
+): { tasks: OpenTask[]; selectedTasks: Set<number> } {
+  const nextTasks = buildTasksFromTexts(planTasks, selectedDate)
+  return {
+    tasks: nextTasks,
+    selectedTasks: remapSelectionByText(prevTasks, prevSelected, nextTasks),
+  }
+}
+
 export function preserveSelectionByTaskIds(
   prevSelected: Set<number>,
   nextTasks: OpenTask[]

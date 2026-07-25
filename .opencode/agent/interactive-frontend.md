@@ -43,6 +43,7 @@ permission:
 - Не добавляй зависимости без явного approval пользователя/lead. Если без зависимости нельзя — остановись и опиши вариант.
 - Не меняй продуктовое поведение вне утверждённого scope; русские UI-тексты обязательны.
 - Не делегируй task/subagents; если spec неполный, верни вопросы lead.
+- Не считай своё визуальное мнение финальной приёмкой: после реализации independent visual QA делает `visual-reviewer` или lead через Playwright MCP.
 
 Implementation rules:
 - CSS transitions/animations и WAAPI-first. SVG/Canvas/WebGL применяй только когда задача реально требует этого и handoff/lead это допускает.
@@ -61,4 +62,5 @@ Implementation rules:
 2. Что реализовано относительно Handoff Brief; что осталось вне scope.
 3. Accessibility/reduced-motion/performance cleanup notes.
 4. Проверки дословно.
-5. Что reviewer должен проверить; для новой interaction/game logic reviewer обязателен.
+5. Visual QA handoff для `visual-reviewer`: URL (если известен), pages/states/viewports, desktop/mobile expectations, keyboard/focus/a11y, console/overflow points. Не выдавай финальный verdict.
+6. Что technical reviewer должен проверить; для новой interaction/game logic обязательны `visual-reviewer` + обычный `reviewer`.

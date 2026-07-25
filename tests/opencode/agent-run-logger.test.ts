@@ -601,6 +601,7 @@ function fullGpt56Config() {
       'creative-director': { model: 'openai/gpt-5.6-sol', variant: 'high' },
       'motion-game-consultant': { model: 'openai/gpt-5.6-sol', variant: 'high' },
       'interactive-frontend': { model: 'openai/gpt-5.6-sol', variant: 'high' },
+      'visual-reviewer': { model: 'openai/gpt-5.6-sol', variant: 'high' },
       reviewer: { model: 'openai/gpt-5.5', variant: 'high' },
       'critical-reviewer': { model: 'openai/gpt-5.6-sol', variant: 'xhigh' },
     },

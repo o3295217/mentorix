@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildTasksFromTexts,
+  mergeAppliedPlanTasks,
   parseExtraTasksJson,
   parseSelectedTasksJson,
   preserveSelectionByTaskIds,
@@ -33,6 +34,23 @@ describe('daily task helpers', () => {
     const nextTasks = buildTasksFromTexts(['Edited selected', 'Active'], '2026-05-02')
 
     expect(Array.from(preserveSelectionByTaskIds(new Set([1]), nextTasks))).toEqual([1])
+  })
+
+  it('merges applied planTasks preserving completed existing tasks by text and adding new tasks unchecked', () => {
+    const prevTasks = buildTasksFromTexts(['Готово', 'Активно'], '2026-05-02')
+    const merged = mergeAppliedPlanTasks(prevTasks, new Set([1]), ['Готово', 'Активно', 'Новая'], '2026-05-02')
+
+    expect(merged.tasks.map(task => task.taskText)).toEqual(['Готово', 'Активно', 'Новая'])
+    expect(Array.from(merged.selectedTasks)).toEqual([1])
+  })
+
+  it('uses the latest selected tasks snapshot when merging after an in-flight apply', () => {
+    const prevTasks = buildTasksFromTexts(['Сделать отчёт', 'Позвонить'], '2026-05-02')
+    const selectedAtClick = new Set([1])
+    const selectedAtCommit = new Set([2])
+
+    expect(Array.from(mergeAppliedPlanTasks(prevTasks, selectedAtClick, ['Сделать отчёт', 'Позвонить', 'Новая'], '2026-05-02').selectedTasks)).toEqual([1])
+    expect(Array.from(mergeAppliedPlanTasks(prevTasks, selectedAtCommit, ['Сделать отчёт', 'Позвонить', 'Новая'], '2026-05-02').selectedTasks)).toEqual([2])
   })
 
   it('preserves unselected task status when editing unselected task text', () => {

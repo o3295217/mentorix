@@ -119,12 +119,12 @@ export default function Navigation() {
       <header className="app-top-header fixed inset-x-0 top-0 z-50 border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
         <nav aria-label="Основная навигация" className="app-top-nav-inner mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between lg:h-16">
-            <div className="flex min-w-0 lg:space-x-8">
+            <div className="flex min-w-0 flex-1 items-center gap-6 lg:gap-8">
               <Link href="/" className="flex min-h-11 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
                 <span className="nav-logo" aria-label="mentorix">mentorix</span>
               </Link>
 
-              <div className="hidden items-center space-x-1 lg:flex">
+              <div className="hidden min-w-0 items-center space-x-1 overflow-x-clip lg:flex">
                 {desktopNavItems.map((item) => {
                   const active = isRouteActive(pathname, item.href)
                   return (
@@ -146,7 +146,7 @@ export default function Navigation() {
             </div>
 
             {userName && (
-              <div className="flex min-w-0 items-center lg:space-x-2">
+              <div className="ml-6 flex min-w-0 flex-shrink-0 items-center gap-3 border-l border-gray-800 bg-gray-900/80 pl-4">
                 <Link
                   href="/profile"
                   className="flex min-h-11 min-w-11 max-w-[9rem] items-center justify-end rounded-md px-2 text-sm text-gray-400 hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:hidden"
@@ -154,7 +154,6 @@ export default function Navigation() {
                 >
                   <span className="truncate">{userName}</span>
                 </Link>
-                <span className="nav-user-text hidden text-gray-400 lg:inline">{userName}</span>
                 <button
                   type="button"
                   onClick={handleLogout}

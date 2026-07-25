@@ -5,10 +5,14 @@ import type { CSSProperties } from 'react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useDaily } from '@/hooks/useDaily'
 import { useDailySchedule } from '@/hooks/daily/useDailySchedule'
 import DayTimeline from '@/components/daily/DayTimeline'
 import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalCard'
+import DailyPlanCardHeader from '@/components/daily/DailyPlanCardHeader'
+import type { PlanLens } from '@/components/daily/PlanLensSwitch'
+import { isInvalidProposalFallbackMessage, renderAssistantMessageContent } from '@/components/daily/chat-render-helpers'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskPostponeIcon, TaskRepeatIcon } from '@/components/icons'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
@@ -17,7 +21,10 @@ import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-jso
 import type { DailySchedule, DailyScheduleLoadSummary } from '@/lib/daily-schedule'
 import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
 import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
-import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, getProposalNewTasks, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { getTaskTimeChipLabel, getTaskTimeChips, sortTasksByScheduleTime } from '@/hooks/daily/list-lens-helpers'
+import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
+import { getScheduleBoundaryMinutes } from '@/hooks/daily/schedule-helpers'
 import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
 import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
 
@@ -25,8 +32,8 @@ type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
 type FactItem = { id: number; text: string; type: string; category: string | null }
 
-const taskActionButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md border transition-colors lg:h-8 lg:min-w-8 lg:w-8'
-const confirmButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md text-sm leading-none transition-colors lg:h-7 lg:min-w-7 lg:w-7'
+const taskActionButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:h-8 lg:min-w-8 lg:w-8'
+const confirmButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md text-sm leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:h-7 lg:min-w-7 lg:w-7'
 
 function getLocalTimeHHMM(date = new Date()) {
   const hours = String(date.getHours()).padStart(2, '0')
@@ -63,6 +70,7 @@ type ApplyProposalResponse = {
   updatedAt: string | null
   status?: string
   loadSummary?: DailyScheduleLoadSummary | null
+  planTasks?: string[]
 }
 
 export default function DailyPage() {
@@ -74,10 +82,10 @@ export default function DailyPage() {
   const mobilePlanTabRef = useRef<HTMLButtonElement>(null)
   const mobileAssistantTabRef = useRef<HTMLButtonElement>(null)
   const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const timelineHighlightTimeoutRef = useRef<number | null>(null)
   const activeTaskActionRowRef = useRef<HTMLDivElement | null>(null)
   const habitEditorRef = useRef<HTMLDivElement | null>(null)
   const tasksContainerRef = useRef<HTMLDivElement | null>(null)
-  const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState<string | null>(null)
   const [hasMobileTabSemantics, setHasMobileTabSemantics] = useState(false)
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
@@ -88,9 +96,11 @@ export default function DailyPage() {
   const [assistantOperationError, setAssistantOperationError] = useState('')
   const [mobileView, setMobileView] = useState<'plan' | 'assistant'>('plan')
   const [showMobileContext, setShowMobileContext] = useState(false)
+  const [highlightedTimelineTaskIndexes, setHighlightedTimelineTaskIndexes] = useState<Set<number>>(() => new Set())
   const isSubmittingChatRef = useRef(false)
   const directChatOperationRef = useRef<{ assistantMessageCount: number } | null>(null)
   const timelineMutationLocked = applyingProposalId !== null || isSubmittingChat
+  const planTaskMutationLocked = applyingProposalId !== null
 
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
@@ -249,6 +259,9 @@ export default function DailyPage() {
     sendingChat,
     clearChat,
     markChatProposalApplied,
+    requestPlanChatKickoff,
+    canShowPlanChatKickoffCta,
+    applyPlanTasksFromProposal,
     addTask,
     addExtraTask,
     removeExtraTask,
@@ -319,12 +332,13 @@ export default function DailyPage() {
     if (view !== 'assistant') return
 
     setShowMobileContext(false)
+    void requestPlanChatKickoff(isSubmittingChatRef.current)
     mobileViewFrameRef.current = window.requestAnimationFrame(() => {
       mobileViewFrameRef.current = null
       scrollChatToBottom()
       ensureChatComposerVisible()
     })
-  }, [ensureChatComposerVisible, scrollChatToBottom])
+  }, [ensureChatComposerVisible, requestPlanChatKickoff, scrollChatToBottom])
 
   const handleMobileTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
     let nextView: 'plan' | 'assistant' | null = null
@@ -393,14 +407,6 @@ export default function DailyPage() {
     mutationLocked: timelineMutationLocked,
   })
 
-  const handleEnterTimeline = useCallback(() => {
-    void enterTimeline()
-  }, [enterTimeline])
-
-  const handleExitTimeline = useCallback(() => {
-    void exitTimeline()
-  }, [exitTimeline])
-
   const handleApplyProposal = useCallback(async (
     messageId: string | undefined,
     metadata: NonNullable<(typeof chatMessages)[number]['metadata']>,
@@ -421,6 +427,8 @@ export default function DailyPage() {
       throw operationError
     }
     const requestDate = selectedDate
+    const newTaskCount = getProposalNewTasks(metadata).length
+    const firstNewTaskIndex = tasks.length + 1
     setApplyingProposalId(messageId)
     try {
       await applyDailyScheduleProposal({
@@ -432,19 +440,35 @@ export default function DailyPage() {
           body: JSON.stringify(requestBody),
         }),
         applySavedSchedule,
+        applyPlanTasks: applyPlanTasksFromProposal,
         expectedDate: requestDate,
         markChatProposalApplied: appliedAt => markChatProposalApplied(messageId, appliedAt),
       })
+      if (newTaskCount > 0) {
+        if (timelineHighlightTimeoutRef.current !== null) window.clearTimeout(timelineHighlightTimeoutRef.current)
+        setHighlightedTimelineTaskIndexes(new Set(Array.from({ length: newTaskCount }, (_, index) => firstNewTaskIndex + index)))
+        timelineHighlightTimeoutRef.current = window.setTimeout(() => {
+          timelineHighlightTimeoutRef.current = null
+          setHighlightedTimelineTaskIndexes(new Set())
+        }, 3000)
+      } else {
+        if (timelineHighlightTimeoutRef.current !== null) {
+          window.clearTimeout(timelineHighlightTimeoutRef.current)
+          timelineHighlightTimeoutRef.current = null
+        }
+        setHighlightedTimelineTaskIndexes(new Set())
+      }
+      showMessage(newTaskCount > 0 ? 'Новые задачи добавлены, расписание применено.' : 'Расписание применено, шкала дня обновлена.')
     } catch (error) {
       const operationError = error instanceof FetchJsonError && error.status === 409
-        ? new Error('Расписание уже изменилось. Обновите чат или попросите ассистента собрать новый вариант.')
+        ? new Error(getFetchErrorMessage(error, 'Расписание уже изменилось. Обновите чат или попросите ассистента собрать новый вариант.'))
         : new Error(getFetchErrorMessage(error, 'не удалось применить расписание'))
       setAssistantOperationError(operationError.message)
       throw operationError
     } finally {
       setApplyingProposalId(null)
     }
-  }, [applyingProposalId, applySavedSchedule, ensureEntrySaved, flushScheduleChanges, markChatProposalApplied, selectedDate])
+  }, [applyingProposalId, applyPlanTasksFromProposal, applySavedSchedule, ensureEntrySaved, flushScheduleChanges, markChatProposalApplied, selectedDate, showMessage, tasks.length])
 
   const handleSendChatMessage = useCallback(async (initialMessage?: string) => {
     if (isSubmittingChatRef.current || sendingChat) return
@@ -460,7 +484,6 @@ export default function DailyPage() {
       if (strictProposal) {
         await handleApplyProposal(strictProposal.messageId, strictProposal.metadata, buildProposalApplyOptions(strictProposal.metadata))
         setChatInput('')
-        showMessage('Расписание применено')
         return
       }
       await sendDailyChatWithPreconditions({
@@ -555,6 +578,9 @@ export default function DailyPage() {
     }
     if (mobileViewFrameRef.current !== null) {
       window.cancelAnimationFrame(mobileViewFrameRef.current)
+    }
+    if (timelineHighlightTimeoutRef.current !== null) {
+      window.clearTimeout(timelineHighlightTimeoutRef.current)
     }
   }, [])
 
@@ -774,13 +800,70 @@ export default function DailyPage() {
   // Статистика выполнения
   const activeTasks = tasks.filter(t => !selectedTasks.has(t.id))
   const completedTasks = tasks.filter(t => selectedTasks.has(t.id))
+  const taskTimeChips = useMemo(() => getTaskTimeChips(schedule), [schedule])
+  const sortedActiveTasks = useMemo(() => sortTasksByScheduleTime(activeTasks, taskTimeChips, tasks), [activeTasks, taskTimeChips, tasks])
+  const sortedCompletedTasks = useMemo(() => sortTasksByScheduleTime(completedTasks, taskTimeChips, tasks), [completedTasks, taskTimeChips, tasks])
   const completedCount = completedTasks.length
   const totalCount = tasks.length
   const completionPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const extraDoneCount = extraTasks.length
+  const savedTaskCount = useMemo(() => countSavedPlanTasks(dailyEntry?.planText), [dailyEntry?.planText])
   const hasEvaluation = !!dailyEntry?.evaluation
   const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && dailyEntry.evaluation?.createdAt
     && new Date(dailyEntry.updatedAt) > new Date(dailyEntry.evaluation.createdAt)
+  const todayDateKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), [])
+  const canPlanWithMentrix = selectedDate === todayDateKey
+  const hasGoalContext = weekGoals.length > 0 || monthGoals.length > 0
+  const currentMinutes = useMemo(() => {
+    if (!currentTime) return new Date().getHours() * 60 + new Date().getMinutes()
+    const [hours, minutes] = currentTime.split(':').map(Number)
+    return hours * 60 + minutes
+  }, [currentTime])
+  const workWindow = useMemo(() => {
+    if (!schedule) return { startMinutes: 9 * 60, endMinutes: 18 * 60 }
+    const boundaries = getScheduleBoundaryMinutes(schedule)
+    return { startMinutes: boundaries.planningStartMinutes, endMinutes: boundaries.workEndMinutes }
+  }, [schedule])
+  const dailyPhase = getDailyPhase({
+    selectedDate,
+    todayDate: todayDateKey,
+    savedTaskCount,
+    totalTaskCount: totalCount,
+    completedTaskCount: completedCount,
+    currentMinutes,
+    workStartMinutes: workWindow.startMinutes,
+    workEndMinutes: workWindow.endMinutes,
+  })
+
+  const handlePlanWithMentrix = useCallback(() => {
+    setMobileView('assistant')
+    void requestPlanChatKickoff(isSubmittingChatRef.current)
+    requestAnimationFrame(() => {
+      scrollChatToBottom()
+      ensureChatComposerVisible()
+    })
+  }, [ensureChatComposerVisible, requestPlanChatKickoff, scrollChatToBottom])
+
+  const handleStartPlanChatKickoff = useCallback(() => {
+    void requestPlanChatKickoff(isSubmittingChatRef.current)
+    requestAnimationFrame(() => {
+      scrollChatToBottom()
+      ensureChatComposerVisible()
+    })
+  }, [ensureChatComposerVisible, requestPlanChatKickoff, scrollChatToBottom])
+
+  const handleFocusManualTaskInput = useCallback(() => {
+    newTaskTextareaRef.current?.focus()
+  }, [])
+
+  const handlePlanLensChange = useCallback((lens: PlanLens) => {
+    if (lens === scheduleMode) return
+    if (lens === 'timeline') {
+      void enterTimeline()
+      return
+    }
+    void exitTimeline()
+  }, [enterTimeline, exitTimeline, scheduleMode])
 
   const normalizePlanLine = (value: string) => {
     let s = (value || '')
@@ -828,11 +911,6 @@ export default function DailyPage() {
       return true
     })
   })()
-
-  // Отмечаем, что компонент смонтирован на клиенте
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)')
@@ -908,7 +986,7 @@ export default function DailyPage() {
   const showSavePlanAttention = hasUnsavedChanges && !saving
 
   return (
-    <div className="min-w-0 space-y-4 lg:space-y-6">
+    <div className="min-w-0 space-y-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:space-y-6 lg:pb-0">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">
           <span className="lg:hidden">План дня</span>
@@ -916,10 +994,6 @@ export default function DailyPage() {
         </h1>
         <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
       </div>
-
-      <p className="break-words text-base text-gray-400 sm:text-lg">
-        {mounted ? format(parseDateKey(selectedDate), 'd MMMM yyyy, EEEE', { locale: ru }) : '\u00A0'}
-      </p>
 
       {/* Context from periods */}
       <button
@@ -934,6 +1008,11 @@ export default function DailyPage() {
       </button>
 
       <div id="daily-context" className={`${showMobileContext ? 'space-y-4' : 'hidden'} lg:block lg:space-y-6`}>
+      {!hasGoalContext ? (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3 text-sm text-gray-400">
+          Цели недели и месяца пока не заданы. <Link href="/goals" className="font-medium text-primary-300 hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">Добавьте цели</Link>, чтобы Ментрикс точнее собирал план дня.
+        </div>
+      ) : (
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
           <h3 className="font-semibold text-lg text-blue-200 mb-3">{weekLabel}:</h3>
@@ -956,7 +1035,8 @@ export default function DailyPage() {
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-blue-500/15 px-3 text-lg font-medium leading-none text-blue-400 hover:bg-blue-500/20 hover:text-blue-200 lg:h-auto lg:min-w-0 lg:py-1.5"
+                        disabled={planTaskMutationLocked}
+                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-blue-500/15 px-3 text-lg font-medium leading-none text-blue-400 hover:bg-blue-500/20 hover:text-blue-200 disabled:cursor-not-allowed disabled:opacity-45 lg:h-auto lg:min-w-0 lg:py-1.5"
                         title="Добавить в план дня"
                         aria-label="Добавить в план дня"
                       >
@@ -967,9 +1047,7 @@ export default function DailyPage() {
                 )
               })}
             </ul>
-          ) : (
-            <p className="text-base text-blue-400">Не установлены</p>
-          )}
+          ) : null}
         </div>
 
         <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
@@ -993,7 +1071,8 @@ export default function DailyPage() {
                     {!completed && (
                       <button
                         onClick={() => addGoalToTasks(goalText)}
-                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple-500/15 px-3 text-lg font-medium leading-none text-purple-400 hover:bg-purple-500/20 hover:text-purple-200 lg:h-auto lg:min-w-0 lg:py-1.5"
+                        disabled={planTaskMutationLocked}
+                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple-500/15 px-3 text-lg font-medium leading-none text-purple-400 hover:bg-purple-500/20 hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-45 lg:h-auto lg:min-w-0 lg:py-1.5"
                         title="Добавить в план дня"
                         aria-label="Добавить в план дня"
                       >
@@ -1004,11 +1083,10 @@ export default function DailyPage() {
                 )
               })}
             </ul>
-          ) : (
-            <p className="text-base text-purple-400">Не установлены</p>
-          )}
+          ) : null}
         </div>
       </div>
+      )}
 
       {/* Виджеты «Сделано за неделю» и «Сделано за месяц» */}
       {(weekFactsTotal > 0 || monthFactsTotal > 0) && (
@@ -1127,77 +1205,41 @@ export default function DailyPage() {
           role={hasMobileTabSemantics ? 'tabpanel' : undefined}
           aria-labelledby={hasMobileTabSemantics ? 'daily-plan-tab' : undefined}
           tabIndex={hasMobileTabSemantics ? 0 : undefined}
-          className={`${mobileView === 'plan' ? 'flex' : 'hidden'} card min-h-0 max-h-none min-w-0 flex-col !p-4 lg:col-span-3 lg:flex lg:min-h-[500px] lg:max-h-[80vh] lg:!p-6 lg:!pr-0`}
+          className={`${mobileView === 'plan' ? 'flex' : 'hidden'} card daily-phase-accent min-h-0 max-h-none min-w-0 flex-col overflow-hidden !p-4 lg:col-span-3 lg:flex lg:min-h-[500px] lg:max-h-[80vh] lg:!p-6 lg:!pr-0 ${dailyPhase === 'planning' ? 'opacity-95' : ''}`}
+          data-phase={dailyPhase}
         >
-          <div className="mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 lg:pr-6">
-            <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
-              <h2 className="text-xl font-bold">План на день</h2>
-              <span
-                className="inline-block text-xl font-semibold tabular-nums leading-none tracking-tight text-gray-400"
-                aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
-                title={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
-              >
-                <span className={currentTime ? undefined : 'text-transparent'} suppressHydrationWarning>
-                  {currentTime ?? '00:00'}
-                </span>
-              </span>
-            </div>
-            <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-1 sm:w-auto sm:justify-end">
-              {scheduleMode === 'list' && totalCount > 0 && (
-                <span className={`whitespace-nowrap text-base font-semibold tabular-nums leading-none tracking-tight ${
-                  completionPercent === 100 ? 'text-green-400' :
-                  completionPercent > 0 ? 'text-amber-400' :
-                  'text-gray-400'
-                }`}>
-                  {completedCount}/{totalCount} ({completionPercent}%)
-                  {extraDoneCount > 0 && ` +${extraDoneCount}`}
-                </span>
-              )}
-              {scheduleMode === 'list' && totalCount > 0 && (
-                <span className="text-base leading-none text-gray-600" aria-hidden="true">·</span>
-              )}
-              {scheduleMode === 'list' && (
-                <button
-                  type="button"
-                  onClick={handleEnterTimeline}
-                  disabled={tasks.length === 0 || scheduleEntering || scheduleLoading}
-                  title={
-                    tasks.length === 0
-                      ? 'Добавьте хотя бы одну задачу в план, чтобы расписать день по времени'
-                      : 'Разместить задачи на временной шкале 06:00–24:00'
-                  }
-                  className="min-h-11 whitespace-nowrap rounded-lg px-2 text-base font-semibold text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300 lg:min-h-0 lg:px-0 lg:leading-none"
-                >
-                  {scheduleEntering || scheduleLoading ? 'Открываю…' : 'Расписать по времени'}
-                </button>
-              )}
-              {scheduleMode === 'timeline' && (
-                <button
-                  type="button"
-                  onClick={handleExitTimeline}
-                  disabled={scheduleExiting}
-                  className="min-h-11 whitespace-nowrap rounded-lg px-2 text-base font-semibold text-primary-300 transition-colors hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-primary-300 lg:min-h-0 lg:px-0 lg:leading-none"
-                >
-                  {scheduleExiting ? 'Сохраняю…' : '← Назад к списку'}
-                </button>
-              )}
-            </div>
-          </div>
+          <DailyPlanCardHeader
+            currentTime={currentTime}
+            completedCount={completedCount}
+            totalCount={totalCount}
+            completionPercent={completionPercent}
+            extraDoneCount={extraDoneCount}
+            lens={scheduleMode}
+            onLensChange={handlePlanLensChange}
+            timelineDisabled={tasks.length === 0 || scheduleExiting}
+            timelineBusy={scheduleEntering || scheduleLoading}
+            phase={dailyPhase}
+            evaluating={evaluating}
+            canEvaluate={selectedTasks.size > 0}
+            onEvaluate={handleEvaluateClick}
+          />
 
           {/* Добавление новой задачи */}
           {scheduleMode === 'list' ? (
-            <>
+            <div key="list-lens" className="daily-lens-panel">
           <div className="mb-4 flex flex-shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-start lg:pr-6">
             <textarea
               ref={newTaskTextareaRef}
               value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
               onKeyDown={(e) => {
+                if (planTaskMutationLocked) return
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   addTask()
                 }
               }}
+              disabled={planTaskMutationLocked}
               placeholder="Добавить задачу..."
               rows={1}
               className="min-h-11 flex-1 resize-none overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -1210,7 +1252,8 @@ export default function DailyPage() {
             />
             <button
               onClick={addTask}
-              className="btn-primary min-h-11"
+              disabled={planTaskMutationLocked}
+              className="btn-secondary min-h-11"
             >
               Добавить
             </button>
@@ -1279,7 +1322,7 @@ export default function DailyPage() {
                               className={`min-h-11 min-w-0 flex-1 break-words px-1 text-left transition-colors lg:min-h-0 ${isInPlan ? 'cursor-default line-through opacity-60' : 'hover:text-amber-100'}`}
                               title={isInPlan ? 'Уже в плане' : 'Добавить в план'}
                               aria-label={isInPlan ? `${habit.taskText}: уже в плане` : `Добавить привычку «${habit.taskText}» в план`}
-                              disabled={isInPlan}
+                              disabled={isInPlan || planTaskMutationLocked}
                             >
                               {isInPlan && ' '}
                               {habit.taskText}
@@ -1308,7 +1351,8 @@ export default function DailyPage() {
                     {habitsNotInPlan.length > 0 && (
                       <button
                         onClick={() => addHabitsToTasks()}
-                        className="min-h-11 flex-shrink-0 rounded-md bg-amber-600/80 px-3 text-sm text-white transition-colors hover:bg-amber-600 lg:h-8 lg:min-h-0 lg:px-2.5 lg:text-xs"
+                        disabled={planTaskMutationLocked}
+                        className="min-h-11 flex-shrink-0 rounded-md bg-amber-600/80 px-3 text-sm text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-45 lg:h-8 lg:min-h-0 lg:px-2.5 lg:text-xs"
                       >
                         + Все в план
                       </button>
@@ -1456,18 +1500,44 @@ export default function DailyPage() {
           {/* Список задач */}
           <div ref={tasksContainerRef} className="flex min-h-0 flex-none flex-col gap-2 overflow-visible lg:flex-1 lg:overflow-y-auto lg:pr-6 lg:chat-scrollbar">
             {tasks.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-8">
-                Добавьте задачи на день...
-              </p>
+              <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 text-center shadow-sm">
+                <h3 className="text-base font-semibold text-gray-100">План на день пока пустой</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-gray-400">
+                  {hasGoalContext
+                    ? 'Ментрикс может предложить задачи из целей и разложить день по времени.'
+                    : 'Ментрикс поможет собрать список дел и сделать реалистичное расписание.'}
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  {canPlanWithMentrix && (
+                    <button
+                      type="button"
+                      onClick={handlePlanWithMentrix}
+                      disabled={sendingChat || isSubmittingChat || planTaskMutationLocked}
+                      className={`${dailyPhase === 'planning' ? 'btn-primary' : 'btn-secondary'} min-h-11 disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      Спланировать с Ментриксом
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleFocusManualTaskInput}
+                    disabled={planTaskMutationLocked}
+                    className="btn-secondary min-h-11"
+                  >
+                    Добавить задачу вручную
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 {/* Невыполненные задачи */}
-                {activeTasks.map((task) => {
+                {sortedActiveTasks.map((task) => {
                   const index = tasks.findIndex(t => t.id === task.id)
                   const habit = getHabitForTask(task.taskText)
                   const isPostponeActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'postpone'
                   const isHabitActive = activeTaskAction?.taskId === task.id && (activeTaskAction.type === 'habit-create' || activeTaskAction.type === 'habit-remove')
                   const isDeleteActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'
+                  const timeChipLabel = getTaskTimeChipLabel(taskTimeChips.get(index + 1))
 
                   return (
                     <div
@@ -1476,10 +1546,14 @@ export default function DailyPage() {
                       className="relative"
                     >
                       <div
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(task.id)}
+                        onDragOver={(event) => {
+                          if (!planTaskMutationLocked) handleDragOver(event)
+                        }}
+                        onDrop={() => {
+                          if (!planTaskMutationLocked) handleDrop(task.id)
+                        }}
                         className={`flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
-                          editingTaskId === task.id ? 'cursor-text' : 'lg:cursor-move'
+                          editingTaskId === task.id ? 'cursor-text' : planTaskMutationLocked ? '' : 'lg:cursor-move'
                         } ${
                       selectedTasks.has(task.id)
                         ? 'bg-green-500/10 border-green-500/20'
@@ -1489,9 +1563,11 @@ export default function DailyPage() {
                     } ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                       >
                         <span
-                          draggable={editingTaskId !== task.id}
-                          onDragStart={() => handleDragStart(task.id)}
-                          className="hidden cursor-grab text-gray-500 active:cursor-grabbing lg:inline"
+                          draggable={editingTaskId !== task.id && !planTaskMutationLocked}
+                          onDragStart={() => {
+                            if (!planTaskMutationLocked) handleDragStart(task.id)
+                          }}
+                          className={`hidden text-gray-500 lg:inline ${planTaskMutationLocked ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'}`}
                           aria-hidden="true"
                         >
                           ⋮⋮
@@ -1502,6 +1578,7 @@ export default function DailyPage() {
                             type="checkbox"
                             checked={selectedTasks.has(task.id)}
                             onChange={() => toggleTaskSelection(task.id)}
+                            disabled={planTaskMutationLocked}
                           />
                         </label>
 
@@ -1510,6 +1587,7 @@ export default function DailyPage() {
                             value={editingTaskText}
                             onChange={(e) => setEditingTaskText(e.target.value)}
                             onKeyDown={(e) => {
+                              if (planTaskMutationLocked) return
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()
                                 saveEditedTask(task.id)
@@ -1517,7 +1595,10 @@ export default function DailyPage() {
                                 cancelEditingTask()
                               }
                             }}
-                            onBlur={() => saveEditedTask(task.id)}
+                            onBlur={() => {
+                              if (!planTaskMutationLocked) saveEditedTask(task.id)
+                            }}
+                            disabled={planTaskMutationLocked}
                             autoFocus
                             rows={1}
                             ref={(el) => {
@@ -1537,10 +1618,18 @@ export default function DailyPage() {
                         ) : (
                           <span
                             className={`min-w-0 flex-1 break-words py-2 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
-                            onDoubleClick={() => handleStartEditingTask(task.id, task.taskText)}
+                            onDoubleClick={() => {
+                              if (!planTaskMutationLocked) handleStartEditingTask(task.id, task.taskText)
+                            }}
                             title="Дважды кликните для редактирования"
                           >
                             {task.taskText}
+                          </span>
+                        )}
+
+                        {timeChipLabel && (
+                          <span className="rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 text-xs font-medium tabular-nums text-primary-100">
+                            {timeChipLabel}
                           </span>
                         )}
 
@@ -1551,6 +1640,7 @@ export default function DailyPage() {
                               type="button"
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={() => saveEditedTask(task.id)}
+                              disabled={planTaskMutationLocked}
                               className={`${taskActionButtonBase} gap-1.5 border-green-500/30 px-2 text-green-300 hover:bg-green-500/10 lg:px-0`}
                               aria-label={`Сохранить изменения задачи «${task.taskText}»`}
                             >
@@ -1561,6 +1651,7 @@ export default function DailyPage() {
                               type="button"
                               onPointerDown={(event) => event.preventDefault()}
                               onClick={cancelEditingTask}
+                              disabled={planTaskMutationLocked}
                               className={`${taskActionButtonBase} gap-1.5 border-gray-600 px-2 text-gray-300 hover:bg-gray-800 lg:px-0`}
                               aria-label="Отменить редактирование задачи"
                             >
@@ -1573,6 +1664,7 @@ export default function DailyPage() {
                         <button
                           type="button"
                           onClick={() => handleStartEditingTask(task.id, task.taskText)}
+                          disabled={planTaskMutationLocked}
                           className={`${taskActionButtonBase} gap-1.5 border-transparent px-2 text-gray-300 hover:border-gray-500/30 hover:bg-gray-800 lg:px-0`}
                           aria-label={`Редактировать задачу «${task.taskText}»`}
                           title="Редактировать задачу"
@@ -1584,6 +1676,7 @@ export default function DailyPage() {
                         <button
                           type="button"
                           onClick={() => toggleTaskAction(task.id, 'postpone')}
+                          disabled={planTaskMutationLocked}
                           className={`${taskActionButtonBase} ${
                             isPostponeActive
                               ? 'border-blue-400/35 bg-blue-500/5 text-blue-300'
@@ -1599,6 +1692,7 @@ export default function DailyPage() {
                         <button
                           type="button"
                           onClick={() => toggleTaskAction(task.id, habit ? 'habit-remove' : 'habit-create')}
+                          disabled={planTaskMutationLocked}
                           className={`${taskActionButtonBase} ${
                             isHabitActive
                               ? 'border-amber-400/35 bg-amber-500/5 text-amber-300'
@@ -1614,6 +1708,7 @@ export default function DailyPage() {
                         <button
                           type="button"
                           onClick={() => toggleTaskAction(task.id, 'delete')}
+                          disabled={planTaskMutationLocked}
                           className={`${taskActionButtonBase} ${
                             isDeleteActive
                               ? 'border-red-400/35 bg-red-500/5 text-red-300'
@@ -1658,7 +1753,7 @@ export default function DailyPage() {
                                     postponeTask(task.id, task.taskText, postponeTargetDate)
                                     closeTaskAction()
                                   }}
-                                  disabled={!postponeTargetDate}
+                                  disabled={!postponeTargetDate || planTaskMutationLocked}
                                   className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200 disabled:opacity-40`}
                                   aria-label="Подтвердить перенос задачи"
                                 >
@@ -1684,6 +1779,7 @@ export default function DailyPage() {
                                     removeTask(task.id)
                                     closeTaskAction()
                                   }}
+                                  disabled={planTaskMutationLocked}
                                   className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
                                   aria-label="Подтвердить удаление задачи"
                                 >
@@ -1828,7 +1924,10 @@ export default function DailyPage() {
                       showCompleted ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
                     }`}>
                       <div className={`min-h-0 space-y-2 ${showCompleted ? 'overflow-visible' : 'overflow-hidden'}`}>
-                        {completedTasks.map((task) => (
+                        {sortedCompletedTasks.map((task) => {
+                          const index = tasks.findIndex(t => t.id === task.id)
+                          const timeChipLabel = getTaskTimeChipLabel(taskTimeChips.get(index + 1))
+                          return (
                           <div
                             key={task.id}
                             ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
@@ -1845,6 +1944,7 @@ export default function DailyPage() {
                                 type="checkbox"
                                 checked={true}
                                 onChange={() => toggleTaskSelection(task.id)}
+                                disabled={planTaskMutationLocked}
                               />
                             </label>
                             {editingTaskId === task.id ? (
@@ -1852,6 +1952,7 @@ export default function DailyPage() {
                                 value={editingTaskText}
                                 onChange={(event) => setEditingTaskText(event.target.value)}
                                 onKeyDown={(event) => {
+                                  if (planTaskMutationLocked) return
                                   if (event.key === 'Enter' && !event.shiftKey) {
                                     event.preventDefault()
                                     saveEditedTask(task.id)
@@ -1859,7 +1960,10 @@ export default function DailyPage() {
                                     cancelEditingTask()
                                   }
                                 }}
-                                onBlur={() => saveEditedTask(task.id)}
+                                onBlur={() => {
+                                  if (!planTaskMutationLocked) saveEditedTask(task.id)
+                                }}
+                                disabled={planTaskMutationLocked}
                                 autoFocus
                                 rows={1}
                                 ref={(element) => {
@@ -1879,10 +1983,17 @@ export default function DailyPage() {
                             ) : (
                               <span
                                 className="min-w-0 flex-1 break-words py-2 text-base text-gray-400"
-                                onDoubleClick={() => handleStartEditingTask(task.id, task.taskText)}
+                                onDoubleClick={() => {
+                                  if (!planTaskMutationLocked) handleStartEditingTask(task.id, task.taskText)
+                                }}
                                 title="Дважды кликните для редактирования"
                               >
                                 {task.taskText}
+                              </span>
+                            )}
+                            {timeChipLabel && (
+                              <span className="rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 text-xs font-medium tabular-nums text-primary-100">
+                                {timeChipLabel}
                               </span>
                             )}
                             <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:w-auto lg:flex-nowrap lg:border-0 lg:pt-0">
@@ -1892,6 +2003,7 @@ export default function DailyPage() {
                                   type="button"
                                   onPointerDown={(event) => event.preventDefault()}
                                   onClick={() => saveEditedTask(task.id)}
+                                  disabled={planTaskMutationLocked}
                                   className={`${taskActionButtonBase} gap-1.5 border-green-500/30 px-2 text-green-300 hover:bg-green-500/10 lg:px-0`}
                                   aria-label={`Сохранить изменения выполненной задачи «${task.taskText}»`}
                                 >
@@ -1902,6 +2014,7 @@ export default function DailyPage() {
                                   type="button"
                                   onPointerDown={(event) => event.preventDefault()}
                                   onClick={cancelEditingTask}
+                                  disabled={planTaskMutationLocked}
                                   className={`${taskActionButtonBase} gap-1.5 border-gray-600 px-2 text-gray-300 hover:bg-gray-800 lg:px-0`}
                                   aria-label="Отменить редактирование выполненной задачи"
                                 >
@@ -1914,6 +2027,7 @@ export default function DailyPage() {
                             <button
                               type="button"
                               onClick={() => handleStartEditingTask(task.id, task.taskText)}
+                              disabled={planTaskMutationLocked}
                               className={`${taskActionButtonBase} gap-1.5 border-transparent px-2 text-gray-300 hover:border-gray-500/30 hover:bg-gray-800 lg:px-0`}
                               aria-label={`Редактировать выполненную задачу «${task.taskText}»`}
                               title="Редактировать задачу"
@@ -1927,6 +2041,7 @@ export default function DailyPage() {
                                 e.stopPropagation()
                                 toggleTaskAction(task.id, 'delete')
                               }}
+                              disabled={planTaskMutationLocked}
                               className={`${taskActionButtonBase} ${
                                 activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'
                                   ? 'border-red-400/35 bg-red-500/5 text-red-300'
@@ -1954,6 +2069,7 @@ export default function DailyPage() {
                                       removeTask(task.id)
                                       closeTaskAction()
                                     }}
+                                    disabled={planTaskMutationLocked}
                                     className={`${confirmButtonBase} text-green-300/80 hover:bg-green-500/10 hover:text-green-200`}
                                     aria-label="Подтвердить удаление выполненной задачи"
                                   >
@@ -1974,7 +2090,8 @@ export default function DailyPage() {
                             </div>
                           )}
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
@@ -2000,7 +2117,7 @@ export default function DailyPage() {
                 placeholder="Добавить сделанное вне плана..."
                 className="min-h-11 min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
-              <button onClick={addExtraTask} className="btn-primary min-h-11 py-2 text-sm">
+              <button onClick={addExtraTask} className="btn-secondary min-h-11 py-2 text-sm">
                 Добавить
               </button>
             </div>
@@ -2095,7 +2212,7 @@ export default function DailyPage() {
                 <button 
                   onClick={savePlan} 
                   disabled={saving} 
-                  className={`btn-primary min-h-11 w-full disabled:opacity-50 sm:flex-1 ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
+                  className={`btn-secondary min-h-11 w-full disabled:opacity-50 sm:flex-1 ${showSavePlanAttention ? 'btn-dirty-attention' : ''}`}
                 >
                   {saving ? 'Сохранение...' : 'Сохранить план'}
                 </button>
@@ -2162,33 +2279,38 @@ export default function DailyPage() {
               )}
             </div>
           </div>
-            </>
+            </div>
           ) : scheduleMode === 'timeline' ? (
-            schedule ? (
-              <DayTimeline
-                schedule={schedule}
-                tasks={tasks}
-                selectedTasks={selectedTasks}
-                unscheduledTaskIndexes={unscheduledTaskIndexes}
-                isSaving={scheduleSaving}
-                isDirty={scheduleDirty}
-                error={scheduleError}
-                onSetBlockRange={setBlockRange}
-                onMoveBlock={moveBlockByStep}
-                onRemoveBlock={removeBlock}
-                onScheduleUnscheduled={scheduleUnscheduledTask}
-                appliedAnimationKey={appliedAnimationKey}
-                mutationLocked={timelineMutationLocked}
-              />
-            ) : scheduleLoading ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
-                Загрузка расписания…
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
-                Не удалось загрузить расписание.
-              </div>
-            )
+            <div key="timeline-lens" className="daily-lens-panel min-h-0 flex-1">
+              {schedule ? (
+                <DayTimeline
+                  schedule={schedule}
+                  tasks={tasks}
+                  selectedTasks={selectedTasks}
+                  unscheduledTaskIndexes={unscheduledTaskIndexes}
+                  isSaving={scheduleSaving}
+                  isDirty={scheduleDirty}
+                  error={scheduleError}
+                  onSetBlockRange={setBlockRange}
+                  onMoveBlock={moveBlockByStep}
+                  onRemoveBlock={removeBlock}
+                  onScheduleUnscheduled={scheduleUnscheduledTask}
+                  appliedAnimationKey={appliedAnimationKey}
+                  highlightedTaskIndexes={highlightedTimelineTaskIndexes}
+                  mutationLocked={timelineMutationLocked}
+                  selectedDate={selectedDate}
+                  onToggleTask={toggleTaskSelection}
+                />
+              ) : scheduleLoading ? (
+                <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+                  Загрузка расписания…
+                </div>
+              ) : (
+                <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+                  Не удалось загрузить расписание.
+                </div>
+              )}
+            </div>
           ) : null}
         </div>
 
@@ -2199,7 +2321,8 @@ export default function DailyPage() {
           aria-labelledby={hasMobileTabSemantics ? 'daily-assistant-tab' : undefined}
           aria-busy={sendingChat || isSubmittingChat}
           tabIndex={hasMobileTabSemantics ? 0 : undefined}
-          className={`${mobileView === 'assistant' ? 'flex' : 'hidden'} daily-chat-card card min-h-0 min-w-0 flex-col lg:col-span-2 lg:flex`}
+          className={`${mobileView === 'assistant' ? 'flex' : 'hidden'} daily-chat-card daily-phase-accent card min-h-0 min-w-0 flex-col lg:col-span-2 lg:flex ${dailyPhase === 'planning' ? 'ring-1 ring-primary-500/30' : ''}`}
+          data-phase={dailyPhase}
           style={dailyChatViewportStyle}
         >
           <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-2">
@@ -2233,6 +2356,27 @@ export default function DailyPage() {
           >
             {chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
+                {!canPlanWithMentrix && chatMessages.length === 0 && (
+                  <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2 text-sm text-gray-400">
+                    Планирование с Ментриксом доступно только для сегодняшнего дня
+                  </div>
+                )}
+                {canShowPlanChatKickoffCta && (
+                  <div className="rounded-2xl border border-primary-500/25 bg-primary-500/10 p-4 shadow-sm">
+                    <div className="text-sm font-semibold text-primary-100">Ментрикс может начать планирование</div>
+                    <p className="mt-1 text-sm leading-6 text-gray-300">
+                      Открою диалог по сегодняшнему плану: учту текущие задачи, цели и помогу собрать реалистичное расписание.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleStartPlanChatKickoff}
+                      disabled={sendingChat || isSubmittingChat}
+                      className="btn-secondary mt-3 min-h-11 w-full disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Начать планирование с Ментриксом
+                    </button>
+                  </div>
+                )}
                 <p className="text-center text-gray-500 text-sm mb-4">Спросите Ассистента:</p>
                 <button
                   onClick={() => void handleSendChatMessage('Проанализируй мой план на день и дай рекомендации')}
@@ -2278,9 +2422,19 @@ export default function DailyPage() {
                       <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
                     </div>
                   ) : (
-                    <div className="py-1" role={/(^|\n)Ошибка:/.test(msg.content) ? 'alert' : undefined}>
+                    <div className="py-1" role={/(^|\n)Ошибка:/.test(msg.content) || isInvalidProposalFallbackMessage(msg.content) ? 'alert' : undefined}>
                       <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
-                      <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
+                      <div className="space-y-2 text-gray-100">{renderAssistantMessageContent(msg.content)}</div>
+                      {isInvalidProposalFallbackMessage(msg.content) && (
+                        <button
+                          type="button"
+                          onClick={() => void handleSendChatMessage('Собери расписание ещё раз')}
+                          disabled={sendingChat || isSubmittingChat}
+                          className="btn-secondary mt-2 min-h-9 px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Собрать ещё раз
+                        </button>
+                      )}
                       {msg.metadata?.type === 'daily_schedule_proposal' && !dismissedProposalIds.has(msg.id ?? '') && (
                         <DailyScheduleProposalCard
                           metadata={msg.metadata}

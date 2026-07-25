@@ -561,7 +561,7 @@ model ChatMessage {
   date      String
   role      String   // 'user', 'assistant'
   content   String
-  metadataJson Json?  // encrypted, typed cards (daily_schedule_proposal v1/v2: currentScheduleExists/currentScheduleHash/proposal/loadSummary/appliedAt)
+  metadataJson Json?  // encrypted, typed cards (daily_schedule_proposal v1/v2/v3: currentScheduleExists/currentScheduleHash/currentPlanTasksHash/proposal/loadSummary/appliedAt)
   createdAt DateTime @default(now())
 }
 
@@ -652,8 +652,8 @@ model AuditLog {
 |----------|--------|------|----------|
 | `/api/daily` | GET, POST | `app/api/daily/route.ts` | CRUD дневных записей |
 | `/api/daily/schedule` | GET, PUT | `app/api/daily/schedule/route.ts` | Временное расписание задач дня; `DailyScheduleSchema` поддерживает backward-compatible v1/v2 и v3 (`planningBasis`, `planningStartMinutes`, `workEndMinutes`, `activityEndMinutes`, `category`, `isFixed`); ответ содержит `hash` и server-computed `loadSummary` |
-| `/api/daily/schedule/apply-proposal` | POST | `app/api/daily/schedule/apply-proposal/route.ts` | Подтверждает AI-proposal из `ChatMessage.metadataJson`, проверяет ownership/date/current hash, атомарно применяет v1→schedule v2 или v2→schedule v3 и возвращает persisted schedule/hash/loadSummary |
-| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/done/error`, Anthropic tool `propose_daily_schedule` принимает только proposal v2 (`planningBasis`, `planningStartMinutes`, `workEndMinutes`, `activityEndMinutes`, `category`, `isFixed`, 15-минутная сетка; `loadSummary` не принимается от AI и вычисляется сервером); в system data block передаётся machine-readable контекст актуального persisted schedule (v1/v2/v3 blocks, range/planning, timezone, updatedAt/hash) и latest pending proposal для обсуждения/коррекции; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson`; применение proposal выполняется только явным `/api/daily/schedule/apply-proposal` с конкретным `messageId` |
+| `/api/daily/schedule/apply-proposal` | POST | `app/api/daily/schedule/apply-proposal/route.ts` | Подтверждает AI-proposal из `ChatMessage.metadataJson`, проверяет ownership/date/current hash и для proposal v3 `currentPlanTasksHash`; атомарно применяет v1→schedule v2, v2→schedule v3 или v3 с добавлением `newTasks` в конец `DailyEntry.planText`, отклоняет текстовые дубли новых задач и возвращает persisted schedule/hash/loadSummary плюс актуальный `planTasks` |
+| `/api/daily/chat` | POST | `app/api/daily/chat/route.ts` | Чат с AI о плане; body включает обязательный browser `timezone` (IANA-like), SSE `text/proposal/done/error`, Anthropic tool `propose_daily_schedule` продвигает proposal v3 (`newTasks`, `taskSource: existing/new`, `planningBasis`, `planningStartMinutes`, `workEndMinutes`, `activityEndMinutes`, `category`, `isFixed`, 15-минутная сетка; `loadSummary` не принимается от AI и вычисляется сервером), а parser route нормализует `startMinutes/durationMinutes` блоков к ближайшему 15-минутному шагу и backward-compatible принимает v2/v3; metadata v3 дополняется `currentPlanTasksHash=hashDailyPlanTasks(planTasks)`; при невалидном tool proposal route логирует конкретные diagnostics (bounds/overlap/field issues без полных task text) и делает один corrective tool-use раунд через `tool_result`; если повтор не прошёл и ответ tool-only, route сохраняет fallback-текст вместо пустого assistant message; скрытый kickoff marker `[SYSTEM_KICKOFF_PLAN_CHAT]` заменяется на серверную инструкцию режима A/B/C по данным request и не сохраняется как user-message; в system data block передаётся machine-readable контекст актуального persisted schedule (v1/v2/v3 blocks, range/planning, timezone, updatedAt/hash) и latest pending proposal для обсуждения/коррекции; proposal обязан вернуть тот же timezone и хранится в зашифрованном `ChatMessage.metadataJson`; применение proposal выполняется только явным `/api/daily/schedule/apply-proposal` с конкретным `messageId` |
 | `/api/daily/check-plan` | POST | `app/api/daily/check-plan/route.ts` | Проверка плана AI |
 | `/api/daily/indicators` | GET | `app/api/daily/indicators/route.ts` | Индикаторы для календаря |
 | `/api/evaluate` | POST | `app/api/evaluate/route.ts` | Оценка дня через AI |
@@ -1062,7 +1062,7 @@ export async function getUserStatsForAI(): Promise<string>
 | `types.ts` | Типы для промптов; BalanceFlags с значениями `'ok' \| 'warning' \| 'critical'` |
 | `daily.ts` | `DAILY_EVALUATION_SYSTEM_PROMPT` (13 инструкций, КАЛИБРОВОЧНЫЕ ПРИМЕРЫ: 3 эталонных дня), `buildUserDataPrompt()`, `validateGoals()` |
 | `check-plan.ts` | `CHECK_PLAN_SYSTEM_PROMPT`, `buildCheckPlanPrompt()` |
-| `plan-chat.ts` | `PLAN_CHAT_SYSTEM_PROMPT`, `buildPlanChatContext()` |
+| `plan-chat.ts` | `PLAN_CHAT_SYSTEM_PROMPT`, `buildPlanChatContext()`, kickoff helpers для `[SYSTEM_KICKOFF_PLAN_CHAT]`, v2/v3 parser helper для tool result |
 | `forecast.ts` | `buildForecastPrompt()`, `calculateExecutionQuality()` (расчёт на сервере), `mergeExecutionQuality()` (мерж результатов) |
 | `period.ts` | `buildPeriodEvaluationPrompt()`, `calculatePeriodAverages()` (средние показатели рассчитываются на сервере) |
 | `goals-decompose.ts` | `buildGoalsDecomposePrompt(context, planningProfile?, userProfile?, profileBlocks?)` — промпт декомпозиции целей с персонализацией по профилю и ограничением контекста |

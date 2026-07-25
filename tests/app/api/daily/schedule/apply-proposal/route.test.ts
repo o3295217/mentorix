@@ -91,6 +91,7 @@ describe('/api/daily/schedule/apply-proposal', () => {
 
     expect(response.status).toBe(200)
     expect(body.status).toBe('created')
+    expect(body.planTasks).toEqual(['Deep work'])
     expect(mocks.chatMessageFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 12, userId: 'user-1' }) }))
     expect(mocks.queryRaw).toHaveBeenCalledOnce()
   })

@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-07-22**
+> Последнее обновление: **2026-07-25**
 
 ## Общая информация
 
@@ -93,7 +93,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (36)
+## Компоненты (39)
 
 - `AppShell`
 - `AuthGuard`
@@ -109,8 +109,11 @@
 - `Speedometer`
 - `ThemeProvider`
 - `UncompletedTasksModal`
+- `daily/DailyPlanCardHeader`
 - `daily/DailyScheduleProposalCard`
 - `daily/DayTimeline`
+- `daily/PlanLensSwitch`
+- `daily/chat-render-helpers`
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`
 - `goals/GoalsChatTrigger`

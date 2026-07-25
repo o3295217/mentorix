@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   clearPlanDraftFromStorage,
   getPlanDraftKey,
+  getDailyChatStorageKey,
   parsePlanDraft,
   readPlanDraftFromStorage,
+  sweepLegacyDailyStorage,
   writePlanDraftToStorage,
 } from '@/hooks/daily/plan-draft'
 import type { DailyPlanDraft } from '@/hooks/daily/types'
@@ -65,11 +67,27 @@ describe('daily plan draft helpers', () => {
       selectedTaskIds: [1],
     }
 
-    writePlanDraftToStorage(storage, date, draft)
-    expect(storage.getItem(getPlanDraftKey(date))).toBeTruthy()
-    expect(readPlanDraftFromStorage(storage, date)).toEqual(draft)
+    writePlanDraftToStorage(storage, 'user-1', date, draft)
+    expect(storage.getItem(getPlanDraftKey('user-1', date))).toBeTruthy()
+    expect(readPlanDraftFromStorage(storage, 'user-1', date)).toEqual(draft)
+    expect(readPlanDraftFromStorage(storage, 'user-2', date)).toBeNull()
 
-    clearPlanDraftFromStorage(storage, date)
-    expect(readPlanDraftFromStorage(storage, date)).toBeNull()
+    clearPlanDraftFromStorage(storage, 'user-1', date)
+    expect(readPlanDraftFromStorage(storage, 'user-1', date)).toBeNull()
+  })
+
+  it('ignores and sweeps legacy unscoped daily storage keys', () => {
+    const storage = createStorage()
+    storage.setItem('daily:planDraft:2026-05-02', JSON.stringify({ updatedAt: 'x', planText: 'Legacy', selectedTaskIds: [] }))
+    storage.setItem('daily:chat:2026-05-02', '[]')
+    storage.setItem(getPlanDraftKey('user-1', '2026-05-02'), JSON.stringify({ updatedAt: 'x', planText: 'Scoped', selectedTaskIds: [] }))
+    storage.setItem(getDailyChatStorageKey('user-1', '2026-05-02'), '[]')
+
+    expect(readPlanDraftFromStorage(storage, 'user-2', '2026-05-02')).toBeNull()
+    expect(sweepLegacyDailyStorage(storage)).toBe(2)
+    expect(storage.getItem('daily:planDraft:2026-05-02')).toBeNull()
+    expect(storage.getItem('daily:chat:2026-05-02')).toBeNull()
+    expect(storage.getItem(getPlanDraftKey('user-1', '2026-05-02'))).toBeTruthy()
+    expect(storage.getItem(getDailyChatStorageKey('user-1', '2026-05-02'))).toBeTruthy()
   })
 })

@@ -21,6 +21,18 @@
     animation: scheduleBlockApplyEnter 0.72s cubic-bezier(0.18, 0.9, 0.22, 1) both;
   }
 
+  .schedule-block-new-task-highlight {
+    animation: scheduleBlockNewTaskHighlight 2.6s ease-out both;
+  }
+
+  .daily-lens-panel {
+    animation: dailyLensFadeIn 180ms ease-out both;
+  }
+
+  .daily-phase-accent {
+    transition: opacity 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out;
+  }
+
   @keyframes scheduleBlockApplyEnter {
     0% {
       opacity: 0;
@@ -42,9 +54,32 @@
     }
   }
 
+  @keyframes scheduleBlockNewTaskHighlight {
+    0%, 70% {
+      border-color: rgba(34, 211, 238, 0.85);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.28), 0 0 30px rgba(34, 211, 238, 0.22);
+      background-color: rgba(8, 145, 178, 0.24);
+    }
+    100% {
+      box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+      background-color: transparent;
+    }
+  }
+
+  @keyframes dailyLensFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .schedule-block-apply-enter {
+    .schedule-block-apply-enter,
+    .schedule-block-new-task-highlight,
+    .daily-lens-panel {
       animation: none;
+    }
+
+    .daily-phase-accent {
+      transition: none;
     }
 
     .daily-mobile-tabs *,
