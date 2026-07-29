@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — chore: opencode agent rules, plan card UI, remove extra-task write path
+- 🧩 Компоненты: 3 файлов (DailyPlanCardHeader, PlanLensSwitch, index)
+- 📝 Документация: 4 файлов
+- 📦 Другое: 3 файлов
+
+
 ### 2026-07-25 — chore: deploy current changes
 - 🔌 API: 2 файлов (route, route)
 - 🧩 Компоненты: 6 файлов (Navigation, DailyPlanCardHeader, DailyScheduleProposalCard...)

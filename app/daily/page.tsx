@@ -113,9 +113,6 @@ export default function DailyPage() {
   const [activeTaskAction, setActiveTaskAction] = useState<{ taskId: number; type: TaskActionType } | null>(null)
   const [postponeTargetDate, setPostponeTargetDate] = useState('')
   
-  // Inline-подтверждение удаления extra tasks
-  const [confirmExtraDelete, setConfirmExtraDelete] = useState<number | null>(null)
-  
   // Сворачивание выполненных задач
   const [showCompleted, setShowCompleted] = useState(false)
   const [showHabitsExpanded, setShowHabitsExpanded] = useState(false)
@@ -244,8 +241,6 @@ export default function DailyPage() {
     tasks,
     selectedTasks,
     extraTasks,
-    newExtraTaskText,
-    setNewExtraTaskText,
     newTaskText,
     setNewTaskText,
     saving,
@@ -263,14 +258,6 @@ export default function DailyPage() {
     canShowPlanChatKickoffCta,
     applyPlanTasksFromProposal,
     addTask,
-    addExtraTask,
-    removeExtraTask,
-    startEditingExtraTask,
-    saveEditedExtraTask,
-    cancelEditingExtraTask,
-    editingExtraTaskIndex,
-    editingExtraTaskText,
-    setEditingExtraTaskText,
     addGoalToTasks,
     removeTask,
     postponeTask,
@@ -1726,15 +1713,7 @@ export default function DailyPage() {
                       </div>
 
                       {activeTaskAction?.taskId === task.id && (
-                        <div className={`relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:absolute lg:right-2 lg:top-full lg:mt-1 lg:w-auto lg:bg-gray-900/25 lg:py-1.5 ${
-                          activeTaskAction.type === 'postpone'
-                            ? 'lg:min-w-[300px]'
-                            : activeTaskAction.type === 'delete'
-                              ? 'lg:min-w-[190px]'
-                              : activeTaskAction.type === 'habit-create'
-                                ? 'lg:w-[500px] lg:max-w-[calc(100%-3rem)]'
-                                : 'lg:min-w-[220px]'
-                        }`}>
+                        <div className="relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:bg-gray-900/25 lg:py-1.5">
                           {activeTaskAction.type === 'postpone' && (
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <label className="flex min-w-0 flex-col gap-2 text-sm text-gray-300 sm:flex-row sm:items-center lg:text-xs">
@@ -2059,7 +2038,7 @@ export default function DailyPage() {
                           </div>
 
                           {activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete' && (
-                            <div className="relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:absolute lg:right-2 lg:top-full lg:mt-1 lg:w-auto lg:min-w-[190px] lg:bg-gray-900/25 lg:py-1.5">
+                            <div className="relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:bg-gray-900/25 lg:py-1.5">
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-xs text-gray-300">Удалить задачу?</span>
                                 <div className="flex items-center gap-1">
@@ -2097,111 +2076,6 @@ export default function DailyPage() {
                   </div>
                 )}
               </>
-            )}
-          </div>
-
-          {/* Вне плана (перевыполнение) */}
-          <div className="mt-4 rounded-lg border border-gray-700 bg-gray-900 p-3 lg:mr-6">
-            <h3 className="font-medium text-base text-gray-300 mb-2">+ Вне плана (перевыполнение)</h3>
-            <div className="mb-2 flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={newExtraTaskText}
-                onChange={(e) => setNewExtraTaskText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    addExtraTask()
-                  }
-                }}
-                placeholder="Добавить сделанное вне плана..."
-                className="min-h-11 min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <button onClick={addExtraTask} className="btn-secondary min-h-11 py-2 text-sm">
-                Добавить
-              </button>
-            </div>
-
-            {extraTasks.length > 0 && (
-              <div className="space-y-1">
-                {extraTasks.map((text, index) => (
-                  <div key={`${index}-${text}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-gray-100">
-                    {editingExtraTaskIndex === index ? (
-                      <input
-                        type="text"
-                        value={editingExtraTaskText}
-                        onChange={(e) => setEditingExtraTaskText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            saveEditedExtraTask(index)
-                          } else if (e.key === 'Escape') {
-                            cancelEditingExtraTask()
-                          }
-                        }}
-                        onBlur={() => saveEditedExtraTask(index)}
-                        autoFocus
-                        className="min-h-11 min-w-0 flex-1 rounded border border-primary-300 bg-gray-800 px-2 py-1 text-base text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 lg:text-sm"
-                        aria-label={`Редактировать выполненное вне плана «${text}»`}
-                      />
-                    ) : (
-                      <span
-                        className="min-w-0 flex-1 cursor-default break-words py-2"
-                        onDoubleClick={() => startEditingExtraTask(index, text)}
-                        title="Дважды кликните для редактирования"
-                      >
-                        {text}
-                      </span>
-                    )}
-                    <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-700 pt-1 sm:w-auto sm:border-0 sm:pt-0">
-                    {editingExtraTaskIndex !== index && (
-                      <button
-                        type="button"
-                        onClick={() => startEditingExtraTask(index, text)}
-                        className={`${taskActionButtonBase} gap-1.5 border-transparent px-2 text-gray-300 hover:border-gray-500/30 hover:bg-gray-700 lg:px-0`}
-                        aria-label={`Редактировать выполненное вне плана «${text}»`}
-                        title="Редактировать"
-                      >
-                        <span aria-hidden="true">✎</span>
-                        <span className="sm:sr-only">Редактировать</span>
-                      </button>
-                    )}
-                    {confirmExtraDelete === index ? (
-                      <div className="flex flex-wrap items-center justify-end gap-1 rounded-md border border-gray-700/45 bg-gray-900/25 px-1.5 py-0.5 shadow-none ring-1 ring-white/5 backdrop-blur-sm">
-                        <span className="text-xs text-gray-300">Удалить?</span>
-                        <button
-                          onClick={() => {
-                            removeExtraTask(index)
-                            setConfirmExtraDelete(null)
-                          }}
-                          className={`${confirmButtonBase} text-gray-300 hover:bg-gray-800/50 hover:text-green-300`}
-                          aria-label="Подтвердить удаление выполненного вне плана"
-                        >
-                          <CheckIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setConfirmExtraDelete(null)}
-                          className={`${confirmButtonBase} text-gray-500 hover:bg-gray-800/50 hover:text-gray-300`}
-                          aria-label="Отменить удаление выполненного вне плана"
-                        >
-                          <CloseIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmExtraDelete(index)}
-                        className={`${taskActionButtonBase} border-transparent text-red-300/65 hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200`}
-                        title="Удалить"
-                        aria-label={`Удалить выполненное вне плана «${text}»`}
-                      >
-                        <TaskDeleteIcon className="h-[18px] w-[18px]" />
-                      </button>
-                    )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
           </div>
 
@@ -2326,7 +2200,7 @@ export default function DailyPage() {
           style={dailyChatViewportStyle}
         >
           <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-2">
-            <h2 className="min-w-0 text-lg font-bold sm:text-xl">Обсуждение плана с Ассистентом</h2>
+            <h2 className="min-w-0 text-xl font-bold">Обсуждаем с mentorix</h2>
             {chatMessages.length > 0 && (
               <button 
                 onClick={clearChat}
