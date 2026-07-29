@@ -6,7 +6,7 @@
   "mcp": {
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp@0.0.78", "--isolated", "--headless", "--image-responses", "allow", "--codegen", "none"],
+      "command": ["npx", "-y", "@playwright/mcp@0.0.78", "--isolated", "--headless", "--image-responses", "allow", "--codegen", "none", "--output-dir", "/var/folders/mh/4rglfl5s58x032g2kh_00ns00000gn/T/opencode/playwright"],
       "enabled": true,
       "timeout": 30000
     }

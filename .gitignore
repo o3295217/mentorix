@@ -56,3 +56,4 @@ next-env.d.ts
 
 # opencode runtime metrics
 /.opencode/metrics/agent-runs.jsonl
+.playwright-mcp/

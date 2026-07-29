@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const root = process.cwd()
 
-const PLAYWRIGHT_MCP_COMMAND = ['npx', '-y', '@playwright/mcp@0.0.78', '--isolated', '--headless', '--image-responses', 'allow', '--codegen', 'none']
+const PLAYWRIGHT_MCP_COMMAND = ['npx', '-y', '@playwright/mcp@0.0.78', '--isolated', '--headless', '--image-responses', 'allow', '--codegen', 'none', '--output-dir', '/var/folders/mh/4rglfl5s58x032g2kh_00ns00000gn/T/opencode/playwright']
 const PLAYWRIGHT_RAW_TOOLS = [
   'browser_close',
   'browser_resize',

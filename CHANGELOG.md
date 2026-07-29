@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — refactor(daily): remove extra-task block, fix action panel overlap, align chat heading
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+
+
 ### 2026-07-29 — chore: opencode agent rules, plan card UI, remove extra-task write path
 - 🧩 Компоненты: 3 файлов (DailyPlanCardHeader, PlanLensSwitch, index)
 - 📝 Документация: 4 файлов
