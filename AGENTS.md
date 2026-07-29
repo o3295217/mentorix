@@ -3,11 +3,15 @@
 AI Effectiveness Assistant («mentorix») — персональный ассистент продуктивности:
 цели → ежедневное планирование → AI-оценка дня → аналитика. UI на русском языке.
 
+> **Впервые в проекте — читай `docs/CODEBASE_MAP.md`.** Там карта данных, API, AI-слоя
+> и фронтенда по факту кода, а также список мест, где реальность расходится с правилами
+> ниже. Этот файл — краткие правила, тот — подробная карта.
+
 ## Стек
 
 - Next.js 16 (App Router, `output: standalone`) + React 19 + TypeScript (strict)
 - PostgreSQL + Prisma 5.22 (`prisma/schema.prisma`)
-- Tailwind 3 (`darkMode: class`, тёмная тема по умолчанию, кастомные классы в `app/globals.css`)
+- Tailwind 3 (`darkMode: class`, кастомные классы в `app/globals.css`). Тема жёстко тёмная: `ThemeProvider` — заглушка, переключения нет, хотя в `SPECIFICATION.md` оно описано
 - Zod 4 — валидация **только на сервере** (API routes)
 - `@anthropic-ai/sdk` — AI-функции (оценка дня, чаты, прогнозы)
 - Vitest (`tests/**/*.test.ts`, environment: node), alias `@/` → корень репо
@@ -73,7 +77,7 @@ npm run test        # vitest run
 ### Frontend
 
 - Без SWR/react-query/redux: `useState`/`useEffect` + кастомные хуки + Context (`AuthProvider`, `ThemeProvider`)
-- Запросы через `fetchJson<T>()` из `lib/fetch-json.ts` (типизированные ошибки `FetchJsonError`)
+- Запросы: в новом коде используй `fetchJson<T>()` из `lib/fetch-json.ts` (типизированные ошибки `FetchJsonError`). В существующем коде преобладает сырой `fetch` — это долг, а не образец для копирования (см. `docs/CODEBASE_MAP.md`, раздел 8)
 - Формы: контролируемые useState + строки `error`/`loading`; клиентского zod нет
 - Стили: Tailwind-утилиты + готовые классы из `globals.css` (`.card`, `.btn-primary`); графики — recharts (только `app/analytics/`)
 - Тексты UI — на русском; идентификаторы — на английском

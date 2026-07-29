@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — fix(daily): persist currentPlanTaskCount so chat-only tasks reach the timeline
+- 🔌 API: 1 файлов (route)
+- 📚 Библиотеки: 3 файлов (daily-schedule-context, daily-schedule-proposal, plan-chat)
+- 📝 Документация: 3 файлов
+- 📦 Другое: 2 файлов
+
+
 ### 2026-07-29 — fix(daily): keep chat composer in view, stop plan card stretching, dedupe evaluate button
 - 📄 Страницы: 1 файлов
 - 📝 Документация: 1 файлов
