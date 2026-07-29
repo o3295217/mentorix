@@ -60,6 +60,33 @@ export function TaskDeleteIcon(props: IconProps) {
   )
 }
 
+export function PlanListIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M8 6h11" />
+      <path d="M8 12h11" />
+      <path d="M8 18h11" />
+      <path d="M5 6h.01" />
+      <path d="M5 12h.01" />
+      <path d="M5 18h.01" />
+    </IconBase>
+  )
+}
+
+export function PlanTimelineIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 4v16" />
+      <path d="M6 7h5" />
+      <path d="M6 12h10" />
+      <path d="M6 17h7" />
+      <path d="M11 7h2" />
+      <path d="M16 12h2" />
+      <path d="M13 17h2" />
+    </IconBase>
+  )
+}
+
 export function CheckIcon(props: IconProps) {
   return (
     <IconBase {...props}>

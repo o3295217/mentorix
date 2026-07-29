@@ -66,8 +66,6 @@ export interface UseDailyReturn {
   tasks: OpenTask[]
   selectedTasks: Set<number>
   extraTasks: string[]
-  newExtraTaskText: string
-  setNewExtraTaskText: (text: string) => void
   newTaskText: string
   setNewTaskText: (text: string) => void
   saving: boolean
@@ -100,14 +98,6 @@ export interface UseDailyReturn {
   applyPlanTasksFromProposal: (planTasks: string[]) => void
 
   addTask: () => void
-  addExtraTask: () => void
-  removeExtraTask: (index: number) => void
-  startEditingExtraTask: (index: number, currentText: string) => void
-  saveEditedExtraTask: (index: number) => void
-  cancelEditingExtraTask: () => void
-  editingExtraTaskIndex: number | null
-  editingExtraTaskText: string
-  setEditingExtraTaskText: (text: string) => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
   postponeTask: (taskId: number, taskText: string, targetDate?: string) => Promise<void>

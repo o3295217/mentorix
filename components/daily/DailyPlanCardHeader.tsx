@@ -41,7 +41,7 @@ export default function DailyPlanCardHeader({
       <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
         <h2 className="text-xl font-bold">План на день</h2>
         <span
-          className="inline-block text-xl font-semibold tabular-nums leading-none tracking-tight text-gray-400"
+          className="inline-block text-base font-semibold tabular-nums leading-none tracking-tight text-gray-400"
           aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
           title={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
         >
@@ -52,11 +52,11 @@ export default function DailyPlanCardHeader({
       </div>
       <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 sm:w-auto sm:justify-end">
         {totalCount > 0 && (
-          <span className={`whitespace-nowrap text-base font-semibold tabular-nums leading-none tracking-tight ${
+          <span className={`whitespace-nowrap tabular-nums leading-none tracking-tight ${isExecution ? 'text-xl font-bold' : 'text-base font-semibold'} ${
             completionPercent === 100 ? 'text-green-400' :
             completionPercent > 0 ? 'text-amber-400' :
             'text-gray-400'
-          } ${isExecution ? 'text-2xl sm:text-3xl' : ''}`}>
+          }`}>
             {isExecution ? `${completedCount}/${totalCount} · ${completionPercent}%` : `${completedCount}/${totalCount} (${completionPercent}%)`}
             {extraDoneCount > 0 && ` +${extraDoneCount}`}
           </span>

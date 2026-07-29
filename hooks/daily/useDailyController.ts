@@ -38,7 +38,6 @@ export function useDaily(): UseDailyReturn {
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
   const [extraTasks, setExtraTasks] = useState<string[]>([])
   const [newTaskText, setNewTaskText] = useState('')
-  const [newExtraTaskText, setNewExtraTaskText] = useState('')
   const [saving, setSaving] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [message, setMessage] = useState('')
@@ -46,8 +45,6 @@ export function useDaily(): UseDailyReturn {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [editingTaskText, setEditingTaskText] = useState('')
-  const [editingExtraTaskIndex, setEditingExtraTaskIndex] = useState<number | null>(null)
-  const [editingExtraTaskText, setEditingExtraTaskText] = useState('')
   const [checkingPlan, setCheckingPlan] = useState(false)
   const [checkPlanResult, setCheckPlanResult] = useState<CheckPlanResult | null>(null)
   
@@ -536,74 +533,6 @@ export function useDaily(): UseDailyReturn {
 
     return true
   }, [tasks, selectedTasks, selectedDate, showMessage, clearPlanDraft])
-
-  const saveExtraTasks = useCallback(async (tasksToSave: string[]) => {
-    try {
-      await fetchJson<DailyEntry>('/api/daily', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: selectedDate,
-          extraTasksJson: JSON.stringify(tasksToSave),
-        }),
-      })
-    } catch (error) {
-      console.error('Error saving extra tasks:', error)
-      showMessage(`Ошибка при сохранении: ${getFetchErrorMessage(error, 'ошибка запроса')}`, 2000)
-    }
-  }, [selectedDate, showMessage])
-
-  const addExtraTask = useCallback(() => {
-    const text = newExtraTaskText.trim()
-    if (!text) return
-
-    // Проверяем дубликаты в extraTasks
-    if (extraTasks.some(t => areTasksSimilar(t, text))) {
-      showMessage('Похожая задача уже добавлена во внеплан', 2000)
-      setNewExtraTaskText('')
-      return
-    }
-    // Также проверяем в основных задачах
-    if (tasks.some(t => areTasksSimilar(t.taskText, text))) {
-      showMessage('Похожая задача уже есть в плане', 2000)
-      setNewExtraTaskText('')
-      return
-    }
-
-    const updated = [...extraTasks, text]
-    setExtraTasks(updated)
-    setNewExtraTaskText('')
-    void saveExtraTasks(updated)
-  }, [newExtraTaskText, extraTasks, tasks, saveExtraTasks, showMessage])
-
-  const removeExtraTask = useCallback((index: number) => {
-    const updated = extraTasks.filter((_, i) => i !== index)
-    setExtraTasks(updated)
-    void saveExtraTasks(updated)
-  }, [extraTasks, saveExtraTasks])
-
-  const startEditingExtraTask = useCallback((index: number, currentText: string) => {
-    setEditingExtraTaskIndex(index)
-    setEditingExtraTaskText(currentText)
-  }, [])
-
-  const saveEditedExtraTask = useCallback((index: number) => {
-    if (!editingExtraTaskText.trim()) {
-      setEditingExtraTaskIndex(null)
-      setEditingExtraTaskText('')
-      return
-    }
-    const updated = extraTasks.map((t, i) => (i === index ? editingExtraTaskText.trim() : t))
-    setExtraTasks(updated)
-    setEditingExtraTaskIndex(null)
-    setEditingExtraTaskText('')
-    void saveExtraTasks(updated)
-  }, [editingExtraTaskText, extraTasks, saveExtraTasks])
-
-  const cancelEditingExtraTask = useCallback(() => {
-    setEditingExtraTaskIndex(null)
-    setEditingExtraTaskText('')
-  }, [])
 
   const buildTasksFromTexts = useCallback((texts: string[]): OpenTask[] => {
     return buildTasksFromTextsForDate(texts, selectedDate)
@@ -1147,8 +1076,6 @@ export function useDaily(): UseDailyReturn {
     tasks,
     selectedTasks,
     extraTasks,
-    newExtraTaskText,
-    setNewExtraTaskText,
     newTaskText,
     setNewTaskText,
     saving,
@@ -1171,14 +1098,6 @@ export function useDaily(): UseDailyReturn {
     canShowPlanChatKickoffCta,
     applyPlanTasksFromProposal,
     addTask,
-    addExtraTask,
-    removeExtraTask,
-    startEditingExtraTask,
-    saveEditedExtraTask,
-    cancelEditingExtraTask,
-    editingExtraTaskIndex,
-    editingExtraTaskText,
-    setEditingExtraTaskText,
     addGoalToTasks,
     removeTask,
     postponeTask,
