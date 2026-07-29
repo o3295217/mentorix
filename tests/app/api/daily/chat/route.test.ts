@@ -205,8 +205,13 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     } as never
 
     expect(getScheduleProposalValidationDiagnostics(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })).toEqual(expect.arrayContaining([
-      'block 1: startMinutes 555 < dayStartMinutes 570',
-      'block 2: block end 690 > dayEndMinutes 660',
+      'block 1 [custom]: startMinutes 555 < dayStartMinutes 570',
+      'block 2 [custom]: block end 690 > dayEndMinutes 660',
+      'blocks 2 and 3 overlap',
+    ]))
+    expect(getSafeScheduleProposalValidationDiagnosticsForLog(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })).toEqual(expect.arrayContaining([
+      'block 1 [custom]: starts before dayStartMinutes',
+      'block 2 [custom]: ends after dayEndMinutes',
       'blocks 2 and 3 overlap',
     ]))
   })
@@ -266,6 +271,44 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(metadata.currentPlanTasksHash).toBe(hashDailyPlanTasks(['Deep work']))
     expect(metadata.proposal).toMatchObject({ version: 3, newTasks: ['Prepare landing notes'] })
     expect(metadata.loadSummary.scheduledMinutes).toBe(105)
+  })
+
+  it('accepts tool-only v3 proposals made only from new tasks when current plan tasks are completed', async () => {
+    const newOnlyProposal = {
+      version: 3,
+      date: '2026-02-28',
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 750,
+      dayEndMinutes: 1080,
+      planningBasis: 'current_time',
+      planningStartMinutes: 750,
+      workEndMinutes: 1080,
+      activityEndMinutes: 1080,
+      newTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
+      blocks: [
+        { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Тетроникс', category: 'main', isFixed: false, startMinutes: 750, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 2, taskText: 'Зарядка', category: 'personal', isFixed: false, startMinutes: 810, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'АИОНЛАБ', category: 'main', isFixed: false, startMinutes: 870, durationMinutes: 90 },
+      ],
+    }
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(newOnlyProposal) } },
+    ]))
+
+    const response = await POST(request({ planTasks: ['Подъём в 6 утра', 'Холодный душ'], completedTasks: ['Подъём в 6 утра', 'Холодный душ'], userMessage: 'занеси план' }))
+    const text = await response.text()
+
+    expect(text).toContain('event: proposal')
+    expect(text).not.toContain('не прошёл проверку')
+    expect(mocks.stream).toHaveBeenCalledTimes(1)
+    const metadata = mocks.chatMessageCreate.mock.calls.at(-1)?.[0].data.metadataJson
+    expect(metadata).toMatchObject({
+      schemaVersion: 3,
+      currentPlanTaskCount: 2,
+      proposal: { newTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'] },
+      loadSummary: { scheduledMinutes: 210 },
+    })
   })
 
   it('replaces exact kickoff marker with server instruction and does not store it as user message', async () => {
@@ -367,7 +410,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(correctionCall.tool_choice).toEqual({ type: 'tool', name: 'propose_daily_schedule' })
     expect(correctionToolResult).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_bad', is_error: true })
     expect(correctionToolResult.content).toContain('blocks 1 and 2 overlap')
-    expect(correctionToolResult.content).toContain('block 2: block end 690 > dayEndMinutes 660')
+    expect(correctionToolResult.content).toContain('block 2 [custom]: block end 690 > dayEndMinutes 660')
     expect(text).toContain('Исправил черновик.')
     expect(text).toContain('event: proposal')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({

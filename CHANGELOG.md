@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — fix(daily): keep chat composer in view, stop plan card stretching, dedupe evaluate button
+- 📄 Страницы: 1 файлов
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-07-29 — chore(opencode): move playwright dumps out of repo, cap visual-reviewer browser actions
 - ⚙️ Конфигурация: 2 файлов
 - 📝 Документация: 2 файлов

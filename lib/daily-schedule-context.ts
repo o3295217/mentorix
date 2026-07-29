@@ -18,7 +18,7 @@ export function buildScheduleMachineContext(input: {
       messageId: input.pendingProposal.messageId,
       appliedAt: input.pendingProposal.metadata.appliedAt ?? null,
       currentScheduleHash: input.pendingProposal.metadata.currentScheduleHash,
-      schedule: compactSchedule(proposalToDailySchedule(input.pendingProposal.metadata.proposal), null, null),
+      schedule: compactSchedule(proposalToDailySchedule(input.pendingProposal.metadata.proposal, input.pendingProposal.metadata.schemaVersion === 3 ? { currentPlanTaskCount: input.pendingProposal.metadata.currentPlanTaskCount } : undefined), null, null),
     } : null,
   })
 }

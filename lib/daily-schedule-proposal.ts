@@ -202,6 +202,7 @@ const DailyScheduleProposalMetadataV3Schema = z.object({
   createdAt: z.string().datetime(),
   currentScheduleExists: z.boolean().optional(),
   currentScheduleHash: z.string().length(64).nullable(),
+  currentPlanTaskCount: z.number().int().min(0).optional(),
   currentPlanTasksHash: z.string().length(64).nullable().optional(),
   appliedAt: z.string().datetime().nullable().optional(),
   loadSummary: DailyScheduleLoadSummarySchema,
@@ -265,6 +266,15 @@ function inferMinimumCurrentPlanTaskCount(proposal: DailyScheduleProposalV3): nu
   }, 0)
 }
 
+function formatScheduleIssuePath(path: PropertyKey[]): string {
+  const normalized = path.filter((part): part is string | number => typeof part === 'string' || typeof part === 'number')
+  return normalized.length > 0 ? normalized.join('.') : 'schedule'
+}
+
+function getScheduleValidationIssueDetails(issues: z.ZodIssue[]): string[] {
+  return issues.map(issue => `${formatScheduleIssuePath(issue.path)} [${issue.code}]: ${issue.message}`)
+}
+
 function validateTaskBlocksAgainstCurrentPlan(proposal: DailyScheduleProposal, current: { date: string; timezone: string; planTasks: string[] }): { success: true } | { success: false; error: string } {
   if (proposal.date !== current.date) return { success: false, error: 'proposal date does not match current date' }
   if (proposal.timezone !== current.timezone) return { success: false, error: 'proposal timezone does not match request timezone' }
@@ -295,7 +305,10 @@ export function validateProposalAgainstCurrentPlan(proposal: DailySchedulePropos
   if (!taskValidation.success) return taskValidation
   const schedule = proposalToDailySchedule(proposal, { currentPlanTaskCount: current.planTasks.length })
   const validation = DailyScheduleSchema.safeParse(schedule)
-  if (!validation.success) return { success: false, error: 'proposal cannot be converted to a valid schedule' }
+  if (!validation.success) {
+    const details = getScheduleValidationIssueDetails(validation.error.issues).join('; ')
+    return { success: false, error: details ? `proposal cannot be converted to a valid schedule: ${details}` : 'proposal cannot be converted to a valid schedule' }
+  }
   return { success: true, data: proposal }
 }
 
@@ -367,7 +380,7 @@ export function createProposalMetadata(input: { date: string; proposal: DailySch
     return { ...base, schemaVersion: 2, proposal: input.proposal, loadSummary: computeDailyScheduleLoadSummary(proposalToDailyScheduleV3(input.proposal)) }
   }
   const schedule = proposalToDailyScheduleV3(input.proposal, input.currentPlanTaskCount ?? inferMinimumCurrentPlanTaskCount(input.proposal))
-  return { ...base, schemaVersion: 3, proposal: input.proposal, currentPlanTasksHash: input.currentPlanTasksHash, loadSummary: computeDailyScheduleLoadSummary(schedule) }
+  return { ...base, schemaVersion: 3, proposal: input.proposal, currentPlanTaskCount: input.currentPlanTaskCount, currentPlanTasksHash: input.currentPlanTasksHash, loadSummary: computeDailyScheduleLoadSummary(schedule) }
 }
 
 export function safeParseProposalMetadata(value: unknown): DailyScheduleProposalMetadata | null {
@@ -380,7 +393,7 @@ export function safeParseProposalMetadata(value: unknown): DailyScheduleProposal
     return { ...validation.data, loadSummary: computeDailyScheduleLoadSummary(scheduleValidation.data) }
   }
   if (validation.data.schemaVersion === 3) {
-    const schedule = proposalToDailyScheduleV3(validation.data.proposal, inferMinimumCurrentPlanTaskCount(validation.data.proposal))
+    const schedule = proposalToDailyScheduleV3(validation.data.proposal, validation.data.currentPlanTaskCount ?? inferMinimumCurrentPlanTaskCount(validation.data.proposal))
     const scheduleValidation = DailyScheduleV3Schema.safeParse(schedule)
     if (!scheduleValidation.success) return null
     return { ...validation.data, loadSummary: computeDailyScheduleLoadSummary(scheduleValidation.data) }
@@ -391,5 +404,8 @@ export function safeParseProposalMetadata(value: unknown): DailyScheduleProposal
 }
 
 export function getProposalScheduleHash(metadata: DailyScheduleProposalMetadata): string {
+  if (metadata.schemaVersion === 3) {
+    return hashDailySchedule(proposalToDailySchedule(metadata.proposal, { currentPlanTaskCount: metadata.currentPlanTaskCount }))
+  }
   return hashDailySchedule(proposalToDailySchedule(metadata.proposal))
 }

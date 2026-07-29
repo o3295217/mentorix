@@ -113,6 +113,7 @@ const proposeDailyScheduleTool = {
 type StreamEvent = { type?: string; delta?: { type?: string; text?: string; partial_json?: string }; content_block?: { type?: string; id?: string; name?: string; input?: unknown }; index?: number }
 type ClaudeMessage = { role: 'user' | 'assistant'; content: string | Array<Record<string, unknown>> }
 type ScheduleToolCall = { index: number; id: string; name: string; inputJson: string; parsedInput?: unknown }
+type DiagnosticIssue = { path: PropertyKey[]; message: string; code?: string }
 type ToolValidationResult =
   | { success: true; metadata: ReturnType<typeof createProposalMetadata> }
   | { success: false; diagnosticsForModel: string[]; safeDiagnosticsForLog: string[]; toolCall: ScheduleToolCall }
@@ -134,17 +135,27 @@ function getValueAtPath(value: unknown, path: Array<string | number>): unknown {
   }, value)
 }
 
-function formatZodDiagnostics(input: unknown, issues: Array<{ path: PropertyKey[]; message: string }>, options: { includeValues: boolean }): string[] {
-  return issues.map(issue => {
+function flattenDiagnosticIssues(issues: readonly DiagnosticIssue[]): DiagnosticIssue[] {
+  return issues.flatMap(issue => {
+    if (issue.code !== 'invalid_union' || !('errors' in issue)) return [issue]
+    const unionErrors = (issue as DiagnosticIssue & { errors?: unknown }).errors
+    if (!Array.isArray(unionErrors)) return [issue]
+    return unionErrors.flatMap(branchIssues => Array.isArray(branchIssues) ? flattenDiagnosticIssues(branchIssues as DiagnosticIssue[]) : [])
+  })
+}
+
+function formatZodDiagnostics(input: unknown, issues: readonly DiagnosticIssue[], options: { includeValues: boolean }): string[] {
+  return flattenDiagnosticIssues(issues).map(issue => {
     const path = normalizeIssuePath(issue.path)
     const [first, second, third] = path
     const value = getValueAtPath(input, path)
     const valuePart = options.includeValues && value !== undefined ? ` ${truncateForDiagnostic(value)}` : ''
+    const codePart = issue.code ? ` [${issue.code}]` : ''
     const safeMessage = issue.message.includes('15 minute step') ? 'not in 15-minute step' : issue.message
-    if (first === 'blocks' && typeof second === 'number' && typeof third === 'string') return `block ${second + 1}: ${third}${valuePart} — ${options.includeValues ? issue.message : safeMessage}`
-    if (first === 'blocks' && typeof second === 'number') return `block ${second + 1}: ${options.includeValues ? issue.message : safeMessage}`
+    if (first === 'blocks' && typeof second === 'number' && typeof third === 'string') return `block ${second + 1}: ${third}${valuePart}${codePart} — ${options.includeValues ? issue.message : safeMessage}`
+    if (first === 'blocks' && typeof second === 'number') return `block ${second + 1}${codePart}: ${options.includeValues ? issue.message : safeMessage}`
     const pathText = path.length > 0 ? path.join('.') : 'proposal'
-    return `${pathText}${valuePart} — ${options.includeValues ? issue.message : safeMessage}`
+    return `${pathText}${valuePart}${codePart} — ${options.includeValues ? issue.message : safeMessage}`
   })
 }
 
@@ -181,23 +192,24 @@ function getScheduleProposalValidationDiagnosticsInternal(proposal: DailySchedul
     const validation = DailyScheduleSchema.safeParse(schedule)
     if (validation.success) return diagnostics
 
-    for (const issue of validation.error.issues) {
+    for (const issue of flattenDiagnosticIssues(validation.error.issues)) {
       const [first, second, third] = issue.path
+      const codePart = issue.code ? ` [${issue.code}]` : ''
       if (first === 'blocks' && typeof second === 'number') {
         const block = schedule.blocks[second]
         if (block && issue.message === 'block must be inside day range') {
-          if (block.startMinutes < schedule.dayStartMinutes) diagnostics.push(options.includeValues ? `block ${second + 1}: startMinutes ${block.startMinutes} < dayStartMinutes ${schedule.dayStartMinutes}` : `block ${second + 1}: starts before dayStartMinutes`)
+          if (block.startMinutes < schedule.dayStartMinutes) diagnostics.push(options.includeValues ? `block ${second + 1}${codePart}: startMinutes ${block.startMinutes} < dayStartMinutes ${schedule.dayStartMinutes}` : `block ${second + 1}${codePart}: starts before dayStartMinutes`)
           const blockEnd = getBlockEndMinutes(block)
-          if (blockEnd > schedule.dayEndMinutes) diagnostics.push(options.includeValues ? `block ${second + 1}: block end ${blockEnd} > dayEndMinutes ${schedule.dayEndMinutes}` : `block ${second + 1}: ends after dayEndMinutes`)
+          if (blockEnd > schedule.dayEndMinutes) diagnostics.push(options.includeValues ? `block ${second + 1}${codePart}: block end ${blockEnd} > dayEndMinutes ${schedule.dayEndMinutes}` : `block ${second + 1}${codePart}: ends after dayEndMinutes`)
           continue
         }
         if (block && typeof third === 'string') {
           const valuePart = options.includeValues ? ` ${truncateForDiagnostic((block as Record<string, unknown>)[third])}` : ''
           const safeMessage = issue.message.includes('15 minute step') ? 'not in 15-minute step' : issue.message
-          diagnostics.push(`block ${second + 1}: ${third}${valuePart} — ${options.includeValues ? issue.message : safeMessage}`)
+          diagnostics.push(`block ${second + 1}: ${third}${valuePart}${codePart} — ${options.includeValues ? issue.message : safeMessage}`)
           continue
         }
-        diagnostics.push(`block ${second + 1}: ${issue.message}`)
+        diagnostics.push(`block ${second + 1}${codePart}: ${issue.message}`)
         continue
       }
       if (first === 'blocks' && issue.message.startsWith('blocks overlap:')) {
@@ -211,7 +223,7 @@ function getScheduleProposalValidationDiagnosticsInternal(proposal: DailySchedul
         }
       }
       const path = issue.path.length > 0 ? issue.path.join('.') : 'schedule'
-      diagnostics.push(`${path} — ${issue.message}`)
+      diagnostics.push(`${path}${codePart} — ${issue.message}`)
     }
   } catch (error) {
     diagnostics.push(options.includeValues ? `proposal conversion failed: ${error instanceof Error ? error.message : String(error)}` : 'proposal conversion failed')

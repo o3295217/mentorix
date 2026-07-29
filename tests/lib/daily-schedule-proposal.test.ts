@@ -250,6 +250,39 @@ describe('daily schedule proposal', () => {
     expect(proposalToDailySchedule(proposalV3, { currentPlanTaskCount: 2 })).toMatchObject({ version: 3, blocks: [{ taskIndex: 1 }, { taskIndex: 3 }, { taskIndex: 4 }, { kind: 'meal' }] })
   })
 
+  it('validates and converts v3 proposals that contain only new task blocks with empty or completed-only current plan', () => {
+    const newOnlyProposal: DailyScheduleProposalV3 = {
+      version: 3,
+      date: '2026-02-28',
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 12 * 60 + 30,
+      dayEndMinutes: 18 * 60,
+      planningBasis: 'current_time',
+      planningStartMinutes: 12 * 60 + 30,
+      workEndMinutes: 18 * 60,
+      activityEndMinutes: 18 * 60,
+      newTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
+      blocks: [
+        { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Тетроникс', category: 'main', isFixed: false, startMinutes: 12 * 60 + 30, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 2, taskText: 'Зарядка', category: 'personal', isFixed: false, startMinutes: 13 * 60 + 30, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'АИОНЛАБ', category: 'main', isFixed: false, startMinutes: 14 * 60 + 30, durationMinutes: 90 },
+      ],
+    }
+
+    expect(validateProposalAgainstCurrentPlan(newOnlyProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: [] }).success).toBe(true)
+    expect(validateProposalAgainstCurrentPlan(newOnlyProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Подъём в 6 утра', 'Холодный душ'] }).success).toBe(true)
+    expect(proposalToDailySchedule(newOnlyProposal, { currentPlanTaskCount: 0 })).toMatchObject({ version: 3, blocks: [{ taskIndex: 1 }, { taskIndex: 2 }, { taskIndex: 3 }] })
+    expect(proposalToDailySchedule(newOnlyProposal, { currentPlanTaskCount: 2 })).toMatchObject({ version: 3, blocks: [{ taskIndex: 3 }, { taskIndex: 4 }, { taskIndex: 5 }] })
+
+    const metadata = createProposalMetadata({ date: '2026-02-28', proposal: newOnlyProposal, currentScheduleHash: null, currentScheduleExists: false, currentPlanTaskCount: 2, createdAt: new Date('2026-02-28T10:00:00.000Z') })
+    expect(metadata.currentPlanTaskCount).toBe(2)
+    expect(safeParseProposalMetadata({ ...metadata, loadSummary: { ...metadata.loadSummary, scheduledMinutes: 1 } })).toMatchObject({
+      schemaVersion: 3,
+      currentPlanTaskCount: 2,
+      loadSummary: { scheduledMinutes: 210 },
+    })
+  })
+
   it('creates metadata schemaVersion 3 with optional plan tasks hash and computed load summary', () => {
     const currentPlanTasksHash = hashDailyPlanTasks(['Deep work', 'Review'])
     const metadata = createProposalMetadata({

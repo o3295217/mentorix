@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-29 — Proposal v3 хранит базовый размер planTasks для новых задач
+
+**Что решили.** Для `daily_schedule_proposal` schemaVersion 3 сохраняем `currentPlanTaskCount` рядом с `currentPlanTasksHash` и используем его при повторной конвертации pending proposal в schedule-контекст/хеш.
+
+**Почему.** В proposal v3 `taskSource='new'` использует локальные индексы внутри `newTasks`, а persisted schedule должен ссылаться на итоговый план после добавления новых задач. Без сохранённого базового количества задач повторная конвертация new-only proposal могла только эвристически считать existing blocks; если existing blocks нет (например, текущий план пуст или будущие блоки все из переписки), эвристика возвращала 0 и теряла смещение.
+
+**Что отвергли.** Не стали ослаблять проверку точного `taskText` для existing/new blocks: битые ссылки модели по-прежнему отклоняются. Не стали менять Prisma-схему: metadata хранится в JSON `ChatMessage.metadataJson`.
+
+**Файлы.** `lib/daily-schedule-proposal.ts`, `lib/daily-schedule-context.ts`, `app/api/daily/chat/route.ts`, `lib/prompts/plan-chat.ts`, тесты proposal/chat route, `docs/ARCHITECTURE.md`.
+
+---
+
 ## 2026-07-26 — dev-log: единственным источником оставлен глобальный плагин, проектный удалён
 
 **Что решили.** Удалили `.opencode/plugin/dev-log-writer.ts`. Журнал `docs/dev-log/<YYYY-MM>.md` пишет только глобальный плагин `~/.config/opencode/plugin/dev-log-writer.ts`.
