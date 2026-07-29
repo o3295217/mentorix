@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — docs: add verified codebase map, correct AGENTS.md claims about fetch and theme
+- 📝 Документация: 3 файлов
+
+
 ### 2026-07-29 — fix(daily): persist currentPlanTaskCount so chat-only tasks reach the timeline
 - 🔌 API: 1 файлов (route)
 - 📚 Библиотеки: 3 файлов (daily-schedule-context, daily-schedule-proposal, plan-chat)
