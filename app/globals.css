@@ -362,9 +362,11 @@
     }
 
     .daily-chat-card {
-      height: auto;
-      min-height: 500px;
-      max-height: 80vh;
+      position: sticky;
+      top: 1rem;
+      height: clamp(18rem, calc(100dvh - 22rem), 80vh);
+      min-height: 0;
+      max-height: calc(100dvh - 2rem);
     }
 
     .daily-chat-composer {

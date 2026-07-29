@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — chore(opencode): move playwright dumps out of repo, cap visual-reviewer browser actions
+- ⚙️ Конфигурация: 2 файлов
+- 📝 Документация: 2 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-07-29 — refactor(daily): remove extra-task block, fix action panel overlap, align chat heading
 - 📄 Страницы: 1 файлов
 - 📝 Документация: 1 файлов

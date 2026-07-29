@@ -1185,7 +1185,7 @@ export default function DailyPage() {
       </div>
 
       {/* Plan and Chat side by side - 60/40 */}
-      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-5">
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-5 lg:items-start">
         {/* Plan - Left (60%) */}
         <div
           id="daily-plan-panel"
@@ -2091,7 +2091,7 @@ export default function DailyPage() {
                   {saving ? 'Сохранение...' : 'Сохранить план'}
                 </button>
 
-                {!hasEvaluation ? (
+                {!hasEvaluation && dailyPhase !== 'summary' ? (
                   <button
                     onClick={handleEvaluateClick}
                     disabled={evaluating || selectedTasks.size === 0}
