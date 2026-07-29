@@ -270,13 +270,13 @@ TTL `ephemeral` — 5 минут.
 
 ### Ключевой узел ежедневника
 
-`hooks/daily/useDailyController.ts` (1126 строк) держит почти всю логику страницы дня:
+`hooks/daily/useDailyController.ts` (1125 строк) держит почти всю логику страницы дня:
 дату и загрузку данных, цели недели и месяца, привычки и предложения привычек, черновик
 плана в localStorage, задачи и их редактирование, сохранение плана, проверку плана, чат
 с SSE-стримом, применение задач из предложения AI, запуск оценки дня.
 
-Рядом: `useDailySchedule.ts` (630 строк) — расписание и таймлайн, и набор чистых хелперов
-в `hooks/daily/` (`schedule-helpers.ts` — 848 строк, `task-helpers`, `chat-helpers`,
+Рядом: `useDailySchedule.ts` (629 строк) — расписание и таймлайн, и набор чистых хелперов
+в `hooks/daily/` (`schedule-helpers.ts` — 847 строк, `task-helpers`, `chat-helpers`,
 `proposal-helpers`, `plan-draft`, `phase-helpers` и другие).
 
 ### Стили
@@ -299,8 +299,11 @@ TTL `ephemeral` — 5 минут.
   дашборд, аналитика, прогресс, профиль, история, периоды, оценка дня, большинство
   хуков целей и часть `useDailyController`.
 - `SPECIFICATION.md` описывает переключение темы light/dark/system, которого в продукте нет.
-- `USER_GUIDE.md` не обновлялся с апреля: называет продукт ION и описывает блок
-  «Вне плана», удалённый 2026-07-29.
+- `ARCHITECTURE.md` перечисляет `ThemeProvider` и `/api/profile/theme` без пометки, что
+  первый — заглушка, а второй фронтендом не используется.
+
+`USER_GUIDE.md` актуализирован 2026-07-29 (коммит `e344bf7`): название продукта, удалённый
+блок «Вне плана», ручной запуск оценки, мобильная навигация, отсутствие переключателя темы.
 
 **Архитектурные**
 
@@ -308,8 +311,10 @@ TTL `ephemeral` — 5 минут.
   `/api/progress`, `/api/profile`, `/api/daily`, `/api/tasks/open`, `/api/facts`,
   `/api/goals/period`. Кеша нет, каждая страница грузит заново.
 - Прямые обращения к API из компонентов: `AuthProvider`, `DatePickerWithIndicators`.
-- Крупные файлы: `app/daily/page.tsx` — 2384 строки, `useDailyController.ts` — 1126,
-  `schedule-helpers.ts` — 848, `DayTimeline.tsx` — 832, `app/tasks/page.tsx` — 1077.
+- Крупные файлы: `app/daily/page.tsx` — 2383 строки, `useDailyController.ts` — 1125,
+  `schedule-helpers.ts` — 847, `DayTimeline.tsx` — 831, `app/tasks/page.tsx` — 1076.
+- `/api/profile/theme` (GET и POST) читает и пишет `themePreference` в БД, но фронтендом
+  не вызывается ни разу — мёртвый роут поверх выключенного переключения темы.
 
 **Надёжность и стоимость**
 
