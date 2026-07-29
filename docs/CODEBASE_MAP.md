@@ -14,7 +14,9 @@
 | `docs/USER_GUIDE.md` | продуктовые сценарии глазами пользователя |
 | `docs/DECISIONS.md` | почему приняты нетривиальные решения |
 | `docs/DEPLOY.md`, `docs/INFRASTRUCTURE.md` | production |
+| `docs/rolling_wave_planning.md` | алгоритм rolling wave; живой, реализован в `lib/prompts/goals-decompose.ts` |
 | `docs/dev-log/<YYYY-MM>.md` | факты выполнения задач субагентами (пишется плагином) |
+| `docs/archive/` | завершённые планы код-ревью и старые черновики; **не план работ**, см. `docs/archive/README.md` |
 
 ---
 

@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — docs: refresh user guide for mentorix naming, removed extra-task block, manual evaluation
+- 📝 Документация: 2 файлов
+
+
 ### 2026-07-29 — docs: add verified codebase map, correct AGENTS.md claims about fetch and theme
 - 📝 Документация: 3 файлов
 
