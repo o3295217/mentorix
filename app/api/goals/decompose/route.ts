@@ -6,6 +6,7 @@ import { buildGoalsDecomposePrompt } from '@/lib/prompts/goals-decompose'
 import { buildGoalsValidatePrompt } from '@/lib/prompts/goals-validate'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { sanitizeUserInput } from '@/lib/api-utils'
 import { z } from 'zod'
 
 const PLAN_MARKER_RE = /\[(YEAR|HALF_YEAR|QUARTER|MONTH|WEEK):/
@@ -40,6 +41,10 @@ function clampText(value: string, maxLength: number): string {
   return `${normalized.slice(0, maxLength - 1).trim()}…`
 }
 
+function sanitizeAndClampText(value: string, maxLength: number): string {
+  return clampText(sanitizeUserInput(value), maxLength)
+}
+
 function sanitizeGoalMap(goalMap: Record<string, string[]> | undefined): Record<string, string[]> {
   if (!goalMap) return {}
 
@@ -48,7 +53,7 @@ function sanitizeGoalMap(goalMap: Record<string, string[]> | undefined): Record<
       periodKey,
       goals
         .filter((goal): goal is string => typeof goal === 'string')
-        .map((goal) => clampText(goal, MAX_GOAL_LENGTH))
+        .map((goal) => sanitizeAndClampText(goal, MAX_GOAL_LENGTH))
         .filter(Boolean)
         .slice(0, MAX_GOALS_PER_PERIOD),
     ])
@@ -65,7 +70,7 @@ function sanitizeHistory(
     .slice(-20)
     .map((message) => ({
       role: message.role,
-      content: clampText(message.content, MAX_HISTORY_LENGTH),
+      content: sanitizeAndClampText(message.content, MAX_HISTORY_LENGTH),
     }))
 }
 
@@ -90,10 +95,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { message, context, history } = validation.data
-    const sanitizedMessage = clampText(message, MAX_MESSAGE_LENGTH)
+    const sanitizedMessage = sanitizeAndClampText(message, MAX_MESSAGE_LENGTH)
     const sanitizedContext = {
       ...context,
-      dream: clampText(context.dream, MAX_DREAM_LENGTH),
+      dream: sanitizeAndClampText(context.dream, MAX_DREAM_LENGTH),
       yearGoals: sanitizeGoalMap(context.yearGoals),
       periodGoals: sanitizeGoalMap(context.periodGoals),
       completedGoals: sanitizeGoalMap(context.completedGoals),
