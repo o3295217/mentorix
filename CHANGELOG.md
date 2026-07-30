@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-07-29 — docs: fix stale user-guide claim and line counts in codebase map
+- 📝 Документация: 2 файлов
+
+
 ### 2026-07-29 — docs: archive completed code-review plans, keep rolling wave spec active
 - 📝 Документация: 8 файлов
 
