@@ -238,8 +238,13 @@ TTL `ephemeral` — 5 минут.
 ### Защита ввода
 
 `sanitizeUserInput` (`lib/api-utils.ts`) применяется в промптах `daily.ts` и `insights.ts`,
-а из роутов — только в `/api/daily/chat`. В `/api/goals/decompose` пользовательский текст
-уходит в модель без очистки.
+а из роутов — в `/api/daily/chat` и, с коммита `7c43ce1`, в `/api/goals/decompose`
+(`message`, `context.dream`, строки целей, история чата — строго до `clampText`, иначе
+перестают держаться лимиты длины).
+
+Остаточная брешь там же: **ключи** goal-map не санитизируются и не ограничены по длине
+(`z.record(z.string(), …)`), а интерполируются в промпт сырыми —
+`lib/prompts/goals-decompose.ts:159,167`. Заведено в `docs/ROADMAP.md`.
 
 Ответ модели разбирается через `extractJsonFromAIResponse` с балансировкой скобок и
 типовым валидатором. Исключение: `/api/daily/check-plan` парсит ответ регуляркой и
@@ -326,7 +331,13 @@ TTL `ephemeral` — 5 минут.
 
 **Безопасность**
 
-- `sanitizeUserInput` не применяется в `/api/goals/decompose`.
+- ~~`sanitizeUserInput` не применяется в `/api/goals/decompose`~~ — закрыто коммитом `7c43ce1`.
+  Осталось: ключи goal-map уходят в промпт без санитизации и без лимита длины.
+- `AuthError` не распознаётся в 6 роутах и подменяется на 500 вместо 401:
+  `goals/move:60-63`, `tasks/[id]:40-43`, `tasks/[id]/close:34-37`, `tasks/[id]/delete:33-36`,
+  `tasks/[id]/reopen:33-36`, `tasks/process-uncompleted:155-161`. Образец корректной
+  обработки — `app/api/daily/chat/route.ts:714-717`.
+- `tasks/process-uncompleted:41-46` — без zod, ответ не в форме `{ error: 'Validation failed', details }`.
 - Нарушения шаблона роута из раздела 5.
 
 **Мёртвый код**
