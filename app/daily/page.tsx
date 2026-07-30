@@ -5,12 +5,13 @@ import type { CSSProperties } from 'react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useDaily } from '@/hooks/useDaily'
 import { useDailySchedule } from '@/hooks/daily/useDailySchedule'
 import DayTimeline from '@/components/daily/DayTimeline'
 import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalCard'
 import DailyPlanCardHeader from '@/components/daily/DailyPlanCardHeader'
+import DailyPeriodContext from '@/components/daily/DailyPeriodContext'
+import DailyCompletedWorkWidgets from '@/components/daily/DailyCompletedWorkWidgets'
 import type { PlanLens } from '@/components/daily/PlanLensSwitch'
 import { isInvalidProposalFallbackMessage, renderAssistantMessageContent } from '@/components/daily/chat-render-helpers'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
@@ -27,10 +28,10 @@ import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
 import { getScheduleBoundaryMinutes } from '@/hooks/daily/schedule-helpers'
 import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
 import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
+import type { FactItem } from '@/hooks/daily/types'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
-type FactItem = { id: number; text: string; type: string; category: string | null }
 
 const taskActionButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:h-8 lg:min-w-8 lg:w-8'
 const confirmButtonBase = 'flex h-11 min-w-11 items-center justify-center rounded-md text-sm leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:h-7 lg:min-w-7 lg:w-7'
@@ -49,15 +50,6 @@ function getNextDateKey(dateKey: string) {
 
 function parseDateKey(dateKey: string) {
   return new Date(`${dateKey}T00:00:00`)
-}
-
-function getWorkNoun(count: number) {
-  const lastTwoDigits = count % 100
-  const lastDigit = count % 10
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'дел'
-  if (lastDigit === 1) return 'дело'
-  if (lastDigit >= 2 && lastDigit <= 4) return 'дела'
-  return 'дел'
 }
 
 type FactsResponse = {
@@ -995,154 +987,28 @@ export default function DailyPage() {
       </button>
 
       <div id="daily-context" className={`${showMobileContext ? 'space-y-4' : 'hidden'} lg:block lg:space-y-6`}>
-      {!hasGoalContext ? (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3 text-sm text-gray-400">
-          Цели недели и месяца пока не заданы. <Link href="/goals" className="font-medium text-primary-300 hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">Добавьте цели</Link>, чтобы Ментрикс точнее собирал план дня.
-        </div>
-      ) : (
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-          <h3 className="font-semibold text-lg text-blue-200 mb-3">{weekLabel}:</h3>
-          {weekGoals.length > 0 ? (
-            <ul className="text-base text-blue-300 space-y-1.5">
-              {weekGoals.map((goal, index) => {
-                // Используем статус из API (за весь период) или проверяем задачи текущего дня
-                const goalText = typeof goal === 'string' ? goal : goal.text
-                const completedInPeriod = typeof goal === 'string' ? false : goal.completed
-                const completedToday = isGoalCompleted(goalText)
-                const completed = completedInPeriod || completedToday
-                return (
-                  <li key={index} className="flex min-w-0 items-start gap-2 leading-normal">
-                    <span className={completed ? 'text-green-400' : 'text-gray-500'}>
-                      {completed ? '✓' : '•'}
-                    </span>
-                    <span className={`min-w-0 flex-1 break-words pt-2.5 lg:pt-0 ${completed ? 'text-green-400' : ''}`}>
-                      {goalText}
-                    </span>
-                    {!completed && (
-                      <button
-                        onClick={() => addGoalToTasks(goalText)}
-                        disabled={planTaskMutationLocked}
-                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-blue-500/15 px-3 text-lg font-medium leading-none text-blue-400 hover:bg-blue-500/20 hover:text-blue-200 disabled:cursor-not-allowed disabled:opacity-45 lg:h-auto lg:min-w-0 lg:py-1.5"
-                        title="Добавить в план дня"
-                        aria-label="Добавить в план дня"
-                      >
-                        →
-                      </button>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-          <h3 className="font-semibold text-lg text-purple-200 mb-3">{monthLabel}:</h3>
-          {monthGoals.length > 0 ? (
-            <ul className="text-base text-purple-300 space-y-1.5">
-              {monthGoals.map((goal, index) => {
-                // Используем статус из API (за весь период) или проверяем задачи текущего дня
-                const goalText = typeof goal === 'string' ? goal : goal.text
-                const completedInPeriod = typeof goal === 'string' ? false : goal.completed
-                const completedToday = isGoalCompleted(goalText)
-                const completed = completedInPeriod || completedToday
-                return (
-                  <li key={index} className="flex min-w-0 items-start gap-2 leading-normal">
-                    <span className={completed ? 'text-green-400' : 'text-gray-500'}>
-                      {completed ? '✓' : '•'}
-                    </span>
-                    <span className={`min-w-0 flex-1 break-words pt-2.5 lg:pt-0 ${completed ? 'text-green-400' : ''}`}>
-                      {goalText}
-                    </span>
-                    {!completed && (
-                      <button
-                        onClick={() => addGoalToTasks(goalText)}
-                        disabled={planTaskMutationLocked}
-                        className="flex h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-md bg-purple-500/15 px-3 text-lg font-medium leading-none text-purple-400 hover:bg-purple-500/20 hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-45 lg:h-auto lg:min-w-0 lg:py-1.5"
-                        title="Добавить в план дня"
-                        aria-label="Добавить в план дня"
-                      >
-                        →
-                      </button>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
-        </div>
-      </div>
-      )}
+      <DailyPeriodContext
+        hasGoalContext={hasGoalContext}
+        weekLabel={weekLabel}
+        weekGoals={weekGoals}
+        monthLabel={monthLabel}
+        monthGoals={monthGoals}
+        planTaskMutationLocked={planTaskMutationLocked}
+        isGoalCompleted={isGoalCompleted}
+        addGoalToTasks={addGoalToTasks}
+      />
 
       {/* Виджеты «Сделано за неделю» и «Сделано за месяц» */}
-      {(weekFactsTotal > 0 || monthFactsTotal > 0) && (
-        <div className={`grid grid-cols-1 ${weekFactsTotal > 0 && monthFactsTotal > 0 ? 'md:grid-cols-2' : ''} gap-4`}>
-          {/* Сделано за неделю */}
-          {weekFactsTotal > 0 && (
-          <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4">
-            <button
-              onClick={() => setShowWeekFacts(!showWeekFacts)}
-               className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
-               aria-expanded={showWeekFacts}
-            >
-              <h3 className="text-sm font-medium text-blue-300">
-                Сделано за неделю: {weekFactsTotal} {getWorkNoun(weekFactsTotal)}
-              </h3>
-              <span className="text-blue-400 text-xs">{showWeekFacts ? '▲ скрыть' : '▼ показать'}</span>
-            </button>
-            {showWeekFacts && (
-              <div className="mt-3 space-y-1 lg:max-h-48 lg:overflow-y-auto">
-                {weekFacts.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-blue-500">✓</span>
-                    <span className="min-w-0 break-words text-gray-300">{item.text}</span>
-                    {item.category && (
-                      <span className={`text-[10px] ml-auto ${
-                        item.category === 'стратегические' ? 'text-orange-400' :
-                        item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'
-                      }`}>{item.category}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          )}
-
-          {/* Сделано за месяц */}
-          {monthFactsTotal > 0 && (
-          <div className="rounded-xl bg-purple-500/5 border border-purple-500/20 p-4">
-            <button
-              onClick={() => setShowMonthFacts(!showMonthFacts)}
-               className="flex min-h-11 w-full items-center justify-between gap-2 text-left"
-               aria-expanded={showMonthFacts}
-            >
-              <h3 className="text-sm font-medium text-purple-300">
-                Сделано за месяц: {monthFactsTotal} {getWorkNoun(monthFactsTotal)}
-              </h3>
-              <span className="text-purple-400 text-xs">{showMonthFacts ? '▲ скрыть' : '▼ показать'}</span>
-            </button>
-            {showMonthFacts && (
-              <div className="mt-3 space-y-1 lg:max-h-48 lg:overflow-y-auto">
-                {monthFacts.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-purple-500">✓</span>
-                    <span className="min-w-0 break-words text-gray-300">{item.text}</span>
-                    {item.category && (
-                      <span className={`text-[10px] ml-auto ${
-                        item.category === 'стратегические' ? 'text-orange-400' :
-                        item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'
-                      }`}>{item.category}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          )}
-        </div>
-      )}
+      <DailyCompletedWorkWidgets
+        weekFactsTotal={weekFactsTotal}
+        monthFactsTotal={monthFactsTotal}
+        weekFacts={weekFacts}
+        monthFacts={monthFacts}
+        showWeekFacts={showWeekFacts}
+        showMonthFacts={showMonthFacts}
+        onToggleWeekFacts={() => setShowWeekFacts(!showWeekFacts)}
+        onToggleMonthFacts={() => setShowMonthFacts(!showMonthFacts)}
+      />
       </div>
 
       <div

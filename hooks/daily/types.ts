@@ -55,6 +55,13 @@ export interface PeriodGoalItem {
   completed: boolean
 }
 
+export interface FactItem {
+  id: number
+  text: string
+  type: string
+  category: string | null
+}
+
 export interface UseDailyReturn {
   selectedDate: string
   setSelectedDate: (date: string) => void
