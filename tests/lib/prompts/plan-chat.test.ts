@@ -7,6 +7,7 @@ import {
   isPlanChatKickoffMessage,
   parsePlanChatScheduleProposalToolResult,
 } from '@/lib/prompts/plan-chat'
+import { DAILY_SCHEDULE_TIME_STEP_MINUTES, MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES } from '@/lib/daily-schedule-time'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -43,16 +44,17 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Рекомендуй перенос/сокращение')
   })
 
-  it('requires proposal v3 planning fields, exact 15-minute timing and fixed semantics', () => {
+  it('requires proposal v3 planning fields, minute-level timing and fixed semantics', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Tool input всегда плоский proposal v3')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('planningBasis,planningStartMinutes,workEndMinutes,activityEndMinutes,newTasks,blocks[]')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("taskSource='existing'")
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("taskSource='new'")
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Точность времени строго 15 минут')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сохраняй длительности 45 и 90 минут')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Время указывается с точностью до ${DAILY_SCHEDULE_TIME_STEP_MINUTES} мин.`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сохраняй точные длительности вроде 45 и 90 минут')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('fixed=true только для жёстких событий')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('startMinutes и durationMinutes каждого блока ОБЯЗАНЫ быть кратны 15')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если точная длительность неизвестна, выбери ближайшую реалистичную кратную 15 минутам')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Все времена указываются с шагом ${DAILY_SCHEDULE_TIME_STEP_MINUTES} мин.`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`durationMinutes каждого блока не меньше ${MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES} мин.`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если точная длительность неизвестна, выбери реалистичную оценку без обязательного округления до 15 минут')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Каждый block обязан полностью лежать внутри [dayStartMinutes, dayEndMinutes]')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Blocks НЕ должны пересекаться между собой')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("service block с kind='buffer'")

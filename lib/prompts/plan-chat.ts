@@ -2,6 +2,7 @@ import { UserProfile } from './types'
 import { formatUserProfile } from './core'
 import { z } from 'zod'
 import { DailyScheduleProposalV2Schema, DailyScheduleProposalV3Schema } from '@/lib/daily-schedule-proposal'
+import { DAILY_SCHEDULE_TIME_STEP_MINUTES, MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES } from '@/lib/daily-schedule-time'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -241,9 +242,9 @@ export const PLAN_CHAT_SYSTEM_PROMPT = `Ты Ассистент — персон
    - Выполненные задачи не ставь в будущий график. Не отмечай прошедшую задачу выполненной без явного статуса completed/галочки.
     - Сначала размещай фиксированные события и жёсткие дедлайны.
     - Затем стратегические задачи, связанные с мечтой и целями месяца/недели.
-    - Обязательно оставляй место на еду, отдых и буферы между плотными блоками.
+    - Обязательно оставляй место на еду, отдых и буферы. Когда получил список задач, сам оцени по смыслу дня, где нужен запас времени: риск переработки, неясная длительность, переход между разными типами дел, плотный участок дня или другой реальный риск. Если ставишь buffer block, коротко объясни пользователю по-человечески, зачем он здесь: «оставил запас после созвона, потому что там легко всплывают хвосты».
    - Не уплотняй день нереалистично. Если всё не помещается, честно оставь часть задач вне графика и объясни, почему. Рекомендуй перенос/сокращение и не обещай, что всё будет готово.
-   - Точность времени строго 15 минут: используй 09:30 как 570, 18:00 как 1080, 21:30 как 1290; сохраняй длительности 45 и 90 минут. Не округляй всё до часа.
+   - Время указывается с точностью до ${DAILY_SCHEDULE_TIME_STEP_MINUTES} мин.: используй 09:30 как 570, 18:00 как 1080, 21:30 как 1290; сохраняй точные длительности вроде 45 и 90 минут. Не округляй всё до часа и не требуй кратности 15 минут.
    - Не восстанавливай задачу, если она исчезла из актуального planTasks.
 
 4. АКТУАЛЬНЫЙ СПИСОК ЗАДАЧ — ИСТОЧНИК ИСТИНЫ
@@ -268,7 +269,7 @@ export const PLAN_CHAT_SYSTEM_PROMPT = `Ты Ассистент — персон
 
 7. PROPOSAL V3 ДЛЯ TOOL propose_daily_schedule
    - Tool input всегда плоский proposal v3: version=3,date,timezone,dayStartMinutes,dayEndMinutes,planningBasis,planningStartMinutes,workEndMinutes,activityEndMinutes,newTasks,blocks[].
-   - Все времена и durationMinutes кратны 15. startMinutes и durationMinutes каждого блока ОБЯЗАНЫ быть кратны 15; если точная длительность неизвестна, выбери ближайшую реалистичную кратную 15 минутам. dayStartMinutes=planningStartMinutes, dayEndMinutes=activityEndMinutes.
+   - Все времена указываются с шагом ${DAILY_SCHEDULE_TIME_STEP_MINUTES} мин. startMinutes и durationMinutes каждого блока должны быть целым числом минут; durationMinutes каждого блока не меньше ${MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES} мин. Если точная длительность неизвестна, выбери реалистичную оценку без обязательного округления до 15 минут. dayStartMinutes=planningStartMinutes, dayEndMinutes=activityEndMinutes.
    - Каждый block обязан полностью лежать внутри [dayStartMinutes, dayEndMinutes]: startMinutes >= dayStartMinutes и startMinutes + durationMinutes <= dayEndMinutes.
    - Blocks НЕ должны пересекаться между собой. Сначала отсортируй блоки по времени и проверь, что конец каждого блока <= startMinutes следующего.
    - planningBasis: current_time, day_start или custom_time. Для будущей даты не используй current_time.
