@@ -1,6 +1,6 @@
 import type { DragEvent } from 'react'
 import type { DailyEntry, OpenTask } from '@/lib/types'
-import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
+import type { DailyChatProposalMetadata } from '@/lib/daily-schedule-proposal'
 
 export type DailyPlanDraft = {
   updatedAt: string
@@ -27,7 +27,7 @@ export interface ChatMessage {
   id?: string
   role: 'user' | 'assistant'
   content: string
-  metadata?: DailyScheduleProposalMetadata | null
+  metadata?: DailyChatProposalMetadata | null
 }
 
 export interface Habit {

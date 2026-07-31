@@ -9,6 +9,7 @@ import { useDaily } from '@/hooks/useDaily'
 import { useDailySchedule } from '@/hooks/daily/useDailySchedule'
 import DayTimeline from '@/components/daily/DayTimeline'
 import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalCard'
+import DailyTaskListProposalCard from '@/components/daily/DailyTaskListProposalCard'
 import DailyPlanCardHeader from '@/components/daily/DailyPlanCardHeader'
 import DailyPeriodContext from '@/components/daily/DailyPeriodContext'
 import DailyCompletedWorkWidgets from '@/components/daily/DailyCompletedWorkWidgets'
@@ -20,9 +21,10 @@ import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/componen
 import { areTasksSimilar } from '@/lib/task-match'
 import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 import type { DailySchedule, DailyScheduleLoadSummary } from '@/lib/daily-schedule'
+import type { DailyScheduleProposalMetadata, DailyTaskListProposalMetadata } from '@/lib/daily-schedule-proposal'
 import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
 import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
-import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, getProposalNewTasks, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 import { getTaskTimeChipLabel, getTaskTimeChips, sortTasksByScheduleTime } from '@/hooks/daily/list-lens-helpers'
 import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
 import { getScheduleBoundaryMinutes } from '@/hooks/daily/schedule-helpers'
@@ -63,6 +65,26 @@ type ApplyProposalResponse = {
   status?: string
   loadSummary?: DailyScheduleLoadSummary | null
   planTasks?: string[]
+}
+
+type ApplyTaskListProposalResponse = {
+  status: 'created' | 'already_applied'
+  updatedAt: string
+  planText: string
+  planTasks: string[]
+  hash: string
+  proposalMessageId: number
+}
+
+function getTaskListApplyErrorMessage(error: unknown): string {
+  if (error instanceof FetchJsonError) {
+    if (error.status === 409) return 'План изменился с момента предложения. Я не буду затирать текущий список задач — попросите ассистента обновить предложение.'
+    if (error.status >= 500) return 'Не удалось добавить задачи в план. Попробуйте ещё раз чуть позже.'
+    return getFetchErrorMessage(error, 'Не удалось добавить задачи в план')
+  }
+
+  if (error instanceof TypeError) return 'Не удалось связаться с сервером. Проверьте интернет и попробуйте ещё раз.'
+  return getFetchErrorMessage(error, 'Не удалось добавить задачи в план')
 }
 
 export default function DailyPage() {
@@ -388,7 +410,7 @@ export default function DailyPage() {
 
   const handleApplyProposal = useCallback(async (
     messageId: string | undefined,
-    metadata: NonNullable<(typeof chatMessages)[number]['metadata']>,
+    metadata: DailyScheduleProposalMetadata,
     options: ProposalApplyOptions,
   ) => {
     if (!messageId || applyingProposalId) return
@@ -448,6 +470,49 @@ export default function DailyPage() {
       setApplyingProposalId(null)
     }
   }, [applyingProposalId, applyPlanTasksFromProposal, applySavedSchedule, ensureEntrySaved, flushScheduleChanges, markChatProposalApplied, selectedDate, showMessage, tasks.length])
+
+  const handleApplyTaskListProposal = useCallback(async (
+    messageId: string | undefined,
+    metadata: DailyTaskListProposalMetadata,
+  ) => {
+    if (!messageId || applyingProposalId) return
+    setAssistantOperationError('')
+    directChatOperationRef.current = null
+    const numericMessageId = parsePersistedNumericMessageId(messageId)
+    if (numericMessageId === null) {
+      const operationError = new Error('Не удалось добавить задачи: ответ ассистента ещё не сохранён. Попробуйте обновить чат.')
+      setAssistantOperationError(operationError.message)
+      throw operationError
+    }
+
+    setApplyingProposalId(messageId)
+    try {
+      const response = await fetchJson<ApplyTaskListProposalResponse>('/api/daily/task-list/apply-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          messageId: numericMessageId,
+          confirmed: true,
+          expectedCurrentPlanTasksHash: metadata.currentPlanTasksHash,
+        }),
+      })
+      applyPlanTasksFromProposal(response.planTasks)
+      markChatProposalApplied(messageId, response.updatedAt)
+      showMessage(response.status === 'already_applied' ? 'Список задач уже был добавлен в план.' : 'Задачи добавлены в план.')
+    } catch (error) {
+      if (error instanceof FetchJsonError && error.status === 401) {
+        router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
+        return
+      }
+
+      const operationError = new Error(getTaskListApplyErrorMessage(error))
+      setAssistantOperationError(operationError.message)
+      throw operationError
+    } finally {
+      setApplyingProposalId(null)
+    }
+  }, [applyingProposalId, applyPlanTasksFromProposal, markChatProposalApplied, router, selectedDate, showMessage])
 
   const handleSendChatMessage = useCallback(async (initialMessage?: string) => {
     if (isSubmittingChatRef.current || sendingChat) return
@@ -2180,9 +2245,17 @@ export default function DailyPage() {
                           metadata={msg.metadata}
                           messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}
                           isApplying={applyingProposalId === msg.id}
-                          onApply={(options) => handleApplyProposal(msg.id, msg.metadata!, options)}
+                          onApply={(options) => msg.metadata?.type === 'daily_schedule_proposal' ? handleApplyProposal(msg.id, msg.metadata, options) : Promise.resolve()}
                           onDiscuss={() => handleDiscussProposal('Хочу скорректировать черновик расписания: ')}
                           onDismiss={() => handleDismissProposal(msg.id)}
+                        />
+                      )}
+                      {msg.metadata?.type === 'daily_task_list_proposal' && (
+                        <DailyTaskListProposalCard
+                          metadata={msg.metadata}
+                          messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}
+                          isApplying={applyingProposalId === msg.id}
+                          onApply={() => msg.metadata?.type === 'daily_task_list_proposal' ? handleApplyTaskListProposal(msg.id, msg.metadata) : Promise.resolve()}
                         />
                       )}
                     </div>
