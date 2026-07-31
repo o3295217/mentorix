@@ -596,6 +596,17 @@ export interface ReconcileResult {
   removedBlockIds: string[]
 }
 
+export function renameTaskScheduleBlocks(blocks: BlockInput[], taskIndex: number, taskText: string): BlockInput[] {
+  const nextText = taskText.trim()
+  if (!nextText) return blocks
+
+  return blocks.map(block => (
+    isTaskScheduleBlock(block) && block.taskIndex === taskIndex
+      ? { ...block, taskText: nextText }
+      : block
+  ))
+}
+
 /**
  * Синхронизирует блоки расписания с актуальным составом задач плана.
  * - Сопоставление по (нормализованный текст + номер вхождения), чтобы корректно

@@ -21,6 +21,7 @@ import {
   isTaskScheduleBlock,
   minutesToTimeInputValue,
   minutesToTimeLabel,
+  renameTaskScheduleBlocks,
   reconcileSchedule,
   scheduleEquals,
   snapDownToStep,
@@ -523,17 +524,19 @@ describe('schedule-helpers · reconcileSchedule', () => {
     expect(result.removedBlockIds).toEqual([blocks[1].id])
   })
 
-  it('handles edited task text (becomes unscheduled, block removed)', () => {
+  it('keeps the schedule block linked when task text is edited in place', () => {
     const gen = seqGen()
     const blocks = baseBlocks(gen)
     const prev = [{ taskText: 'A' }, { taskText: 'B' }, { taskText: 'C' }]
     const next = [{ taskText: 'A' }, { taskText: 'B2' }, { taskText: 'C' }]
-    const result = reconcileSchedule(blocks, prev, next)
+    const renamedBlocks = renameTaskScheduleBlocks(blocks, 2, 'B2')
+    const result = reconcileSchedule(renamedBlocks, prev, next)
 
-    expect(onlyTaskBlocks(result.blocks).map(b => b.taskText)).toEqual(['A', 'C'])
-    expect(result.removedBlockIds).toEqual([blocks[1].id])
-    // New "B2" should be unscheduled
-    expect(computeUnscheduledTaskIndexes(result.blocks, next)).toContain(1)
+    expect(onlyTaskBlocks(result.blocks).map(b => b.id)).toEqual(blocks.map(b => b.id))
+    expect(onlyTaskBlocks(result.blocks).map(b => b.taskText)).toEqual(['A', 'B2', 'C'])
+    expect(onlyTaskBlocks(result.blocks).map(b => b.taskIndex)).toEqual([1, 2, 3])
+    expect(result.removedBlockIds).toEqual([])
+    expect(computeUnscheduledTaskIndexes(result.blocks, next)).not.toContain(1)
   })
 
   it('keeps v2 service blocks out of task reconcile and unscheduled calculations', () => {
@@ -542,11 +545,15 @@ describe('schedule-helpers · reconcileSchedule', () => {
       { id: 'task-1', kind: 'task', taskIndex: 1, taskText: 'A', startMinutes: 840, durationMinutes: 60 },
     ]
 
-    const result = reconcileSchedule(blocks, [{ taskText: 'A' }], [{ taskText: 'B' }])
+    const renamedBlocks = renameTaskScheduleBlocks(blocks, 1, 'B')
+    const result = reconcileSchedule(renamedBlocks, [{ taskText: 'A' }], [{ taskText: 'B' }])
 
-    expect(result.blocks).toEqual([blocks[0]])
-    expect(result.removedBlockIds).toEqual(['task-1'])
-    expect(computeUnscheduledTaskIndexes(result.blocks, [{ taskText: 'B' }])).toEqual([0])
+    expect(result.blocks).toEqual([
+      blocks[0],
+      { ...blocks[1], taskText: 'B' },
+    ])
+    expect(result.removedBlockIds).toEqual([])
+    expect(computeUnscheduledTaskIndexes(result.blocks, [{ taskText: 'B' }])).toEqual([])
   })
 
   it('handles duplicates with occurrence-aware matching', () => {

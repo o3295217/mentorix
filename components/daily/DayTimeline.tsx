@@ -34,6 +34,11 @@ export function isTaskHighlighted(block: BlockInput, highlightedTaskIndexes: Rea
   return isTaskScheduleBlock(block) && highlightedTaskIndexes.has(block.taskIndex)
 }
 
+export function getTimelineBlockTitle(block: BlockInput, tasks: OpenTask[]): string {
+  if (!isTaskScheduleBlock(block)) return getBlockDisplayTitle(block)
+  return tasks[block.taskIndex - 1]?.taskText ?? block.taskText
+}
+
 export function shouldCommitPointerDrag(eventType: 'up' | 'cancel', moved: boolean, mutationLocked: boolean): boolean {
   return eventType === 'up' && moved && !mutationLocked
 }
@@ -143,6 +148,12 @@ export interface DayTimelineProps {
   mutationLocked?: boolean
   selectedDate: string
   onToggleTask: (taskId: number) => void
+  editingTaskId: number | null
+  editingTaskText: string
+  onStartEditingTask: (taskId: number, currentText: string) => void
+  onChangeEditingTaskText: (text: string) => void
+  onSaveEditedTask: (taskId: number) => void
+  onCancelEditingTask: () => void
 }
 
 export type DragMode = 'move' | 'resize'
@@ -196,6 +207,12 @@ export default function DayTimeline({
   mutationLocked = false,
   selectedDate,
   onToggleTask,
+  editingTaskId,
+  editingTaskText,
+  onStartEditingTask,
+  onChangeEditingTaskText,
+  onSaveEditedTask,
+  onCancelEditingTask,
 }: DayTimelineProps) {
   const { blocks, timezone } = schedule
   const [draggingTaskIndex, setDraggingTaskIndex] = useState<number | null>(null)
@@ -428,6 +445,7 @@ export default function DayTimeline({
             <ScheduleBlock
               key={getScheduleBlockRenderKey(block.id, appliedAnimationKey)}
               block={block}
+              title={getTimelineBlockTitle(block, tasks)}
               dayStart={dayStart}
               dayEnd={dayEnd}
               pxPerMinute={pxPerMinute}
@@ -444,6 +462,12 @@ export default function DayTimeline({
               animationIndex={index}
               isHighlighted={isTaskHighlighted(block, highlightedTaskIndexes)}
               mutationLocked={mutationLocked}
+              editingTaskId={editingTaskId}
+              editingTaskText={editingTaskText}
+              onStartEditingTask={onStartEditingTask}
+              onChangeEditingTaskText={onChangeEditingTaskText}
+              onSaveEditedTask={onSaveEditedTask}
+              onCancelEditingTask={onCancelEditingTask}
             />
           ))}
         </div>
@@ -456,6 +480,7 @@ export default function DayTimeline({
 
 interface ScheduleBlockProps {
   block: BlockInput
+  title: string
   dayStart: number
   dayEnd: number
   pxPerMinute: number
@@ -469,10 +494,17 @@ interface ScheduleBlockProps {
   animationIndex: number
   isHighlighted: boolean
   mutationLocked: boolean
+  editingTaskId: number | null
+  editingTaskText: string
+  onStartEditingTask: (taskId: number, currentText: string) => void
+  onChangeEditingTaskText: (text: string) => void
+  onSaveEditedTask: (taskId: number) => void
+  onCancelEditingTask: () => void
 }
 
 function ScheduleBlock({
   block,
+  title,
   dayStart,
   dayEnd,
   pxPerMinute,
@@ -486,6 +518,12 @@ function ScheduleBlock({
   animationIndex,
   isHighlighted,
   mutationLocked,
+  editingTaskId,
+  editingTaskText,
+  onStartEditingTask,
+  onChangeEditingTaskText,
+  onSaveEditedTask,
+  onCancelEditingTask,
 }: ScheduleBlockProps) {
   const [editing, setEditing] = useState(false)
   const [draftStart, setDraftStart] = useState(block.startMinutes)
@@ -494,6 +532,8 @@ function ScheduleBlock({
   const dragRef = useRef<DragState | null>(null)
   const previewRef = useRef<PreviewRange>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const blockKind = 'kind' in block ? block.kind : 'task'
+  const isTaskBlock = isTaskScheduleBlock(block)
 
   // Keep local draft in sync when entering edit mode.
   useEffect(() => {
@@ -509,16 +549,15 @@ function ScheduleBlock({
     previewRef.current = null
     setPreviewRange(null)
     setEditing(false)
-  }, [mutationLocked])
+    if (isTaskBlock) onCancelEditingTask()
+  }, [mutationLocked, isTaskBlock, onCancelEditingTask])
 
   const displayStart = previewRange?.startMinutes ?? block.startMinutes
   const displayDuration = previewRange?.durationMinutes ?? block.durationMinutes
   const top = (displayStart - dayStart) * pxPerMinute
   const height = displayDuration * pxPerMinute
   const endLabel = minutesToTimeLabel(displayStart + displayDuration)
-  const title = getBlockDisplayTitle(block)
-  const blockKind = 'kind' in block ? block.kind : 'task'
-  const isTaskBlock = isTaskScheduleBlock(block)
+  const isEditingTaskText = isTaskBlock && taskId !== null && editingTaskId === taskId
   const isVeryShortBlock = displayDuration <= 15
   const isShortBlock = displayDuration <= 30
   const kindClass = blockKind === 'meal'
@@ -616,12 +655,23 @@ function ScheduleBlock({
     setPreviewRange(next)
   }
 
+  const openEditing = () => {
+    if (!canMutateTimeline(mutationLocked)) return
+    setEditing(true)
+    if (isTaskBlock && taskId !== null) onStartEditingTask(taskId, title)
+  }
+
+  const closeEditing = () => {
+    setEditing(false)
+    if (isTaskBlock) onCancelEditingTask()
+  }
+
   // === Keyboard ===
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (editing) {
       if (e.key === 'Escape') {
         e.preventDefault()
-        setEditing(false)
+        closeEditing()
       }
       return
     }
@@ -638,7 +688,7 @@ function ScheduleBlock({
       onMove(block.id, step)
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      setEditing(true)
+      openEditing()
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault()
       onRemove(block.id)
@@ -650,6 +700,7 @@ function ScheduleBlock({
 
   const applyEdit = () => {
     if (!canMutateTimeline(mutationLocked)) return
+    if (isTaskBlock && taskId !== null) onSaveEditedTask(taskId)
     onSetBlockRange(block.id, draftStart, draftDuration)
     setEditing(false)
   }
@@ -709,6 +760,20 @@ function ScheduleBlock({
             <div className={`min-w-0 flex-1 truncate text-[13px] font-medium text-gray-100 sm:text-sm ${isCompleted && isTaskBlock ? 'text-gray-400 line-through' : ''}`}>
               {title}
             </div>
+            {isTaskBlock && taskId !== null && !mutationLocked && (
+              <button
+                type="button"
+                className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  openEditing()
+                }}
+                aria-label={`Править задачу «${title}»`}
+              >
+                ✎
+              </button>
+            )}
             <div className="shrink-0 text-xs font-medium text-gray-300">
               {startLabel}–{endLabel} · {formatDurationLabel(displayDuration)}
               {fixed && <span className="ml-1 rounded border border-amber-400/60 bg-amber-500/15 px-1 text-[10px] font-semibold text-amber-100">фикс.</span>}
@@ -733,6 +798,19 @@ function ScheduleBlock({
               <div className={`min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-gray-100 ${isCompleted && isTaskBlock ? 'text-gray-400 line-through' : ''}`}>
                 {title}
               </div>
+              {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
+                <button
+                  type="button"
+                  className="shrink-0 rounded border border-gray-700 px-2 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => {
+                    e.stopPropagation()
+                    openEditing()
+                  }}
+                >
+                  Править
+                </button>
+              )}
             </div>
             <div className={`${isShortBlock ? 'text-xs leading-tight' : 'text-[13px] leading-5'} text-gray-300`}>
               <span className="mr-1 rounded bg-gray-950/30 px-1.5 py-0.5 text-[11px] uppercase tracking-wide">{categoryLabels[category]}</span>
@@ -748,6 +826,29 @@ function ScheduleBlock({
             onPointerDown={e => e.stopPropagation()}
             onClick={e => e.stopPropagation()}
           >
+            {isTaskBlock && taskId !== null && (
+              <label className="flex flex-col gap-1 text-xs text-gray-300">
+                <span>Задача</span>
+                <textarea
+                  disabled={mutationLocked}
+                  rows={2}
+                  className="resize-none rounded bg-gray-900 px-2 py-1 text-xs text-gray-100 outline-none focus:ring-1 focus:ring-blue-400"
+                  value={isEditingTaskText ? editingTaskText : title}
+                  onChange={e => onChangeEditingTaskText(e.target.value)}
+                  onKeyDown={e => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault()
+                      applyEdit()
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      closeEditing()
+                    }
+                    e.stopPropagation()
+                  }}
+                  aria-label="Текст задачи"
+                />
+              </label>
+            )}
             <label className="flex items-center justify-between gap-2 text-xs text-gray-300">
               <span>Начало</span>
               <input
@@ -791,7 +892,7 @@ function ScheduleBlock({
               <button
                 type="button"
                 className="rounded bg-gray-700 px-2 py-1 text-xs font-medium text-gray-200 hover:bg-gray-600"
-                onClick={() => setEditing(false)}
+                onClick={closeEditing}
               >
                 Отмена
               </button>

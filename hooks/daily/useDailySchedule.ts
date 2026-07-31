@@ -16,6 +16,7 @@ import {
   getPendingSaveDateChangeAction,
   isTaskScheduleBlock,
   isScheduleRequestCurrent,
+  renameTaskScheduleBlocks,
   reconcileSchedule,
   scheduleEquals,
   type ScheduleRequestContext,
@@ -49,6 +50,7 @@ export interface UseDailyScheduleReturn {
   setBlockRange: (blockId: string, startMinutes: number, durationMinutes: number) => void
   moveBlockByStep: (blockId: string, deltaMinutes: number) => void
   removeBlock: (blockId: string) => void
+  renameScheduledTask: (taskId: number, taskText: string) => void
   scheduleUnscheduledTask: (taskIndex: number, startMinutes?: number, durationMinutes?: number) => void
   applySavedSchedule: (next: DailySchedule, expectedDate?: string) => boolean
   flushScheduleChanges: () => Promise<boolean>
@@ -534,6 +536,23 @@ export function useDailySchedule({
     [scheduleSave],
   )
 
+  const renameScheduledTask = useCallback(
+    (taskId: number, taskText: string) => {
+      if (mutationLockedRef.current) return
+      const current = scheduleRef.current
+      const nextText = taskText.trim()
+      if (!current || !nextText) return
+      const nextBlocks = renameTaskScheduleBlocks(current.blocks, taskId, nextText)
+      const changed = nextBlocks.some((block, index) => scheduleBlockChanged(current.blocks[index], block))
+      if (!changed) return
+      const next = withScheduleBlocks(current, nextBlocks)
+      setSchedule(next)
+      scheduleRef.current = next
+      scheduleSave(next)
+    },
+    [scheduleSave],
+  )
+
   const scheduleUnscheduledTask = useCallback(
     (taskIndex: number, startMinutes?: number, durationMinutes: number = 30) => {
       if (mutationLockedRef.current) return
@@ -621,6 +640,7 @@ export function useDailySchedule({
     setBlockRange,
     moveBlockByStep,
     removeBlock,
+    renameScheduledTask,
     scheduleUnscheduledTask,
     applySavedSchedule,
     flushScheduleChanges,

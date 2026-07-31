@@ -115,7 +115,7 @@ export default function DailyPage() {
   const isSubmittingChatRef = useRef(false)
   const directChatOperationRef = useRef<{ assistantMessageCount: number } | null>(null)
   const timelineMutationLocked = applyingProposalId !== null || isSubmittingChat
-  const planTaskMutationLocked = applyingProposalId !== null
+  const planTaskMutationLocked = applyingProposalId !== null || isSubmittingChat
 
   const [habitFrequency, setHabitFrequency] = useState<FrequencyType>('daily')
   const [habitDays, setHabitDays] = useState<number[]>([])
@@ -396,6 +396,7 @@ export default function DailyPage() {
     setBlockRange,
     moveBlockByStep,
     removeBlock,
+    renameScheduledTask,
     scheduleUnscheduledTask,
     applySavedSchedule,
     flushScheduleChanges,
@@ -408,6 +409,12 @@ export default function DailyPage() {
     showMessage,
     mutationLocked: timelineMutationLocked,
   })
+
+  const handleSaveEditedTask = useCallback((taskId: number) => {
+    const nextText = editingTaskText.trim()
+    if (nextText) renameScheduledTask(taskId, nextText)
+    saveEditedTask(taskId)
+  }, [editingTaskText, renameScheduledTask, saveEditedTask])
 
   const handleApplyProposal = useCallback(async (
     messageId: string | undefined,
@@ -1514,13 +1521,13 @@ export default function DailyPage() {
                               if (planTaskMutationLocked) return
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()
-                                saveEditedTask(task.id)
+                                handleSaveEditedTask(task.id)
                               } else if (e.key === 'Escape') {
                                 cancelEditingTask()
                               }
                             }}
                             onBlur={() => {
-                              if (!planTaskMutationLocked) saveEditedTask(task.id)
+                              if (!planTaskMutationLocked) handleSaveEditedTask(task.id)
                             }}
                             disabled={planTaskMutationLocked}
                             autoFocus
@@ -1563,7 +1570,7 @@ export default function DailyPage() {
                             <button
                               type="button"
                               onPointerDown={(event) => event.preventDefault()}
-                              onClick={() => saveEditedTask(task.id)}
+                              onClick={() => handleSaveEditedTask(task.id)}
                               disabled={planTaskMutationLocked}
                               className={`${taskActionButtonBase} gap-1.5 border-green-500/30 px-2 text-green-300 hover:bg-green-500/10 lg:px-0`}
                               aria-label={`Сохранить изменения задачи «${task.taskText}»`}
@@ -1871,13 +1878,13 @@ export default function DailyPage() {
                                   if (planTaskMutationLocked) return
                                   if (event.key === 'Enter' && !event.shiftKey) {
                                     event.preventDefault()
-                                    saveEditedTask(task.id)
+                                    handleSaveEditedTask(task.id)
                                   } else if (event.key === 'Escape') {
                                     cancelEditingTask()
                                   }
                                 }}
                                 onBlur={() => {
-                                  if (!planTaskMutationLocked) saveEditedTask(task.id)
+                                  if (!planTaskMutationLocked) handleSaveEditedTask(task.id)
                                 }}
                                 disabled={planTaskMutationLocked}
                                 autoFocus
@@ -1918,7 +1925,7 @@ export default function DailyPage() {
                                 <button
                                   type="button"
                                   onPointerDown={(event) => event.preventDefault()}
-                                  onClick={() => saveEditedTask(task.id)}
+                                  onClick={() => handleSaveEditedTask(task.id)}
                                   disabled={planTaskMutationLocked}
                                   className={`${taskActionButtonBase} gap-1.5 border-green-500/30 px-2 text-green-300 hover:bg-green-500/10 lg:px-0`}
                                   aria-label={`Сохранить изменения выполненной задачи «${task.taskText}»`}
@@ -2111,6 +2118,12 @@ export default function DailyPage() {
                   mutationLocked={timelineMutationLocked}
                   selectedDate={selectedDate}
                   onToggleTask={toggleTaskSelection}
+                  editingTaskId={editingTaskId}
+                  editingTaskText={editingTaskText}
+                  onStartEditingTask={startEditingTask}
+                  onChangeEditingTaskText={setEditingTaskText}
+                  onSaveEditedTask={handleSaveEditedTask}
+                  onCancelEditingTask={cancelEditingTask}
                 />
               ) : scheduleLoading ? (
                 <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
