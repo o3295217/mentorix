@@ -356,7 +356,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     ])
   })
 
-  it('persists fallback assistant text instead of an empty message when a tool-only proposal is invalid', async () => {
+  it('persists task-list metadata and a human message when tool-only schedule is invalid but new tasks are valid', async () => {
     const invalidInput = { ...proposalInputV3, blocks: [{ ...proposalInputV3.blocks[0], taskText: 'Invented' }] }
     mocks.stream.mockReturnValue(makeStream([
       { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
@@ -366,16 +366,22 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     const response = await POST(request())
     const text = await response.text()
 
-    expect(text).toContain('Я подготовил черновик расписания, но он не прошёл проверку')
-    expect(text).not.toContain('event: proposal')
+    expect(text).toContain('Я собрал список задач и могу добавить его в план.')
+    expect(text).toContain('С временной шкалой не получилось')
+    expect(text).toContain('event: proposal')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         role: 'assistant',
-        content: 'Я подготовил черновик расписания, но он не прошёл проверку. Попросите меня собрать расписание ещё раз.',
+        content: expect.stringContaining('Я собрал список задач и могу добавить его в план.'),
+        metadataJson: expect.objectContaining({
+          type: 'daily_task_list_proposal',
+          schemaVersion: 1,
+          tasks: ['Prepare landing notes'],
+          currentPlanTasksHash: hashDailyPlanTasks(['Deep work']),
+          appliedAt: null,
+          scheduleIssue: expect.objectContaining({ status: 'schedule_rejected', nextAction: null }),
+        }),
       }),
-    }))
-    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
-      data: expect.not.objectContaining({ metadataJson: expect.anything() }),
     }))
   })
 
@@ -419,15 +425,17 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.logAIUsage).toHaveBeenCalledTimes(2)
   })
 
-  it('falls back after exactly one failed corrective attempt', async () => {
+  it('keeps task list after exactly one failed corrective attempt when empty plan tasks are all new', async () => {
     const invalidProposal = {
       ...proposalInputV3,
+      newTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
       dayEndMinutes: 660,
       activityEndMinutes: 660,
       workEndMinutes: 645,
       blocks: [
-        { ...proposalInputV3.blocks[0], startMinutes: 570, durationMinutes: 90 },
-        { ...proposalInputV3.blocks[1], startMinutes: 630, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Тетроникс', category: 'main', isFixed: false, startMinutes: 570, durationMinutes: 90 },
+        { kind: 'task', taskSource: 'new', taskIndex: 2, taskText: 'Зарядка', category: 'personal', isFixed: false, startMinutes: 630, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'АИОНЛАБ', category: 'main', isFixed: false, startMinutes: 705, durationMinutes: 60 },
       ],
     }
     mocks.stream
@@ -440,14 +448,24 @@ describe('/api/daily/chat SSE schedule proposal', () => {
         { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidProposal) } },
       ]))
 
-    const response = await POST(request())
+    const response = await POST(request({ planTasks: [], completedTasks: [], userMessage: 'собери план из переписки' }))
     const text = await response.text()
 
     expect(mocks.stream).toHaveBeenCalledTimes(2)
-    expect(text).not.toContain('event: proposal')
-    expect(text).toContain('Я подготовил черновик расписания, но он не прошёл проверку')
+    expect(text).toContain('event: proposal')
+    expect(text).toContain('Я собрал список задач и могу добавить его в план.')
+    expect(text).toContain('в расписании есть пересекающиеся блоки')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ role: 'assistant', content: 'Я подготовил черновик расписания, но он не прошёл проверку. Попросите меня собрать расписание ещё раз.' }),
+      data: expect.objectContaining({
+        role: 'assistant',
+        content: expect.stringContaining('Расписание пока не применяю'),
+        metadataJson: expect.objectContaining({
+          type: 'daily_task_list_proposal',
+          tasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
+          currentPlanTaskCount: 0,
+          currentPlanTasksHash: hashDailyPlanTasks([]),
+        }),
+      }),
     }))
   })
 

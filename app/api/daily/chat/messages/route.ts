@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
-import { safeParseProposalMetadata } from '@/lib/daily-schedule-proposal'
+import { safeParseDailyChatProposalMetadata } from '@/lib/daily-schedule-proposal'
 
 const ALLOWED_CHAT_ROLES = new Set(['user', 'assistant'])
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ messages: messages.map(message => ({
       ...message,
-      metadata: safeParseProposalMetadata(message.metadataJson),
+      metadata: safeParseDailyChatProposalMetadata(message.metadataJson),
       metadataJson: undefined,
     })) })
   } catch (error) {

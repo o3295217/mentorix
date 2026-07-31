@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DailyScheduleSchema, hashDailySchedule } from '@/lib/daily-schedule'
-import { getNewTasksFromProposal, hashDailyPlanTasks, proposalToDailySchedule, safeParseProposalMetadata, validateProposalAgainstCurrentPlan } from '@/lib/daily-schedule-proposal'
+import { getNewTasksFromProposal, hashDailyPlanTasks, proposalToDailySchedule, safeParseProposalMetadata, safeParseTaskListProposalMetadata, validateProposalAgainstCurrentPlan } from '@/lib/daily-schedule-proposal'
 import { lockDailyEntryForScheduleMutation } from '@/lib/daily-schedule-lock'
 import { parseDateParam } from '@/lib/dates'
 
@@ -10,6 +10,12 @@ export type ApplyScheduleProposalResult =
   | { status: 400; error: string }
   | { status: 404 }
   | { status: 409; currentHash: string | null; error?: string }
+
+export type ApplyTaskListProposalResult =
+  | { status: 200; updatedAt: Date; applyStatus: 'created' | 'already_applied'; proposalMessageId: number; planText: string; planTasks: string[]; currentPlanTasksHash: string }
+  | { status: 400; error: string }
+  | { status: 404 }
+  | { status: 409; currentPlanTasksHash: string; error?: string }
 
 class ControlledScheduleApplyError extends Error {
   constructor(readonly result: Extract<ApplyScheduleProposalResult, { status: 409 }>) {
@@ -59,6 +65,12 @@ function getNewTaskDuplicateConflict(planTasks: string[], newTasks: string[]): s
     seenNewTasks.add(normalized)
   }
   return null
+}
+
+function getPlanTasksConflict(input: { currentPlanTasksHash: string; basePlanTasks: string[] }): string | null {
+  return hashDailyPlanTasks(input.basePlanTasks) === input.currentPlanTasksHash
+    ? null
+    : 'Список задач изменился после создания предложения. Попросите AI обновить список.'
 }
 
 export async function applyDailyScheduleProposal(input: {
@@ -144,4 +156,74 @@ export async function applyDailyScheduleProposal(input: {
     if (error instanceof ControlledScheduleApplyError) return error.result
     throw error
   }
+}
+
+export async function applyDailyTaskListProposal(input: {
+  userId: string
+  date: string
+  messageId: number
+  expectedCurrentPlanTasksHash: string
+}): Promise<ApplyTaskListProposalResult> {
+  return prisma.$transaction(async tx => {
+    const entryIdentity = await tx.dailyEntry.findFirst({ where: { userId: input.userId, date: parseDateParam(input.date) }, select: { id: true } })
+    if (!entryIdentity) return { status: 404 as const }
+    await lockDailyEntryForScheduleMutation(tx, entryIdentity.id)
+
+    const message = await tx.chatMessage.findFirst({ where: { id: input.messageId, userId: input.userId, date: input.date, role: 'assistant' }, select: { id: true, metadataJson: true } })
+    if (!message) return { status: 404 as const }
+
+    const metadata = safeParseTaskListProposalMetadata(message.metadataJson)
+    if (!metadata || metadata.date !== input.date) return { status: 400 as const, error: 'Valid task list proposal metadata not found' }
+
+    const entry = await tx.dailyEntry.findFirst({ where: { id: entryIdentity.id, userId: input.userId, date: parseDateParam(input.date) }, select: { id: true, planText: true, updatedAt: true } })
+    if (!entry) return { status: 404 as const }
+
+    const planTasks = splitPlanTasks(entry.planText)
+    const newTasks = metadata.tasks.map(task => task.trim())
+    const basePlanTasksForProposal = metadata.appliedAt ? stripAppliedNewTasks(planTasks, newTasks) : planTasks
+    const currentPlanTasksHash = hashDailyPlanTasks(planTasks)
+
+    if (input.expectedCurrentPlanTasksHash !== metadata.currentPlanTasksHash) {
+      return { status: 409 as const, currentPlanTasksHash, error: 'Task list proposal base hash mismatch' }
+    }
+
+    if (!basePlanTasksForProposal) {
+      return { status: 409 as const, currentPlanTasksHash, error: 'Список задач изменился после применения предложения. Попросите AI обновить список.' }
+    }
+
+    if (metadata.appliedAt) {
+      const planTasksConflict = getPlanTasksConflict({ currentPlanTasksHash: metadata.currentPlanTasksHash, basePlanTasks: basePlanTasksForProposal })
+      if (planTasksConflict) return { status: 409 as const, currentPlanTasksHash, error: planTasksConflict }
+      return {
+        status: 200 as const,
+        updatedAt: entry.updatedAt,
+        applyStatus: 'already_applied' as const,
+        proposalMessageId: message.id,
+        planText: entry.planText ?? '',
+        planTasks,
+        currentPlanTasksHash,
+      }
+    }
+
+    const planTasksConflict = getPlanTasksConflict({ currentPlanTasksHash: metadata.currentPlanTasksHash, basePlanTasks: planTasks })
+    if (planTasksConflict) return { status: 409 as const, currentPlanTasksHash, error: planTasksConflict }
+
+    const duplicateConflict = getNewTaskDuplicateConflict(planTasks, newTasks)
+    if (duplicateConflict) return { status: 409 as const, currentPlanTasksHash, error: duplicateConflict }
+
+    const updatedPlanText = appendPlanTasks(entry.planText, newTasks)
+    const updatedPlanTasks = splitPlanTasks(updatedPlanText)
+    const updatedEntry = await tx.dailyEntry.update({ where: { id: entry.id }, data: { planText: updatedPlanText }, select: { planText: true, updatedAt: true } })
+    const updatedPlanTasksHash = hashDailyPlanTasks(updatedPlanTasks)
+    await tx.chatMessage.update({ where: { id: message.id }, data: { metadataJson: { ...metadata, appliedAt: new Date().toISOString() } as unknown as Prisma.InputJsonValue } })
+    return {
+      status: 200 as const,
+      updatedAt: updatedEntry.updatedAt,
+      applyStatus: 'created' as const,
+      proposalMessageId: message.id,
+      planText: updatedEntry.planText ?? updatedPlanText,
+      planTasks: updatedPlanTasks,
+      currentPlanTasksHash: updatedPlanTasksHash,
+    }
+  })
 }

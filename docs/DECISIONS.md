@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-31 — Список задач отделён от невалидной временной шкалы
+
+**Что решили.** При невалидном `propose_daily_schedule` сервер сохраняет валидные `newTasks` как отдельную карточку `daily_task_list_proposal` в `ChatMessage.metadataJson`, а применять её можно отдельным endpoint `/api/daily/task-list/apply-proposal`. Расписание по этому endpoint не пишется вообще.
+
+**Почему.** Баг продукта был в склейке двух разных сущностей: список задач и временная шкала жили одним объектом `daily_schedule_proposal`, поэтому арифметическая ошибка в блоках уничтожала список. Отдельный тип metadata делает список первичным и самодостаточным, а `currentPlanTasksHash`/`appliedAt` сохраняют те же гарантии идемпотентности и защиты от применения поверх изменившегося плана.
+
+**Что отвергли.** Не стали добавлять режим в `/api/daily/schedule/apply-proposal`: этот endpoint по контракту мутирует `DailySchedule` и возвращает schedule/hash/loadSummary, а список должен применяться без касания расписания. Не стали сохранять битую шкалу как schedule proposal: это оставлено для следующего UX-шага через `scheduleIssue.nextAction`.
+
+**Файлы.** `lib/daily-schedule-proposal.ts`, `lib/daily-schedule-apply.ts`, `lib/daily-chat-constants.ts`, `app/api/daily/chat/route.ts`, `app/api/daily/chat/messages/route.ts`, `app/api/daily/task-list/apply-proposal/route.ts`, тесты chat/apply routes и lib, `docs/ARCHITECTURE.md`.
+
+---
+
 ## 2026-07-31 — Валидация расписания перешла на минутную сетку отдельно от UX-шагов
 
 **Что решили.** Единый источник гранулярности валидации расписания вынесен в `lib/daily-schedule-time.ts`: `DAILY_SCHEDULE_TIME_STEP_MINUTES = 1`, `isTimeStep()`. Минимальная длительность блока осталась отдельной константой 15 минут, а клиентский шаг взаимодействия таймлайна — отдельной `SCHEDULE_INTERACTION_STEP_MINUTES = 15`.

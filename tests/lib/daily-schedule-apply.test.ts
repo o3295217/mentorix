@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashDailySchedule } from '@/lib/daily-schedule'
-import { createProposalMetadata, hashDailyPlanTasks, proposalToDailySchedule, proposalToDailyScheduleV3, type DailyScheduleProposalV2, type DailyScheduleProposalV3 } from '@/lib/daily-schedule-proposal'
+import { createProposalMetadata, createTaskListProposalMetadata, hashDailyPlanTasks, proposalToDailySchedule, proposalToDailyScheduleV3, type DailyScheduleProposalV2, type DailyScheduleProposalV3 } from '@/lib/daily-schedule-proposal'
 
 const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { $transaction: mocks.transaction },
 }))
 
-import { applyDailyScheduleProposal } from '@/lib/daily-schedule-apply'
+import { applyDailyScheduleProposal, applyDailyTaskListProposal } from '@/lib/daily-schedule-apply'
 
 const proposalV3: DailyScheduleProposalV3 = {
   version: 3,
@@ -270,5 +270,41 @@ describe('applyDailyScheduleProposal', () => {
     expect(mocks.dailyEntryUpdate).toHaveBeenCalledOnce()
     expect(mocks.dailyScheduleUpsert).toHaveBeenCalledOnce()
     expect(mocks.chatMessageUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('applyDailyTaskListProposal', () => {
+  it('appends task-list proposal to planText without touching DailySchedule', async () => {
+    const currentPlanTasks: string[] = []
+    const metadata = createTaskListProposalMetadata({
+      date: '2026-02-28',
+      tasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
+      currentPlanTaskCount: 0,
+      currentPlanTasksHash: hashDailyPlanTasks(currentPlanTasks),
+      scheduleIssue: { reason: 'в расписании есть пересекающиеся блоки.', diagnostics: ['blocks 1 and 2 overlap'], nextAction: null },
+    })
+    mocks.chatMessageFindFirst.mockResolvedValue({ id: 12, metadataJson: metadata })
+    setupEntry('', { scheduleJson: { version: 3, timezone: 'Europe/Moscow', dayStartMinutes: 540, dayEndMinutes: 1080, planningBasis: 'day_start', planningStartMinutes: 540, workEndMinutes: 1080, activityEndMinutes: 1080, blocks: [] }, updatedAt: new Date('2026-02-28T09:00:00.000Z') })
+    mocks.dailyEntryUpdate.mockResolvedValue({ planText: 'Тетроникс\nЗарядка\nАИОНЛАБ', updatedAt: new Date('2026-02-28T11:00:00.000Z') })
+
+    const result = await applyDailyTaskListProposal({ userId: 'user-1', date: '2026-02-28', messageId: 12, expectedCurrentPlanTasksHash: hashDailyPlanTasks(currentPlanTasks) })
+
+    expect(result).toMatchObject({ status: 200, applyStatus: 'created', planText: 'Тетроникс\nЗарядка\nАИОНЛАБ', planTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'] })
+    expect(mocks.dailyEntryUpdate).toHaveBeenCalledWith({ where: { id: 42 }, data: { planText: 'Тетроникс\nЗарядка\nАИОНЛАБ' }, select: { planText: true, updatedAt: true } })
+    expect(mocks.dailyScheduleUpsert).not.toHaveBeenCalled()
+  })
+
+  it('is idempotent for repeated task-list apply and does not duplicate tasks', async () => {
+    const basePlanTasks: string[] = []
+    const tasks = ['Тетроникс', 'Зарядка']
+    const metadata = { ...createTaskListProposalMetadata({ date: '2026-02-28', tasks, currentPlanTaskCount: 0, currentPlanTasksHash: hashDailyPlanTasks(basePlanTasks) }), appliedAt: '2026-02-28T11:00:00.000Z' }
+    mocks.chatMessageFindFirst.mockResolvedValue({ id: 12, metadataJson: metadata })
+    setupEntry(tasks.join('\n'))
+
+    const result = await applyDailyTaskListProposal({ userId: 'user-1', date: '2026-02-28', messageId: 12, expectedCurrentPlanTasksHash: hashDailyPlanTasks(basePlanTasks) })
+
+    expect(result).toMatchObject({ status: 200, applyStatus: 'already_applied', planTasks: tasks })
+    expect(mocks.dailyEntryUpdate).not.toHaveBeenCalled()
+    expect(mocks.dailyScheduleUpsert).not.toHaveBeenCalled()
   })
 })

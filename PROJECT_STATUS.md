@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (55)
+## API Endpoints (56)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -56,6 +56,7 @@
 | `/api/daily/indicators` | GET |
 | `/api/daily/schedule` | GET, PUT |
 | `/api/daily/schedule/apply-proposal` | POST |
+| `/api/daily/task-list/apply-proposal` | POST |
 | `/api/evaluate` | POST |
 | `/api/evaluate/batch` | GET, POST |
 | `/api/evaluate-period` | POST |

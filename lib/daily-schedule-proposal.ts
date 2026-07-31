@@ -215,6 +215,27 @@ const DailyScheduleProposalMetadataV3Schema = z.object({
 
 export const DailyScheduleProposalMetadataSchema = z.union([DailyScheduleProposalMetadataV1Schema, DailyScheduleProposalMetadataV2Schema, DailyScheduleProposalMetadataV3Schema])
 
+const DailyTaskListProposalScheduleIssueSchema = z.object({
+  status: z.literal('schedule_rejected'),
+  reason: z.string().trim().min(1).max(500),
+  diagnostics: z.array(z.string().trim().min(1).max(500)).max(20),
+  nextAction: z.enum(['place_from_current', 'ignore_current', 'edit']).nullable().optional(),
+}).strict()
+
+export const DailyTaskListProposalMetadataSchema = z.object({
+  type: z.literal('daily_task_list_proposal'),
+  schemaVersion: z.literal(1),
+  date: DateSchema,
+  createdAt: z.string().datetime(),
+  currentPlanTaskCount: z.number().int().min(0),
+  currentPlanTasksHash: z.string().length(64),
+  appliedAt: z.string().datetime().nullable().optional(),
+  tasks: z.array(TaskTextSchema).min(1).max(MAX_DAILY_SCHEDULE_PROPOSAL_NEW_TASKS),
+  scheduleIssue: DailyTaskListProposalScheduleIssueSchema.optional(),
+}).strict()
+
+export const DailyChatProposalMetadataSchema = z.union([DailyScheduleProposalMetadataSchema, DailyTaskListProposalMetadataSchema])
+
 export type DailyScheduleProposalV1Block = z.infer<typeof DailyScheduleProposalV1BlockSchema>
 export type DailyScheduleProposalV2Block = z.infer<typeof DailyScheduleProposalV2BlockSchema>
 export type DailyScheduleProposalV3Block = z.infer<typeof DailyScheduleProposalV3BlockSchema>
@@ -223,6 +244,8 @@ export type DailyScheduleProposalV2 = z.infer<typeof DailyScheduleProposalV2Sche
 export type DailyScheduleProposalV3 = z.infer<typeof DailyScheduleProposalV3Schema>
 export type DailyScheduleProposal = z.infer<typeof DailyScheduleProposalSchema>
 export type DailyScheduleProposalMetadata = z.infer<typeof DailyScheduleProposalMetadataSchema>
+export type DailyTaskListProposalMetadata = z.infer<typeof DailyTaskListProposalMetadataSchema>
+export type DailyChatProposalMetadata = z.infer<typeof DailyChatProposalMetadataSchema>
 export type ProposalToDailyScheduleOptions = { currentPlanTaskCount?: number }
 
 export function hashDailyPlanTasks(planTasks: string[]): string {
@@ -231,6 +254,36 @@ export function hashDailyPlanTasks(planTasks: string[]): string {
 
 export function getNewTasksFromProposal(proposal: DailyScheduleProposalV3): string[] {
   return [...proposal.newTasks]
+}
+
+export function createTaskListProposalMetadata(input: {
+  date: string
+  tasks: string[]
+  currentPlanTaskCount: number
+  currentPlanTasksHash: string
+  scheduleIssue?: { reason: string; diagnostics: string[]; nextAction?: 'place_from_current' | 'ignore_current' | 'edit' | null }
+  createdAt?: Date
+}): DailyTaskListProposalMetadata {
+  const parsedTasks = z.array(TaskTextSchema).min(1).max(MAX_DAILY_SCHEDULE_PROPOSAL_NEW_TASKS).parse(input.tasks)
+  const metadata: DailyTaskListProposalMetadata = {
+    type: 'daily_task_list_proposal',
+    schemaVersion: 1,
+    date: input.date,
+    createdAt: (input.createdAt ?? new Date()).toISOString(),
+    currentPlanTaskCount: input.currentPlanTaskCount,
+    currentPlanTasksHash: input.currentPlanTasksHash,
+    appliedAt: null,
+    tasks: parsedTasks,
+  }
+  if (input.scheduleIssue) {
+    metadata.scheduleIssue = {
+      status: 'schedule_rejected',
+      reason: input.scheduleIssue.reason,
+      diagnostics: input.scheduleIssue.diagnostics,
+      nextAction: input.scheduleIssue.nextAction ?? null,
+    }
+  }
+  return metadata
 }
 
 function snapMinutesToStep(value: number, options: { min: number; max: number }): number {
@@ -402,6 +455,18 @@ export function safeParseProposalMetadata(value: unknown): DailyScheduleProposal
   const schedule = proposalToDailyScheduleV2(validation.data.proposal)
   const scheduleValidation = DailyScheduleV2Schema.safeParse(schedule)
   return scheduleValidation.success ? validation.data : null
+}
+
+export function safeParseTaskListProposalMetadata(value: unknown): DailyTaskListProposalMetadata | null {
+  const validation = DailyTaskListProposalMetadataSchema.safeParse(value)
+  return validation.success ? validation.data : null
+}
+
+export function safeParseDailyChatProposalMetadata(value: unknown): DailyChatProposalMetadata | null {
+  const validation = DailyChatProposalMetadataSchema.safeParse(value)
+  if (!validation.success) return null
+  if (validation.data.type === 'daily_task_list_proposal') return validation.data
+  return safeParseProposalMetadata(value)
 }
 
 export function getProposalScheduleHash(metadata: DailyScheduleProposalMetadata): string {

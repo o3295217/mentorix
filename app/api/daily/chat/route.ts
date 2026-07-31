@@ -22,11 +22,11 @@ import { getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { getWorkContextForAI } from '@/lib/completed-work'
 import { getPlanUserContext } from '@/lib/user-context'
 import { DailyScheduleSchema, getBlockEndMinutes, hashDailySchedule } from '@/lib/daily-schedule'
-import { createProposalMetadata, hashDailyPlanTasks, normalizeDailyScheduleProposalToolInput, proposalToDailySchedule, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan, type DailyScheduleProposal } from '@/lib/daily-schedule-proposal'
+import { createProposalMetadata, createTaskListProposalMetadata, hashDailyPlanTasks, normalizeDailyScheduleProposalToolInput, proposalToDailySchedule, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan, type DailyScheduleProposal, type DailyChatProposalMetadata } from '@/lib/daily-schedule-proposal'
 import { buildScheduleMachineContext } from '@/lib/daily-schedule-context'
 import { isStrictScheduleChangeRequest } from '@/lib/daily-schedule-intent'
 import { AuthError } from '@/lib/auth'
-import { FALLBACK_INVALID_PROPOSAL_MESSAGE } from '@/lib/daily-chat-constants'
+import { buildTaskListProposalWithRejectedScheduleMessage, DEFAULT_REJECTED_SCHEDULE_HUMAN_REASON, FALLBACK_INVALID_PROPOSAL_MESSAGE, humanizeScheduleProposalDiagnostics } from '@/lib/daily-chat-constants'
 
 const ChatSchema = z.object({
   date: z.string().trim().min(1).max(32),
@@ -116,7 +116,7 @@ type ScheduleToolCall = { index: number; id: string; name: string; inputJson: st
 type DiagnosticIssue = { path: PropertyKey[]; message: string; code?: string }
 type ToolValidationResult =
   | { success: true; metadata: ReturnType<typeof createProposalMetadata> }
-  | { success: false; diagnosticsForModel: string[]; safeDiagnosticsForLog: string[]; toolCall: ScheduleToolCall }
+  | { success: false; diagnosticsForModel: string[]; safeDiagnosticsForLog: string[]; toolCall: ScheduleToolCall; taskListMetadata?: ReturnType<typeof createTaskListProposalMetadata>; userReason?: string }
 
 function truncateForDiagnostic(value: unknown): string {
   const text = typeof value === 'string' ? value : JSON.stringify(value)
@@ -584,7 +584,17 @@ export async function POST(request: NextRequest) {
                   const diagnosticsForModel = getScheduleProposalValidationDiagnostics(proposalParse.data, { date, timezone, planTasks })
                   const safeDiagnosticsForLog = getSafeScheduleProposalValidationDiagnosticsForLog(proposalParse.data, { date, timezone, planTasks })
                   console.warn('[Plan Chat] Invalid schedule proposal against current plan:', safeDiagnosticsForLog)
-                  return { success: false, diagnosticsForModel, safeDiagnosticsForLog, toolCall: { ...toolCall, parsedInput: proposalParse.data } }
+                  const userReason = humanizeScheduleProposalDiagnostics(safeDiagnosticsForLog)
+                  const taskListMetadata = proposalParse.data.version === 3 && proposalParse.data.date === date && proposalParse.data.timezone === timezone && proposalParse.data.newTasks.length > 0
+                    ? createTaskListProposalMetadata({
+                        date,
+                        tasks: proposalParse.data.newTasks,
+                        currentPlanTaskCount: planTasks.length,
+                        currentPlanTasksHash,
+                        scheduleIssue: { reason: userReason, diagnostics: safeDiagnosticsForLog, nextAction: null },
+                      })
+                    : undefined
+                  return { success: false, diagnosticsForModel, safeDiagnosticsForLog, toolCall: { ...toolCall, parsedInput: proposalParse.data }, taskListMetadata, userReason }
                 }
                 const metadata = planValidation.data.version === 3
                   ? createProposalMetadata({ date, proposal: planValidation.data, currentScheduleHash, currentScheduleExists, currentPlanTaskCount: planTasks.length, currentPlanTasksHash })
@@ -603,10 +613,17 @@ export async function POST(request: NextRequest) {
           const firstStreamResult = await collectStream(stream)
           const durationMs = Date.now() - startTime
 
-          let proposalMetadata: ReturnType<typeof createProposalMetadata> | null = null
+          let proposalMetadata: DailyChatProposalMetadata | null = null
+          let taskListProposalMessage: string | null = null
           const firstValidation = validateToolCalls(firstStreamResult.toolCalls)
           if (firstValidation?.success) proposalMetadata = firstValidation.metadata
-          else if (firstValidation && !firstValidation.success) rejectedScheduleProposal = true
+          else if (firstValidation && !firstValidation.success) {
+            rejectedScheduleProposal = true
+            if (firstValidation.taskListMetadata) {
+              proposalMetadata = firstValidation.taskListMetadata
+              taskListProposalMessage = buildTaskListProposalWithRejectedScheduleMessage(firstValidation.userReason ?? firstValidation.taskListMetadata.scheduleIssue?.reason ?? '')
+            }
+          }
 
           await logAIUsage({
             userId,
@@ -618,7 +635,7 @@ export async function POST(request: NextRequest) {
             success: true,
           })
 
-          if (!proposalMetadata && firstValidation && !firstValidation.success) {
+          if ((!proposalMetadata || proposalMetadata.type === 'daily_task_list_proposal') && firstValidation && !firstValidation.success) {
             const correctionStartTime = Date.now()
             const correctionMessages: ClaudeMessage[] = [
               ...fixedMessages,
@@ -651,7 +668,13 @@ export async function POST(request: NextRequest) {
             const correctionResult = await collectStream(correctionStream)
             const correctionValidation = validateToolCalls(correctionResult.toolCalls)
             if (correctionValidation?.success) proposalMetadata = correctionValidation.metadata
-            else if (correctionValidation && !correctionValidation.success) rejectedScheduleProposal = true
+            else if (correctionValidation && !correctionValidation.success) {
+              rejectedScheduleProposal = true
+              if (correctionValidation.taskListMetadata) {
+                proposalMetadata = correctionValidation.taskListMetadata
+                taskListProposalMessage = buildTaskListProposalWithRejectedScheduleMessage(correctionValidation.userReason ?? correctionValidation.taskListMetadata.scheduleIssue?.reason ?? '')
+              }
+            }
 
             await logAIUsage({
               userId,
@@ -666,9 +689,21 @@ export async function POST(request: NextRequest) {
 
           if (proposalMetadata) controller.enqueue(sseEvent('proposal', { metadata: proposalMetadata }))
 
+          if (proposalMetadata?.type === 'daily_task_list_proposal' && taskListProposalMessage) {
+            if (assistantMessage.trim().length > 0) {
+              assistantMessage = `${assistantMessage.trim()}\n\n${taskListProposalMessage}`
+              controller.enqueue(sseEvent('text', { text: `\n\n${taskListProposalMessage}` }))
+            } else {
+              assistantMessage = taskListProposalMessage
+              controller.enqueue(sseEvent('text', { text: taskListProposalMessage }))
+            }
+          }
+
           if (assistantMessage.trim().length === 0) {
             assistantMessage = proposalMetadata
-              ? 'Я подготовил черновик расписания. Проверьте карточку ниже.'
+              ? proposalMetadata.type === 'daily_task_list_proposal'
+                ? (taskListProposalMessage ?? buildTaskListProposalWithRejectedScheduleMessage(proposalMetadata.scheduleIssue?.reason ?? DEFAULT_REJECTED_SCHEDULE_HUMAN_REASON))
+                : 'Я подготовил черновик расписания. Проверьте карточку ниже.'
               : rejectedScheduleProposal
                 ? FALLBACK_INVALID_PROPOSAL_MESSAGE
                 : 'Не удалось сформировать ответ. Попросите меня повторить.'
