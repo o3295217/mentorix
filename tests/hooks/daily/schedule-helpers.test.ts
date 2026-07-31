@@ -95,7 +95,7 @@ const expectOk = (result: ReturnType<typeof applyCascadeScheduleEdit>) => {
 }
 
 describe('schedule-helpers · time & numeric primitives', () => {
-  it('snaps to 15-minute step (round and floor)', () => {
+  it('snaps interaction edits to 15-minute step (round and floor)', () => {
     expect(snapToStep(7)).toBe(0)
     expect(snapToStep(8)).toBe(15)
     expect(snapToStep(22)).toBe(15)
@@ -155,7 +155,7 @@ describe('schedule-helpers · geometry', () => {
     expect(isBlockInRange({ startMinutes: 1400, durationMinutes: 60 }, 360, 1440)).toBe(false)
   })
 
-  it('clamps block to range with 15-min step', () => {
+  it('clamps block to range with 15-minute interaction step', () => {
     const r = clampBlockToRange({ startMinutes: 350, durationMinutes: 22 }, 360, 1440)
     expect(r).toEqual({ startMinutes: 360, durationMinutes: 15 })
 
@@ -304,7 +304,7 @@ describe('schedule-helpers · applyCascadeScheduleEdit', () => {
     expect(input).toEqual(snapshot)
   })
 
-  it('snaps requested starts and durations to 15-minute intervals', () => {
+  it('snaps requested interaction starts and durations to 15-minute intervals', () => {
     const result = expectOk(applyCascadeScheduleEdit(
       schedule([], at(9), at(11)),
       { type: 'insert', block: block('x', 0, 22, 1), startMinutes: at(9, 37), durationMinutes: 22 },

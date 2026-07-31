@@ -9,16 +9,17 @@ import {
   DailyScheduleV2Schema,
   DailyScheduleV3,
   DailyScheduleV3Schema,
+  MIN_BLOCK_DURATION_MINUTES,
   computeDailyScheduleLoadSummary,
   hashDailySchedule,
-  isTimeStep,
 } from '@/lib/daily-schedule'
+import { DAILY_SCHEDULE_TIME_STEP_MINUTES, isTimeStep } from '@/lib/daily-schedule-time'
 import { isValidDateOnly } from '@/lib/dates'
 
 const DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isValidDateOnly, 'Invalid calendar date')
 export const TimezoneSchema = z.string().trim().min(1).max(100).regex(/^([A-Za-z_]+\/[A-Za-z0-9_+.-]+(?:\/[A-Za-z0-9_+.-]+)*|UTC)$/, 'Expected IANA timezone')
 export const MAX_DAILY_SCHEDULE_PROPOSAL_NEW_TASKS = 10
-export const DAILY_SCHEDULE_PROPOSAL_TIME_STEP_MINUTES = 15
+export const DAILY_SCHEDULE_PROPOSAL_TIME_STEP_MINUTES = DAILY_SCHEDULE_TIME_STEP_MINUTES
 const TaskTextSchema = z.string().trim().min(1).max(500)
 
 export const DailyScheduleProposalV1BlockSchema = z.object({
@@ -27,7 +28,7 @@ export const DailyScheduleProposalV1BlockSchema = z.object({
   taskText: z.string().trim().min(1).max(500).optional(),
   title: z.string().trim().min(1).max(120).optional(),
   startMinutes: z.number().int().min(0).max(1440),
-  durationMinutes: z.number().int().min(15).max(1440),
+  durationMinutes: z.number().int().min(MIN_BLOCK_DURATION_MINUTES).max(1440),
 }).superRefine((block, ctx) => {
   if (block.kind === 'task') {
     if (block.taskIndex === undefined) ctx.addIssue({ code: 'custom', path: ['taskIndex'], message: 'taskIndex is required for task blocks' })
@@ -54,7 +55,7 @@ export const DailyScheduleProposalV2TaskBlockSchema = z.object({
   category: DailyScheduleBlockCategorySchema,
   isFixed: z.boolean(),
   startMinutes: z.number().int().min(0).max(1440),
-  durationMinutes: z.number().int().min(15).max(1440),
+  durationMinutes: z.number().int().min(MIN_BLOCK_DURATION_MINUTES).max(1440),
 })
 
 export const DailyScheduleProposalV2ServiceBlockSchema = z.object({
@@ -63,7 +64,7 @@ export const DailyScheduleProposalV2ServiceBlockSchema = z.object({
   category: DailyScheduleBlockCategorySchema,
   isFixed: z.boolean(),
   startMinutes: z.number().int().min(0).max(1440),
-  durationMinutes: z.number().int().min(15).max(1440),
+  durationMinutes: z.number().int().min(MIN_BLOCK_DURATION_MINUTES).max(1440),
 })
 
 export const DailyScheduleProposalV2BlockSchema = z.discriminatedUnion('kind', [
@@ -85,11 +86,11 @@ export const DailyScheduleProposalV2Schema = z.object({
   rationale: z.string().trim().max(1000).optional(),
 }).superRefine((proposal, ctx) => {
   for (const field of ['dayStartMinutes', 'dayEndMinutes', 'planningStartMinutes', 'workEndMinutes', 'activityEndMinutes'] as const) {
-    if (!isTimeStep(proposal[field])) ctx.addIssue({ code: 'custom', path: [field], message: `${field} must use 15 minute step` })
+    if (!isTimeStep(proposal[field])) ctx.addIssue({ code: 'custom', path: [field], message: `${field} must use 1 minute step` })
   }
   for (const [index, block] of proposal.blocks.entries()) {
-    if (!isTimeStep(block.startMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 15 minute step' })
-    if (!isTimeStep(block.durationMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 15 minute step' })
+    if (!isTimeStep(block.startMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 1 minute step' })
+    if (!isTimeStep(block.durationMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 1 minute step' })
   }
 })
 
@@ -106,7 +107,7 @@ export const DailyScheduleProposalV3TaskBlockSchema = z.object({
   category: DailyScheduleBlockCategorySchema,
   isFixed: z.boolean(),
   startMinutes: z.number().int().min(0).max(1440),
-  durationMinutes: z.number().int().min(15).max(1440),
+  durationMinutes: z.number().int().min(MIN_BLOCK_DURATION_MINUTES).max(1440),
 }).strict()
 
 export const DailyScheduleProposalV3ServiceBlockSchema = z.object({
@@ -115,7 +116,7 @@ export const DailyScheduleProposalV3ServiceBlockSchema = z.object({
   category: DailyScheduleBlockCategorySchema,
   isFixed: z.boolean(),
   startMinutes: z.number().int().min(0).max(1440),
-  durationMinutes: z.number().int().min(15).max(1440),
+  durationMinutes: z.number().int().min(MIN_BLOCK_DURATION_MINUTES).max(1440),
 }).strict()
 
 export const DailyScheduleProposalV3BlockSchema = z.discriminatedUnion('kind', [
@@ -138,7 +139,7 @@ export const DailyScheduleProposalV3Schema = z.object({
   rationale: z.string().trim().max(1000).optional(),
 }).strict().superRefine((proposal, ctx) => {
   for (const field of ['dayStartMinutes', 'dayEndMinutes', 'planningStartMinutes', 'workEndMinutes', 'activityEndMinutes'] as const) {
-    if (!isTimeStep(proposal[field])) ctx.addIssue({ code: 'custom', path: [field], message: `${field} must use 15 minute step` })
+    if (!isTimeStep(proposal[field])) ctx.addIssue({ code: 'custom', path: [field], message: `${field} must use 1 minute step` })
   }
 
   const normalizedNewTasks = new Set<string>()
@@ -149,8 +150,8 @@ export const DailyScheduleProposalV3Schema = z.object({
   }
 
   for (const [index, block] of proposal.blocks.entries()) {
-    if (!isTimeStep(block.startMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 15 minute step' })
-    if (!isTimeStep(block.durationMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 15 minute step' })
+    if (!isTimeStep(block.startMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 1 minute step' })
+    if (!isTimeStep(block.durationMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 1 minute step' })
     if (block.kind !== 'task') continue
 
     if (block.taskSource === 'new') {
@@ -252,7 +253,7 @@ export function normalizeDailyScheduleProposalToolInput(input: unknown): unknown
         normalizedBlock.startMinutes = snapMinutesToStep(normalizedBlock.startMinutes, { min: 0, max: 1440 })
       }
       if (typeof normalizedBlock.durationMinutes === 'number' && Number.isFinite(normalizedBlock.durationMinutes)) {
-        normalizedBlock.durationMinutes = snapMinutesToStep(normalizedBlock.durationMinutes, { min: DAILY_SCHEDULE_PROPOSAL_TIME_STEP_MINUTES, max: 1440 })
+        normalizedBlock.durationMinutes = snapMinutesToStep(normalizedBlock.durationMinutes, { min: MIN_BLOCK_DURATION_MINUTES, max: 1440 })
       }
       return normalizedBlock
     }),

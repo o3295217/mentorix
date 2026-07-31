@@ -1,9 +1,13 @@
 import crypto from 'crypto'
 import { z } from 'zod'
+import { DAILY_SCHEDULE_TIME_STEP_MINUTES, MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES, isTimeStep } from '@/lib/daily-schedule-time'
 
-export const TIME_STEP_MINUTES = 15
+export const TIME_STEP_MINUTES = DAILY_SCHEDULE_TIME_STEP_MINUTES
+export const MIN_BLOCK_DURATION_MINUTES = MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES
 export const MAX_MINUTES_IN_DAY = 1440
 const MAX_BLOCKS = 100
+
+export { isTimeStep }
 
 export const DailySchedulePlanningBasisSchema = z.enum(['current_time', 'day_start', 'custom_time'])
 export const DailyScheduleBlockCategorySchema = z.enum(['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'])
@@ -11,7 +15,7 @@ export const DailyScheduleBlockCategorySchema = z.enum(['main', 'operational', '
 const BaseBlockSchema = z.object({
   id: z.string().trim().min(1).max(100),
   startMinutes: z.number().int().min(0).max(MAX_MINUTES_IN_DAY),
-  durationMinutes: z.number().int().min(TIME_STEP_MINUTES).max(MAX_MINUTES_IN_DAY),
+  durationMinutes: z.number().int().min(MIN_BLOCK_DURATION_MINUTES).max(MAX_MINUTES_IN_DAY),
 })
 
 export const DailyScheduleV1BlockSchema = BaseBlockSchema.extend({
@@ -60,18 +64,18 @@ function refineSchedule<T extends { dayStartMinutes: number; dayEndMinutes: numb
     ctx.addIssue({ code: 'custom', path: ['dayEndMinutes'], message: 'dayEndMinutes must be greater than dayStartMinutes' })
   }
   if (!isTimeStep(schedule.dayStartMinutes)) {
-    ctx.addIssue({ code: 'custom', path: ['dayStartMinutes'], message: 'dayStartMinutes must use 15 minute step' })
+    ctx.addIssue({ code: 'custom', path: ['dayStartMinutes'], message: 'dayStartMinutes must use 1 minute step' })
   }
   if (!isTimeStep(schedule.dayEndMinutes)) {
-    ctx.addIssue({ code: 'custom', path: ['dayEndMinutes'], message: 'dayEndMinutes must use 15 minute step' })
+    ctx.addIssue({ code: 'custom', path: ['dayEndMinutes'], message: 'dayEndMinutes must use 1 minute step' })
   }
 
   for (const [index, block] of schedule.blocks.entries()) {
     if (!isTimeStep(block.startMinutes)) {
-      ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 15 minute step' })
+      ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 1 minute step' })
     }
     if (!isTimeStep(block.durationMinutes)) {
-      ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 15 minute step' })
+      ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 1 minute step' })
     }
     if (block.startMinutes < schedule.dayStartMinutes || getBlockEndMinutes(block) > schedule.dayEndMinutes) {
       ctx.addIssue({ code: 'custom', path: ['blocks', index], message: 'block must be inside day range' })
@@ -94,13 +98,13 @@ function refineScheduleV3(schedule: {
   refineSchedule(schedule, ctx)
 
   if (!isTimeStep(schedule.planningStartMinutes)) {
-    ctx.addIssue({ code: 'custom', path: ['planningStartMinutes'], message: 'planningStartMinutes must use 15 minute step' })
+    ctx.addIssue({ code: 'custom', path: ['planningStartMinutes'], message: 'planningStartMinutes must use 1 minute step' })
   }
   if (!isTimeStep(schedule.workEndMinutes)) {
-    ctx.addIssue({ code: 'custom', path: ['workEndMinutes'], message: 'workEndMinutes must use 15 minute step' })
+    ctx.addIssue({ code: 'custom', path: ['workEndMinutes'], message: 'workEndMinutes must use 1 minute step' })
   }
   if (!isTimeStep(schedule.activityEndMinutes)) {
-    ctx.addIssue({ code: 'custom', path: ['activityEndMinutes'], message: 'activityEndMinutes must use 15 minute step' })
+    ctx.addIssue({ code: 'custom', path: ['activityEndMinutes'], message: 'activityEndMinutes must use 1 minute step' })
   }
   if (!(schedule.planningStartMinutes < schedule.workEndMinutes && schedule.workEndMinutes <= schedule.activityEndMinutes)) {
     ctx.addIssue({ code: 'custom', path: ['planningStartMinutes'], message: 'planningStartMinutes must be less than workEndMinutes and workEndMinutes must not exceed activityEndMinutes' })
@@ -189,7 +193,6 @@ export function isDailyScheduleV3(schedule: DailySchedule): schedule is DailySch
 export function isTaskBlock(block: DailyScheduleBlock): block is DailyScheduleV1Block | DailyScheduleV2TaskBlock | DailyScheduleV3TaskBlock { return !('kind' in block) || block.kind === 'task' }
 export function isServiceBlock(block: DailyScheduleBlock): block is DailyScheduleV2ServiceBlock | DailyScheduleV3ServiceBlock { return 'kind' in block && block.kind !== 'task' }
 
-export function isTimeStep(value: number): boolean { return value % TIME_STEP_MINUTES === 0 }
 export function getBlockEndMinutes(block: Pick<DailyScheduleBlock, 'startMinutes' | 'durationMinutes'>): number { return block.startMinutes + block.durationMinutes }
 export function blocksOverlap(first: Pick<DailyScheduleBlock, 'startMinutes' | 'durationMinutes'>, second: Pick<DailyScheduleBlock, 'startMinutes' | 'durationMinutes'>): boolean {
   return first.startMinutes < getBlockEndMinutes(second) && second.startMinutes < getBlockEndMinutes(first)

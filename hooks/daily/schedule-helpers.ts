@@ -2,12 +2,13 @@
 // No React, no DOM, no Node-only APIs — safe for tests and the client bundle.
 
 import type { DailySchedule, DailyScheduleBlock, DailyScheduleBlockCategory, DailyScheduleLoadSummary, DailyScheduleV2Block } from '@/lib/daily-schedule'
+import { DAILY_SCHEDULE_INTERACTION_STEP_MINUTES, MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES, isTimeStep } from '@/lib/daily-schedule-time'
 
-export const TIME_STEP_MINUTES = 15
+export const SCHEDULE_INTERACTION_STEP_MINUTES = DAILY_SCHEDULE_INTERACTION_STEP_MINUTES
 export const DEFAULT_DAY_START_MINUTES = 6 * 60 // 06:00
 export const DEFAULT_DAY_END_MINUTES = 24 * 60 // 24:00 (= 1440)
 export const DEFAULT_BLOCK_DURATION_MINUTES = 60
-export const MIN_BLOCK_DURATION_MINUTES = 15
+export const MIN_BLOCK_DURATION_MINUTES = MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES
 export const DEFAULT_GAP_MINUTES = 15
 export const MAX_BLOCKS = 100
 
@@ -31,11 +32,11 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-export function snapToStep(value: number, step: number = TIME_STEP_MINUTES): number {
+export function snapToStep(value: number, step: number = SCHEDULE_INTERACTION_STEP_MINUTES): number {
   return Math.round(value / step) * step
 }
 
-export function snapDownToStep(value: number, step: number = TIME_STEP_MINUTES): number {
+export function snapDownToStep(value: number, step: number = SCHEDULE_INTERACTION_STEP_MINUTES): number {
   return Math.floor(value / step) * step
 }
 
@@ -253,10 +254,6 @@ function isFixedScheduleBlock(block: BlockInput): boolean {
   return 'isFixed' in block && block.isFixed === true
 }
 
-function isTimeStep(value: number): boolean {
-  return Number.isInteger(value) && value % TIME_STEP_MINUTES === 0
-}
-
 function getTimelineEnd(schedule: DailySchedule): number {
   return schedule.version === 3 ? Math.min(schedule.dayEndMinutes, schedule.activityEndMinutes) : schedule.dayEndMinutes
 }
@@ -286,7 +283,7 @@ function validateTimelineStructure(schedule: DailySchedule): StructureValidation
     return { ok: false, reason: 'invalid-input', message: 'Schedule day range is invalid' }
   }
   if (!isTimeStep(dayStart) || !isTimeStep(dayEnd)) {
-    return { ok: false, reason: 'invalid-input', message: 'Schedule day range must use 15 minute step' }
+    return { ok: false, reason: 'invalid-input', message: 'Schedule day range must use 1 minute step' }
   }
 
   const ids = new Set<string>()
@@ -299,7 +296,7 @@ function validateTimelineStructure(schedule: DailySchedule): StructureValidation
       return { ok: false, reason: 'invalid-input', message: 'Schedule block time values must be finite', blockId: block.id }
     }
     if (!isTimeStep(block.startMinutes) || !isTimeStep(block.durationMinutes)) {
-      return { ok: false, reason: 'invalid-input', message: 'Schedule blocks must use 15 minute step', blockId: block.id }
+      return { ok: false, reason: 'invalid-input', message: 'Schedule blocks must use 1 minute step', blockId: block.id }
     }
     if (block.durationMinutes < MIN_BLOCK_DURATION_MINUTES) {
       return { ok: false, reason: 'invalid-input', message: 'Schedule block duration is too short', blockId: block.id }
@@ -541,7 +538,7 @@ export function autoLayoutBlocks(
     if (duration > min) {
       duration = snapDownToStep(
         Math.max(min, Math.floor((span - gap * (fitCount - 1)) / fitCount)),
-        TIME_STEP_MINUTES,
+        SCHEDULE_INTERACTION_STEP_MINUTES,
       )
       if (duration < min) duration = min
       break

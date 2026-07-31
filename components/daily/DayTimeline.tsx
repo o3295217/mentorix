@@ -6,6 +6,7 @@ import type { OpenTask } from '@/lib/types'
 import {
   type BlockInput,
   MIN_BLOCK_DURATION_MINUTES,
+  SCHEDULE_INTERACTION_STEP_MINUTES,
   computeClientScheduleLoadSummary,
   formatDurationLabel,
   getBlockDisplayTitle,
@@ -628,7 +629,7 @@ function ScheduleBlock({
       e.preventDefault()
       return
     }
-    const step = e.shiftKey ? 60 : 15
+    const step = e.shiftKey ? 60 : SCHEDULE_INTERACTION_STEP_MINUTES
     if (e.key === 'ArrowUp') {
       e.preventDefault()
       onMove(block.id, -step)
@@ -768,7 +769,7 @@ function ScheduleBlock({
                 disabled={mutationLocked}
                 min={MIN_BLOCK_DURATION_MINUTES}
                 max={1440}
-                step={15}
+                step={SCHEDULE_INTERACTION_STEP_MINUTES}
                 className="w-20 rounded bg-gray-900 px-1.5 py-1 text-xs text-gray-100 outline-none focus:ring-1 focus:ring-blue-400"
                 value={draftDuration}
                 onChange={e => {

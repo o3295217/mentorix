@@ -151,7 +151,7 @@ function formatZodDiagnostics(input: unknown, issues: readonly DiagnosticIssue[]
     const value = getValueAtPath(input, path)
     const valuePart = options.includeValues && value !== undefined ? ` ${truncateForDiagnostic(value)}` : ''
     const codePart = issue.code ? ` [${issue.code}]` : ''
-    const safeMessage = issue.message.includes('15 minute step') ? 'not in 15-minute step' : issue.message
+    const safeMessage = issue.message.includes('1 minute step') ? 'not in 1-minute step' : issue.message
     if (first === 'blocks' && typeof second === 'number' && typeof third === 'string') return `block ${second + 1}: ${third}${valuePart}${codePart} — ${options.includeValues ? issue.message : safeMessage}`
     if (first === 'blocks' && typeof second === 'number') return `block ${second + 1}${codePart}: ${options.includeValues ? issue.message : safeMessage}`
     const pathText = path.length > 0 ? path.join('.') : 'proposal'
@@ -205,7 +205,7 @@ function getScheduleProposalValidationDiagnosticsInternal(proposal: DailySchedul
         }
         if (block && typeof third === 'string') {
           const valuePart = options.includeValues ? ` ${truncateForDiagnostic((block as Record<string, unknown>)[third])}` : ''
-          const safeMessage = issue.message.includes('15 minute step') ? 'not in 15-minute step' : issue.message
+          const safeMessage = issue.message.includes('1 minute step') ? 'not in 1-minute step' : issue.message
           diagnostics.push(`block ${second + 1}: ${third}${valuePart}${codePart} — ${options.includeValues ? issue.message : safeMessage}`)
           continue
         }

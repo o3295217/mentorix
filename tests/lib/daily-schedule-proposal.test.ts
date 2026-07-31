@@ -117,10 +117,10 @@ describe('daily schedule proposal', () => {
     expect(proposalToDailySchedule(proposalV2).version).toBe(3)
   })
 
-  it('rejects proposal v2 with invalid time step through full schedule validation', () => {
-    const validation = validateProposalAgainstCurrentPlan({ ...proposalV2, planningStartMinutes: 571 }, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work', 'Review'] })
+  it('accepts proposal v2 planning start on the minute grid through full schedule validation', () => {
+    const validation = validateProposalAgainstCurrentPlan({ ...proposalV2, dayStartMinutes: 571, planningStartMinutes: 571 }, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work', 'Review'] })
 
-    expect(validation.success).toBe(false)
+    expect(validation.success).toBe(true)
   })
 
   it('round-trips safe metadata schema', () => {
@@ -159,7 +159,7 @@ describe('daily schedule proposal', () => {
     expect(DailyScheduleProposalSchema.safeParse(proposalV3).success).toBe(true)
   })
 
-  it('rejects invalid proposal v3 new task references and time steps', () => {
+  it('rejects invalid proposal v3 new task references and newTasks limits', () => {
     expect(DailyScheduleProposalV3Schema.safeParse({
       ...proposalV3,
       blocks: [
@@ -197,7 +197,7 @@ describe('daily schedule proposal', () => {
     }).success).toBe(false)
   })
 
-  it('normalizes v2 and v3 tool block times to the nearest 15-minute step', () => {
+  it('normalizes v2 and v3 tool block times to the nearest minute and clamps minimum duration', () => {
     const normalizedV2 = normalizeDailyScheduleProposalToolInput({
       ...proposalV2,
       blocks: [
@@ -209,8 +209,8 @@ describe('daily schedule proposal', () => {
     expect(normalizedV2).toMatchObject({
       blocks: [
         { startMinutes: 0, durationMinutes: 15 },
-        { startMinutes: 540, durationMinutes: 15 },
-        { startMinutes: 1440, durationMinutes: 1440 },
+        { startMinutes: 547, durationMinutes: 15 },
+        { startMinutes: 1438, durationMinutes: 1440 },
       ],
     })
 
@@ -223,8 +223,8 @@ describe('daily schedule proposal', () => {
     })
     expect(normalizedV3).toMatchObject({
       blocks: [
-        { startMinutes: 555, durationMinutes: 15 },
-        { startMinutes: 555, durationMinutes: 30 },
+        { startMinutes: 548, durationMinutes: 22 },
+        { startMinutes: 553, durationMinutes: 23 },
       ],
     })
   })

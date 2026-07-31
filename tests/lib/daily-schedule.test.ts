@@ -86,7 +86,7 @@ describe('DailyScheduleSchema', () => {
     expect(isServiceBlock(schedule.blocks[1])).toBe(true)
   })
 
-  it('rejects v3 non 15-minute planning fields and inconsistent planning order', () => {
+  it('rejects v3 inconsistent planning order', () => {
     const result = DailyScheduleSchema.safeParse({
       version: 3,
       timezone: 'Europe/Moscow',
@@ -118,13 +118,20 @@ describe('DailyScheduleSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects non 15-minute start and duration steps', () => {
+  it('accepts minute-level v3 planning start not aligned to 15 minutes', () => {
     const result = DailyScheduleSchema.safeParse({
-      ...validSchedule,
-      blocks: [{ ...validSchedule.blocks[0], startMinutes: 541, durationMinutes: 20 }],
+      version: 3,
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 10 * 60 + 33,
+      dayEndMinutes: 18 * 60,
+      planningBasis: 'current_time',
+      planningStartMinutes: 10 * 60 + 33,
+      workEndMinutes: 17 * 60,
+      activityEndMinutes: 18 * 60,
+      blocks: [{ id: 'task-1', kind: 'task', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 10 * 60 + 33, durationMinutes: 20 }],
     })
 
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('rejects block outside day range', () => {

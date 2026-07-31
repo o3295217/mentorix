@@ -1,10 +1,7 @@
 import type { DailySchedule, DailyScheduleBlock } from '@/lib/daily-schedule'
+import { isTimeStep } from '@/lib/daily-schedule-time'
 
 const scheduleCategories = ['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'] as const
-
-function isTimeStep(value: number): boolean {
-  return Number.isInteger(value) && value % 15 === 0
-}
 
 function getBlockEnd(block: { startMinutes: number; durationMinutes: number }): number {
   return block.startMinutes + block.durationMinutes

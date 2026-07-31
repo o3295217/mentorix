@@ -330,12 +330,12 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'assistant' }) }))
   })
 
-  it('normalizes off-step v3 tool block times before validation and metadata creation', async () => {
+  it('normalizes fractional v3 tool block times before validation and metadata creation', async () => {
     const almostValid = {
       ...proposalInputV3,
       blocks: [
-        { ...proposalInputV3.blocks[0], startMinutes: 568, durationMinutes: 44 },
-        { ...proposalInputV3.blocks[1], startMinutes: 637, durationMinutes: 52 },
+        { ...proposalInputV3.blocks[0], startMinutes: 570.4, durationMinutes: 44.4 },
+        { ...proposalInputV3.blocks[1], startMinutes: 636.6, durationMinutes: 51.6 },
       ],
     }
     mocks.stream.mockReturnValue(makeStream([
@@ -351,8 +351,8 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     const metadata = mocks.chatMessageCreate.mock.calls.at(-1)?.[0].data.metadataJson
     expect(metadata.schemaVersion).toBe(3)
     expect(metadata.proposal.blocks).toMatchObject([
-      { startMinutes: 570, durationMinutes: 45 },
-      { startMinutes: 630, durationMinutes: 45 },
+      { startMinutes: 570, durationMinutes: 44 },
+      { startMinutes: 637, durationMinutes: 52 },
     ])
   })
 
