@@ -22,6 +22,7 @@ import { areTasksSimilar } from '@/lib/task-match'
 import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 import type { DailySchedule, DailyScheduleLoadSummary } from '@/lib/daily-schedule'
 import type { DailyScheduleProposalMetadata, DailyTaskListProposalMetadata } from '@/lib/daily-schedule-proposal'
+import type { DailyScheduleIssueAction } from '@/lib/daily-chat-constants'
 import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
 import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
 import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
@@ -554,6 +555,11 @@ export default function DailyPage() {
       setIsSubmittingChat(false)
     }
   }, [chatInput, chatMessages, dismissedProposalIds, ensureEntrySaved, flushScheduleChanges, handleApplyProposal, scrollChatToBottom, sendChatMessage, sendingChat, setChatInput, showMessage])
+
+  const handleScheduleIssueAction = useCallback(async (marker: string, action: DailyScheduleIssueAction) => {
+    showMessage(action === 'edit' ? 'Ассистент учтёт, что уже сделано, и поправит расписание.' : 'Ассистент собирает расписание.')
+    await handleSendChatMessage(marker)
+  }, [handleSendChatMessage, showMessage])
 
   useEffect(() => {
     const directOperation = directChatOperationRef.current
@@ -2255,7 +2261,9 @@ export default function DailyPage() {
                           metadata={msg.metadata}
                           messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}
                           isApplying={applyingProposalId === msg.id}
+                          isChatBusy={sendingChat || isSubmittingChat}
                           onApply={() => msg.metadata?.type === 'daily_task_list_proposal' ? handleApplyTaskListProposal(msg.id, msg.metadata) : Promise.resolve()}
+                          onScheduleIssueAction={handleScheduleIssueAction}
                         />
                       )}
                     </div>

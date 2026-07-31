@@ -4,6 +4,39 @@ export const TASK_LIST_PROPOSAL_WITH_REJECTED_SCHEDULE_MESSAGE_PREFIX = 'Я со
 export const TASK_LIST_PROPOSAL_WITH_REJECTED_SCHEDULE_MESSAGE_CTA = 'Расписание пока не применяю — сначала добавим список, а временную шкалу можно собрать отдельно.'
 export const DEFAULT_REJECTED_SCHEDULE_HUMAN_REASON = 'часть временной шкалы противоречит текущему плану.'
 
+export type DailyScheduleIssueAction = 'place_from_current' | 'ignore_current' | 'edit'
+
+export const DAILY_SCHEDULE_ISSUE_ACTIONS: Array<{
+  action: DailyScheduleIssueAction
+  label: string
+  marker: string
+  modelInstruction: string
+}> = [
+  {
+    action: 'place_from_current',
+    label: 'С текущего момента',
+    marker: '[SYSTEM_PLACE_SCHEDULE_FROM_CURRENT]',
+    modelInstruction: 'Собери расписание для добавленного списка задач на оставшуюся часть дня. Используй planningBasis: current_time — начинай размещение с текущего момента и не планируй уже прошедшее время.',
+  },
+  {
+    action: 'ignore_current',
+    label: 'День с начала',
+    marker: '[SYSTEM_PLACE_SCHEDULE_FROM_DAY_START]',
+    modelInstruction: 'Собери расписание для добавленного списка задач на весь день. Используй planningBasis: day_start — игнорируй текущее время и планируй так, как будто день ещё не начался.',
+  },
+  {
+    action: 'edit',
+    label: 'Учесть сделанное',
+    marker: '[SYSTEM_EDIT_SCHEDULE_WITH_COMPLETED_DAY_PART]',
+    modelInstruction: 'Скорректируй расписание для добавленного списка задач с учётом того, что часть дня уже прошла и я уже успел(а) что-то сделать. Используй planningBasis: custom_time — предложи правку существующей временной шкалы, не собирай день заново с нуля.',
+  },
+]
+
+export function getDailyScheduleIssueActionByMarker(message: string) {
+  const marker = message.trim()
+  return DAILY_SCHEDULE_ISSUE_ACTIONS.find(item => item.marker === marker) ?? null
+}
+
 export function humanizeScheduleProposalDiagnostics(diagnostics: string[]): string {
   const text = diagnostics.join('\n').toLocaleLowerCase('ru-RU')
   if (text.includes('overlap')) return 'в расписании есть пересекающиеся блоки.'

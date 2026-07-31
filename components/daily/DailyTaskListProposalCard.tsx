@@ -2,12 +2,15 @@
 
 import { useState } from 'react'
 import type { DailyTaskListProposalMetadata } from '@/lib/daily-schedule-proposal'
+import { DAILY_SCHEDULE_ISSUE_ACTIONS, type DailyScheduleIssueAction } from '@/lib/daily-chat-constants'
 
 export interface DailyTaskListProposalCardProps {
   metadata: DailyTaskListProposalMetadata
   messageId?: string
   isApplying: boolean
+  isChatBusy: boolean
   onApply: () => Promise<void>
+  onScheduleIssueAction: (marker: string, action: DailyScheduleIssueAction) => Promise<void>
 }
 
 function getApplyButtonLabel(input: { isApplied: boolean; isApplying: boolean }): string {
@@ -20,7 +23,9 @@ export default function DailyTaskListProposalCard({
   metadata,
   messageId,
   isApplying,
+  isChatBusy,
   onApply,
+  onScheduleIssueAction,
 }: DailyTaskListProposalCardProps) {
   const [error, setError] = useState('')
   const isApplied = Boolean(metadata.appliedAt)
@@ -32,6 +37,16 @@ export default function DailyTaskListProposalCard({
       await onApply()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось добавить задачи в план')
+    }
+  }
+
+  const handleScheduleIssueAction = async (marker: string, action: DailyScheduleIssueAction) => {
+    if (!isApplied || isChatBusy) return
+    setError('')
+    try {
+      await onScheduleIssueAction(marker, action)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось отправить запрос на расписание')
     }
   }
 
@@ -53,6 +68,27 @@ export default function DailyTaskListProposalCard({
         <p className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs leading-5 text-amber-100">
           {metadata.scheduleIssue.reason}
         </p>
+      )}
+
+      {metadata.scheduleIssue && (
+        <div className="mb-3 rounded-xl border border-gray-700 bg-gray-900/80 p-3">
+          <p className="text-xs font-medium text-gray-200">Как собрать временную шкалу?</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {DAILY_SCHEDULE_ISSUE_ACTIONS.map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                onClick={() => void handleScheduleIssueAction(item.marker, item.action)}
+                disabled={!isApplied || isChatBusy}
+                className="min-h-10 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100 transition-colors hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:border-gray-700 disabled:bg-gray-800 disabled:text-gray-500"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          {!isApplied && <p className="mt-2 text-xs text-gray-500">Сначала добавьте список в план — тогда ассистент увидит эти задачи и разложит их по времени.</p>}
+          {isApplied && isChatBusy && <p className="mt-2 text-xs text-cyan-200" role="status">Ассистент собирает расписание…</p>}
+        </div>
       )}
 
       <div className="space-y-1.5">

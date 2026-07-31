@@ -328,6 +328,30 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(userContent).not.toContain('[SYSTEM_KICKOFF_PLAN_CHAT]')
     expect(mocks.chatMessageCreate).toHaveBeenCalledTimes(1)
     expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'assistant' }) }))
+
+    const scheduleMarkers = [
+      ['[SYSTEM_PLACE_SCHEDULE_FROM_CURRENT]', 'planningBasis: current_time'],
+      ['[SYSTEM_PLACE_SCHEDULE_FROM_DAY_START]', 'planningBasis: day_start'],
+      ['[SYSTEM_EDIT_SCHEDULE_WITH_COMPLETED_DAY_PART]', 'planningBasis: custom_time'],
+    ] as const
+    for (const [marker, expectedInstructionPart] of scheduleMarkers) {
+      mocks.stream.mockClear()
+      mocks.stream.mockReturnValue(makeStream([{ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Собираю расписание.' } }]))
+      mocks.chatMessageCreate.mockReset().mockResolvedValueOnce({ id: 88 })
+
+      const scheduleResponse = await POST(request({ userMessage: marker }))
+      const scheduleText = await scheduleResponse.text()
+      const scheduleCall = mocks.stream.mock.calls[0][0]
+      const scheduleUserContent = scheduleCall.messages.at(-1).content
+
+      expect(scheduleResponse.headers.get('content-type')).toContain('text/event-stream')
+      expect(scheduleText).toContain('"assistantMessageId":88')
+      expect(scheduleUserContent).toContain(expectedInstructionPart)
+      expect(scheduleUserContent).not.toContain(marker)
+      expect(mocks.chatMessageCreate).toHaveBeenCalledTimes(1)
+      expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'assistant' }) }))
+      expect(mocks.chatMessageCreate).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'user', content: expect.stringContaining('planningBasis') }) }))
+    }
   })
 
   it('normalizes fractional v3 tool block times before validation and metadata creation', async () => {

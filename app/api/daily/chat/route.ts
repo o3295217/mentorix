@@ -26,7 +26,7 @@ import { createProposalMetadata, createTaskListProposalMetadata, hashDailyPlanTa
 import { buildScheduleMachineContext } from '@/lib/daily-schedule-context'
 import { isStrictScheduleChangeRequest } from '@/lib/daily-schedule-intent'
 import { AuthError } from '@/lib/auth'
-import { buildTaskListProposalWithRejectedScheduleMessage, DEFAULT_REJECTED_SCHEDULE_HUMAN_REASON, FALLBACK_INVALID_PROPOSAL_MESSAGE, humanizeScheduleProposalDiagnostics } from '@/lib/daily-chat-constants'
+import { buildTaskListProposalWithRejectedScheduleMessage, DEFAULT_REJECTED_SCHEDULE_HUMAN_REASON, FALLBACK_INVALID_PROPOSAL_MESSAGE, getDailyScheduleIssueActionByMarker, humanizeScheduleProposalDiagnostics } from '@/lib/daily-chat-constants'
 
 const ChatSchema = z.object({
   date: z.string().trim().min(1).max(32),
@@ -381,6 +381,7 @@ export async function POST(request: NextRequest) {
       pendingProposal,
     })
     const isKickoff = isPlanChatKickoffMessage(userMessage)
+    const scheduleIssueAction = getDailyScheduleIssueActionByMarker(userMessage)
 
     // Типизация для истории
     type RecentEntry = typeof recentEntries[number]
@@ -439,6 +440,8 @@ export async function POST(request: NextRequest) {
     const kickoffMode = isKickoff ? getPlanChatKickoffMode(kickoffContext) : null
     const modelUserMessage = kickoffMode
       ? buildPlanChatKickoffInstruction(kickoffMode, kickoffContext)
+      : scheduleIssueAction
+        ? scheduleIssueAction.modelInstruction
       : sanitizeUserInput(userMessage, 4000)
     const currentPlanTasksHash = hashDailyPlanTasks(planTasks)
     
@@ -450,7 +453,7 @@ export async function POST(request: NextRequest) {
     // Определяем, нужно ли показывать план
     // План показываем если пользователь просит его посмотреть или это первое сообщение
     const planKeywords = ['план', 'задач', 'посмотри', 'смотри', 'анализ', 'проверь', 'оцен', 'что сегодня', 'что делать', 'что у меня', 'покажи']
-    const needPlan = isKickoff || messages.length === 0 || planKeywords.some(kw => userMessage.toLowerCase().includes(kw))
+    const needPlan = isKickoff || scheduleIssueAction !== null || messages.length === 0 || planKeywords.some(kw => userMessage.toLowerCase().includes(kw))
     
     console.log('[Plan Chat] Request summary:', {
       date,
@@ -459,6 +462,7 @@ export async function POST(request: NextRequest) {
       historyMessages: messages.length,
       needPlan,
       kickoffMode,
+      scheduleIssueAction: scheduleIssueAction?.action ?? null,
     })
 
     // Собрать историю сообщений для Claude
@@ -467,6 +471,7 @@ export async function POST(request: NextRequest) {
     // Добавить историю сообщений как есть
     for (const msg of messages) {
       if (msg.role === 'user' && isPlanChatKickoffMessage(msg.content)) continue
+      if (msg.role === 'user' && getDailyScheduleIssueActionByMarker(msg.content)) continue
       claudeMessages.push({
         role: msg.role,
         content: msg.content,
@@ -528,7 +533,7 @@ export async function POST(request: NextRequest) {
       model,
       max_tokens: 4096,
       tools: [proposeDailyScheduleTool as never],
-      tool_choice: !isKickoff && isStrictScheduleChangeRequest(userMessage) ? { type: 'tool', name: 'propose_daily_schedule' } : { type: 'auto' },
+      tool_choice: scheduleIssueAction !== null || (!isKickoff && isStrictScheduleChangeRequest(userMessage)) ? { type: 'tool', name: 'propose_daily_schedule' } : { type: 'auto' },
       system: systemBlocks as never,
       messages: fixedMessages,
     })
@@ -713,7 +718,7 @@ export async function POST(request: NextRequest) {
           console.log('[Plan Chat] Response length:', assistantMessage.length)
 
           try {
-            if (!isKickoff) {
+            if (!isKickoff && scheduleIssueAction === null) {
               await prisma.chatMessage.create({ data: { userId, date, role: 'user', content: modelUserMessage } })
             }
             const assistantData = proposalMetadata
