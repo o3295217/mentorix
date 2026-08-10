@@ -11,17 +11,17 @@ ASSUME_YES=0
 
 usage() {
   cat <<'USAGE'
-Update AI Assistant Docker container locally.
+Update AI Assistant Docker services locally.
 
 Usage:
   scripts/update-docker-local.sh [--git-pull] [--no-cache] [--prod] [--project NAME] [--no-stop-existing] [--yes]
 
 Options:
   --git-pull   Pull latest code (git pull --ff-only) before rebuild
-  --no-cache   Build without cache
+  --no-cache   Build without cache (prod only; ignored in dev)
   --prod       Use docker-compose.production.yml (includes postgres service)
   --project    Override Docker Compose project name (avoids orphan warnings)
-  --no-stop-existing  Do not stop existing app container if it occupies port 3000
+  --no-stop-existing  Do not stop existing app container if it occupies port 3000 (prod only)
   --yes        Assume "yes" for prompts
 USAGE
 }
@@ -91,14 +91,10 @@ cd "$ROOT_DIR"
 info "Project: $(basename "$ROOT_DIR")"
 
 if [[ -z "$PROJECT_NAME" ]]; then
-  # Important: use a distinct project name in dev mode so that containers
-  # created by other compose files (e.g. postgres from production stack)
-  # are not treated as orphans.
-  if [[ "$MODE" == "prod" ]]; then
-    PROJECT_NAME="$(basename "$ROOT_DIR")"
-  else
-    PROJECT_NAME="$(basename "$ROOT_DIR")-dev"
-  fi
+  # Keep the default project name stable between local and production compose
+  # files: the local postgres service intentionally reuses the existing
+  # ai-assistant-db container and external pgdata volume.
+  PROJECT_NAME="$(basename "$ROOT_DIR")"
 fi
 
 info "Compose project: $PROJECT_NAME"
@@ -129,7 +125,9 @@ if [[ "$MODE" == "prod" ]]; then
 fi
 
 # If port 3000 is already occupied by an existing app container, handle it.
-if docker ps --format '{{.Names}} {{.Ports}}' | grep -qE '(^| )ai-assistant-(app|production) ' && docker ps --format '{{.Names}} {{.Ports}}' | grep -qE '0\.0\.0\.0:3000->|\[::\]:3000->'; then
+# This is only relevant in prod mode: dev mode starts postgres only, while the
+# Next.js app runs outside Docker via `npm run dev`.
+if [[ "$MODE" == "prod" ]] && docker ps --format '{{.Names}} {{.Ports}}' | grep -qE '(^| )ai-assistant-(app|production) ' && docker ps --format '{{.Names}} {{.Ports}}' | grep -qE '0\.0\.0\.0:3000->|\[::\]:3000->'; then
   if [[ "$STOP_EXISTING" == "1" ]]; then
     warn "Port 3000 looks occupied by an existing AI Assistant container."
     if confirm "Stop conflicting container(s) ai-assistant-app/ai-assistant-production?"; then
@@ -141,6 +139,21 @@ if docker ps --format '{{.Names}} {{.Ports}}' | grep -qE '(^| )ai-assistant-(app
   else
     die "Port 3000 is occupied and --no-stop-existing was set. Stop the container using port 3000 and retry."
   fi
+fi
+
+if [[ "$MODE" == "dev" ]]; then
+  if [[ "$NO_CACHE" == "1" ]]; then
+    warn "--no-cache is ignored in dev mode: docker-compose.local.yml contains only postgres, nothing to build."
+  fi
+
+  info "Start postgres (compose: $COMPOSE_FILE)"
+  docker compose "${COMPOSE_ARGS[@]}" up -d postgres
+
+  info "Status"
+  docker compose "${COMPOSE_ARGS[@]}" ps postgres
+
+  info "Postgres is up. Start the app locally with: npm run dev"
+  exit 0
 fi
 
 info "Rebuild app (compose: $COMPOSE_FILE)"
