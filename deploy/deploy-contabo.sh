@@ -104,7 +104,7 @@ echo "Прямая доступность Anthropic подтверждена (HT
 echo -e "\n${GREEN}5. Синхронизация проекта на Contabo${NC}"
 rsync -az --delete --delete-delay \
   -e "$SSH_COMMAND" \
-  --exclude '.git/' \
+  --exclude '.git' \
   --exclude 'node_modules/' \
   --exclude '.next/' \
   --exclude '.env*' \
