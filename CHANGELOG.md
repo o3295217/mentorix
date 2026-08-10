@@ -6,6 +6,17 @@
 
 ## [Unreleased]
 
+### 2026-08-10 — chore(deploy): exclude .git as both file and directory from the production rsync
+- 📝 Документация: 1 файлов
+- 📦 Другое: 1 файлов
+
+
+### 2026-07-31 — feat(daily): edit a task from the timeline and keep list and timeline in sync
+- 🧩 Компоненты: 1 файлов (DayTimeline)
+- 📄 Страницы: 1 файлов
+- 📦 Другое: 3 файлов
+
+
 ### 2026-07-29 — docs: fix stale user-guide claim and line counts in codebase map
 - 📝 Документация: 2 файлов
 
