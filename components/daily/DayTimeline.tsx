@@ -124,8 +124,8 @@ export function getUnscheduledTrayViewConfig(): { defaultDurationMinutes: number
   return {
     defaultDurationMinutes: DEFAULT_UNSCHEDULED_DURATION_MINUTES,
     showsDurationControls: false,
-    hint: 'Перетащите задачу на шкалу',
-    chipItemClassName: 'w-[min(76vw,240px)] flex-shrink-0 md:w-[240px]',
+    hint: 'Перетащите на шкалу или нажмите',
+    chipItemClassName: 'w-[min(72vw,220px)] flex-shrink-0 sm:w-[220px]',
     chipButtonClassIncludes: ['w-full', 'cursor-grab', 'active:cursor-grabbing', 'disabled:cursor-not-allowed'],
     emptyCanvasText: null,
   }
@@ -222,6 +222,7 @@ export default function DayTimeline({
   const loadSummary = useMemo(() => computeClientScheduleLoadSummary(schedule), [schedule])
   const trayConfig = getUnscheduledTrayViewConfig()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const isScheduleEmpty = blocks.length === 0
   const timelineWindow = getCompressedTimelineWindow(schedule, showFullDay)
   const dayStart = timelineWindow.startMinutes
   const dayEnd = timelineWindow.endMinutes
@@ -273,12 +274,12 @@ export default function DayTimeline({
   return (
     <div className="day-timeline flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pr-2">
       {/* Status bar */}
-      <div className="flex flex-wrap items-center gap-2 text-sm leading-5 text-gray-400">
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-5 text-gray-500 sm:text-sm">
         {getTimelineBoundaryPills(schedule).map(label => (
-          <span key={label} className="rounded-full border border-gray-800/70 bg-gray-950/60 px-2 py-1 text-xs text-gray-300 tabular-nums">{label}</span>
+          <span key={label} className="rounded-full border border-gray-800/70 bg-gray-950/60 px-2 py-0.5 text-xs text-gray-300 tabular-nums">{label}</span>
         ))}
-        <span>
-          Часовой пояс: <span className="text-gray-200">{timezone}</span>
+        <span className="ml-1 truncate text-gray-500 sm:max-w-none">
+          {timezone}
         </span>
         <span aria-hidden>·</span>
         {isSaving ? (
@@ -292,39 +293,43 @@ export default function DayTimeline({
         {mutationLocked && <span className="text-blue-300" role="status" aria-live="polite">Шкала временно заблокирована на время применения</span>}
       </div>
 
-      <div className="grid gap-2 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2 text-xs text-gray-300 sm:grid-cols-[1fr_auto]">
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <span>Занято: <b className="text-gray-100">{formatDurationLabel(loadSummary.scheduledMinutes)} ({loadSummary.scheduledPercent}%)</b></span>
-          <span>Свободно: <b className="text-gray-100">{formatDurationLabel(loadSummary.unscheduledMinutes)} ({loadSummary.unscheduledPercent}%)</b></span>
-          {Object.entries(loadSummary.categories).map(([category, value]) => value.minutes > 0 && (
-            <span key={category}>{categoryLabels[category as keyof typeof categoryLabels]}: {formatDurationLabel(value.minutes)} · {value.percent}%</span>
-          ))}
+      {!isScheduleEmpty && (
+        <div className="grid gap-2 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2 text-xs text-gray-300 sm:grid-cols-[1fr_auto]">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <span>Занято: <b className="text-gray-100">{formatDurationLabel(loadSummary.scheduledMinutes)} ({loadSummary.scheduledPercent}%)</b></span>
+            <span>Свободно: <b className="text-gray-100">{formatDurationLabel(loadSummary.unscheduledMinutes)} ({loadSummary.unscheduledPercent}%)</b></span>
+            {Object.entries(loadSummary.categories).map(([category, value]) => value.minutes > 0 && (
+              <span key={category}>{categoryLabels[category as keyof typeof categoryLabels]}: {formatDurationLabel(value.minutes)} · {value.percent}%</span>
+            ))}
+          </div>
+          <p className="text-gray-400">{loadSummary.recommendation}</p>
         </div>
-        <p className="text-gray-400">{loadSummary.recommendation}</p>
-      </div>
+      )}
 
-      {timelineWindow.isCompressed && (
-        <div className="rounded-2xl border border-primary-500/20 bg-primary-500/10 p-3 text-sm text-gray-300">
+      {isScheduleEmpty && (
+        <div className="rounded-2xl border border-primary-500/20 bg-primary-500/10 px-3 py-2 text-sm text-gray-300">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p>Пока нет блоков расписания — показываю только рабочее окно, чтобы не прокручивать пустой день.</p>
-            <button
-              type="button"
-              onClick={() => setShowFullDay(true)}
-              className="min-h-10 rounded-lg px-3 text-sm font-medium text-primary-200 transition-colors hover:bg-primary-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
-            >
-              Показать весь день
-            </button>
+            <p>{timelineWindow.isCompressed ? 'Расписание пустое — показываю рабочее окно, чтобы сразу было видно шкалу.' : 'Расписание пустое — весь день открыт на шкале.'}</p>
+            {timelineWindow.isCompressed && (
+              <button
+                type="button"
+                onClick={() => setShowFullDay(true)}
+                className="min-h-10 rounded-lg px-3 text-sm font-medium text-primary-200 transition-colors hover:bg-primary-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              >
+                Показать весь день
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {unscheduledTasks.length > 0 && (
-        <div className="flex-shrink-0 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-3 pr-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex-shrink-0 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2 pr-3">
+          <div className="mb-1 flex items-center justify-between gap-3">
             <h4 className="text-sm font-medium text-gray-200">Не распределено ({unscheduledTasks.length})</h4>
-            <span className="text-right text-xs text-gray-500">{trayConfig.hint}</span>
+            <span className="hidden text-right text-xs text-gray-500 sm:inline">{trayConfig.hint}</span>
           </div>
-          <ul className="flex max-h-24 gap-2 overflow-x-auto px-1 pb-2 pr-3 md:flex-wrap md:overflow-y-auto md:overflow-x-hidden">
+          <ul className="flex gap-2 overflow-x-auto px-1 pb-1 pr-3" aria-label="Не распределённые задачи для перетаскивания на шкалу">
             {unscheduledTasks.map(({ index, task }) => (
               <li key={`${index}-${task.id}`} className={trayConfig.chipItemClassName}>
                 <button
@@ -344,7 +349,7 @@ export default function DayTimeline({
                     setDropPreview(null)
                   }}
                   disabled={mutationLocked}
-                  className={`group flex w-full cursor-grab items-center gap-2 rounded-xl border border-gray-800/80 bg-gray-900/70 px-3 py-2 text-left text-sm text-gray-200 shadow-sm transition hover:border-blue-400/50 hover:bg-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-400 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50 ${draggingTaskIndex === index ? 'scale-[0.98] border-blue-400/70 bg-blue-500/15' : ''}`}
+                  className={`group flex w-full cursor-grab items-center gap-2 rounded-xl border border-gray-800/80 bg-gray-900/70 px-3 py-1.5 text-left text-sm text-gray-200 shadow-sm transition hover:border-blue-400/50 hover:bg-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-400 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50 ${draggingTaskIndex === index ? 'scale-[0.98] border-blue-400/70 bg-blue-500/15' : ''}`}
                   title={`Перетащить «${task.taskText}» на шкалу или нажать для ближайшего слота`}
                   aria-label={`Задача «${task.taskText}». Перетащите на шкалу или нажмите, чтобы поставить в ближайший свободный слот на 30 минут`}
                   aria-grabbed={draggingTaskIndex === index}

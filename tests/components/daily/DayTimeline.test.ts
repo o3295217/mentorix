@@ -83,8 +83,8 @@ describe('timeline drop and tray view helpers', () => {
     expect(getUnscheduledTrayViewConfig()).toEqual({
       defaultDurationMinutes: 30,
       showsDurationControls: false,
-      hint: 'Перетащите задачу на шкалу',
-      chipItemClassName: 'w-[min(76vw,240px)] flex-shrink-0 md:w-[240px]',
+      hint: 'Перетащите на шкалу или нажмите',
+      chipItemClassName: 'w-[min(72vw,220px)] flex-shrink-0 sm:w-[220px]',
       chipButtonClassIncludes: ['w-full', 'cursor-grab', 'active:cursor-grabbing', 'disabled:cursor-not-allowed'],
       emptyCanvasText: null,
     })

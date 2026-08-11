@@ -123,7 +123,7 @@ function getLoadLevel(scheduledPercent: number): DailyScheduleLoadSummary['loadL
 
 function getLoadRecommendation(loadLevel: DailyScheduleLoadSummary['loadLevel']): string {
   switch (loadLevel) {
-    case 'empty': return 'Расписание пока пустое: добавьте главные задачи и обязательные блоки.'
+    case 'empty': return 'Расписание пустое — начните с главных задач или обязательных блоков.'
     case 'light': return 'Нагрузка лёгкая: можно добавить важную задачу или оставить запас.'
     case 'balanced': return 'Нагрузка сбалансирована: есть план и буферы на непредвиденное.'
     case 'busy': return 'День плотный: проверьте буферы и зафиксированные обязательства.'
