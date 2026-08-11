@@ -160,8 +160,6 @@ export const DailyScheduleProposalV3Schema = z.object({
       const expectedText = proposal.newTasks[block.taskIndex - 1]
       if (!expectedText) {
         ctx.addIssue({ code: 'custom', path: ['blocks', index, 'taskIndex'], message: 'new task block references unknown newTasks index' })
-      } else if (block.taskText !== expectedText) {
-        ctx.addIssue({ code: 'custom', path: ['blocks', index, 'taskText'], message: 'new task block taskText must match newTasks item' })
       }
     }
   }
@@ -249,6 +247,15 @@ export type DailyScheduleProposalMetadata = z.infer<typeof DailyScheduleProposal
 export type DailyTaskListProposalMetadata = z.infer<typeof DailyTaskListProposalMetadataSchema>
 export type DailyChatProposalMetadata = z.infer<typeof DailyChatProposalMetadataSchema>
 export type ProposalToDailyScheduleOptions = { currentPlanTaskCount?: number }
+export type DailyScheduleProposalUnscheduledBlock = {
+  originalIndex: number
+  reason: 'does_not_fit'
+  block: Record<string, unknown>
+  task?: { taskSource?: 'existing' | 'new'; taskIndex?: number; taskText?: string }
+}
+export type DailyScheduleProposalNormalizationResult = { unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] }
+
+const normalizationResults = new WeakMap<object, DailyScheduleProposalNormalizationResult>()
 
 export function hashDailyPlanTasks(planTasks: string[]): string {
   return crypto.createHash('sha256').update(JSON.stringify({ version: 1, tasks: planTasks.map(task => task.trim()) })).digest('hex')
@@ -307,6 +314,10 @@ type MovableScheduleBlock = {
   isFixed: boolean
 }
 
+type LayoutBlock = MovableScheduleBlock & { endMinutes: number }
+
+type FreeInterval = { startMinutes: number; endMinutes: number }
+
 function getMovableScheduleBlocks(blocks: unknown[]): MovableScheduleBlock[] {
   return blocks.flatMap((block, originalIndex) => {
     if (!block || typeof block !== 'object' || Array.isArray(block)) return []
@@ -319,6 +330,106 @@ function getMovableScheduleBlocks(blocks: unknown[]): MovableScheduleBlock[] {
 
 function sortScheduleBlocksByStart(blocks: MovableScheduleBlock[]): MovableScheduleBlock[] {
   return [...blocks].sort((first, second) => first.startMinutes - second.startMinutes || first.originalIndex - second.originalIndex)
+}
+
+function sortLayoutBlocksByStart(blocks: LayoutBlock[]): LayoutBlock[] {
+  return [...blocks].sort((first, second) => first.startMinutes - second.startMinutes || first.originalIndex - second.originalIndex)
+}
+
+function getScheduleDayWindow(candidate: Record<string, unknown>): FreeInterval | null {
+  const startMinutes = candidate.version === 3 ? candidate.planningStartMinutes : candidate.dayStartMinutes
+  const endMinutes = candidate.version === 3 ? candidate.activityEndMinutes : candidate.dayEndMinutes
+  if (typeof startMinutes !== 'number' || !Number.isFinite(startMinutes)) return null
+  if (typeof endMinutes !== 'number' || !Number.isFinite(endMinutes)) return null
+  const normalizedStart = snapMinutesToStep(startMinutes, { min: 0, max: 1440 })
+  const normalizedEnd = snapMinutesToStep(endMinutes, { min: 0, max: 1440 })
+  if (normalizedEnd <= normalizedStart) return null
+  return { startMinutes: normalizedStart, endMinutes: normalizedEnd }
+}
+
+function getFixedOccupiedIntervals(fixedBlocks: LayoutBlock[], dayWindow: FreeInterval): FreeInterval[] {
+  const intervals = fixedBlocks
+    .filter(block => block.startMinutes >= dayWindow.startMinutes && block.endMinutes <= dayWindow.endMinutes)
+    .sort((first, second) => first.startMinutes - second.startMinutes || first.originalIndex - second.originalIndex)
+
+  const merged: FreeInterval[] = []
+  for (const interval of intervals) {
+    const previous = merged.at(-1)
+    if (previous && interval.startMinutes <= previous.endMinutes) {
+      previous.endMinutes = Math.max(previous.endMinutes, interval.endMinutes)
+    } else {
+      merged.push({ startMinutes: interval.startMinutes, endMinutes: interval.endMinutes })
+    }
+  }
+  return merged
+}
+
+function getFreeIntervals(dayWindow: FreeInterval, occupiedIntervals: FreeInterval[]): FreeInterval[] {
+  const freeIntervals: FreeInterval[] = []
+  let cursor = dayWindow.startMinutes
+
+  for (const interval of occupiedIntervals) {
+    if (interval.startMinutes > cursor) freeIntervals.push({ startMinutes: cursor, endMinutes: interval.startMinutes })
+    cursor = Math.max(cursor, interval.endMinutes)
+  }
+
+  if (cursor < dayWindow.endMinutes) freeIntervals.push({ startMinutes: cursor, endMinutes: dayWindow.endMinutes })
+  return freeIntervals
+}
+
+function getUnscheduledTaskInfo(block: NormalizedProposalBlock): DailyScheduleProposalUnscheduledBlock['task'] | undefined {
+  if (block.kind !== 'task') return undefined
+  const task: NonNullable<DailyScheduleProposalUnscheduledBlock['task']> = {}
+  if (block.taskSource === 'existing' || block.taskSource === 'new') task.taskSource = block.taskSource
+  if (typeof block.taskIndex === 'number') task.taskIndex = block.taskIndex
+  if (typeof block.taskText === 'string') task.taskText = block.taskText
+  return task
+}
+
+function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record<string, unknown>): { blocks: unknown[]; unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] } | null {
+  const dayWindow = getScheduleDayWindow(candidate)
+  if (!dayWindow) return null
+
+  const scheduleBlocks = getMovableScheduleBlocks(blocks).map(block => ({ ...block, endMinutes: getBlockEndMinutes(block) }))
+  if (scheduleBlocks.length !== blocks.length) return null
+
+  const fixedBlocks = scheduleBlocks.filter(block => block.isFixed)
+  const flexibleBlocks = scheduleBlocks.filter(block => !block.isFixed).sort((first, second) => first.originalIndex - second.originalIndex)
+  const freeIntervals = getFreeIntervals(dayWindow, getFixedOccupiedIntervals(fixedBlocks, dayWindow))
+  const placedFlexibleBlocks: LayoutBlock[] = []
+  const unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] = []
+  let cursor = dayWindow.startMinutes
+
+  for (const block of flexibleBlocks) {
+    const durationMinutes = block.durationMinutes
+    const interval = freeIntervals.find(freeInterval => {
+      if (freeInterval.endMinutes <= cursor) return false
+      const startMinutes = Math.max(cursor, freeInterval.startMinutes)
+      return startMinutes + durationMinutes <= freeInterval.endMinutes && startMinutes + durationMinutes <= 1440
+    })
+
+    if (!interval) {
+      const unscheduledBlock: DailyScheduleProposalUnscheduledBlock = {
+        originalIndex: block.originalIndex,
+        reason: 'does_not_fit',
+        block: { ...block.block },
+      }
+      const task = getUnscheduledTaskInfo(block.block)
+      if (task) unscheduledBlock.task = task
+      unscheduledBlocks.push(unscheduledBlock)
+      continue
+    }
+
+    const startMinutes = Math.max(cursor, interval.startMinutes)
+    const endMinutes = startMinutes + durationMinutes
+    block.startMinutes = startMinutes
+    block.endMinutes = endMinutes
+    block.block.startMinutes = startMinutes
+    placedFlexibleBlocks.push(block)
+    cursor = endMinutes
+  }
+
+  return { blocks: sortLayoutBlocksByStart([...fixedBlocks, ...placedFlexibleBlocks]).map(block => block.block), unscheduledBlocks }
 }
 
 function separateOverlappingScheduleBlocks(blocks: unknown[]): unknown[] {
@@ -360,6 +471,11 @@ export function normalizeDailyScheduleProposalToolInput(input: unknown): unknown
   if (!Array.isArray(candidate.blocks)) return input
 
   const normalizedCandidate = { ...candidate }
+  for (const field of ['dayStartMinutes', 'dayEndMinutes', 'planningStartMinutes', 'workEndMinutes', 'activityEndMinutes'] as const) {
+    if (typeof normalizedCandidate[field] === 'number' && Number.isFinite(normalizedCandidate[field])) {
+      normalizedCandidate[field] = snapMinutesToStep(normalizedCandidate[field], { min: 0, max: 1440 })
+    }
+  }
   if (normalizedCandidate.version === 3) {
     normalizedCandidate.dayStartMinutes = normalizedCandidate.planningStartMinutes
     normalizedCandidate.dayEndMinutes = normalizedCandidate.activityEndMinutes
@@ -374,13 +490,26 @@ export function normalizeDailyScheduleProposalToolInput(input: unknown): unknown
     if (typeof normalizedBlock.durationMinutes === 'number' && Number.isFinite(normalizedBlock.durationMinutes)) {
       normalizedBlock.durationMinutes = snapMinutesToStep(normalizedBlock.durationMinutes, { min: MIN_BLOCK_DURATION_MINUTES, max: 1440 })
     }
+    if (normalizedCandidate.version === 3 && normalizedBlock.kind === 'task' && normalizedBlock.taskSource === 'new' && typeof normalizedBlock.taskIndex === 'number' && Array.isArray(normalizedCandidate.newTasks)) {
+      const expectedTaskText = normalizedCandidate.newTasks[normalizedBlock.taskIndex - 1]
+      if (typeof expectedTaskText === 'string') normalizedBlock.taskText = expectedTaskText
+    }
     return normalizedBlock
   })
 
-  return {
+  const layout = normalizedCandidate.version === 3 ? placeFlexibleBlocksInFreeIntervals(normalizedBlocks, normalizedCandidate) : null
+  const normalizedOutput = {
     ...normalizedCandidate,
-    blocks: separateOverlappingScheduleBlocks(normalizedBlocks),
+    blocks: layout ? layout.blocks : separateOverlappingScheduleBlocks(normalizedBlocks),
   }
+  normalizationResults.set(normalizedOutput, { unscheduledBlocks: layout?.unscheduledBlocks ?? [] })
+
+  return normalizedOutput
+}
+
+export function getDailyScheduleProposalNormalizationResult(input: unknown): DailyScheduleProposalNormalizationResult | null {
+  if (!input || typeof input !== 'object') return null
+  return normalizationResults.get(input) ?? null
 }
 
 function inferMinimumCurrentPlanTaskCount(proposal: DailyScheduleProposalV3): number {
@@ -409,7 +538,7 @@ function validateTaskBlocksAgainstCurrentPlan(proposal: DailyScheduleProposal, c
       if (typeof newTaskIndex !== 'number') return { success: false, error: `new task block ${index} references unknown newTasks index` }
       const expectedText = proposal.newTasks[newTaskIndex - 1]
       if (!expectedText) return { success: false, error: `new task block ${index} references unknown newTasks index` }
-      if (block.taskText !== expectedText) return { success: false, error: `new task block ${index} taskText does not match newTasks` }
+      block.taskText = expectedText
       continue
     }
     const taskIndex = block.taskIndex
@@ -417,9 +546,7 @@ function validateTaskBlocksAgainstCurrentPlan(proposal: DailyScheduleProposal, c
       return { success: false, error: `task block ${index} references unknown taskIndex` }
     }
     const expectedText = current.planTasks[taskIndex - 1]
-    if (block.taskText !== expectedText) {
-      return { success: false, error: `task block ${index} taskText does not match current plan` }
-    }
+    block.taskText = expectedText
   }
   return { success: true }
 }

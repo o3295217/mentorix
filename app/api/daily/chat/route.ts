@@ -22,7 +22,7 @@ import { getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { getWorkContextForAI } from '@/lib/completed-work'
 import { getPlanUserContext } from '@/lib/user-context'
 import { DailyScheduleSchema, getBlockEndMinutes, hashDailySchedule } from '@/lib/daily-schedule'
-import { createProposalMetadata, createTaskListProposalMetadata, hashDailyPlanTasks, normalizeDailyScheduleProposalToolInput, proposalToDailySchedule, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan, type DailyScheduleProposal, type DailyChatProposalMetadata } from '@/lib/daily-schedule-proposal'
+import { createProposalMetadata, createTaskListProposalMetadata, getDailyScheduleProposalNormalizationResult, hashDailyPlanTasks, normalizeDailyScheduleProposalToolInput, proposalToDailySchedule, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan, type DailyScheduleProposal, type DailyChatProposalMetadata, type DailyScheduleProposalUnscheduledBlock } from '@/lib/daily-schedule-proposal'
 import { buildScheduleMachineContext } from '@/lib/daily-schedule-context'
 import { isStrictScheduleChangeRequest } from '@/lib/daily-schedule-intent'
 import { AuthError } from '@/lib/auth'
@@ -115,7 +115,7 @@ type ClaudeMessage = { role: 'user' | 'assistant'; content: string | Array<Recor
 type ScheduleToolCall = { index: number; id: string; name: string; inputJson: string; parsedInput?: unknown }
 type DiagnosticIssue = { path: PropertyKey[]; message: string; code?: string }
 type ToolValidationResult =
-  | { success: true; metadata: ReturnType<typeof createProposalMetadata> }
+  | { success: true; metadata: ReturnType<typeof createProposalMetadata>; unscheduledMessage?: string }
   | { success: false; diagnosticsForModel: string[]; safeDiagnosticsForLog: string[]; toolCall: ScheduleToolCall; taskListMetadata?: ReturnType<typeof createTaskListProposalMetadata>; userReason?: string }
 
 function truncateForDiagnostic(value: unknown): string {
@@ -174,7 +174,6 @@ function getScheduleProposalValidationDiagnosticsInternal(proposal: DailySchedul
       }
       const expectedText = proposal.newTasks[taskIndex - 1]
       if (!expectedText) diagnostics.push(`block ${index + 1}: new taskIndex ${taskIndex} does not exist in newTasks`)
-      else if (block.taskText !== expectedText) diagnostics.push(options.includeValues ? `block ${index + 1}: taskText "${truncateForDiagnostic(block.taskText)}" does not match newTasks[${taskIndex}]` : `block ${index + 1}: taskText mismatch with newTasks[${taskIndex}]`)
       continue
     }
     const taskIndex = block.taskIndex
@@ -184,7 +183,6 @@ function getScheduleProposalValidationDiagnosticsInternal(proposal: DailySchedul
     }
     const expectedText = current.planTasks[taskIndex - 1]
     if (!expectedText) diagnostics.push(`block ${index + 1}: existing taskIndex ${taskIndex} does not exist in current planTasks`)
-    else if (block.taskText !== expectedText) diagnostics.push(options.includeValues ? `block ${index + 1}: taskText "${truncateForDiagnostic(block.taskText)}" does not match current plan task ${taskIndex}` : `block ${index + 1}: taskText mismatch with current plan task ${taskIndex}`)
   }
 
   try {
@@ -238,6 +236,17 @@ export function getScheduleProposalValidationDiagnostics(proposal: DailySchedule
 
 export function getSafeScheduleProposalValidationDiagnosticsForLog(proposal: DailyScheduleProposal, current: { date: string; timezone: string; planTasks: string[] }): string[] {
   return getScheduleProposalValidationDiagnosticsInternal(proposal, current, { includeValues: false })
+}
+
+function buildUnscheduledBlocksMessage(blocks: DailyScheduleProposalUnscheduledBlock[]): string | null {
+  const taskLabels = blocks.flatMap(block => {
+    if (!block.task) return []
+    if (block.task.taskText) return [block.task.taskText]
+    if (block.task.taskIndex) return [`задача #${block.task.taskIndex}`]
+    return []
+  })
+  if (taskLabels.length === 0) return null
+  return `Часть задач не вошла в свободные промежутки дня и осталась в «Не распределено»: ${taskLabels.join(', ')}. Перетащите их на шкалу вручную или расширьте окно дня.`
 }
 
 // День недели на русском
@@ -576,6 +585,7 @@ export async function POST(request: NextRequest) {
               if (toolCall.name !== 'propose_daily_schedule') continue
               try {
                 const parsedInput = normalizeDailyScheduleProposalToolInput(JSON.parse(toolCall.inputJson))
+                const normalizationResult = getDailyScheduleProposalNormalizationResult(parsedInput)
                 toolCall.parsedInput = parsedInput
                 const proposalParse = parsePlanChatScheduleProposalToolResult(parsedInput)
                 if (!proposalParse.success) {
@@ -604,7 +614,7 @@ export async function POST(request: NextRequest) {
                 const metadata = planValidation.data.version === 3
                   ? createProposalMetadata({ date, proposal: planValidation.data, currentScheduleHash, currentScheduleExists, currentPlanTaskCount: planTasks.length, currentPlanTasksHash })
                   : createProposalMetadata({ date, proposal: planValidation.data, currentScheduleHash, currentScheduleExists })
-                return { success: true, metadata }
+                return { success: true, metadata, unscheduledMessage: buildUnscheduledBlocksMessage(normalizationResult?.unscheduledBlocks ?? []) ?? undefined }
               } catch (toolError) {
                 const diagnosticsForModel = [`tool input JSON parse failed: ${toolError instanceof Error ? toolError.message : String(toolError)}`]
                 const safeDiagnosticsForLog = ['tool input JSON parse failed']
@@ -620,8 +630,12 @@ export async function POST(request: NextRequest) {
 
           let proposalMetadata: DailyChatProposalMetadata | null = null
           let taskListProposalMessage: string | null = null
+          let scheduleNormalizationMessage: string | null = null
           const firstValidation = validateToolCalls(firstStreamResult.toolCalls)
-          if (firstValidation?.success) proposalMetadata = firstValidation.metadata
+          if (firstValidation?.success) {
+            proposalMetadata = firstValidation.metadata
+            scheduleNormalizationMessage = firstValidation.unscheduledMessage ?? null
+          }
           else if (firstValidation && !firstValidation.success) {
             rejectedScheduleProposal = true
             if (firstValidation.taskListMetadata) {
@@ -672,7 +686,10 @@ export async function POST(request: NextRequest) {
             })
             const correctionResult = await collectStream(correctionStream)
             const correctionValidation = validateToolCalls(correctionResult.toolCalls)
-            if (correctionValidation?.success) proposalMetadata = correctionValidation.metadata
+            if (correctionValidation?.success) {
+              proposalMetadata = correctionValidation.metadata
+              scheduleNormalizationMessage = correctionValidation.unscheduledMessage ?? null
+            }
             else if (correctionValidation && !correctionValidation.success) {
               rejectedScheduleProposal = true
               if (correctionValidation.taskListMetadata) {
@@ -701,6 +718,16 @@ export async function POST(request: NextRequest) {
             } else {
               assistantMessage = taskListProposalMessage
               controller.enqueue(sseEvent('text', { text: taskListProposalMessage }))
+            }
+          }
+
+          if (proposalMetadata?.type === 'daily_schedule_proposal' && scheduleNormalizationMessage) {
+            if (assistantMessage.trim().length > 0) {
+              assistantMessage = `${assistantMessage.trim()}\n\n${scheduleNormalizationMessage}`
+              controller.enqueue(sseEvent('text', { text: `\n\n${scheduleNormalizationMessage}` }))
+            } else {
+              assistantMessage = scheduleNormalizationMessage
+              controller.enqueue(sseEvent('text', { text: scheduleNormalizationMessage }))
             }
           }
 

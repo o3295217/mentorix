@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DailyScheduleSchema } from '@/lib/daily-schedule'
+import { DailyScheduleSchema, findScheduleOverlaps } from '@/lib/daily-schedule'
 import {
   DailyScheduleProposalSchema,
   DailyScheduleProposalV1Schema,
   DailyScheduleProposalV2Schema,
   DailyScheduleProposalV3Schema,
   createProposalMetadata,
+  getDailyScheduleProposalNormalizationResult,
   getNewTasksFromProposal,
   hashDailyPlanTasks,
   normalizeDailyScheduleProposalToolInput,
@@ -160,7 +161,7 @@ describe('daily schedule proposal', () => {
     expect(DailyScheduleProposalSchema.safeParse(proposalV3).success).toBe(true)
   })
 
-  it('rejects invalid proposal v3 new task references and newTasks limits', () => {
+  it('normalizes taskText from source of truth and keeps v3 new task references strict', () => {
     expect(DailyScheduleProposalV3Schema.safeParse({
       ...proposalV3,
       blocks: [
@@ -168,7 +169,14 @@ describe('daily schedule proposal', () => {
         { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Different text', category: 'operational', isFixed: false, startMinutes: 10 * 60 + 5, durationMinutes: 30 },
         proposalV3.blocks[2],
       ],
-    }).success).toBe(false)
+    }).success).toBe(true)
+
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [{ ...proposalV3.blocks[1], taskText: 'Different text' }],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks[0]).toMatchObject({ taskText: 'Call accountant' })
 
     expect(DailyScheduleProposalV3Schema.safeParse({
       ...proposalV3,
@@ -217,6 +225,10 @@ describe('daily schedule proposal', () => {
 
     const normalizedV3 = normalizeDailyScheduleProposalToolInput({
       ...proposalV3,
+      dayStartMinutes: 548,
+      planningStartMinutes: 548,
+      workEndMinutes: 18 * 60,
+      activityEndMinutes: 19 * 60,
       blocks: [
         { ...proposalV3.blocks[0], startMinutes: 548, durationMinutes: 22 },
         { ...proposalV3.blocks[1], startMinutes: 553, durationMinutes: 23 },
@@ -243,6 +255,7 @@ describe('daily schedule proposal', () => {
       { startMinutes: 9 * 60, durationMinutes: 60 },
       { startMinutes: 10 * 60, durationMinutes: 30 },
     ])
+    expect(findScheduleOverlaps(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 }).blocks)).toEqual([])
     expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
   })
 
@@ -255,8 +268,9 @@ describe('daily schedule proposal', () => {
       ],
     }) as DailyScheduleProposalV3
 
-    expect(normalized.blocks[0]).toMatchObject({ startMinutes: 10 * 60, durationMinutes: 30, isFixed: true })
-    expect(normalized.blocks[1]).toMatchObject({ startMinutes: 10 * 60 + 30, durationMinutes: 60, isFixed: false })
+    expect(normalized.blocks[0]).toMatchObject({ startMinutes: 9 * 60, durationMinutes: 60, isFixed: false })
+    expect(normalized.blocks[1]).toMatchObject({ startMinutes: 10 * 60, durationMinutes: 30, isFixed: true })
+    expect(findScheduleOverlaps(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 }).blocks)).toEqual([])
     expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
   })
 
@@ -275,6 +289,49 @@ describe('daily schedule proposal', () => {
     ])
     expect(DailyScheduleProposalV3Schema.safeParse(normalized).success).toBe(true)
     expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(false)
+  })
+
+  it('removes flexible blocks that do not fit and returns unscheduled block information', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 10 * 60,
+      planningStartMinutes: 9 * 60,
+      workEndMinutes: 10 * 60,
+      activityEndMinutes: 10 * 60,
+      newTasks: [],
+      blocks: [
+        { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Model text 1', category: 'main', isFixed: false, startMinutes: 9 * 60, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 2, taskText: 'Model text 2', category: 'main', isFixed: false, startMinutes: 9 * 60 + 15, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 3, taskText: 'Model text 3', category: 'main', isFixed: false, startMinutes: 9 * 60 + 30, durationMinutes: 30 },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks).toMatchObject([
+      { taskIndex: 1, startMinutes: 9 * 60, durationMinutes: 30 },
+      { taskIndex: 2, startMinutes: 9 * 60 + 30, durationMinutes: 30 },
+    ])
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual({
+      unscheduledBlocks: [expect.objectContaining({ originalIndex: 2, reason: 'does_not_fit', task: expect.objectContaining({ taskSource: 'existing', taskIndex: 3 }) })],
+    })
+    const validation = validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work', 'Review', 'Third task'] })
+    expect(validation.success).toBe(true)
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 3 })).success).toBe(true)
+  })
+
+  it('overwrites existing taskText from current plan instead of rejecting mismatches', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [
+        { ...proposalV3.blocks[0], taskText: 'Wrong text from model' },
+      ],
+    }) as DailyScheduleProposalV3
+
+    const validation = validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] })
+
+    expect(validation.success).toBe(true)
+    expect(normalized.blocks[0]).toMatchObject({ taskText: 'Deep work' })
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
   })
 
   it('normalizes v3 day range invariants from planningStartMinutes and activityEndMinutes', () => {
@@ -317,9 +374,52 @@ describe('daily schedule proposal', () => {
 
     expect(normalized.dayStartMinutes).toBe(9 * 60)
     expect(normalized.dayEndMinutes).toBe(21 * 60)
-    expect(normalized.blocks[4]).toMatchObject({ startMinutes: 11 * 60 + 30, durationMinutes: 45 })
-    expect(normalized.blocks[9]).toMatchObject({ startMinutes: 18 * 60 + 30, durationMinutes: 30 })
+    expect(findScheduleOverlaps(proposalToDailySchedule(normalized, { currentPlanTaskCount: 2 }).blocks)).toEqual([])
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual({ unscheduledBlocks: [] })
     expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work', 'Review'] }).success).toBe(true)
+  })
+
+  it('normalizes the 14-block 06:00-24:00 regression case into a valid schedule', () => {
+    const planTasks = Array.from({ length: 9 }, (_, index) => `Task ${index + 1}`)
+    const regressionProposal: DailyScheduleProposalV3 = {
+      version: 3,
+      date: '2026-02-28',
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 6 * 60,
+      dayEndMinutes: 24 * 60,
+      planningBasis: 'day_start',
+      planningStartMinutes: 6 * 60,
+      workEndMinutes: 18 * 60,
+      activityEndMinutes: 24 * 60,
+      newTasks: [],
+      blocks: [
+        { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Task 1', category: 'main', isFixed: false, startMinutes: 6 * 60, durationMinutes: 60 },
+        { kind: 'buffer', title: 'Inbox', category: 'buffer', isFixed: false, startMinutes: 6 * 60 + 30, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 2, taskText: 'Task 2', category: 'main', isFixed: false, startMinutes: 7 * 60 + 30, durationMinutes: 90 },
+        { kind: 'rest', title: 'Break', category: 'rest', isFixed: false, startMinutes: 8 * 60 + 20, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 3, taskText: 'Task 3', category: 'main', isFixed: false, startMinutes: 8 * 60 + 35, durationMinutes: 60 },
+        { kind: 'meal', title: 'Lunch', category: 'meal', isFixed: true, startMinutes: 12 * 60, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 4, taskText: 'Task 4', category: 'operational', isFixed: false, startMinutes: 12 * 60 + 20, durationMinutes: 60 },
+        { kind: 'buffer', title: 'Buffer', category: 'buffer', isFixed: false, startMinutes: 14 * 60, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 5, taskText: 'Task 5', category: 'main', isFixed: false, startMinutes: 15 * 60, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 6, taskText: 'Task 6', category: 'main', isFixed: false, startMinutes: 15 * 60 + 30, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 7, taskText: 'Wrong model text', category: 'main', isFixed: false, startMinutes: 23 * 60, durationMinutes: 120 },
+        { kind: 'rest', title: 'Late rest', category: 'rest', isFixed: false, startMinutes: 1450, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 8, taskText: 'Task 8', category: 'personal', isFixed: false, startMinutes: 21 * 60 + 40, durationMinutes: 90 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 9, taskText: 'Task 9', category: 'main', isFixed: false, startMinutes: 22 * 60 + 30, durationMinutes: 60 },
+      ],
+    }
+
+    const normalized = normalizeDailyScheduleProposalToolInput(regressionProposal) as DailyScheduleProposalV3
+    const validation = validateProposalAgainstCurrentPlan(normalized, { date: regressionProposal.date, timezone: regressionProposal.timezone, planTasks })
+
+    expect(validation.success).toBe(true)
+    expect(normalized.blocks).toHaveLength(14)
+    expect(normalized.blocks[10]).toMatchObject({ taskIndex: 7, taskText: 'Task 7' })
+    const schedule = proposalToDailySchedule(normalized, { currentPlanTaskCount: planTasks.length })
+    expect(findScheduleOverlaps(schedule.blocks)).toEqual([])
+    expect(schedule.blocks.every(block => block.startMinutes >= 6 * 60 && block.startMinutes + block.durationMinutes <= 24 * 60)).toBe(true)
+    expect(DailyScheduleSchema.safeParse(schedule).success).toBe(true)
   })
 
   it('keeps backward-compatible v1 and v2 proposal parsing', () => {

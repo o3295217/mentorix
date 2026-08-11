@@ -216,17 +216,18 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     ]))
   })
 
-  it('keeps user task text out of safe log diagnostics while model diagnostics stay specific', () => {
+  it('does not include user task text in current-plan validation diagnostics for unknown indexes', () => {
     const invalidProposal = {
       ...proposalInputV3,
-      blocks: [{ ...proposalInputV3.blocks[0], taskText: 'Sensitive user task text' }],
+      blocks: [{ ...proposalInputV3.blocks[0], taskIndex: 2, taskText: 'Sensitive user task text' }],
     } as never
 
     const modelDiagnostics = getScheduleProposalValidationDiagnostics(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })
     const logDiagnostics = getSafeScheduleProposalValidationDiagnosticsForLog(invalidProposal, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] })
 
-    expect(modelDiagnostics.join('\n')).toContain('Sensitive user task text')
-    expect(logDiagnostics).toContain('block 1: taskText mismatch with current plan task 1')
+    expect(modelDiagnostics).toContain('block 1: existing taskIndex 2 does not exist in current planTasks')
+    expect(logDiagnostics).toContain('block 1: existing taskIndex 2 does not exist in current planTasks')
+    expect(modelDiagnostics.join('\n')).not.toContain('Sensitive user task text')
     expect(logDiagnostics.join('\n')).not.toContain('Sensitive user task text')
     expect(logDiagnostics.join('\n')).not.toContain('Deep work')
   })
@@ -376,12 +377,12 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(metadata.schemaVersion).toBe(3)
     expect(metadata.proposal.blocks).toMatchObject([
       { startMinutes: 570, durationMinutes: 44 },
-      { startMinutes: 637, durationMinutes: 52 },
+      { startMinutes: 614, durationMinutes: 52 },
     ])
   })
 
   it('persists task-list metadata and a human message when tool-only schedule is invalid but new tasks are valid', async () => {
-    const invalidInput = { ...proposalInputV3, blocks: [{ ...proposalInputV3.blocks[0], taskText: 'Invented' }] }
+    const invalidInput = { ...proposalInputV3, blocks: [{ ...proposalInputV3.blocks[0], isFixed: true, startMinutes: 570, durationMinutes: 60 }, { ...proposalInputV3.blocks[1], isFixed: true, startMinutes: 600, durationMinutes: 60 }] }
     mocks.stream.mockReturnValue(makeStream([
       { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
       { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidInput) } },
@@ -416,8 +417,8 @@ describe('/api/daily/chat SSE schedule proposal', () => {
       activityEndMinutes: 660,
       workEndMinutes: 645,
       blocks: [
-        { ...proposalInputV3.blocks[0], startMinutes: 570, durationMinutes: 90 },
-        { ...proposalInputV3.blocks[1], startMinutes: 630, durationMinutes: 60 },
+        { ...proposalInputV3.blocks[0], isFixed: true, startMinutes: 570, durationMinutes: 90 },
+        { ...proposalInputV3.blocks[1], isFixed: true, startMinutes: 630, durationMinutes: 60 },
       ],
     }
     mocks.stream
@@ -439,8 +440,8 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledTimes(2)
     expect(correctionCall.tool_choice).toEqual({ type: 'tool', name: 'propose_daily_schedule' })
     expect(correctionToolResult).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_bad', is_error: true })
-    expect(correctionToolResult.content).not.toContain('blocks 1 and 2 overlap')
-    expect(correctionToolResult.content).toContain('block 2 [custom]: block end 720 > dayEndMinutes 660')
+    expect(correctionToolResult.content).toContain('blocks 1 and 2 overlap')
+    expect(correctionToolResult.content).toContain('block 2 [custom]: block end 690 > dayEndMinutes 660')
     expect(text).toContain('Исправил черновик.')
     expect(text).toContain('event: proposal')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -457,9 +458,9 @@ describe('/api/daily/chat SSE schedule proposal', () => {
       activityEndMinutes: 660,
       workEndMinutes: 645,
       blocks: [
-        { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Тетроникс', category: 'main', isFixed: false, startMinutes: 570, durationMinutes: 90 },
-        { kind: 'task', taskSource: 'new', taskIndex: 2, taskText: 'Зарядка', category: 'personal', isFixed: false, startMinutes: 630, durationMinutes: 60 },
-        { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'АИОНЛАБ', category: 'main', isFixed: false, startMinutes: 705, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Тетроникс', category: 'main', isFixed: true, startMinutes: 570, durationMinutes: 90 },
+        { kind: 'task', taskSource: 'new', taskIndex: 2, taskText: 'Зарядка', category: 'personal', isFixed: true, startMinutes: 630, durationMinutes: 60 },
+        { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'АИОНЛАБ', category: 'main', isFixed: true, startMinutes: 705, durationMinutes: 60 },
       ],
     }
     mocks.stream
@@ -478,7 +479,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledTimes(2)
     expect(text).toContain('event: proposal')
     expect(text).toContain('Я собрал список задач и могу добавить его в план.')
-    expect(text).toContain('один из блоков выходит за пределы выбранного дня')
+    expect(text).toContain('в расписании есть пересекающиеся блоки')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         role: 'assistant',
@@ -601,7 +602,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     mocks.stream.mockReturnValue(makeStream([
       { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Текст.' } },
       { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
-      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ ...proposalInput, blocks: [{ ...proposalInput.blocks[0], taskText: 'Invented' }] }) } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ ...proposalInput, blocks: [{ ...proposalInput.blocks[0], taskIndex: 2, taskText: 'Invented' }] }) } },
     ]))
 
     const response = await POST(request())
