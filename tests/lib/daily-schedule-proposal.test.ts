@@ -274,7 +274,7 @@ describe('daily schedule proposal', () => {
     expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
   })
 
-  it('keeps two overlapping fixed blocks for strict schedule validation to reject', () => {
+  it('moves the later fixed block when two fixed blocks overlap and returns move information', () => {
     const normalized = normalizeDailyScheduleProposalToolInput({
       ...proposalV3,
       blocks: [
@@ -285,10 +285,66 @@ describe('daily schedule proposal', () => {
 
     expect(normalized.blocks).toMatchObject([
       { startMinutes: 9 * 60, durationMinutes: 60, isFixed: true },
-      { startMinutes: 9 * 60 + 30, durationMinutes: 60, isFixed: true },
+      { startMinutes: 10 * 60, durationMinutes: 60, isFixed: true },
     ])
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({
+      movedFixedBlocks: [expect.objectContaining({ originalIndex: 1, reason: 'overlap', from: { startMinutes: 9 * 60 + 30, durationMinutes: 60 }, to: { startMinutes: 10 * 60, durationMinutes: 60 } })],
+    }))
     expect(DailyScheduleProposalV3Schema.safeParse(normalized).success).toBe(true)
-    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(false)
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
+  })
+
+  it('defaults an invalid day window and still returns a valid schedule', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      dayStartMinutes: 'bad',
+      dayEndMinutes: null,
+      planningStartMinutes: 'bad',
+      workEndMinutes: 'bad',
+      activityEndMinutes: null,
+      blocks: [proposalV3.blocks[0], { ...proposalV3.blocks[1], startMinutes: 9 * 60 + 30 }],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized).toMatchObject({ dayStartMinutes: 0, planningStartMinutes: 0, dayEndMinutes: 1440, activityEndMinutes: 1440, workEndMinutes: 1440 })
+    expect(getDailyScheduleProposalNormalizationResult(normalized)?.layoutIssues).toContain('day window was missing, invalid or too short; defaulted to full day')
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
+  })
+
+  it('moves unrecognized block array items to unscheduledBlocks and schedules the rest', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [null, proposalV3.blocks[0], 'garbage', { ...proposalV3.blocks[1], startMinutes: 9 * 60 + 30 }],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks).toHaveLength(2)
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({
+      unscheduledBlocks: [
+        expect.objectContaining({ originalIndex: 0, reason: 'unrecognized_block' }),
+        expect.objectContaining({ originalIndex: 2, reason: 'unrecognized_block' }),
+      ],
+    }))
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
+  })
+
+  it('moves a fixed block that starts outside the day window back inside', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      dayStartMinutes: 9 * 60,
+      dayEndMinutes: 10 * 60,
+      planningStartMinutes: 9 * 60,
+      workEndMinutes: 10 * 60,
+      activityEndMinutes: 10 * 60,
+      blocks: [
+        { ...proposalV3.blocks[3], startMinutes: 11 * 60, durationMinutes: 30, isFixed: true },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks[0]).toMatchObject({ startMinutes: 9 * 60 + 30, durationMinutes: 30, isFixed: true })
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({
+      movedFixedBlocks: [expect.objectContaining({ originalIndex: 0, reason: 'outside_day_range', from: { startMinutes: 11 * 60, durationMinutes: 30 }, to: { startMinutes: 9 * 60 + 30, durationMinutes: 30 } })],
+    }))
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
   })
 
   it('removes flexible blocks that do not fit and returns unscheduled block information', () => {
@@ -311,9 +367,9 @@ describe('daily schedule proposal', () => {
       { taskIndex: 1, startMinutes: 9 * 60, durationMinutes: 30 },
       { taskIndex: 2, startMinutes: 9 * 60 + 30, durationMinutes: 30 },
     ])
-    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual({
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({
       unscheduledBlocks: [expect.objectContaining({ originalIndex: 2, reason: 'does_not_fit', task: expect.objectContaining({ taskSource: 'existing', taskIndex: 3 }) })],
-    })
+    }))
     const validation = validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work', 'Review', 'Third task'] })
     expect(validation.success).toBe(true)
     expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 3 })).success).toBe(true)
@@ -375,7 +431,7 @@ describe('daily schedule proposal', () => {
     expect(normalized.dayStartMinutes).toBe(9 * 60)
     expect(normalized.dayEndMinutes).toBe(21 * 60)
     expect(findScheduleOverlaps(proposalToDailySchedule(normalized, { currentPlanTaskCount: 2 }).blocks)).toEqual([])
-    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual({ unscheduledBlocks: [] })
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({ unscheduledBlocks: [] }))
     expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work', 'Review'] }).success).toBe(true)
   })
 
@@ -420,6 +476,65 @@ describe('daily schedule proposal', () => {
     expect(findScheduleOverlaps(schedule.blocks)).toEqual([])
     expect(schedule.blocks.every(block => block.startMinutes >= 6 * 60 && block.startMinutes + block.durationMinutes <= 24 * 60)).toBe(true)
     expect(DailyScheduleSchema.safeParse(schedule).success).toBe(true)
+  })
+
+  it('keeps randomized overlapping/out-of-bounds fixed and flexible v3 proposals valid after normalization', () => {
+    const planTasks = Array.from({ length: 12 }, (_, index) => `Random task ${index + 1}`)
+    let seed = 42
+    const random = () => {
+      seed = (seed * 1664525 + 1013904223) % 2 ** 32
+      return seed / 2 ** 32
+    }
+    const randomInt = (min: number, max: number) => Math.floor(random() * (max - min + 1)) + min
+    let validSchedules = 0
+
+    for (let caseIndex = 0; caseIndex < 30; caseIndex++) {
+      const planningStartMinutes = randomInt(-120, 720)
+      const activityEndMinutes = randomInt(540, 1560)
+      const blockCount = randomInt(8, 18)
+      const blocks = Array.from({ length: blockCount }, (_, blockIndex) => {
+        const isTask = random() < 0.7
+        const base = {
+          category: (['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'] as const)[randomInt(0, 6)],
+          isFixed: random() < 0.45,
+          startMinutes: randomInt(-180, 1620),
+          durationMinutes: randomInt(15, 240),
+        }
+        if (isTask) {
+          const taskIndex = (blockIndex % planTasks.length) + 1
+          return { kind: 'task' as const, taskSource: 'existing' as const, taskIndex, taskText: planTasks[taskIndex - 1], ...base, category: base.category === 'meal' || base.category === 'rest' || base.category === 'buffer' ? 'main' as const : base.category }
+        }
+        const kind = (['meal', 'rest', 'buffer'] as const)[randomInt(0, 2)]
+        return { kind, title: `Service ${caseIndex}-${blockIndex}`, ...base, category: kind }
+      })
+
+      const normalized = normalizeDailyScheduleProposalToolInput({
+        version: 3,
+        date: '2026-02-28',
+        timezone: 'Europe/Moscow',
+        dayStartMinutes: planningStartMinutes,
+        dayEndMinutes: activityEndMinutes,
+        planningBasis: 'day_start',
+        planningStartMinutes,
+        workEndMinutes: randomInt(480, 1440),
+        activityEndMinutes,
+        newTasks: [],
+        blocks,
+      }) as DailyScheduleProposalV3
+
+      const proposalParse = DailyScheduleProposalV3Schema.safeParse(normalized)
+      expect(proposalParse.success).toBe(true)
+      if (!proposalParse.success) throw new Error('Expected normalized proposal to parse')
+      const validation = validateProposalAgainstCurrentPlan(proposalParse.data, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks })
+      expect(validation.success).toBe(true)
+      if (!validation.success) throw new Error(validation.error)
+      const schedule = proposalToDailySchedule(proposalParse.data, { currentPlanTaskCount: planTasks.length })
+      expect(DailyScheduleSchema.safeParse(schedule).success).toBe(true)
+      expect(findScheduleOverlaps(schedule.blocks)).toEqual([])
+      validSchedules++
+    }
+
+    expect(validSchedules).toBe(30)
   })
 
   it('keeps backward-compatible v1 and v2 proposal parsing', () => {

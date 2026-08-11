@@ -382,7 +382,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
   })
 
   it('persists task-list metadata and a human message when tool-only schedule is invalid but new tasks are valid', async () => {
-    const invalidInput = { ...proposalInputV3, blocks: [{ ...proposalInputV3.blocks[0], isFixed: true, startMinutes: 570, durationMinutes: 60 }, { ...proposalInputV3.blocks[1], isFixed: true, startMinutes: 600, durationMinutes: 60 }] }
+    const invalidInput = { ...proposalInputV3, blocks: [{ ...proposalInputV3.blocks[0], taskIndex: 99 }] }
     mocks.stream.mockReturnValue(makeStream([
       { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
       { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidInput) } },
@@ -410,16 +410,10 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     }))
   })
 
-  it('sends one corrective tool_result after invalid day-boundary proposal and stores valid corrected metadata', async () => {
+  it('sends one corrective tool_result after invalid current-plan taskIndex and stores valid corrected metadata', async () => {
     const invalidProposal = {
       ...proposalInputV3,
-      dayEndMinutes: 660,
-      activityEndMinutes: 660,
-      workEndMinutes: 645,
-      blocks: [
-        { ...proposalInputV3.blocks[0], isFixed: true, startMinutes: 570, durationMinutes: 90 },
-        { ...proposalInputV3.blocks[1], isFixed: true, startMinutes: 630, durationMinutes: 60 },
-      ],
+      blocks: [{ ...proposalInputV3.blocks[0], taskIndex: 99 }],
     }
     mocks.stream
       .mockReturnValueOnce(makeStream([
@@ -440,8 +434,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledTimes(2)
     expect(correctionCall.tool_choice).toEqual({ type: 'tool', name: 'propose_daily_schedule' })
     expect(correctionToolResult).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_bad', is_error: true })
-    expect(correctionToolResult.content).toContain('blocks 1 and 2 overlap')
-    expect(correctionToolResult.content).toContain('block 2 [custom]: block end 690 > dayEndMinutes 660')
+    expect(correctionToolResult.content).toContain('block 1: existing taskIndex 99 does not exist in current planTasks')
     expect(text).toContain('Исправил черновик.')
     expect(text).toContain('event: proposal')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -450,8 +443,8 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.logAIUsage).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps task list after exactly one failed corrective attempt when empty plan tasks are all new', async () => {
-    const invalidProposal = {
+  it('keeps valid new-task schedule proposal and reports tasks that did not fit', async () => {
+    const packedProposal = {
       ...proposalInputV3,
       newTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
       dayEndMinutes: 660,
@@ -463,30 +456,24 @@ describe('/api/daily/chat SSE schedule proposal', () => {
         { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'АИОНЛАБ', category: 'main', isFixed: true, startMinutes: 705, durationMinutes: 60 },
       ],
     }
-    mocks.stream
-      .mockReturnValueOnce(makeStream([
-        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_bad_1', name: 'propose_daily_schedule' } },
-        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidProposal) } },
-      ]))
-      .mockReturnValueOnce(makeStream([
-        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_bad_2', name: 'propose_daily_schedule' } },
-        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(invalidProposal) } },
-      ]))
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_packed', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(packedProposal) } },
+    ]))
 
     const response = await POST(request({ planTasks: [], completedTasks: [], userMessage: 'собери план из переписки' }))
     const text = await response.text()
 
-    expect(mocks.stream).toHaveBeenCalledTimes(2)
+    expect(mocks.stream).toHaveBeenCalledTimes(1)
     expect(text).toContain('event: proposal')
-    expect(text).toContain('Я собрал список задач и могу добавить его в план.')
-    expect(text).toContain('в расписании есть пересекающиеся блоки')
+    expect(text).toContain('осталась в «Не распределено»: Зарядка, АИОНЛАБ')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         role: 'assistant',
-        content: expect.stringContaining('Расписание пока не применяю'),
+        content: expect.stringContaining('Не распределено'),
         metadataJson: expect.objectContaining({
-          type: 'daily_task_list_proposal',
-          tasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'],
+          type: 'daily_schedule_proposal',
+          proposal: expect.objectContaining({ newTasks: ['Тетроникс', 'Зарядка', 'АИОНЛАБ'] }),
           currentPlanTaskCount: 0,
           currentPlanTasksHash: hashDailyPlanTasks([]),
         }),

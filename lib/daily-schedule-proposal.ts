@@ -249,11 +249,19 @@ export type DailyChatProposalMetadata = z.infer<typeof DailyChatProposalMetadata
 export type ProposalToDailyScheduleOptions = { currentPlanTaskCount?: number }
 export type DailyScheduleProposalUnscheduledBlock = {
   originalIndex: number
-  reason: 'does_not_fit'
+  reason: 'does_not_fit' | 'unrecognized_block' | 'final_repair_failed'
   block: Record<string, unknown>
   task?: { taskSource?: 'existing' | 'new'; taskIndex?: number; taskText?: string }
 }
-export type DailyScheduleProposalNormalizationResult = { unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] }
+export type DailyScheduleProposalMovedFixedBlock = {
+  originalIndex: number
+  reason: 'overlap' | 'outside_day_range' | 'final_repair'
+  from: { startMinutes: number; durationMinutes: number }
+  to: { startMinutes: number; durationMinutes: number }
+  title?: string
+  task?: { taskSource?: 'existing' | 'new'; taskIndex?: number; taskText?: string }
+}
+export type DailyScheduleProposalNormalizationResult = { unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[]; movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[]; layoutIssues: string[] }
 
 const normalizationResults = new WeakMap<object, DailyScheduleProposalNormalizationResult>()
 
@@ -336,45 +344,31 @@ function sortLayoutBlocksByStart(blocks: LayoutBlock[]): LayoutBlock[] {
   return [...blocks].sort((first, second) => first.startMinutes - second.startMinutes || first.originalIndex - second.originalIndex)
 }
 
-function getScheduleDayWindow(candidate: Record<string, unknown>): FreeInterval | null {
-  const startMinutes = candidate.version === 3 ? candidate.planningStartMinutes : candidate.dayStartMinutes
-  const endMinutes = candidate.version === 3 ? candidate.activityEndMinutes : candidate.dayEndMinutes
-  if (typeof startMinutes !== 'number' || !Number.isFinite(startMinutes)) return null
-  if (typeof endMinutes !== 'number' || !Number.isFinite(endMinutes)) return null
-  const normalizedStart = snapMinutesToStep(startMinutes, { min: 0, max: 1440 })
-  const normalizedEnd = snapMinutesToStep(endMinutes, { min: 0, max: 1440 })
-  if (normalizedEnd <= normalizedStart) return null
-  return { startMinutes: normalizedStart, endMinutes: normalizedEnd }
+function getFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function getFixedOccupiedIntervals(fixedBlocks: LayoutBlock[], dayWindow: FreeInterval): FreeInterval[] {
-  const intervals = fixedBlocks
-    .filter(block => block.startMinutes >= dayWindow.startMinutes && block.endMinutes <= dayWindow.endMinutes)
-    .sort((first, second) => first.startMinutes - second.startMinutes || first.originalIndex - second.originalIndex)
+function getScheduleDayWindow(candidate: Record<string, unknown>): { window: FreeInterval; issues: string[] } {
+  const issues: string[] = []
+  const primaryStart = getFiniteNumber(candidate.version === 3 ? candidate.planningStartMinutes : candidate.dayStartMinutes)
+  const primaryEnd = getFiniteNumber(candidate.version === 3 ? candidate.activityEndMinutes : candidate.dayEndMinutes)
+  if (primaryStart === null || primaryEnd === null) issues.push('day window was missing, invalid or too short; defaulted to full day')
+  const rawStart = primaryStart
+    ?? getFiniteNumber(candidate.dayStartMinutes)
+    ?? 0
+  const rawEnd = primaryEnd
+    ?? getFiniteNumber(candidate.dayEndMinutes)
+    ?? 1440
 
-  const merged: FreeInterval[] = []
-  for (const interval of intervals) {
-    const previous = merged.at(-1)
-    if (previous && interval.startMinutes <= previous.endMinutes) {
-      previous.endMinutes = Math.max(previous.endMinutes, interval.endMinutes)
-    } else {
-      merged.push({ startMinutes: interval.startMinutes, endMinutes: interval.endMinutes })
-    }
-  }
-  return merged
-}
-
-function getFreeIntervals(dayWindow: FreeInterval, occupiedIntervals: FreeInterval[]): FreeInterval[] {
-  const freeIntervals: FreeInterval[] = []
-  let cursor = dayWindow.startMinutes
-
-  for (const interval of occupiedIntervals) {
-    if (interval.startMinutes > cursor) freeIntervals.push({ startMinutes: cursor, endMinutes: interval.startMinutes })
-    cursor = Math.max(cursor, interval.endMinutes)
+  let startMinutes = snapMinutesToStep(rawStart, { min: 0, max: 1440 })
+  let endMinutes = snapMinutesToStep(rawEnd, { min: 0, max: 1440 })
+  if (endMinutes - startMinutes < MIN_BLOCK_DURATION_MINUTES) {
+    if (!issues.includes('day window was missing, invalid or too short; defaulted to full day')) issues.push('day window was missing, invalid or too short; defaulted to full day')
+    startMinutes = 0
+    endMinutes = 1440
   }
 
-  if (cursor < dayWindow.endMinutes) freeIntervals.push({ startMinutes: cursor, endMinutes: dayWindow.endMinutes })
-  return freeIntervals
+  return { window: { startMinutes, endMinutes }, issues }
 }
 
 function getUnscheduledTaskInfo(block: NormalizedProposalBlock): DailyScheduleProposalUnscheduledBlock['task'] | undefined {
@@ -386,50 +380,164 @@ function getUnscheduledTaskInfo(block: NormalizedProposalBlock): DailySchedulePr
   return task
 }
 
-function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record<string, unknown>): { blocks: unknown[]; unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] } | null {
-  const dayWindow = getScheduleDayWindow(candidate)
-  if (!dayWindow) return null
+function getBlockTitle(block: NormalizedProposalBlock): string | undefined {
+  return typeof block.title === 'string' ? block.title : undefined
+}
 
-  const scheduleBlocks = getMovableScheduleBlocks(blocks).map(block => ({ ...block, endMinutes: getBlockEndMinutes(block) }))
-  if (scheduleBlocks.length !== blocks.length) return null
+function makeUnscheduledBlock(block: unknown, originalIndex: number, reason: DailyScheduleProposalUnscheduledBlock['reason']): DailyScheduleProposalUnscheduledBlock {
+  const normalizedBlock = block && typeof block === 'object' && !Array.isArray(block) ? block as NormalizedProposalBlock : { value: block }
+  const unscheduledBlock: DailyScheduleProposalUnscheduledBlock = { originalIndex, reason, block: { ...normalizedBlock } }
+  const task = getUnscheduledTaskInfo(normalizedBlock)
+  if (task) unscheduledBlock.task = task
+  return unscheduledBlock
+}
 
-  const fixedBlocks = scheduleBlocks.filter(block => block.isFixed)
-  const flexibleBlocks = scheduleBlocks.filter(block => !block.isFixed).sort((first, second) => first.originalIndex - second.originalIndex)
-  const freeIntervals = getFreeIntervals(dayWindow, getFixedOccupiedIntervals(fixedBlocks, dayWindow))
-  const placedFlexibleBlocks: LayoutBlock[] = []
+function makeMovedFixedBlock(block: LayoutBlock, fromStartMinutes: number, reason: DailyScheduleProposalMovedFixedBlock['reason']): DailyScheduleProposalMovedFixedBlock {
+  const movedBlock: DailyScheduleProposalMovedFixedBlock = {
+    originalIndex: block.originalIndex,
+    reason,
+    from: { startMinutes: fromStartMinutes, durationMinutes: block.durationMinutes },
+    to: { startMinutes: block.startMinutes, durationMinutes: block.durationMinutes },
+  }
+  const title = getBlockTitle(block.block)
+  if (title) movedBlock.title = title
+  const task = getUnscheduledTaskInfo(block.block)
+  if (task) movedBlock.task = task
+  return movedBlock
+}
+
+function getValidScheduleBlocks(blocks: unknown[]): { blocks: LayoutBlock[]; unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] } {
+  const validBlocks: LayoutBlock[] = []
   const unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[] = []
+
+  for (const [originalIndex, block] of blocks.entries()) {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block, originalIndex, 'unrecognized_block'))
+      continue
+    }
+    const normalizedBlock = block as NormalizedProposalBlock
+    if (DailyScheduleProposalV3BlockSchema.safeParse(normalizedBlock).success !== true) {
+      unscheduledBlocks.push(makeUnscheduledBlock(normalizedBlock, originalIndex, 'unrecognized_block'))
+      continue
+    }
+    if (typeof normalizedBlock.startMinutes !== 'number' || !Number.isFinite(normalizedBlock.startMinutes) || typeof normalizedBlock.durationMinutes !== 'number' || !Number.isFinite(normalizedBlock.durationMinutes)) {
+      unscheduledBlocks.push(makeUnscheduledBlock(normalizedBlock, originalIndex, 'unrecognized_block'))
+      continue
+    }
+    const scheduleBlock: MovableScheduleBlock = { block: normalizedBlock, originalIndex, startMinutes: normalizedBlock.startMinutes, durationMinutes: normalizedBlock.durationMinutes, isFixed: normalizedBlock.isFixed === true }
+    validBlocks.push({ ...scheduleBlock, endMinutes: getBlockEndMinutes(scheduleBlock) })
+  }
+
+  return { blocks: validBlocks, unscheduledBlocks }
+}
+
+function overlapsPlacedBlocks(block: Pick<LayoutBlock, 'startMinutes' | 'durationMinutes'>, placedBlocks: LayoutBlock[]): boolean {
+  return placedBlocks.some(placedBlock => blocksOverlap(block, placedBlock))
+}
+
+function findAvailableStart(placedBlocks: LayoutBlock[], durationMinutes: number, dayWindow: FreeInterval, searchStartMinutes: number): number | null {
+  if (durationMinutes > dayWindow.endMinutes - dayWindow.startMinutes) return null
+  let cursor = Math.max(dayWindow.startMinutes, Math.min(searchStartMinutes, dayWindow.endMinutes))
+  const sortedPlacedBlocks = sortLayoutBlocksByStart(placedBlocks)
+
+  for (const placedBlock of sortedPlacedBlocks) {
+    if (getBlockEndMinutes(placedBlock) <= cursor) continue
+    if (cursor + durationMinutes <= placedBlock.startMinutes) return cursor
+    cursor = Math.max(cursor, getBlockEndMinutes(placedBlock))
+  }
+
+  return cursor + durationMinutes <= dayWindow.endMinutes ? cursor : null
+}
+
+function placeBlockAt(block: LayoutBlock, startMinutes: number): LayoutBlock {
+  block.startMinutes = startMinutes
+  block.endMinutes = startMinutes + block.durationMinutes
+  block.block.startMinutes = startMinutes
+  return block
+}
+
+function repairPlacedBlocks(blocks: LayoutBlock[], dayWindow: FreeInterval, unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[], movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[], layoutIssues: string[]): LayoutBlock[] {
+  const repairedBlocks: LayoutBlock[] = []
   let cursor = dayWindow.startMinutes
 
-  for (const block of flexibleBlocks) {
-    const durationMinutes = block.durationMinutes
-    const interval = freeIntervals.find(freeInterval => {
-      if (freeInterval.endMinutes <= cursor) return false
-      const startMinutes = Math.max(cursor, freeInterval.startMinutes)
-      return startMinutes + durationMinutes <= freeInterval.endMinutes && startMinutes + durationMinutes <= 1440
-    })
-
-    if (!interval) {
-      const unscheduledBlock: DailyScheduleProposalUnscheduledBlock = {
-        originalIndex: block.originalIndex,
-        reason: 'does_not_fit',
-        block: { ...block.block },
-      }
-      const task = getUnscheduledTaskInfo(block.block)
-      if (task) unscheduledBlock.task = task
-      unscheduledBlocks.push(unscheduledBlock)
+  for (const block of sortLayoutBlocksByStart(blocks)) {
+    const fromStartMinutes = block.startMinutes
+    const insideDay = block.startMinutes >= dayWindow.startMinutes && getBlockEndMinutes(block) <= dayWindow.endMinutes && getBlockEndMinutes(block) <= 1440
+    const overlaps = overlapsPlacedBlocks(block, repairedBlocks)
+    if (insideDay && !overlaps) {
+      repairedBlocks.push(block)
+      cursor = Math.max(cursor, getBlockEndMinutes(block))
       continue
     }
 
-    const startMinutes = Math.max(cursor, interval.startMinutes)
-    const endMinutes = startMinutes + durationMinutes
-    block.startMinutes = startMinutes
-    block.endMinutes = endMinutes
-    block.block.startMinutes = startMinutes
-    placedFlexibleBlocks.push(block)
-    cursor = endMinutes
+    layoutIssues.push(`final repair moved block ${block.originalIndex + 1}`)
+    const repairedStart = findAvailableStart(repairedBlocks, block.durationMinutes, dayWindow, cursor) ?? findAvailableStart(repairedBlocks, block.durationMinutes, dayWindow, dayWindow.startMinutes)
+    if (repairedStart === null) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'final_repair_failed'))
+      continue
+    }
+
+    placeBlockAt(block, repairedStart)
+    if (block.isFixed) movedFixedBlocks.push(makeMovedFixedBlock(block, fromStartMinutes, 'final_repair'))
+    repairedBlocks.push(block)
+    cursor = Math.max(cursor, getBlockEndMinutes(block))
   }
 
-  return { blocks: sortLayoutBlocksByStart([...fixedBlocks, ...placedFlexibleBlocks]).map(block => block.block), unscheduledBlocks }
+  return repairedBlocks
+}
+
+function createFallbackBlock(dayWindow: FreeInterval): NormalizedProposalBlock {
+  return { kind: 'buffer', title: 'Свободное планирование', category: 'buffer', isFixed: false, startMinutes: dayWindow.startMinutes, durationMinutes: MIN_BLOCK_DURATION_MINUTES }
+}
+
+function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record<string, unknown>): { blocks: unknown[]; dayWindow: FreeInterval; unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[]; movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[]; layoutIssues: string[] } {
+  const { window: dayWindow, issues: layoutIssues } = getScheduleDayWindow(candidate)
+  const { blocks: scheduleBlocks, unscheduledBlocks } = getValidScheduleBlocks(blocks)
+  const placedBlocks: LayoutBlock[] = []
+  const movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[] = []
+  let cursor = dayWindow.startMinutes
+
+  for (const block of scheduleBlocks.sort((first, second) => first.originalIndex - second.originalIndex)) {
+    const fromStartMinutes = block.startMinutes
+    if (block.durationMinutes > dayWindow.endMinutes - dayWindow.startMinutes) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'does_not_fit'))
+      continue
+    }
+
+    const latestStartMinutes = dayWindow.endMinutes - block.durationMinutes
+    const preferredStartMinutes = Math.min(latestStartMinutes, Math.max(dayWindow.startMinutes, block.startMinutes))
+    const preferredBlock = { startMinutes: preferredStartMinutes, durationMinutes: block.durationMinutes }
+    const canKeepFixedTime = block.isFixed && preferredStartMinutes === block.startMinutes && !overlapsPlacedBlocks(preferredBlock, placedBlocks)
+
+    if (canKeepFixedTime) {
+      placeBlockAt(block, preferredStartMinutes)
+      placedBlocks.push(block)
+      cursor = Math.max(cursor, getBlockEndMinutes(block))
+      continue
+    }
+
+    const movedReason: DailyScheduleProposalMovedFixedBlock['reason'] = preferredStartMinutes !== block.startMinutes ? 'outside_day_range' : 'overlap'
+    const searchStartMinutes = block.isFixed && preferredStartMinutes !== block.startMinutes ? preferredStartMinutes : cursor
+    const placedStart = findAvailableStart(placedBlocks, block.durationMinutes, dayWindow, searchStartMinutes) ?? findAvailableStart(placedBlocks, block.durationMinutes, dayWindow, dayWindow.startMinutes)
+    if (placedStart === null) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'does_not_fit'))
+      continue
+    }
+
+    placeBlockAt(block, placedStart)
+    placedBlocks.push(block)
+    cursor = Math.max(cursor, getBlockEndMinutes(block))
+    if (block.isFixed && block.startMinutes !== fromStartMinutes) movedFixedBlocks.push(makeMovedFixedBlock(block, fromStartMinutes, movedReason))
+  }
+
+  let repairedBlocks = repairPlacedBlocks(placedBlocks, dayWindow, unscheduledBlocks, movedFixedBlocks, layoutIssues)
+  if (repairedBlocks.length === 0) {
+    const fallbackBlock = createFallbackBlock(dayWindow)
+    repairedBlocks = [{ block: fallbackBlock, originalIndex: blocks.length, startMinutes: fallbackBlock.startMinutes as number, durationMinutes: fallbackBlock.durationMinutes as number, isFixed: false, endMinutes: getBlockEndMinutes(fallbackBlock as Pick<DailyScheduleV3['blocks'][number], 'startMinutes' | 'durationMinutes'>) }]
+    layoutIssues.push('added fallback buffer block because no model block could be scheduled')
+  }
+
+  return { blocks: sortLayoutBlocksByStart(repairedBlocks).map(block => block.block), dayWindow, unscheduledBlocks, movedFixedBlocks, layoutIssues }
 }
 
 function separateOverlappingScheduleBlocks(blocks: unknown[]): unknown[] {
@@ -498,11 +606,22 @@ export function normalizeDailyScheduleProposalToolInput(input: unknown): unknown
   })
 
   const layout = normalizedCandidate.version === 3 ? placeFlexibleBlocksInFreeIntervals(normalizedBlocks, normalizedCandidate) : null
+  if (layout && normalizedCandidate.version === 3) {
+    normalizedCandidate.planningStartMinutes = layout.dayWindow.startMinutes
+    normalizedCandidate.activityEndMinutes = layout.dayWindow.endMinutes
+    normalizedCandidate.dayStartMinutes = layout.dayWindow.startMinutes
+    normalizedCandidate.dayEndMinutes = layout.dayWindow.endMinutes
+    const rawWorkEndMinutes = getFiniteNumber(normalizedCandidate.workEndMinutes)
+    const workEndMinutes = rawWorkEndMinutes === null
+      ? layout.dayWindow.endMinutes
+      : snapMinutesToStep(rawWorkEndMinutes, { min: layout.dayWindow.startMinutes + 1, max: layout.dayWindow.endMinutes })
+    normalizedCandidate.workEndMinutes = Math.min(layout.dayWindow.endMinutes, Math.max(layout.dayWindow.startMinutes + 1, workEndMinutes))
+  }
   const normalizedOutput = {
     ...normalizedCandidate,
     blocks: layout ? layout.blocks : separateOverlappingScheduleBlocks(normalizedBlocks),
   }
-  normalizationResults.set(normalizedOutput, { unscheduledBlocks: layout?.unscheduledBlocks ?? [] })
+  normalizationResults.set(normalizedOutput, { unscheduledBlocks: layout?.unscheduledBlocks ?? [], movedFixedBlocks: layout?.movedFixedBlocks ?? [], layoutIssues: layout?.layoutIssues ?? [] })
 
   return normalizedOutput
 }

@@ -22,7 +22,7 @@ import { getAiModel, getAnthropicClient } from '@/lib/anthropic'
 import { getWorkContextForAI } from '@/lib/completed-work'
 import { getPlanUserContext } from '@/lib/user-context'
 import { DailyScheduleSchema, getBlockEndMinutes, hashDailySchedule } from '@/lib/daily-schedule'
-import { createProposalMetadata, createTaskListProposalMetadata, getDailyScheduleProposalNormalizationResult, hashDailyPlanTasks, normalizeDailyScheduleProposalToolInput, proposalToDailySchedule, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan, type DailyScheduleProposal, type DailyChatProposalMetadata, type DailyScheduleProposalUnscheduledBlock } from '@/lib/daily-schedule-proposal'
+import { createProposalMetadata, createTaskListProposalMetadata, getDailyScheduleProposalNormalizationResult, hashDailyPlanTasks, normalizeDailyScheduleProposalToolInput, proposalToDailySchedule, safeParseProposalMetadata, TimezoneSchema, validateProposalAgainstCurrentPlan, type DailyScheduleProposal, type DailyChatProposalMetadata, type DailyScheduleProposalMovedFixedBlock, type DailyScheduleProposalUnscheduledBlock } from '@/lib/daily-schedule-proposal'
 import { buildScheduleMachineContext } from '@/lib/daily-schedule-context'
 import { isStrictScheduleChangeRequest } from '@/lib/daily-schedule-intent'
 import { AuthError } from '@/lib/auth'
@@ -247,6 +247,16 @@ function buildUnscheduledBlocksMessage(blocks: DailyScheduleProposalUnscheduledB
   })
   if (taskLabels.length === 0) return null
   return `Часть задач не вошла в свободные промежутки дня и осталась в «Не распределено»: ${taskLabels.join(', ')}. Перетащите их на шкалу вручную или расширьте окно дня.`
+}
+
+function buildMovedFixedBlocksMessage(blocks: DailyScheduleProposalMovedFixedBlock[]): string | null {
+  if (blocks.length === 0) return null
+  const labels = blocks.map(block => block.title ?? block.task?.taskText ?? (block.task?.taskIndex ? `задача #${block.task.taskIndex}` : `блок #${block.originalIndex + 1}`))
+  return `Некоторые блоки были помечены как фиксированные, но конфликтовали со шкалой. Я переставил их в свободное время: ${labels.join(', ')}.`
+}
+
+function buildScheduleNormalizationMessage(input: { unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[]; movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[] }): string | null {
+  return [buildUnscheduledBlocksMessage(input.unscheduledBlocks), buildMovedFixedBlocksMessage(input.movedFixedBlocks)].filter((message): message is string => Boolean(message)).join('\n') || null
 }
 
 // День недели на русском
@@ -614,7 +624,7 @@ export async function POST(request: NextRequest) {
                 const metadata = planValidation.data.version === 3
                   ? createProposalMetadata({ date, proposal: planValidation.data, currentScheduleHash, currentScheduleExists, currentPlanTaskCount: planTasks.length, currentPlanTasksHash })
                   : createProposalMetadata({ date, proposal: planValidation.data, currentScheduleHash, currentScheduleExists })
-                return { success: true, metadata, unscheduledMessage: buildUnscheduledBlocksMessage(normalizationResult?.unscheduledBlocks ?? []) ?? undefined }
+                return { success: true, metadata, unscheduledMessage: buildScheduleNormalizationMessage({ unscheduledBlocks: normalizationResult?.unscheduledBlocks ?? [], movedFixedBlocks: normalizationResult?.movedFixedBlocks ?? [] }) ?? undefined }
               } catch (toolError) {
                 const diagnosticsForModel = [`tool input JSON parse failed: ${toolError instanceof Error ? toolError.message : String(toolError)}`]
                 const safeDiagnosticsForLog = ['tool input JSON parse failed']
