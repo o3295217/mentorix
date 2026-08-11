@@ -6,6 +6,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-f
 import { ru } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { useDaily } from '@/hooks/useDaily'
+import { getDailyChatMessageRenderKey } from '@/hooks/daily/useDailyController'
 import { useDailySchedule } from '@/hooks/daily/useDailySchedule'
 import DayTimeline from '@/components/daily/DayTimeline'
 import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalCard'
@@ -2235,7 +2236,7 @@ export default function DailyPage() {
             ) : (
               chatMessages.map((msg, index) => (
                 <div
-                  key={msg.id ?? index}
+                  key={getDailyChatMessageRenderKey(msg, index)}
                   className={msg.role === 'user'
                     ? 'flex justify-end'
                     : ''

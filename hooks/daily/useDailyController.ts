@@ -23,6 +23,20 @@ import { consumeDailyChatSseStream, DailyChatSseError } from './stream-consumer'
 import { shouldKickoffPlanChat, shouldShowPlanChatKickoffCta, SYSTEM_KICKOFF_PLAN_CHAT } from './kickoff-helpers'
 import { getDailyChatDraftKey } from '@/hooks/chat-viewport-helpers'
 
+let dailyChatTempMessageIdCounter = 0
+
+export function createDailyChatTempMessageId(prefix: 'local-user' | 'pending'): string {
+  dailyChatTempMessageIdCounter += 1
+  const uniquePart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : Date.now()
+  return `${prefix}-${dailyChatTempMessageIdCounter}-${uniquePart}`
+}
+
+export function getDailyChatMessageRenderKey(message: Pick<ChatMessage, 'id'>, index: number): string {
+  return message.id ?? `idx-${index}`
+}
+
 export function useDaily(): UseDailyReturn {
   const { user } = useAuth()
   const storageUserId = user?.id ?? null
@@ -853,7 +867,7 @@ export function useDaily(): UseDailyReturn {
     const currentMessages = chatMessagesRef.current
 
     // Добавить сообщение пользователя в историю (если не initialMessage)
-    const newUserMessage: ChatMessage = { role: 'user', content: messageToSend }
+    const newUserMessage: ChatMessage = { id: createDailyChatTempMessageId('local-user'), role: 'user', content: messageToSend }
     const updatedMessages = initialMessage 
       ? currentMessages // При initial message не добавляем в UI - это системный запрос
       : [...currentMessages, newUserMessage]
@@ -902,7 +916,7 @@ export function useDaily(): UseDailyReturn {
       }
 
       const baseMessages = updatedMessages
-      const tempAssistantId = `pending-${Date.now()}`
+      const tempAssistantId = createDailyChatTempMessageId('pending')
       const assistantMessage: ChatMessage = { id: tempAssistantId, role: 'assistant', content: '', metadata: null }
       const messagesWithAssistant = [...baseMessages, assistantMessage]
       chatMessagesRef.current = messagesWithAssistant
