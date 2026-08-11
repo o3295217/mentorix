@@ -409,7 +409,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     }))
   })
 
-  it('sends one corrective tool_result after invalid proposal and stores valid corrected metadata', async () => {
+  it('sends one corrective tool_result after invalid day-boundary proposal and stores valid corrected metadata', async () => {
     const invalidProposal = {
       ...proposalInputV3,
       dayEndMinutes: 660,
@@ -439,8 +439,8 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledTimes(2)
     expect(correctionCall.tool_choice).toEqual({ type: 'tool', name: 'propose_daily_schedule' })
     expect(correctionToolResult).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_bad', is_error: true })
-    expect(correctionToolResult.content).toContain('blocks 1 and 2 overlap')
-    expect(correctionToolResult.content).toContain('block 2 [custom]: block end 690 > dayEndMinutes 660')
+    expect(correctionToolResult.content).not.toContain('blocks 1 and 2 overlap')
+    expect(correctionToolResult.content).toContain('block 2 [custom]: block end 720 > dayEndMinutes 660')
     expect(text).toContain('Исправил черновик.')
     expect(text).toContain('event: proposal')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -478,7 +478,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledTimes(2)
     expect(text).toContain('event: proposal')
     expect(text).toContain('Я собрал список задач и могу добавить его в план.')
-    expect(text).toContain('в расписании есть пересекающиеся блоки')
+    expect(text).toContain('один из блоков выходит за пределы выбранного дня')
     expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         role: 'assistant',

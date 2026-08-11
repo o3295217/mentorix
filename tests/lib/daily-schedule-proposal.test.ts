@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DailyScheduleSchema } from '@/lib/daily-schedule'
 import {
   DailyScheduleProposalSchema,
   DailyScheduleProposalV1Schema,
@@ -224,9 +225,101 @@ describe('daily schedule proposal', () => {
     expect(normalizedV3).toMatchObject({
       blocks: [
         { startMinutes: 548, durationMinutes: 22 },
-        { startMinutes: 553, durationMinutes: 23 },
+        { startMinutes: 570, durationMinutes: 23 },
       ],
     })
+  })
+
+  it('separates two overlapping flexible blocks while preserving durations and chronological order', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [
+        { ...proposalV3.blocks[0], startMinutes: 9 * 60, durationMinutes: 60, isFixed: false },
+        { ...proposalV3.blocks[1], startMinutes: 9 * 60 + 30, durationMinutes: 30, isFixed: false },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks).toMatchObject([
+      { startMinutes: 9 * 60, durationMinutes: 60 },
+      { startMinutes: 10 * 60, durationMinutes: 30 },
+    ])
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
+  })
+
+  it('keeps fixed block in place and moves overlapping flexible block even when flexible block starts earlier', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [
+        { ...proposalV3.blocks[0], startMinutes: 9 * 60 + 30, durationMinutes: 60, isFixed: false },
+        { ...proposalV3.blocks[3], startMinutes: 10 * 60, durationMinutes: 30, isFixed: true },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks[0]).toMatchObject({ startMinutes: 10 * 60, durationMinutes: 30, isFixed: true })
+    expect(normalized.blocks[1]).toMatchObject({ startMinutes: 10 * 60 + 30, durationMinutes: 60, isFixed: false })
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
+  })
+
+  it('keeps two overlapping fixed blocks for strict schedule validation to reject', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [
+        { ...proposalV3.blocks[0], startMinutes: 9 * 60, durationMinutes: 60, isFixed: true },
+        { ...proposalV3.blocks[3], startMinutes: 9 * 60 + 30, durationMinutes: 60, isFixed: true },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks).toMatchObject([
+      { startMinutes: 9 * 60, durationMinutes: 60, isFixed: true },
+      { startMinutes: 9 * 60 + 30, durationMinutes: 60, isFixed: true },
+    ])
+    expect(DailyScheduleProposalV3Schema.safeParse(normalized).success).toBe(true)
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(false)
+  })
+
+  it('normalizes v3 day range invariants from planningStartMinutes and activityEndMinutes', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      dayStartMinutes: 8 * 60,
+      dayEndMinutes: 22 * 60,
+      planningStartMinutes: 9 * 60,
+      activityEndMinutes: 19 * 60,
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.dayStartMinutes).toBe(normalized.planningStartMinutes)
+    expect(normalized.dayEndMinutes).toBe(normalized.activityEndMinutes)
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work'] }).success).toBe(true)
+  })
+
+  it('normalizes repeated real-world overlap pairs before validation', () => {
+    const realWorldProposal: DailyScheduleProposalV3 = {
+      ...proposalV3,
+      dayStartMinutes: 8 * 60,
+      dayEndMinutes: 22 * 60,
+      planningStartMinutes: 9 * 60,
+      activityEndMinutes: 21 * 60,
+      newTasks: ['Call accountant', 'Book tickets', 'Buy milk'],
+      blocks: [
+        { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 9 * 60, durationMinutes: 45 },
+        { kind: 'rest', title: 'Break', category: 'rest', isFixed: false, startMinutes: 9 * 60 + 45, durationMinutes: 15 },
+        { kind: 'buffer', title: 'Inbox', category: 'buffer', isFixed: false, startMinutes: 10 * 60, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'new', taskIndex: 1, taskText: 'Call accountant', category: 'operational', isFixed: false, startMinutes: 10 * 60 + 45, durationMinutes: 45 },
+        { kind: 'task', taskSource: 'new', taskIndex: 2, taskText: 'Book tickets', category: 'personal', isFixed: false, startMinutes: 11 * 60 + 15, durationMinutes: 45 },
+        { kind: 'meal', title: 'Lunch', category: 'meal', isFixed: true, startMinutes: 13 * 60, durationMinutes: 60 },
+        { kind: 'buffer', title: 'Travel', category: 'travel', isFixed: true, startMinutes: 16 * 60, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 2, taskText: 'Review', category: 'main', isFixed: false, startMinutes: 17 * 60, durationMinutes: 60 },
+        { kind: 'rest', title: 'Walk', category: 'rest', isFixed: false, startMinutes: 18 * 60, durationMinutes: 30 },
+        { kind: 'task', taskSource: 'new', taskIndex: 3, taskText: 'Buy milk', category: 'personal', isFixed: false, startMinutes: 18 * 60 + 15, durationMinutes: 30 },
+      ],
+    }
+
+    const normalized = normalizeDailyScheduleProposalToolInput(realWorldProposal) as DailyScheduleProposalV3
+
+    expect(normalized.dayStartMinutes).toBe(9 * 60)
+    expect(normalized.dayEndMinutes).toBe(21 * 60)
+    expect(normalized.blocks[4]).toMatchObject({ startMinutes: 11 * 60 + 30, durationMinutes: 45 })
+    expect(normalized.blocks[9]).toMatchObject({ startMinutes: 18 * 60 + 30, durationMinutes: 30 })
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work', 'Review'] }).success).toBe(true)
   })
 
   it('keeps backward-compatible v1 and v2 proposal parsing', () => {

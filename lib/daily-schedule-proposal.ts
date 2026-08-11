@@ -10,7 +10,9 @@ import {
   DailyScheduleV3,
   DailyScheduleV3Schema,
   MIN_BLOCK_DURATION_MINUTES,
+  blocksOverlap,
   computeDailyScheduleLoadSummary,
+  getBlockEndMinutes,
   hashDailySchedule,
 } from '@/lib/daily-schedule'
 import { DAILY_SCHEDULE_TIME_STEP_MINUTES, isTimeStep } from '@/lib/daily-schedule-time'
@@ -291,25 +293,93 @@ function snapMinutesToStep(value: number, options: { min: number; max: number })
   return Math.min(options.max, Math.max(options.min, snapped))
 }
 
+type NormalizedProposalBlock = Record<string, unknown> & {
+  startMinutes?: unknown
+  durationMinutes?: unknown
+  isFixed?: unknown
+}
+
+type MovableScheduleBlock = {
+  block: NormalizedProposalBlock
+  originalIndex: number
+  startMinutes: number
+  durationMinutes: number
+  isFixed: boolean
+}
+
+function getMovableScheduleBlocks(blocks: unknown[]): MovableScheduleBlock[] {
+  return blocks.flatMap((block, originalIndex) => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) return []
+    const normalizedBlock = block as NormalizedProposalBlock
+    if (typeof normalizedBlock.startMinutes !== 'number' || !Number.isFinite(normalizedBlock.startMinutes)) return []
+    if (typeof normalizedBlock.durationMinutes !== 'number' || !Number.isFinite(normalizedBlock.durationMinutes)) return []
+    return [{ block: normalizedBlock, originalIndex, startMinutes: normalizedBlock.startMinutes, durationMinutes: normalizedBlock.durationMinutes, isFixed: normalizedBlock.isFixed === true }]
+  })
+}
+
+function sortScheduleBlocksByStart(blocks: MovableScheduleBlock[]): MovableScheduleBlock[] {
+  return [...blocks].sort((first, second) => first.startMinutes - second.startMinutes || first.originalIndex - second.originalIndex)
+}
+
+function separateOverlappingScheduleBlocks(blocks: unknown[]): unknown[] {
+  const scheduleBlocks = getMovableScheduleBlocks(blocks)
+  const maxIterations = scheduleBlocks.length * scheduleBlocks.length + scheduleBlocks.length
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    const sortedBlocks = sortScheduleBlocksByStart(scheduleBlocks)
+    let changed = false
+
+    for (let index = 1; index < sortedBlocks.length; index++) {
+      const previous = sortedBlocks[index - 1]
+      const current = sortedBlocks[index]
+      if (!blocksOverlap(previous, current)) continue
+      if (previous.isFixed && current.isFixed) continue
+
+      const movable = previous.isFixed ? current : current.isFixed ? previous : current
+      const anchor = movable === previous ? current : previous
+      const nextStartMinutes = getBlockEndMinutes(anchor)
+      if (nextStartMinutes <= movable.startMinutes) continue
+
+      movable.startMinutes = nextStartMinutes
+      movable.block.startMinutes = nextStartMinutes
+      changed = true
+      break
+    }
+
+    if (!changed) break
+  }
+
+  if (scheduleBlocks.length !== blocks.length) return blocks
+  return sortScheduleBlocksByStart(scheduleBlocks).map(scheduleBlock => scheduleBlock.block)
+}
+
 export function normalizeDailyScheduleProposalToolInput(input: unknown): unknown {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return input
   const candidate = input as Record<string, unknown>
   if (candidate.version !== 2 && candidate.version !== 3) return input
   if (!Array.isArray(candidate.blocks)) return input
 
+  const normalizedCandidate = { ...candidate }
+  if (normalizedCandidate.version === 3) {
+    normalizedCandidate.dayStartMinutes = normalizedCandidate.planningStartMinutes
+    normalizedCandidate.dayEndMinutes = normalizedCandidate.activityEndMinutes
+  }
+
+  const normalizedBlocks = candidate.blocks.map(block => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) return block
+    const normalizedBlock = { ...(block as Record<string, unknown>) }
+    if (typeof normalizedBlock.startMinutes === 'number' && Number.isFinite(normalizedBlock.startMinutes)) {
+      normalizedBlock.startMinutes = snapMinutesToStep(normalizedBlock.startMinutes, { min: 0, max: 1440 })
+    }
+    if (typeof normalizedBlock.durationMinutes === 'number' && Number.isFinite(normalizedBlock.durationMinutes)) {
+      normalizedBlock.durationMinutes = snapMinutesToStep(normalizedBlock.durationMinutes, { min: MIN_BLOCK_DURATION_MINUTES, max: 1440 })
+    }
+    return normalizedBlock
+  })
+
   return {
-    ...candidate,
-    blocks: candidate.blocks.map(block => {
-      if (!block || typeof block !== 'object' || Array.isArray(block)) return block
-      const normalizedBlock = { ...(block as Record<string, unknown>) }
-      if (typeof normalizedBlock.startMinutes === 'number' && Number.isFinite(normalizedBlock.startMinutes)) {
-        normalizedBlock.startMinutes = snapMinutesToStep(normalizedBlock.startMinutes, { min: 0, max: 1440 })
-      }
-      if (typeof normalizedBlock.durationMinutes === 'number' && Number.isFinite(normalizedBlock.durationMinutes)) {
-        normalizedBlock.durationMinutes = snapMinutesToStep(normalizedBlock.durationMinutes, { min: MIN_BLOCK_DURATION_MINUTES, max: 1440 })
-      }
-      return normalizedBlock
-    }),
+    ...normalizedCandidate,
+    blocks: separateOverlappingScheduleBlocks(normalizedBlocks),
   }
 }
 
