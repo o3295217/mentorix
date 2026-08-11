@@ -32,7 +32,8 @@ import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
 import { getScheduleBoundaryMinutes } from '@/hooks/daily/schedule-helpers'
 import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
 import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
-import type { FactItem } from '@/hooks/daily/types'
+import type { FactItem, Habit } from '@/hooks/daily/types'
+import type { OpenTask } from '@/lib/types'
 
 type FrequencyType = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'custom'
 type TaskActionType = 'delete' | 'postpone' | 'habit-create' | 'habit-remove'
@@ -54,6 +55,36 @@ function getNextDateKey(dateKey: string) {
 
 function parseDateKey(dateKey: string) {
   return new Date(`${dateKey}T00:00:00`)
+}
+
+function normalizeTaskText(text: string) {
+  return text.trim().toLowerCase()
+}
+
+export function getDailyPlanCounters(
+  tasks: Pick<OpenTask, 'id' | 'taskText'>[],
+  selectedTasks: ReadonlySet<number>,
+  habits: Pick<Habit, 'taskText'>[],
+) {
+  const habitTaskTexts = new Set(habits.map(habit => normalizeTaskText(habit.taskText)))
+  const workTasks = tasks.filter(task => !habitTaskTexts.has(normalizeTaskText(task.taskText)))
+  const completedTasks = tasks.filter(task => selectedTasks.has(task.id))
+  const completedWorkTasks = workTasks.filter(task => selectedTasks.has(task.id))
+  const habitTasks = tasks.filter(task => habitTaskTexts.has(normalizeTaskText(task.taskText)))
+  const completedHabitTasks = habitTasks.filter(task => selectedTasks.has(task.id))
+
+  const workTotalCount = workTasks.length
+  const workCompletedCount = completedWorkTasks.length
+
+  return {
+    totalCount: tasks.length,
+    completedCount: completedTasks.length,
+    workTotalCount,
+    workCompletedCount,
+    workCompletionPercent: workTotalCount > 0 ? Math.round((workCompletedCount / workTotalCount) * 100) : 0,
+    habitTotalCount: habitTasks.length,
+    habitCompletedCount: completedHabitTasks.length,
+  }
 }
 
 type FactsResponse = {
@@ -861,9 +892,15 @@ export default function DailyPage() {
   const taskTimeChips = useMemo(() => getTaskTimeChips(schedule), [schedule])
   const sortedActiveTasks = useMemo(() => sortTasksByScheduleTime(activeTasks, taskTimeChips, tasks), [activeTasks, taskTimeChips, tasks])
   const sortedCompletedTasks = useMemo(() => sortTasksByScheduleTime(completedTasks, taskTimeChips, tasks), [completedTasks, taskTimeChips, tasks])
-  const completedCount = completedTasks.length
-  const totalCount = tasks.length
-  const completionPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const {
+    totalCount,
+    completedCount,
+    workTotalCount,
+    workCompletedCount,
+    workCompletionPercent,
+    habitTotalCount,
+    habitCompletedCount,
+  } = useMemo(() => getDailyPlanCounters(tasks, selectedTasks, habits), [tasks, selectedTasks, habits])
   const extraDoneCount = extraTasks.length
   const savedTaskCount = useMemo(() => countSavedPlanTasks(dailyEntry?.planText), [dailyEntry?.planText])
   const hasEvaluation = !!dailyEntry?.evaluation
@@ -1142,9 +1179,11 @@ export default function DailyPage() {
         >
           <DailyPlanCardHeader
             currentTime={currentTime}
-            completedCount={completedCount}
-            totalCount={totalCount}
-            completionPercent={completionPercent}
+            completedCount={workCompletedCount}
+            totalCount={workTotalCount}
+            completionPercent={workCompletionPercent}
+            habitCompletedCount={habitCompletedCount}
+            habitTotalCount={habitTotalCount}
             extraDoneCount={extraDoneCount}
             lens={scheduleMode}
             onLensChange={handlePlanLensChange}

@@ -8,6 +8,8 @@ type DailyPlanCardHeaderProps = {
   completedCount: number
   totalCount: number
   completionPercent: number
+  habitCompletedCount: number
+  habitTotalCount: number
   extraDoneCount: number
   lens: PlanLens
   onLensChange: (lens: PlanLens) => void
@@ -24,6 +26,8 @@ export default function DailyPlanCardHeader({
   completedCount,
   totalCount,
   completionPercent,
+  habitCompletedCount,
+  habitTotalCount,
   extraDoneCount,
   lens,
   onLensChange,
@@ -59,6 +63,14 @@ export default function DailyPlanCardHeader({
           }`}>
             {isExecution ? `${completedCount}/${totalCount} · ${completionPercent}%` : `${completedCount}/${totalCount} (${completionPercent}%)`}
             {extraDoneCount > 0 && ` +${extraDoneCount}`}
+          </span>
+        )}
+        {habitTotalCount > 0 && (
+          <span
+            className="whitespace-nowrap text-xs font-medium tabular-nums leading-none text-gray-500"
+            title="Бытовые привычки не входят в показатель рабочих задач"
+          >
+            привычки {habitCompletedCount}/{habitTotalCount}
           </span>
         )}
         {isSummary && (
