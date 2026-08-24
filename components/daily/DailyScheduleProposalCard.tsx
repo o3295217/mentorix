@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
 import { formatDurationLabel, minutesToTimeLabel } from '@/hooks/daily/schedule-helpers'
 import { buildProposalApplyOptions, getProposalLoadSummary, getProposalNewTasks, proposalHasExistingSchedule, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import ScheduleLoadSummary from '@/components/daily/ScheduleLoadSummary'
 
 export interface DailyScheduleProposalCardProps {
   metadata: DailyScheduleProposalMetadata
@@ -17,10 +18,10 @@ export interface DailyScheduleProposalCardProps {
 const kindLabel = { task: 'задача', meal: 'еда', rest: 'отдых', buffer: 'буфер' } as const
 const categoryLabel = { main: 'главное', operational: 'операц.', travel: 'дорога', personal: 'личное', meal: 'еда', rest: 'отдых', buffer: 'буфер' } as const
 const kindClass = {
-  task: 'border-blue-400/50 bg-blue-500/15 text-blue-100',
-  meal: 'border-orange-400/50 bg-orange-500/15 text-orange-100',
-  rest: 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100',
-  buffer: 'border-purple-400/50 bg-purple-500/15 text-purple-100',
+  task: 'border-blue-400/25 bg-blue-500/10 text-blue-100',
+  meal: 'border-orange-400/25 bg-orange-500/10 text-orange-100',
+  rest: 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100',
+  buffer: 'border-purple-400/25 bg-purple-500/10 text-purple-100',
 } as const
 
 type ProposalBlock = DailyScheduleProposalMetadata['proposal']['blocks'][number]
@@ -110,7 +111,7 @@ export default function DailyScheduleProposalCard({
   }
 
   return (
-    <section className="mt-3 max-w-xl rounded-2xl border border-blue-500/30 bg-gradient-to-br from-gray-900 to-gray-950 p-3 shadow-lg shadow-blue-950/20" aria-label="Предложение расписания">
+    <section className="mt-3 border-l-2 border-primary-500/40 py-1 pl-3" aria-label="Предложение расписания">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-gray-100">{getProposalTitle({ hasExistingSchedule, newTaskCount: newTasks.length })}</h3>
@@ -133,16 +134,7 @@ export default function DailyScheduleProposalCard({
         </p>
       )}
 
-      <div className="mb-2 rounded-lg border border-gray-800 bg-gray-950/50 p-2 text-xs text-gray-300">
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <span>Занято: <b className="text-gray-100">{formatDurationLabel(summary.scheduledMinutes)} ({summary.scheduledPercent}%)</b></span>
-          <span>Свободно: <b className="text-gray-100">{formatDurationLabel(summary.unscheduledMinutes)} ({summary.unscheduledPercent}%)</b></span>
-          {Object.entries(summary.categories).map(([category, value]) => value.minutes > 0 && (
-            <span key={category}>{categoryLabel[category as keyof typeof categoryLabel]}: {formatDurationLabel(value.minutes)} · {value.percent}%</span>
-          ))}
-        </div>
-        <p className="mt-1 text-gray-400">{summary.recommendation}</p>
-      </div>
+      <ScheduleLoadSummary summary={summary} className="mb-2" />
 
       <div className="space-y-1.5">
         {blocks.map((block, index) => {
@@ -150,14 +142,14 @@ export default function DailyScheduleProposalCard({
           const fixed = isProposalBlockFixed(block)
           const isNewTaskBlock = block.kind === 'task' && 'taskSource' in block && block.taskSource === 'new'
           return (
-            <div key={`${block.kind}-${block.startMinutes}-${index}`} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${kindClass[block.kind]}`} title={fixed ? 'Фиксированное время' : undefined} aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}>
-              <div className="w-24 shrink-0 text-xs font-medium">
+            <div key={`${block.kind}-${block.startMinutes}-${index}`} className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border px-2 py-1 ${kindClass[block.kind]}`} title={fixed ? 'Фиксированное время' : undefined} aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}>
+              <span className="shrink-0 text-[11px] font-medium tabular-nums opacity-75">
                 {minutesToTimeLabel(block.startMinutes)}–{minutesToTimeLabel(block.startMinutes + block.durationMinutes)}
-              </div>
-              <div className="min-w-0 flex-1 truncate text-sm">{title}</div>
-              {isNewTaskBlock && <span className="rounded-full border border-cyan-300/50 bg-cyan-400/15 px-1.5 py-0.5 text-[11px] font-semibold text-cyan-100">новая</span>}
-              {fixed && <span className="rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-100">фикс.</span>}
-              <div className="hidden shrink-0 text-xs opacity-80 sm:block">{getProposalBlockMetaLabel(block)}</div>
+              </span>
+              <span className="min-w-0 flex-1 break-words text-sm">{title}</span>
+              {isNewTaskBlock && <span className="shrink-0 rounded-full border border-cyan-300/50 bg-cyan-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-100">новая</span>}
+              {fixed && <span className="shrink-0 rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100">фикс.</span>}
+              <span className="w-full break-words text-[11px] opacity-70">{getProposalBlockMetaLabel(block)}</span>
             </div>
           )
         })}

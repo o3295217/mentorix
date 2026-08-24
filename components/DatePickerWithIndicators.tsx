@@ -373,13 +373,13 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
   return (
-    <div ref={pickerRef} className="relative w-full min-w-0 sm:w-auto">
+    <div ref={pickerRef} className="relative w-auto min-w-0 flex-shrink-0">
       {/* Trigger */}
       <button
         ref={triggerRef}
         type="button"
         onClick={toggleCalendar}
-        className="input flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-between gap-2 text-left text-base sm:w-auto"
+        className="input flex min-h-11 w-auto min-w-0 cursor-pointer items-center justify-between gap-2 text-left text-base"
         aria-expanded={isOpen}
         aria-controls="daily-date-picker-calendar"
         aria-haspopup="dialog"

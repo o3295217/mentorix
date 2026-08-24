@@ -932,7 +932,9 @@ export default function DailyPage() {
 
   const handlePlanWithMentrix = useCallback(() => {
     setMobileView('assistant')
-    void requestPlanChatKickoff(isSubmittingChatRef.current)
+    // force: true — явный клик пользователя должен запускать kickoff, даже если
+    // предыдущая попытка для этой даты уже была (например, не породила сообщений).
+    void requestPlanChatKickoff(isSubmittingChatRef.current, true)
     requestAnimationFrame(() => {
       scrollChatToBottom()
       ensureChatComposerVisible()
@@ -940,7 +942,7 @@ export default function DailyPage() {
   }, [ensureChatComposerVisible, requestPlanChatKickoff, scrollChatToBottom])
 
   const handleStartPlanChatKickoff = useCallback(() => {
-    void requestPlanChatKickoff(isSubmittingChatRef.current)
+    void requestPlanChatKickoff(isSubmittingChatRef.current, true)
     requestAnimationFrame(() => {
       scrollChatToBottom()
       ensureChatComposerVisible()
@@ -1082,7 +1084,7 @@ export default function DailyPage() {
 
   return (
     <div className="min-w-0 space-y-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:space-y-6 lg:pb-0">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">
           <span className="lg:hidden">План дня</span>
           <span className="hidden lg:inline">Ежедневное планирование</span>
@@ -2185,7 +2187,7 @@ export default function DailyPage() {
           aria-labelledby={hasMobileTabSemantics ? 'daily-assistant-tab' : undefined}
           aria-busy={sendingChat || isSubmittingChat}
           tabIndex={hasMobileTabSemantics ? 0 : undefined}
-          className={`${mobileView === 'assistant' ? 'flex' : 'hidden'} daily-chat-card daily-phase-accent card min-h-0 min-w-0 flex-col lg:col-span-2 lg:flex ${dailyPhase === 'planning' ? 'ring-1 ring-primary-500/30' : ''}`}
+          className={`${mobileView === 'assistant' ? 'flex' : 'hidden'} daily-chat-card${chatMessages.length === 0 ? ' daily-chat-card--empty' : ''} daily-phase-accent card min-h-0 min-w-0 flex-col lg:col-span-2 lg:flex ${dailyPhase === 'planning' ? 'ring-1 ring-primary-500/30' : ''}`}
           data-phase={dailyPhase}
           style={dailyChatViewportStyle}
         >
@@ -2220,56 +2222,53 @@ export default function DailyPage() {
           >
             {chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
-                {!canPlanWithMentrix && chatMessages.length === 0 && (
+                {!canPlanWithMentrix && (
                   <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2 text-sm text-gray-400">
                     Планирование с Ментриксом доступно только для сегодняшнего дня
                   </div>
                 )}
-                {canShowPlanChatKickoffCta && (
-                  <div className="rounded-2xl border border-primary-500/25 bg-primary-500/10 p-4 shadow-sm">
-                    <div className="text-sm font-semibold text-primary-100">Ментрикс может начать планирование</div>
-                    <p className="mt-1 text-sm leading-6 text-gray-300">
-                      Открою диалог по сегодняшнему плану: учту текущие задачи, цели и помогу собрать реалистичное расписание.
-                    </p>
+                {tasks.length === 0 ? (
+                  canShowPlanChatKickoffCta && (
+                    <div className="rounded-2xl border border-primary-500/25 bg-primary-500/10 p-4 shadow-sm">
+                      <div className="text-sm font-semibold text-primary-100">Ментрикс может начать планирование</div>
+                      <p className="mt-1 text-sm leading-6 text-gray-300">
+                        Соберу план на день из целей недели и месяца и разложу задачи по времени — начните диалог, и я задам уточняющие вопросы.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleStartPlanChatKickoff}
+                        disabled={sendingChat || isSubmittingChat}
+                        className="btn-secondary mt-3 min-h-11 w-full disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Начать планирование с Ментриксом
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <>
+                    <p className="text-center text-gray-500 text-sm mb-4">Спросите Ассистента:</p>
                     <button
-                      type="button"
-                      onClick={handleStartPlanChatKickoff}
+                      onClick={() => void handleSendChatMessage('Проанализируй мой план на день и дай рекомендации')}
                       disabled={sendingChat || isSubmittingChat}
-                      className="btn-secondary mt-3 min-h-11 w-full disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
                     >
-                      Начать планирование с Ментриксом
+                      <span className="text-sm font-medium text-gray-200">Проанализировать план</span>
                     </button>
-                  </div>
-                )}
-                <p className="text-center text-gray-500 text-sm mb-4">Спросите Ассистента:</p>
-                <button
-                  onClick={() => void handleSendChatMessage('Проанализируй мой план на день и дай рекомендации')}
-                  disabled={sendingChat || isSubmittingChat || tasks.length === 0}
-                  className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                >
-
-                  <span className="text-sm font-medium text-gray-200">Проанализировать план</span>
-                </button>
-                <button
-                  onClick={() => void handleSendChatMessage('Оцени временные затраты на каждую задачу и скажи, реалистичен ли план по времени')}
-                  disabled={sendingChat || isSubmittingChat || tasks.length === 0}
-                  className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                >
-
-                  <span className="text-sm font-medium text-gray-200">Оценить время</span>
-                </button>
-                <button
-                  onClick={() => void handleSendChatMessage('Как мой план связан с целями недели и месяца? Какие задачи стоит добавить?')}
-                  disabled={sendingChat || isSubmittingChat || tasks.length === 0}
-                  className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                >
-
-                  <span className="text-sm font-medium text-gray-200">Связь с целями</span>
-                </button>
-                {tasks.length === 0 && (
-                  <p className="text-center text-xs text-gray-500 mt-2">
-                    Добавьте задачи в план
-                  </p>
+                    <button
+                      onClick={() => void handleSendChatMessage('Оцени временные затраты на каждую задачу и скажи, реалистичен ли план по времени')}
+                      disabled={sendingChat || isSubmittingChat}
+                      className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <span className="text-sm font-medium text-gray-200">Оценить время</span>
+                    </button>
+                    <button
+                      onClick={() => void handleSendChatMessage('Как мой план связан с целями недели и месяца? Какие задачи стоит добавить?')}
+                      disabled={sendingChat || isSubmittingChat}
+                      className="w-full p-3 text-left bg-gray-800 hover:bg-gray-600 border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <span className="text-sm font-medium text-gray-200">Связь с целями</span>
+                    </button>
+                  </>
                 )}
               </div>
             ) : (

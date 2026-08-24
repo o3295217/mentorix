@@ -958,7 +958,7 @@ export function useDaily(): UseDailyReturn {
     }
   }, [chatInput, tasks, selectedTasks, selectedDate, showMessage, clearChatDraft])
 
-  const requestPlanChatKickoff = useCallback(async (isSubmittingChat = false) => {
+  const requestPlanChatKickoff = useCallback(async (isSubmittingChat = false, force = false) => {
     if (!shouldKickoffPlanChat({
       selectedDate,
       chatMessages: chatMessagesRef.current,
@@ -966,6 +966,7 @@ export function useDaily(): UseDailyReturn {
       sendingChat,
       isSubmittingChat,
       attemptedDates: kickoffAttemptedDatesRef.current,
+      force,
     })) return false
 
     kickoffAttemptedDatesRef.current.add(selectedDate)

@@ -385,6 +385,20 @@
       max-height: calc(100dvh - 2rem);
     }
 
+    /*
+     * Пока в чате нет сообщений — панель не растягивается на весь вьюпорт, а тянется
+     * вровень с высотой соседней карточки «План на день» (grid-ряд с lg:items-start
+     * иначе не стретчит карточки). Sticky здесь не нужен — контент и так помещается,
+     * а sticky-позиционирование мешало бы стретчу до высоты ряда.
+     */
+    .daily-chat-card--empty {
+      position: static;
+      align-self: stretch;
+      height: auto;
+      min-height: 22rem;
+      max-height: none;
+    }
+
     .daily-chat-composer {
       padding-bottom: 0;
       scroll-margin-bottom: 0;

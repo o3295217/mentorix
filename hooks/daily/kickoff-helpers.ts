@@ -11,6 +11,12 @@ export type PlanChatKickoffGuardInput = {
   isSubmittingChat?: boolean
   attemptedDates: ReadonlySet<string>
   today?: Date
+  /**
+   * Обходит гейт attemptedDates. Нужен для явного действия пользователя (клик по CTA) —
+   * иначе однажды проваленный/непроизведший сообщений авто-kickoff навсегда блокирует
+   * повторный запуск для этой даты, пока не перезагрузится страница.
+   */
+  force?: boolean
 }
 
 export function shouldKickoffPlanChat({
@@ -21,31 +27,18 @@ export function shouldKickoffPlanChat({
   isSubmittingChat = false,
   attemptedDates,
   today = new Date(),
+  force = false,
 }: PlanChatKickoffGuardInput): boolean {
   if (selectedDate !== format(today, 'yyyy-MM-dd')) return false
   if (loadedDate !== selectedDate) return false
   if (chatMessages.length > 0) return false
   if (sendingChat || isSubmittingChat) return false
-  if (attemptedDates.has(selectedDate)) return false
+  if (!force && attemptedDates.has(selectedDate)) return false
   return true
 }
 
-export function shouldShowPlanChatKickoffCta({
-  selectedDate,
-  chatMessages,
-  loadedDate,
-  sendingChat,
-  isSubmittingChat = false,
-  attemptedDates,
-  today = new Date(),
-}: PlanChatKickoffGuardInput): boolean {
-  return shouldKickoffPlanChat({
-    selectedDate,
-    chatMessages,
-    loadedDate,
-    sendingChat,
-    isSubmittingChat,
-    attemptedDates,
-    today,
-  })
+// Видимость CTA не зависит от того, пробовали ли уже запускать kickoff:
+// если чат по-прежнему пуст, кнопка должна оставаться доступной для повторного клика.
+export function shouldShowPlanChatKickoffCta(input: PlanChatKickoffGuardInput): boolean {
+  return shouldKickoffPlanChat({ ...input, force: true })
 }

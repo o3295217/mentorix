@@ -3,20 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DailySchedule } from '@/lib/daily-schedule'
 import type { OpenTask } from '@/lib/types'
+import ScheduleLoadSummary from '@/components/daily/ScheduleLoadSummary'
+import TimeField from '@/components/daily/TimeField'
 import {
   type BlockInput,
   MIN_BLOCK_DURATION_MINUTES,
   SCHEDULE_INTERACTION_STEP_MINUTES,
+  clamp,
   computeClientScheduleLoadSummary,
   formatDurationLabel,
   getBlockDisplayTitle,
   getScheduleBoundaryMinutes,
   getScheduleBlockCategory,
   isTaskScheduleBlock,
-  minutesToTimeInputValue,
   minutesToTimeLabel,
   snapToStep,
-  timeLabelToMinutes,
 } from '@/hooks/daily/schedule-helpers'
 
 const PX_PER_MIN = 3 // 15-min block ≈ 45px (≥44px touch target)
@@ -293,18 +294,7 @@ export default function DayTimeline({
         {mutationLocked && <span className="text-blue-300" role="status" aria-live="polite">Шкала временно заблокирована на время применения</span>}
       </div>
 
-      {!isScheduleEmpty && (
-        <div className="grid gap-2 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2 text-xs text-gray-300 sm:grid-cols-[1fr_auto]">
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span>Занято: <b className="text-gray-100">{formatDurationLabel(loadSummary.scheduledMinutes)} ({loadSummary.scheduledPercent}%)</b></span>
-            <span>Свободно: <b className="text-gray-100">{formatDurationLabel(loadSummary.unscheduledMinutes)} ({loadSummary.unscheduledPercent}%)</b></span>
-            {Object.entries(loadSummary.categories).map(([category, value]) => value.minutes > 0 && (
-              <span key={category}>{categoryLabels[category as keyof typeof categoryLabels]}: {formatDurationLabel(value.minutes)} · {value.percent}%</span>
-            ))}
-          </div>
-          <p className="text-gray-400">{loadSummary.recommendation}</p>
-        </div>
-      )}
+      {!isScheduleEmpty && <ScheduleLoadSummary summary={loadSummary} className="px-1" />}
 
       {isScheduleEmpty && (
         <div className="rounded-2xl border border-primary-500/20 bg-primary-500/10 px-3 py-2 text-sm text-gray-300">
@@ -856,34 +846,50 @@ function ScheduleBlock({
             )}
             <label className="flex items-center justify-between gap-2 text-xs text-gray-300">
               <span>Начало</span>
-              <input
-                type="time"
+              <TimeField
+                value={draftStart}
+                onChange={setDraftStart}
                 disabled={mutationLocked}
-                className="rounded bg-gray-900 px-1.5 py-1 text-xs text-gray-100 outline-none focus:ring-1 focus:ring-blue-400"
-                value={minutesToTimeInputValue(draftStart)}
-                onChange={e => {
-                  const m = timeLabelToMinutes(e.target.value)
-                  if (m >= 0) setDraftStart(m)
-                }}
-                aria-label="Время начала блока"
+                ariaLabel="Время начала блока"
+                stepMinutes={SCHEDULE_INTERACTION_STEP_MINUTES}
               />
             </label>
             <label className="flex items-center justify-between gap-2 text-xs text-gray-300">
               <span>Минут</span>
-              <input
-                type="number"
-                disabled={mutationLocked}
-                min={MIN_BLOCK_DURATION_MINUTES}
-                max={1440}
-                step={SCHEDULE_INTERACTION_STEP_MINUTES}
-                className="w-20 rounded bg-gray-900 px-1.5 py-1 text-xs text-gray-100 outline-none focus:ring-1 focus:ring-blue-400"
-                value={draftDuration}
-                onChange={e => {
-                  const n = Number(e.target.value)
-                  if (Number.isFinite(n)) setDraftDuration(snapToStep(n))
-                }}
-                aria-label="Длительность блока в минутах"
-              />
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={mutationLocked}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-gray-700 text-sm leading-none text-gray-200 outline-none hover:border-blue-400/70 hover:text-blue-100 focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => setDraftDuration(d => clamp(snapToStep(d - SCHEDULE_INTERACTION_STEP_MINUTES), MIN_BLOCK_DURATION_MINUTES, 1440))}
+                  aria-label="Уменьшить длительность на шаг"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  disabled={mutationLocked}
+                  min={MIN_BLOCK_DURATION_MINUTES}
+                  max={1440}
+                  step={SCHEDULE_INTERACTION_STEP_MINUTES}
+                  className="w-14 rounded bg-gray-900 px-1 py-1 text-center text-xs text-gray-100 outline-none [appearance:textfield] focus:ring-1 focus:ring-blue-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  value={draftDuration}
+                  onChange={e => {
+                    const n = Number(e.target.value)
+                    if (Number.isFinite(n)) setDraftDuration(snapToStep(n))
+                  }}
+                  aria-label="Длительность блока в минутах"
+                />
+                <button
+                  type="button"
+                  disabled={mutationLocked}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-gray-700 text-sm leading-none text-gray-200 outline-none hover:border-blue-400/70 hover:text-blue-100 focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => setDraftDuration(d => clamp(snapToStep(d + SCHEDULE_INTERACTION_STEP_MINUTES), MIN_BLOCK_DURATION_MINUTES, 1440))}
+                  aria-label="Увеличить длительность на шаг"
+                >
+                  +
+                </button>
+              </div>
             </label>
             <div className="flex flex-wrap gap-1.5">
               <button

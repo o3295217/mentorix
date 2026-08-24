@@ -76,13 +76,8 @@ export function PlanListIcon(props: IconProps) {
 export function PlanTimelineIcon(props: IconProps) {
   return (
     <IconBase {...props}>
-      <path d="M6 4v16" />
-      <path d="M6 7h5" />
-      <path d="M6 12h10" />
-      <path d="M6 17h7" />
-      <path d="M11 7h2" />
-      <path d="M16 12h2" />
-      <path d="M13 17h2" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3.2 1.9" />
     </IconBase>
   )
 }
