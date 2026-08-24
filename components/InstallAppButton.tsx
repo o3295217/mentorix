@@ -126,10 +126,10 @@ export default function InstallAppButton({ className = '', variant = 'landing', 
             <span className="absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-white/20 opacity-0 blur-xl transition-all duration-700 group-hover:left-[120%] group-hover:opacity-100" />
           </>
         )}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="relative h-5 w-5 flex-shrink-0" aria-hidden="true">
-          <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
-          <path d="M12 14.5v-7" />
-          <path d="M9.5 12l2.5 2.5L14.5 12" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="relative h-5 w-5 flex-shrink-0" aria-hidden="true">
+          <path d="M12 3.5v11" />
+          <path d="M6.5 9.5l5.5 5.5 5.5-5.5" />
+          <path d="M4.5 20h15" />
         </svg>
         <span className="relative">{label}</span>
       </button>

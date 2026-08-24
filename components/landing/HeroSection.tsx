@@ -55,7 +55,7 @@ export default function HeroSection() {
           >
             Войти
           </Link>
-          <InstallAppButton />
+          <InstallAppButton label="Установить" />
         </div>
       </div>
 
