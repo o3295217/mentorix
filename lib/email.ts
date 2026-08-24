@@ -65,10 +65,13 @@ export async function sendEmail(options: {
   }
 
   try {
-    const from = process.env.SMTP_FROM || process.env.SMTP_USER;
-    
+    // Gmail SMTP требует, чтобы адрес From совпадал с аккаунтом (или его алиасом),
+    // но отображаемое имя может быть любым
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER!;
+    const fromName = process.env.EMAIL_FROM_NAME || 'mentorix';
+
     await transport.sendMail({
-      from,
+      from: { name: fromName, address: fromAddress },
       to: options.to,
       subject: options.subject,
       text: options.text,

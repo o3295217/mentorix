@@ -130,6 +130,7 @@ SMTP_PORT=587
 SMTP_USER=your@gmail.com
 SMTP_PASS=<app-password>
 SMTP_FROM=your@gmail.com
+EMAIL_FROM_NAME=mentorix
 NEXT_PUBLIC_APP_URL=https://mentorix.aionlab.ru
 ```
 

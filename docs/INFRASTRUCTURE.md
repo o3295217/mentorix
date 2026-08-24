@@ -142,7 +142,8 @@ Cloudflare/Wrangler/Workers не являются частью текущей pr
 | `REGISTRATION_MODE` | `open` / `invite` / `closed` |
 | `SMTP_HOST` / `SMTP_PORT` | SMTP-сервер |
 | `SMTP_USER` / `SMTP_PASS` | SMTP credentials |
-| `SMTP_FROM` | Адрес отправителя |
+| `SMTP_FROM` | Адрес отправителя (для Gmail — сам аккаунт или его алиас) |
+| `EMAIL_FROM_NAME` | Отображаемое имя отправителя (по умолчанию `mentorix`) |
 | `NEXT_PUBLIC_APP_URL` | https://mentorix.aionlab.ru; обязательна на build-time (`app.build.args`) и runtime (`environment`), публичная не-secret переменная |
 
 `NEXT_PUBLIC_APP_URL` используется Next.js во время `next build` для standalone/metadata и остаётся в runtime env для ссылок в email/API helpers. В build args передаётся только эта публичная переменная; Dockerfile валидирует её через Node URL parser (строго `https://`, hostname обязателен, credentials запрещены). `.dockerignore` и deploy rsync рекурсивно исключают `.env*`, key/secrets/cert paths (`*.pem`, `*.key`, `*.p12`, `*.pfx`) и SQL/backup dumps; обратно включаются только `prisma/migrations/**/migration.sql`, чтобы Prisma migrations оставались в Docker build context/remote sync.
