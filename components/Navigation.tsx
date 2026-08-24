@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from './AuthProvider'
+import InstallAppButton from './InstallAppButton'
 import {
   desktopNavItems,
   getFocusTrapTargetIndex,
@@ -209,6 +210,7 @@ export default function Navigation() {
                 })}
               </nav>
               <div className="mt-3 border-t border-gray-800 pt-3">
+                <InstallAppButton variant="menu" className="mb-1" />
                 <button
                   type="button"
                   onClick={handleLogout}
