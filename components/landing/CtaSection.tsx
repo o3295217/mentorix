@@ -34,7 +34,7 @@ export default function CtaSection() {
             </svg>
           </Link>
           {/* Дубль установки для мобильных — под основным CTA, в том же стиле */}
-          <InstallAppButton variant="cta" className="mx-auto mt-4 max-w-xs sm:hidden" />
+          <InstallAppButton variant="cta" label="Установить" className="mx-auto mt-4 max-w-xs sm:hidden" />
         </div>
       </div>
     </section>

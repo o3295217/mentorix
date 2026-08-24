@@ -32,9 +32,10 @@ type InstallAppButtonProps = {
    * приложения; cta — градиентная «пилюля» в стиле кнопки «Начать путь»
    */
   variant?: 'landing' | 'menu' | 'cta'
+  label?: string
 }
 
-export default function InstallAppButton({ className = '', variant = 'landing' }: InstallAppButtonProps) {
+export default function InstallAppButton({ className = '', variant = 'landing', label = 'Взять Ментрикса с собой' }: InstallAppButtonProps) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [visible, setVisible] = useState(false)
   const [isIos, setIsIos] = useState(false)
@@ -130,7 +131,7 @@ export default function InstallAppButton({ className = '', variant = 'landing' }
           <path d="M12 14.5v-7" />
           <path d="M9.5 12l2.5 2.5L14.5 12" />
         </svg>
-        <span className="relative">Взять Ментрикса с собой</span>
+        <span className="relative">{label}</span>
       </button>
       {showIosHint && iosHint}
     </div>
