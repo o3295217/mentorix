@@ -94,7 +94,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (44)
+## Компоненты (45)
 
 - `AppShell`
 - `AuthGuard`
@@ -107,6 +107,7 @@
 - `Navigation`
 - `ProgressIndicator`
 - `Providers`
+- `ServiceWorkerRegistration`
 - `Speedometer`
 - `ThemeProvider`
 - `UncompletedTasksModal`

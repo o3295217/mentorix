@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Manrope, Orbitron } from 'next/font/google'
 import './globals.css'
 import AppShell from '@/components/AppShell'
+import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration'
 import { Providers } from '@/components/Providers'
 import { getAppUrl } from '@/lib/app-url'
 
@@ -38,12 +39,21 @@ export const metadata: Metadata = {
     title: 'mentorix — ИИ-ассистент для достижения целей',
     description: 'Опиши свою цель. Каждый день — планируй, действуй, получай честную оценку от ИИ.',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'mentorix',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
+  },
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: '#111827',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -53,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        <ServiceWorkerRegistration />
       </body>
     </html>
   )

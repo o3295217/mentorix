@@ -1075,7 +1075,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (14 основных + 8 для целей)
+### Список компонентов (15 основных + 8 для целей)
 
 **Основные:**
 - `AppShell`
@@ -1089,6 +1089,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `Navigation`
 - `ProgressIndicator`
 - `Providers`
+- `ServiceWorkerRegistration`
 - `Speedometer`
 - `ThemeProvider`
 - `UncompletedTasksModal`
