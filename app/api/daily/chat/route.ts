@@ -47,7 +47,7 @@ function sseEvent(type: 'text' | 'proposal' | 'done' | 'error', data: unknown): 
 
 const proposeDailyScheduleTool = {
   name: 'propose_daily_schedule',
-  description: 'Предложить расписание дня в proposal v3. Use exactly the date/timezone from the request context; do not guess timezone. All minute values and durations must be multiples of 15. The server does the final layout: it pins every isFixed block to its own startMinutes first, then packs the flexible blocks into the remaining free intervals in list order. So propose WHAT and HOW LONG, and give a fixed block the exact time the user demanded — never shift a fixed block to avoid an overlap, and do not lay the day out as one sequential chain. Existing task blocks must reference current planTasks by exact 1-based taskIndex and exact taskText with taskSource=existing. Newly proposed tasks must be listed in top-level newTasks and referenced by taskSource=new with taskIndex as a 1-based index into newTasks. Do not include loadSummary: it is computed by the server.',
+  description: 'Предложить расписание дня в proposal v3. Use exactly the date/timezone from the request context; do not guess timezone. All minute values are whole minutes (1-minute precision; no rounding to 15); each block durationMinutes must be at least 15. The server does the final layout: it pins every isFixed block to its own startMinutes first, then packs the flexible blocks into the remaining free intervals in list order. So propose WHAT and HOW LONG, and give a fixed block the exact time the user demanded — never shift a fixed block to avoid an overlap, and do not lay the day out as one sequential chain. Existing task blocks must reference current planTasks by exact 1-based taskIndex and exact taskText with taskSource=existing. Newly proposed tasks must be listed in top-level newTasks and referenced by taskSource=new with taskIndex as a 1-based index into newTasks. Do not include loadSummary: it is computed by the server.',
   input_schema: {
     type: 'object',
     additionalProperties: false,
@@ -56,12 +56,12 @@ const proposeDailyScheduleTool = {
       version: { type: 'integer', const: 3 },
       date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
       timezone: { type: 'string', minLength: 1, maxLength: 100, pattern: '^([A-Za-z_]+\\/[A-Za-z0-9_+.-]+(?:\\/[A-Za-z0-9_+.-]+)*|UTC)$', description: 'Must exactly match the timezone value from the request context.' },
-      dayStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'Must equal planningStartMinutes.' },
-      dayEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'Must equal activityEndMinutes.' },
+      dayStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Must equal planningStartMinutes.' },
+      dayEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Must equal activityEndMinutes.' },
       planningBasis: { enum: ['current_time', 'day_start', 'custom_time'], description: 'today: current_time/day_start/custom_time; future date: day_start/custom_time only.' },
-      planningStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'Start minute chosen for planning; preserve exact HH:MM such as 09:30.' },
-      workEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'End of work activity; must be > planningStartMinutes and <= activityEndMinutes.' },
-      activityEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'End of the whole active day; must be >= workEndMinutes.' },
+      planningStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Start minute chosen for planning; preserve exact HH:MM such as 09:30.' },
+      workEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'End of work activity; must be > planningStartMinutes and <= activityEndMinutes.' },
+      activityEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'End of the whole active day; must be >= workEndMinutes.' },
       newTasks: {
         type: 'array',
         maxItems: 10,
@@ -86,8 +86,8 @@ const proposeDailyScheduleTool = {
                 taskText: { type: 'string', minLength: 1, maxLength: 500, description: 'Exact text from planTasks for existing tasks or from newTasks for new tasks.' },
                 category: { enum: ['main', 'operational', 'travel', 'personal'], description: 'main for strategic/deep priority tasks; operational for routine work; travel/personal when applicable.' },
                 isFixed: { type: 'boolean', description: 'true only for hard-time events/deadlines explicitly fixed by the user or current schedule. A fixed block keeps the exact time the user named.' },
-                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
-                durationMinutes: { type: 'integer', minimum: 15, maximum: 1440, multipleOf: 15 },
+                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
+                durationMinutes: { type: 'integer', minimum: 15, maximum: 1440 },
               },
             },
             {
@@ -99,8 +99,8 @@ const proposeDailyScheduleTool = {
                 title: { type: 'string', minLength: 1, maxLength: 120 },
                 category: { enum: ['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'], description: 'Semantic category. Use personal/travel for user-stated fixed commitments that are not plan tasks.' },
                 isFixed: { type: 'boolean', description: 'true only for hard-time service events explicitly fixed by the user or current schedule. A fixed block keeps the exact time the user named.' },
-                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
-                durationMinutes: { type: 'integer', minimum: 15, maximum: 1440, multipleOf: 15 },
+                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
+                durationMinutes: { type: 'integer', minimum: 15, maximum: 1440 },
               },
             },
           ],
