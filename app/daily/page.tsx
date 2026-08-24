@@ -2180,14 +2180,17 @@ export default function DailyPage() {
           ) : null}
         </div>
 
-        {/* Chat - Right (40%) */}
+        {/* Chat - Right (40%): на десктопе обёртка растягивается на высоту ряда
+            (её задаёт левая карточка), а сама панель абсолютом заполняет обёртку —
+            обе карточки всегда одной высоты, лишний контент скроллится внутри */}
+        <div className={`${mobileView === 'assistant' ? 'block' : 'hidden'} min-h-0 min-w-0 lg:relative lg:col-span-2 lg:block lg:self-stretch`}>
         <div
           id="daily-assistant-panel"
           role={hasMobileTabSemantics ? 'tabpanel' : undefined}
           aria-labelledby={hasMobileTabSemantics ? 'daily-assistant-tab' : undefined}
           aria-busy={sendingChat || isSubmittingChat}
           tabIndex={hasMobileTabSemantics ? 0 : undefined}
-          className={`${mobileView === 'assistant' ? 'flex' : 'hidden'} daily-chat-card${chatMessages.length === 0 ? ' daily-chat-card--empty' : ''} daily-phase-accent card min-h-0 min-w-0 flex-col lg:col-span-2 lg:flex ${dailyPhase === 'planning' ? 'ring-1 ring-primary-500/30' : ''}`}
+          className={`daily-chat-card${chatMessages.length === 0 ? ' daily-chat-card--empty' : ''} daily-phase-accent card flex min-h-0 min-w-0 flex-col lg:absolute lg:inset-0 ${dailyPhase === 'planning' ? 'ring-1 ring-primary-500/30' : ''}`}
           data-phase={dailyPhase}
           style={dailyChatViewportStyle}
         >
@@ -2365,6 +2368,7 @@ export default function DailyPage() {
               →
             </button>
           </div>
+        </div>
         </div>
       </div>
 

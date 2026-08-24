@@ -377,25 +377,15 @@
       padding-bottom: 1rem;
     }
 
-    .daily-chat-card {
-      position: sticky;
-      top: 1rem;
-      height: clamp(18rem, calc(100dvh - 22rem), 80vh);
-      min-height: 0;
-      max-height: calc(100dvh - 2rem);
-    }
-
     /*
-     * Пока в чате нет сообщений — панель не растягивается на весь вьюпорт, а тянется
-     * вровень с высотой соседней карточки «План на день» (grid-ряд с lg:items-start
-     * иначе не стретчит карточки). Sticky здесь не нужен — контент и так помещается,
-     * а sticky-позиционирование мешало бы стретчу до высоты ряда.
+     * На десктопе высоту панели чата целиком задаёт обёртка-грид-элемент
+     * (см. app/daily/page.tsx): обёртка стретчится на высоту ряда, которую
+     * определяет левая карточка «План на день», а панель лежит в ней
+     * absolute inset-0. Собственные viewport-высоты здесь не нужны.
      */
-    .daily-chat-card--empty {
-      position: static;
-      align-self: stretch;
+    .daily-chat-card {
       height: auto;
-      min-height: 22rem;
+      min-height: 0;
       max-height: none;
     }
 
