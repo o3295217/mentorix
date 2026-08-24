@@ -33,8 +33,8 @@ export default function CtaSection() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m0 0-6-6m6 6-6 6" />
             </svg>
           </Link>
-          {/* Дубль установки для мобильных — под основным CTA */}
-          <InstallAppButton className="mx-auto mt-4 max-w-xs sm:hidden" />
+          {/* Дубль установки для мобильных — под основным CTA, в том же стиле */}
+          <InstallAppButton variant="cta" className="mx-auto mt-4 max-w-xs sm:hidden" />
         </div>
       </div>
     </section>
