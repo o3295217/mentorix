@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-08-11 — fix(schedule): layout always returns a valid day, no silent fallback
+- 🔌 API: 1 файлов (route)
+- 📚 Библиотеки: 1 файлов (daily-schedule-proposal)
+- 📝 Документация: 2 файлов
+- 📦 Другое: 2 файлов
+
+
 ### 2026-08-10 — chore(deploy): exclude .git as both file and directory from the production rsync
 - 📝 Документация: 1 файлов
 - 📦 Другое: 1 файлов
