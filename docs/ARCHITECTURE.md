@@ -1075,7 +1075,7 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (15 основных + 8 для целей)
+### Список компонентов (16 основных + 8 для целей)
 
 **Основные:**
 - `AppShell`
@@ -1084,6 +1084,7 @@ export async function getUserStatsForAI(): Promise<string>
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `ExpandableInput`
+- `InstallAppButton`
 - `Landing`
 - `LayoutFooter`
 - `Navigation`

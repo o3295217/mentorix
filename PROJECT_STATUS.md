@@ -94,7 +94,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (45)
+## Компоненты (46)
 
 - `AppShell`
 - `AuthGuard`
@@ -102,6 +102,7 @@
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `ExpandableInput`
+- `InstallAppButton`
 - `Landing`
 - `LayoutFooter`
 - `Navigation`

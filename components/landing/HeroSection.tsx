@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import InstallAppButton from '@/components/InstallAppButton'
 
 export default function HeroSection() {
   return (
@@ -54,6 +55,7 @@ export default function HeroSection() {
           >
             Войти
           </Link>
+          <InstallAppButton />
         </div>
       </div>
 
