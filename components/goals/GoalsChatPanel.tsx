@@ -256,7 +256,7 @@ export default function GoalsChatPanel({
           max-md:inset-x-0 max-md:rounded-t-2xl max-md:border-t max-md:border-slate-700
           ${isOpen
             ? 'pointer-events-auto md:translate-x-0 max-md:translate-y-0'
-            : 'pointer-events-none md:translate-x-full max-md:translate-y-full'}
+            : 'pointer-events-none md:translate-x-full goals-chat-panel--closed'}
         `}
         style={panelStyle}
       >

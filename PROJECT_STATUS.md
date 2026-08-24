@@ -94,7 +94,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (42)
+## Компоненты (44)
 
 - `AppShell`
 - `AuthGuard`
@@ -117,6 +117,8 @@
 - `daily/DailyTaskListProposalCard`
 - `daily/DayTimeline`
 - `daily/PlanLensSwitch`
+- `daily/ScheduleLoadSummary`
+- `daily/TimeField`
 - `daily/chat-render-helpers`
 - `goals/DreamBar`
 - `goals/GoalsChatPanel`

@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-08-24 — chore(claude): add project subagents for claude code
+- 📝 Документация: 9 файлов
+
+
 ### 2026-08-11 — fix(schedule): layout always returns a valid day, no silent fallback
 - 🔌 API: 1 файлов (route)
 - 📚 Библиотеки: 1 файлов (daily-schedule-proposal)

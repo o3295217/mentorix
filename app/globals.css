@@ -199,14 +199,30 @@
 
   .goals-chat-panel {
     top: auto;
-    bottom: max(
+    /* Тот же отступ используется и для видимого (открытого) положения панели,
+       и для гарантированного увода закрытой панели за экран — см. .goals-chat-panel--closed. */
+    --goals-chat-hidden-offset: max(
       var(--chat-keyboard-inset, 0px),
       calc(var(--app-mobile-nav-height) + env(safe-area-inset-bottom, 0px))
     );
+    bottom: var(--goals-chat-hidden-offset);
     max-height: min(
       85vh,
       calc(var(--chat-visual-viewport-height, 100vh) - 0.5rem)
     );
+  }
+
+  /* На мобильном закрытая панель прячется через translateY. Простого translateY(100%)
+     недостаточно: он сдвигает панель ровно на её собственную высоту, а bottom уже
+     приподнят над мобильной навигацией — в результате верхняя полоса панели
+     («КОНТЕКСТ: …» с крестиком) оставалась на экране поверх nav (перекрывала её и
+     давала на этом месте pointer-events: none, из-за чего клики проваливались).
+     Добавляем тот же отступ, что и bottom, чтобы панель гарантированно уходила
+     целиком за нижний край экрана. */
+  @media (max-width: 767.98px) {
+    .goals-chat-panel--closed {
+      transform: translateY(calc(100% + var(--goals-chat-hidden-offset, 0px)));
+    }
   }
 
   .goals-chat-composer {
