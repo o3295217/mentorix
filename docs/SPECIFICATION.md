@@ -803,7 +803,8 @@ SMTP_HOST="..."
 SMTP_PORT=587
 SMTP_USER="..."
 SMTP_PASS="..."
-EMAIL_FROM="noreply@..."
+SMTP_FROM="noreply@..."
+EMAIL_FROM_NAME="mentorix"
 BASE_URL="http://localhost:3003"
 
 # Режим регистрации (open / closed / invite)
@@ -811,7 +812,7 @@ REGISTRATION_MODE=open
 ```
 
 ### Локальная разработка
-- **Порт:** 3003 (настроено в `scripts/start-local.sh` и `Start AI Assistant.command`)
+- **Порт:** берётся из `NEXT_PUBLIC_APP_URL` (по умолчанию 3003) — логика в `scripts/start-local.sh`
 - **БД:** PostgreSQL через Docker Compose
 - **Запуск:** `npm run dev` или `./Start AI\ Assistant.command`
 

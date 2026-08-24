@@ -214,7 +214,7 @@
 ### Технический долг
 
 1. **Prisma migrations — прежняя заметка была неверной.** Утверждение «есть проблема с shadow DB,
-   используем `db push`» верно только для локальной разработки: `scripts/start-local.sh:89`.
+   используем `db push`» верно только для локальной разработки: `scripts/start-local.sh:121`.
    В репозитории **28 каталогов миграций**, в каждом `migration.sql`, плюс `migration_lock.toml`.
    Production применяет их штатно и fail-closed: `docker-entrypoint.sh:8` выполняет
    `prisma migrate deploy` и отказывается стартовать при ошибке («refusing to start»).

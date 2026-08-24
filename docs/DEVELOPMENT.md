@@ -23,20 +23,21 @@
 
 ### Вариант A: macOS launcher
 
-Файл `Start AI Assistant.command` делает следующее:
+Файл `Start AI Assistant.command` — тонкая обёртка над `scripts/start-local.sh` (держит окно Terminal открытым при ошибке). Сам скрипт делает следующее:
 
 - проверяет Node.js и npm;
 - при необходимости создаёт `.env.local` из `.env.example`;
+- поднимает postgres из `docker-compose.local.yml` и ждёт готовности (`docker compose up -d --wait`);
 - запускает `npm install`;
 - выполняет `npx prisma generate`;
 - выполняет `npx prisma db push`;
-- стартует dev-сервер с базового порта `3003` и, если он занят, выбирает следующий свободный.
+- стартует dev-сервер на порту из `NEXT_PUBLIC_APP_URL` (по умолчанию `3003`) и открывает браузер, когда сервер начинает отвечать.
 
 Важно:
 
 - не предполагайте `localhost:3000` по умолчанию;
-- фактический URL всегда смотрите в терминале launcher;
-- если launcher поднял приложение не на `3003`, а на `3004+`, и вы тестируете email-ссылки, держите `NEXT_PUBLIC_APP_URL` синхронным с реальным портом.
+- порт фиксированный и берётся из `NEXT_PUBLIC_APP_URL` — автоподбора соседнего порта больше нет: если порт занят, скрипт покажет, кем, и предложит остановить старый процесс;
+- для запуска postgres нужен `POSTGRES_PASSWORD` (см. `.env.example`).
 
 ### Вариант B: вручную
 
@@ -52,11 +53,13 @@ npm run dev -- -p 3003
 
 ### PostgreSQL
 
-В репозитории нет отдельного локального `docker-compose.yml`. Есть только `docker-compose.production.yml`, поэтому для разработки:
+Для разработки есть `docker-compose.local.yml` — он поднимает только postgres (контейнер `ai-assistant-db`, данные в существующем volume `ai-assistant-spec-opencode_pgdata`). Его автоматически используют `scripts/start-local.sh` и `scripts/update-docker-local.sh`; вручную:
 
-- либо поднимайте свой локальный PostgreSQL;
-- либо адаптируйте production compose под dev-сценарий;
-- либо используйте уже существующую БД, прописав корректный `DATABASE_URL`.
+```bash
+docker compose -f docker-compose.local.yml up -d --wait postgres
+```
+
+Пароль контейнера берётся из `POSTGRES_PASSWORD` (compose читает `.env`; launcher при необходимости передаёт `.env.local` через `--env-file`). Полный стек (приложение + БД) описан в `docker-compose.production.yml`.
 
 ## Важные env-переменные
 
@@ -88,7 +91,7 @@ npm run dev -- -p 3003
 ### Шифрование и email
 
 - `ENCRYPTION_KEY` - AES-256-GCM ключ для Prisma middleware.
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` - нужны для email-верификации и сброса пароля.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` - нужны для email-верификации и сброса пароля. `EMAIL_FROM_NAME` - отображаемое имя отправителя (по умолчанию `mentorix`).
 
 ## Команды
 
