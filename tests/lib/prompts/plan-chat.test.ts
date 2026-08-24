@@ -56,10 +56,28 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`durationMinutes каждого блока не меньше ${MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES} мин.`)
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если точная длительность неизвестна, выбери реалистичную оценку без обязательного округления до 15 минут')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Каждый block обязан полностью лежать внутри [dayStartMinutes, dayEndMinutes]')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Blocks НЕ должны пересекаться между собой')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не выравнивай блоки в непересекающуюся цепочку')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не должны пересекаться только фиксированные блоки между собой')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("service block с kind='buffer'")
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не требуй включать его в planTasks')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не добавляй loadSummary')
+  })
+
+  it('pins user-demanded fixed times and leaves overlap resolution to the server', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ТЫ ПРЕДЛАГАЕШЬ «ЧТО И СКОЛЬКО ДЛИТСЯ», СЕРВЕР РЕШАЕТ «КОГДА»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сначала он прибивает фиксированные блоки ровно к их startMinutes')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('isFixed=true и startMinutes = именно то время, которое назвал пользователь, буквально, без сдвигов и округлений')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАПРЕЩЕНО сдвигать фиксированный блок, чтобы освободить место гибким задачам')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не выстраивай день сплошной последовательной цепочкой от текущего времени')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('isFixed=false, его startMinutes ориентировочный')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Верни блок ровно на это время с isFixed=true и не повторяй сдвиг')
+  })
+
+  it('forbids stating block times that differ from the tool payload', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ТЕКСТ НЕ ИМЕЕТ ПРАВА РАСХОДИТЬСЯ С ДАННЫМИ TOOL')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Любое время, названное в тексте, обязано совпадать с тем, что ты передал в блоке')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Точное время в тексте называй только для фиксированных блоков')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Гибкие блоки описывай порядком и длительностью')
   })
 
   it('handles current time without dropping overdue unfinished tasks', () => {

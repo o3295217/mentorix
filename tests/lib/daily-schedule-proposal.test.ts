@@ -294,6 +294,52 @@ describe('daily schedule proposal', () => {
     expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
   })
 
+  it('keeps a fixed block pinned to its own time when flexible blocks earlier in the model list overlap it', () => {
+    // Regression for the bug where the server relocated a block the user explicitly pinned
+    // (e.g. "call at 15:00-16:00, don't move it") because flexible blocks placed earlier in the
+    // model's list claimed the slot first. Fixed block: 15:00-16:00 (900-960). Two flexible
+    // blocks come earlier in the list and, placed back-to-back from the day start, would spill
+    // into 900-960 under naive list-order placement.
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      dayStartMinutes: 8 * 60,
+      dayEndMinutes: 20 * 60,
+      planningStartMinutes: 8 * 60,
+      workEndMinutes: 18 * 60,
+      activityEndMinutes: 20 * 60,
+      blocks: [
+        { ...proposalV3.blocks[0], taskIndex: 1, startMinutes: 14 * 60, durationMinutes: 60, isFixed: false },
+        { ...proposalV3.blocks[1], taskIndex: 1, startMinutes: 14 * 60, durationMinutes: 70, isFixed: false },
+        { kind: 'meal', title: 'Call', category: 'meal', isFixed: true, startMinutes: 15 * 60, durationMinutes: 60 },
+      ],
+    }) as DailyScheduleProposalV3
+
+    const fixedBlock = normalized.blocks.find(block => block.kind === 'meal')
+    expect(fixedBlock).toMatchObject({ startMinutes: 15 * 60, durationMinutes: 60, isFixed: true })
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({ movedFixedBlocks: [] }))
+    expect(findScheduleOverlaps(proposalToDailySchedule(normalized, { currentPlanTaskCount: 2 }).blocks)).toEqual([])
+    expect(validateProposalAgainstCurrentPlan(normalized, { date: proposalV3.date, timezone: proposalV3.timezone, planTasks: ['Deep work', 'Review'] }).success).toBe(true)
+  })
+
+  it('moves a later-listed fixed block when two fixed blocks conflict, without touching flexible blocks', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      blocks: [
+        { ...proposalV3.blocks[0], startMinutes: 9 * 60, durationMinutes: 60, isFixed: true },
+        { ...proposalV3.blocks[3], startMinutes: 9 * 60 + 30, durationMinutes: 60, isFixed: true },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks).toMatchObject([
+      { startMinutes: 9 * 60, durationMinutes: 60, isFixed: true },
+      { startMinutes: 10 * 60, durationMinutes: 60, isFixed: true },
+    ])
+    expect(getDailyScheduleProposalNormalizationResult(normalized)).toEqual(expect.objectContaining({
+      movedFixedBlocks: [expect.objectContaining({ originalIndex: 1, reason: 'overlap', from: { startMinutes: 9 * 60 + 30, durationMinutes: 60 }, to: { startMinutes: 10 * 60, durationMinutes: 60 } })],
+    }))
+    expect(findScheduleOverlaps(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 }).blocks)).toEqual([])
+  })
+
   it('defaults an invalid day window and still returns a valid schedule', () => {
     const normalized = normalizeDailyScheduleProposalToolInput({
       ...proposalV3,

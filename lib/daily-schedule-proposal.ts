@@ -456,15 +456,34 @@ function placeBlockAt(block: LayoutBlock, startMinutes: number): LayoutBlock {
   return block
 }
 
+// Repairs are a last-resort safety net after the two-phase layout in
+// placeFlexibleBlocksInFreeIntervals; under normal operation nothing here should trigger.
+// Priority order matters when it does: a fixed block sitting on a valid, non-overlapping slot
+// must never be displaced by this pass, and when something still has to move, flexible blocks
+// absorb the disruption first — fixed blocks are only repaired as an absolute last resort.
 function repairPlacedBlocks(blocks: LayoutBlock[], dayWindow: FreeInterval, unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[], movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[], layoutIssues: string[]): LayoutBlock[] {
-  const repairedBlocks: LayoutBlock[] = []
-  let cursor = dayWindow.startMinutes
-
-  for (const block of sortLayoutBlocksByStart(blocks)) {
-    const fromStartMinutes = block.startMinutes
+  const isBlockValid = (block: LayoutBlock, alreadyPlaced: LayoutBlock[]): boolean => {
     const insideDay = block.startMinutes >= dayWindow.startMinutes && getBlockEndMinutes(block) <= dayWindow.endMinutes && getBlockEndMinutes(block) <= 1440
-    const overlaps = overlapsPlacedBlocks(block, repairedBlocks)
-    if (insideDay && !overlaps) {
+    return insideDay && !overlapsPlacedBlocks(block, alreadyPlaced)
+  }
+
+  const repairedBlocks: LayoutBlock[] = []
+  const invalidFixedBlocks: { block: LayoutBlock; fromStartMinutes: number }[] = []
+
+  // Pass 1: keep every fixed block that already sits on a valid, non-overlapping slot.
+  // Invalid ones (out of window or colliding with another fixed block) wait until pass 3.
+  for (const block of sortLayoutBlocksByStart(blocks.filter(block => block.isFixed))) {
+    if (isBlockValid(block, repairedBlocks)) {
+      repairedBlocks.push(block)
+    } else {
+      invalidFixedBlocks.push({ block, fromStartMinutes: block.startMinutes })
+    }
+  }
+
+  // Pass 2: flexible blocks move first when repair is needed — they never bump a fixed block.
+  let cursor = dayWindow.startMinutes
+  for (const block of sortLayoutBlocksByStart(blocks.filter(block => !block.isFixed))) {
+    if (isBlockValid(block, repairedBlocks)) {
       repairedBlocks.push(block)
       cursor = Math.max(cursor, getBlockEndMinutes(block))
       continue
@@ -478,26 +497,53 @@ function repairPlacedBlocks(blocks: LayoutBlock[], dayWindow: FreeInterval, unsc
     }
 
     placeBlockAt(block, repairedStart)
-    if (block.isFixed) movedFixedBlocks.push(makeMovedFixedBlock(block, fromStartMinutes, 'final_repair'))
     repairedBlocks.push(block)
     cursor = Math.max(cursor, getBlockEndMinutes(block))
   }
 
-  return repairedBlocks
+  // Pass 3: only now repair the fixed blocks that were invalid from the start.
+  for (const { block, fromStartMinutes } of invalidFixedBlocks) {
+    layoutIssues.push(`final repair moved block ${block.originalIndex + 1}`)
+    const repairedStart = findAvailableStart(repairedBlocks, block.durationMinutes, dayWindow, fromStartMinutes) ?? findAvailableStart(repairedBlocks, block.durationMinutes, dayWindow, dayWindow.startMinutes)
+    if (repairedStart === null) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'final_repair_failed'))
+      continue
+    }
+
+    placeBlockAt(block, repairedStart)
+    movedFixedBlocks.push(makeMovedFixedBlock(block, fromStartMinutes, 'final_repair'))
+    repairedBlocks.push(block)
+  }
+
+  return sortLayoutBlocksByStart(repairedBlocks)
 }
 
 function createFallbackBlock(dayWindow: FreeInterval): NormalizedProposalBlock {
   return { kind: 'buffer', title: 'Свободное планирование', category: 'buffer', isFixed: false, startMinutes: dayWindow.startMinutes, durationMinutes: MIN_BLOCK_DURATION_MINUTES }
 }
 
+// Two-phase layout: fixed blocks are pinned to their own time first, and only get moved when
+// they truly cannot stay (outside the day window, or colliding with another fixed block placed
+// earlier in the model's list). Flexible blocks are laid out afterwards, in model list order,
+// into whatever free intervals remain around the now-settled fixed blocks. This ordering is the
+// fix for the bug where a flexible block earlier in the model's list could steal a fixed block's
+// slot, forcing the server to relocate a block the user explicitly pinned (e.g. "call at 15:00,
+// don't move it").
 function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record<string, unknown>): { blocks: unknown[]; dayWindow: FreeInterval; unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[]; movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[]; layoutIssues: string[] } {
   const { window: dayWindow, issues: layoutIssues } = getScheduleDayWindow(candidate)
   const { blocks: scheduleBlocks, unscheduledBlocks } = getValidScheduleBlocks(blocks)
   const placedBlocks: LayoutBlock[] = []
   const movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[] = []
-  let cursor = dayWindow.startMinutes
 
-  for (const block of scheduleBlocks.sort((first, second) => first.originalIndex - second.originalIndex)) {
+  const fixedBlocks = scheduleBlocks.filter(block => block.isFixed).sort((first, second) => first.originalIndex - second.originalIndex)
+  const flexibleBlocks = scheduleBlocks.filter(block => !block.isFixed).sort((first, second) => first.originalIndex - second.originalIndex)
+
+  // Phase 1: place every fixed block at its own startMinutes. A fixed block only moves when it
+  // does not fit the day window at all, sits outside the window, or collides with a fixed block
+  // that was placed earlier in this loop (in model list order) — never because a flexible block
+  // wanted the same slot, since no flexible block has been placed yet.
+  let fixedCursor = dayWindow.startMinutes
+  for (const block of fixedBlocks) {
     const fromStartMinutes = block.startMinutes
     if (block.durationMinutes > dayWindow.endMinutes - dayWindow.startMinutes) {
       unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'does_not_fit'))
@@ -507,17 +553,17 @@ function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record
     const latestStartMinutes = dayWindow.endMinutes - block.durationMinutes
     const preferredStartMinutes = Math.min(latestStartMinutes, Math.max(dayWindow.startMinutes, block.startMinutes))
     const preferredBlock = { startMinutes: preferredStartMinutes, durationMinutes: block.durationMinutes }
-    const canKeepFixedTime = block.isFixed && preferredStartMinutes === block.startMinutes && !overlapsPlacedBlocks(preferredBlock, placedBlocks)
+    const canKeepFixedTime = preferredStartMinutes === block.startMinutes && !overlapsPlacedBlocks(preferredBlock, placedBlocks)
 
     if (canKeepFixedTime) {
       placeBlockAt(block, preferredStartMinutes)
       placedBlocks.push(block)
-      cursor = Math.max(cursor, getBlockEndMinutes(block))
+      fixedCursor = Math.max(fixedCursor, getBlockEndMinutes(block))
       continue
     }
 
     const movedReason: DailyScheduleProposalMovedFixedBlock['reason'] = preferredStartMinutes !== block.startMinutes ? 'outside_day_range' : 'overlap'
-    const searchStartMinutes = block.isFixed && preferredStartMinutes !== block.startMinutes ? preferredStartMinutes : cursor
+    const searchStartMinutes = preferredStartMinutes !== block.startMinutes ? preferredStartMinutes : fixedCursor
     const placedStart = findAvailableStart(placedBlocks, block.durationMinutes, dayWindow, searchStartMinutes) ?? findAvailableStart(placedBlocks, block.durationMinutes, dayWindow, dayWindow.startMinutes)
     if (placedStart === null) {
       unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'does_not_fit'))
@@ -526,8 +572,30 @@ function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record
 
     placeBlockAt(block, placedStart)
     placedBlocks.push(block)
+    fixedCursor = Math.max(fixedCursor, getBlockEndMinutes(block))
+    if (block.startMinutes !== fromStartMinutes) movedFixedBlocks.push(makeMovedFixedBlock(block, fromStartMinutes, movedReason))
+  }
+
+  // Phase 2: pack flexible blocks into the remaining free intervals, in model list order,
+  // routing around whatever fixed blocks phase 1 already committed to. findAvailableStart scans
+  // every already-placed block (fixed and flexible), so it naturally drops a flexible block into
+  // a gap before, between, or after fixed blocks — not only after the running cursor.
+  let cursor = dayWindow.startMinutes
+  for (const block of flexibleBlocks) {
+    if (block.durationMinutes > dayWindow.endMinutes - dayWindow.startMinutes) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'does_not_fit'))
+      continue
+    }
+
+    const placedStart = findAvailableStart(placedBlocks, block.durationMinutes, dayWindow, cursor) ?? findAvailableStart(placedBlocks, block.durationMinutes, dayWindow, dayWindow.startMinutes)
+    if (placedStart === null) {
+      unscheduledBlocks.push(makeUnscheduledBlock(block.block, block.originalIndex, 'does_not_fit'))
+      continue
+    }
+
+    placeBlockAt(block, placedStart)
+    placedBlocks.push(block)
     cursor = Math.max(cursor, getBlockEndMinutes(block))
-    if (block.isFixed && block.startMinutes !== fromStartMinutes) movedFixedBlocks.push(makeMovedFixedBlock(block, fromStartMinutes, movedReason))
   }
 
   let repairedBlocks = repairPlacedBlocks(placedBlocks, dayWindow, unscheduledBlocks, movedFixedBlocks, layoutIssues)

@@ -189,6 +189,50 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(mocks.stream).toHaveBeenCalledTimes(1)
   })
 
+  it('treats an existing but empty schedule (0 blocks) as no schedule for double-confirmation purposes', async () => {
+    mocks.dailyEntryFindFirst.mockResolvedValue({
+      schedule: {
+        scheduleJson: { version: 2, timezone: 'Europe/Moscow', dayStartMinutes: 480, dayEndMinutes: 1080, blocks: [] },
+        updatedAt: new Date('2026-02-28T09:00:00.000Z'),
+      },
+    })
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Текст.' } },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(proposalInput) } },
+    ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+
+    expect(text).toContain('event: proposal')
+    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: 'assistant', metadataJson: expect.objectContaining({ currentScheduleExists: false }) }),
+    }))
+  })
+
+  it('treats an existing schedule with at least one block as existing for double-confirmation purposes', async () => {
+    mocks.dailyEntryFindFirst.mockResolvedValue({
+      schedule: {
+        scheduleJson: { version: 2, timezone: 'Europe/Moscow', dayStartMinutes: 480, dayEndMinutes: 1080, blocks: [{ id: 'b1', kind: 'task', taskIndex: 1, taskText: 'Deep work', startMinutes: 540, durationMinutes: 60 }] },
+        updatedAt: new Date('2026-02-28T09:00:00.000Z'),
+      },
+    })
+    mocks.stream.mockReturnValue(makeStream([
+      { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Текст.' } },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', name: 'propose_daily_schedule' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(proposalInput) } },
+    ]))
+
+    const response = await POST(request())
+    const text = await response.text()
+
+    expect(text).toContain('event: proposal')
+    expect(mocks.chatMessageCreate).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: 'assistant', metadataJson: expect.objectContaining({ currentScheduleExists: true }) }),
+    }))
+  })
+
   it('formats schedule conversion diagnostics with bounds and overlaps', () => {
     const invalidProposal = {
       ...proposalInputV3,

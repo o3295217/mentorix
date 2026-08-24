@@ -47,7 +47,7 @@ function sseEvent(type: 'text' | 'proposal' | 'done' | 'error', data: unknown): 
 
 const proposeDailyScheduleTool = {
   name: 'propose_daily_schedule',
-  description: 'Предложить расписание дня в proposal v3. Use exactly the date/timezone from the request context; do not guess timezone. All minute values and durations must be multiples of 15. Existing task blocks must reference current planTasks by exact 1-based taskIndex and exact taskText with taskSource=existing. Newly proposed tasks must be listed in top-level newTasks and referenced by taskSource=new with taskIndex as a 1-based index into newTasks. Do not include loadSummary: it is computed by the server.',
+  description: 'Предложить расписание дня в proposal v3. Use exactly the date/timezone from the request context; do not guess timezone. All minute values and durations must be multiples of 15. The server does the final layout: it pins every isFixed block to its own startMinutes first, then packs the flexible blocks into the remaining free intervals in list order. So propose WHAT and HOW LONG, and give a fixed block the exact time the user demanded — never shift a fixed block to avoid an overlap, and do not lay the day out as one sequential chain. Existing task blocks must reference current planTasks by exact 1-based taskIndex and exact taskText with taskSource=existing. Newly proposed tasks must be listed in top-level newTasks and referenced by taskSource=new with taskIndex as a 1-based index into newTasks. Do not include loadSummary: it is computed by the server.',
   input_schema: {
     type: 'object',
     additionalProperties: false,
@@ -85,8 +85,8 @@ const proposeDailyScheduleTool = {
                 taskIndex: { type: 'integer', minimum: 1, description: '1-based index into planTasks when taskSource=existing; 1-based index into newTasks when taskSource=new.' },
                 taskText: { type: 'string', minLength: 1, maxLength: 500, description: 'Exact text from planTasks for existing tasks or from newTasks for new tasks.' },
                 category: { enum: ['main', 'operational', 'travel', 'personal'], description: 'main for strategic/deep priority tasks; operational for routine work; travel/personal when applicable.' },
-                isFixed: { type: 'boolean', description: 'true only for hard-time events/deadlines explicitly fixed by the user or current schedule.' },
-                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15 },
+                isFixed: { type: 'boolean', description: 'true only for hard-time events/deadlines explicitly fixed by the user or current schedule. A fixed block keeps the exact time the user named.' },
+                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
                 durationMinutes: { type: 'integer', minimum: 15, maximum: 1440, multipleOf: 15 },
               },
             },
@@ -98,8 +98,8 @@ const proposeDailyScheduleTool = {
                 kind: { enum: ['meal', 'rest', 'buffer'] },
                 title: { type: 'string', minLength: 1, maxLength: 120 },
                 category: { enum: ['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'], description: 'Semantic category. Use personal/travel for user-stated fixed commitments that are not plan tasks.' },
-                isFixed: { type: 'boolean', description: 'true only for hard-time service events explicitly fixed by the user or current schedule.' },
-                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15 },
+                isFixed: { type: 'boolean', description: 'true only for hard-time service events explicitly fixed by the user or current schedule. A fixed block keeps the exact time the user named.' },
+                startMinutes: { type: 'integer', minimum: 0, maximum: 1440, multipleOf: 15, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
                 durationMinutes: { type: 'integer', minimum: 15, maximum: 1440, multipleOf: 15 },
               },
             },
@@ -380,7 +380,11 @@ export async function POST(request: NextRequest) {
     ])
 
     const currentScheduleValidation = currentEntry?.schedule ? DailyScheduleSchema.safeParse(currentEntry.schedule.scheduleJson) : null
-    const currentScheduleExists = !!currentEntry?.schedule
+    // A DailySchedule row can exist with zero blocks (user cleared the timeline). Only treat a
+    // schedule as "existing" for double-confirmation purposes when it actually has content —
+    // otherwise the chat asks the user to confirm overwriting a schedule that is visibly empty.
+    // A schedule we failed to parse is treated conservatively as existing, same as before.
+    const currentScheduleExists = !!currentEntry?.schedule && !(currentScheduleValidation?.success && currentScheduleValidation.data.blocks.length === 0)
     const currentScheduleHash = currentScheduleValidation?.success ? hashDailySchedule(currentScheduleValidation.data) : null
     const scheduleContext = currentEntry?.schedule
       ? `\n\n🗓️ ТЕКУЩЕЕ РАСПИСАНИЕ: есть; updatedAt=${currentEntry.schedule.updatedAt.toISOString()}; hash=${currentScheduleHash ?? 'invalid'}`
@@ -681,7 +685,7 @@ export async function POST(request: NextRequest) {
                   content: JSON.stringify({
                     error: 'Schedule proposal validation failed',
                     violations: firstValidation.diagnosticsForModel,
-                    instruction: 'Call propose_daily_schedule exactly once with a corrected proposal. Keep the same date and timezone. All blocks must be inside dayStartMinutes/dayEndMinutes and must not overlap.',
+                    instruction: 'Call propose_daily_schedule exactly once with a corrected proposal. Keep the same date and timezone. All blocks must be inside dayStartMinutes/dayEndMinutes. Keep every isFixed block at the exact startMinutes the user demanded: the server lays flexible blocks around fixed ones, so never move a fixed block to resolve an overlap, and do not rebuild the day as one sequential chain.',
                   }),
                 }],
               },
