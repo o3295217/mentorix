@@ -118,7 +118,7 @@ export default function InstallAppButton({ className = '', variant = 'landing' }
           <path d="M12 14.5v-7" />
           <path d="M9.5 12l2.5 2.5L14.5 12" />
         </svg>
-        Установить на телефон
+        Взять Ментрикса с собой
       </button>
       {showIosHint && iosHint}
     </div>
