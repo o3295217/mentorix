@@ -140,6 +140,11 @@ ssh_batch "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f doc
 echo -e "\n${GREEN}7. Запуск/обновление production containers${NC}"
 ssh_batch "cd '$REMOTE_PATH' && docker compose --env-file .env.production -f docker-compose.production.yml up -d"
 
+echo -e "\n${GREEN}7b. Уборка build-кэша и старых образов${NC}"
+# Сборка идёт с --no-cache, поэтому build-кэш никогда не переиспользуется —
+# без уборки он копится гигабайтами с каждым деплоем. Volumes не трогаем.
+ssh_batch "docker builder prune -a -f >/dev/null && docker image prune -f >/dev/null && echo 'build cache and dangling images pruned' || echo 'prune failed, skipping (not fatal)'"
+
 echo -e "\n${GREEN}8. Best-effort перезапуск Telegram-бота${NC}"
 ssh_batch "sudo -n systemctl restart tg-bot 2>/dev/null && echo 'tg-bot restarted' || echo 'tg-bot service not found or restart failed, skipping'"
 
