@@ -12,6 +12,7 @@ import {
   applyCascadeScheduleEdit,
   computeUnscheduledTaskIndexes,
   createDefaultIdGenerator,
+  expandScheduleBoundsForBlock,
   findFreeSlot,
   getPendingSaveDateChangeAction,
   isTaskScheduleBlock,
@@ -484,11 +485,16 @@ export function useDailySchedule({
       if (mutationLockedRef.current) return
       const current = scheduleRef.current
       if (!current) return
-      const result = applyCascadeScheduleEdit(current, {
+      const snappedStart = snapToStep(startMinutes)
+      const snappedDuration = Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(durationMinutes))
+      // Ручной жест (drag/resize/ручной ввод времени) может выставить блок за текущие
+      // границы дня — раздвигаем их под блок перед валидацией вместо отказа.
+      const widened = expandScheduleBoundsForBlock(current, { startMinutes: snappedStart, durationMinutes: snappedDuration })
+      const result = applyCascadeScheduleEdit(widened, {
         type: 'set',
         blockId,
-        startMinutes: snapToStep(startMinutes),
-        durationMinutes: Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(durationMinutes)),
+        startMinutes: snappedStart,
+        durationMinutes: snappedDuration,
       })
       if (!result.ok) {
         const msg = getCascadeErrorMessage(result.reason)
@@ -561,28 +567,36 @@ export function useDailySchedule({
       const task = tasksRef.current[taskIndex]
       if (!task) return
       const duration = Math.max(MIN_BLOCK_DURATION_MINUTES, snapToStep(durationMinutes))
-      const slot = startMinutes === undefined
+      // Явный startMinutes приходит из ручного жеста (drop на шкалу за пределами текущих
+      // границ дня) — раздвигаем границы под него перед поиском слота и валидацией.
+      // Без явного startMinutes (клик по чипу «Не распределено») слот ищется в текущих
+      // границах — раздвигать их незачем, так как позиция ещё не выбрана пользователем.
+      const explicitStart = startMinutes === undefined ? undefined : snapToStep(startMinutes)
+      const widened = explicitStart === undefined
+        ? current
+        : expandScheduleBoundsForBlock(current, { startMinutes: explicitStart, durationMinutes: duration })
+      const slot = explicitStart === undefined
         ? findFreeSlot(
           duration,
-          current.dayStartMinutes,
-          current.dayEndMinutes,
-          current.blocks,
+          widened.dayStartMinutes,
+          widened.dayEndMinutes,
+          widened.blocks,
         )
-        : snapToStep(startMinutes)
-      if (slot === null || slot < current.dayStartMinutes || slot + duration > current.dayEndMinutes) {
+        : explicitStart
+      if (slot === null || slot < widened.dayStartMinutes || slot + duration > widened.dayEndMinutes) {
         showMessageRef.current('Нет свободного слота на шкале — увеличьте диапазон или сдвиньте блоки')
         return
       }
       const newBlock: BlockInput = {
         id: idGeneratorRef.current(),
-        ...(current.version >= 2 ? { kind: 'task' as const } : {}),
-        ...(current.version === 3 ? { category: 'main' as const, isFixed: false } : {}),
+        ...(widened.version >= 2 ? { kind: 'task' as const } : {}),
+        ...(widened.version === 3 ? { category: 'main' as const, isFixed: false } : {}),
         taskIndex: taskIndex + 1,
         taskText: task.taskText.trim(),
         startMinutes: slot,
         durationMinutes: duration,
       }
-      const result = applyCascadeScheduleEdit(current, { type: 'insert', block: newBlock, startMinutes: slot, durationMinutes: duration })
+      const result = applyCascadeScheduleEdit(widened, { type: 'insert', block: newBlock, startMinutes: slot, durationMinutes: duration })
       if (!result.ok) {
         const msg = getCascadeErrorMessage(result.reason)
         setError(msg)

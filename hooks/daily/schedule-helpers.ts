@@ -835,6 +835,57 @@ export function getPendingSaveDateChangeAction(
   return isScheduleRequestCurrent(pending, next) ? 'keep-current' : 'flush-previous-date'
 }
 
+// === Boundary expansion (manual placement outside current day range) ===
+
+const MAX_MINUTES_IN_DAY = 24 * 60
+
+/**
+ * Расширяет границы расписания под ручное размещение блока (drag/drop, resize, ручной ввод
+ * времени), если блок выходит за текущие dayStart/dayEnd. Инвариант данных ("блок внутри
+ * dayStart..dayEnd") остаётся обязательным в валидаторе — здесь мы заранее раздвигаем сами
+ * границы, а не ослабляем проверку.
+ *
+ * Для v3-расписаний dayStartMinutes всегда равен planningStartMinutes, а dayEndMinutes —
+ * activityEndMinutes (инвариант схемы), поэтому оба поля двигаются вместе с day-границами.
+ * workEndMinutes дополнительно подтягивается вперёд, если блок заканчивается позже него —
+ * даже когда день целиком не пришлось раздвигать (блок лёг между "работа до" и "активность
+ * до"), иначе граница "Работа до" указывала бы на время до конца блока, и авто-раскладка
+ * от предложения ИИ (lib/daily-schedule-proposal.ts — другой путь, здесь не используется)
+ * конфликтовала бы с ней при следующем построении.
+ *
+ * Если ни одна граница не требует изменения, возвращает исходный объект без изменений.
+ */
+export function expandScheduleBoundsForBlock(schedule: DailySchedule, block: RangeLike): DailySchedule {
+  const blockStart = clamp(block.startMinutes, 0, MAX_MINUTES_IN_DAY)
+  const blockEnd = clamp(getBlockEnd(block), 0, MAX_MINUTES_IN_DAY)
+  const nextDayStart = Math.min(schedule.dayStartMinutes, blockStart)
+  const nextDayEnd = Math.max(schedule.dayEndMinutes, blockEnd)
+
+  if (schedule.version === 3) {
+    const nextWorkEnd = clamp(
+      Math.max(schedule.workEndMinutes, blockEnd),
+      nextDayStart + MIN_BLOCK_DURATION_MINUTES,
+      nextDayEnd,
+    )
+    if (nextDayStart === schedule.dayStartMinutes && nextDayEnd === schedule.dayEndMinutes && nextWorkEnd === schedule.workEndMinutes) {
+      return schedule
+    }
+    return {
+      ...schedule,
+      dayStartMinutes: nextDayStart,
+      dayEndMinutes: nextDayEnd,
+      planningStartMinutes: nextDayStart,
+      activityEndMinutes: nextDayEnd,
+      workEndMinutes: nextWorkEnd,
+    }
+  }
+
+  if (nextDayStart === schedule.dayStartMinutes && nextDayEnd === schedule.dayEndMinutes) {
+    return schedule
+  }
+  return { ...schedule, dayStartMinutes: nextDayStart, dayEndMinutes: nextDayEnd }
+}
+
 export function buildSchedule(timezone: string, dayStart: number, dayEnd: number, blocks: BlockInput[]): DailySchedule {
   if (blocks.some(block => 'kind' in block)) {
     return {

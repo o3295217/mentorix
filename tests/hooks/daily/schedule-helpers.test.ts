@@ -11,6 +11,7 @@ import {
   clampBlockToRange,
   computeClientScheduleLoadSummary,
   computeUnscheduledTaskIndexes,
+  expandScheduleBoundsForBlock,
   findFreeSlot,
   formatDurationLabel,
   getPendingSaveDateChangeAction,
@@ -390,6 +391,85 @@ describe('schedule-helpers · v3 shape preservation and dirty detection', () => 
     expect(canApplySavedScheduleToCurrentDate('2026-07-16', '2026-07-16')).toBe(true)
     expect(canApplySavedScheduleToCurrentDate('2026-07-16', '2026-07-17')).toBe(false)
     expect(canApplySavedScheduleToCurrentDate(undefined, '2026-07-17')).toBe(true)
+  })
+})
+
+describe('schedule-helpers · expandScheduleBoundsForBlock', () => {
+  it('leaves the schedule untouched (same reference) when the block is fully inside the current range', () => {
+    const current = v3Schedule([]) // dayStart 9:00, dayEnd 21:30
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(10), durationMinutes: 60 })
+    expect(next).toBe(current)
+  })
+
+  it('widens dayStartMinutes when the block starts earlier than the current day range', () => {
+    const current = schedule([], at(9), at(18)) // v1: 9:00-18:00
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(6), durationMinutes: 30 })
+    expect(next.dayStartMinutes).toBe(at(6))
+    expect(next.dayEndMinutes).toBe(at(18))
+  })
+
+  it('widens dayEndMinutes when the block ends later than the current day range', () => {
+    const current = schedule([], at(9), at(18)) // v1: 9:00-18:00
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(22), durationMinutes: 60 })
+    expect(next.dayStartMinutes).toBe(at(9))
+    expect(next.dayEndMinutes).toBe(at(23))
+  })
+
+  it('widens both ends for a block spanning wider than the current day range', () => {
+    const current = schedule([], at(9), at(18))
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(6), durationMinutes: at(18) })
+    expect(next.dayStartMinutes).toBe(at(6))
+    expect(next.dayEndMinutes).toBe(at(24))
+  })
+
+  it('for v3 schedules keeps planningStartMinutes === dayStartMinutes and activityEndMinutes === dayEndMinutes after widening', () => {
+    const current = v3Schedule([]) // dayStart 9:00, dayEnd 21:30, workEnd 18:00
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(7), durationMinutes: 30 })
+    expect(next.version).toBe(3)
+    if (next.version !== 3) throw new Error('expected v3')
+    expect(next.dayStartMinutes).toBe(at(7))
+    expect(next.planningStartMinutes).toBe(at(7))
+    expect(next.dayEndMinutes).toBe(at(21, 30))
+    expect(next.activityEndMinutes).toBe(at(21, 30))
+    // workEndMinutes untouched — the block ends well before it.
+    expect(next.workEndMinutes).toBe(at(18))
+  })
+
+  it('for v3 schedules pushes workEndMinutes forward when the block ends after it, even if the day range itself does not need to widen', () => {
+    const current = v3Schedule([]) // workEnd 18:00, dayEnd/activityEnd 21:30
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(19), durationMinutes: 60 }) // ends 20:00, inside old day range but after workEnd
+    expect(next.version).toBe(3)
+    if (next.version !== 3) throw new Error('expected v3')
+    // Day range (dayStart/dayEnd/activityEnd) is untouched — the block already fit inside it.
+    expect(next.dayStartMinutes).toBe(at(9))
+    expect(next.dayEndMinutes).toBe(at(21, 30))
+    expect(next.activityEndMinutes).toBe(at(21, 30))
+    // workEndMinutes is pushed to the block's end so the "Работа до" pill and AI-proposal
+    // layout building on it stay consistent with where the block actually was placed.
+    expect(next.workEndMinutes).toBe(at(20))
+  })
+
+  it('for v3 schedules pushes workEndMinutes forward together with a day-range widening block', () => {
+    const current = v3Schedule([]) // dayEnd/activityEnd 21:30, workEnd 18:00
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(22), durationMinutes: 60 }) // ends 23:00, past dayEnd and workEnd
+    expect(next.version).toBe(3)
+    if (next.version !== 3) throw new Error('expected v3')
+    expect(next.dayEndMinutes).toBe(at(23))
+    expect(next.activityEndMinutes).toBe(at(23))
+    expect(next.workEndMinutes).toBe(at(23))
+  })
+
+  it('clamps the widened workEndMinutes to the new activityEnd rather than exceeding it', () => {
+    const current = v3Schedule([]) // dayEnd/activityEnd 21:30
+    const next = expandScheduleBoundsForBlock(current, { startMinutes: at(21), durationMinutes: 30 }) // ends exactly at old activityEnd
+    expect(next.version).toBe(3)
+    if (next.version !== 3) throw new Error('expected v3')
+    // Block fits inside the old day range (21:00-21:30 <= 21:30) so dayEnd/activityEnd stay put,
+    // but the block ends after the old workEnd (18:00) — workEnd is pushed up to it, capped at activityEnd.
+    expect(next.dayEndMinutes).toBe(at(21, 30))
+    expect(next.activityEndMinutes).toBe(at(21, 30))
+    expect(next.workEndMinutes).toBe(at(21, 30))
+    expect(next.workEndMinutes).toBeLessThanOrEqual(next.activityEndMinutes)
   })
 })
 

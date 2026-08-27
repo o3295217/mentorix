@@ -99,9 +99,61 @@ export function getTimelineAxisMarkerLabels(): string[] {
   return []
 }
 
+const FULL_DAY_START_MINUTES = 0
+const FULL_DAY_END_MINUTES = 1440
+
+export interface DayNightGradientStop {
+  offsetPercent: number
+  color: string
+}
+
+// Низкая непрозрачность — это лёгкая подложка-настроение поверх тёмной темы, а не заливка;
+// текст блоков и меток оси не задет: подложка лежит только под сеткой шкалы, метки — в
+// отдельном жёлобе оси со своим фоном, а сами карточки блоков рисуются поверх со своей
+// куда более плотной заливкой (см. kindClass ниже).
+const NIGHT_COLOR = 'rgba(10, 12, 24, 0.55)' // 00:00–~05:00 и 21:00–24:00 — самый тёмный сине-чёрный
+const DAWN_WARM_COLOR = 'rgba(54, 42, 36, 0.38)' // ~07:30 — пик тёплого оттенка на подъёме к утру
+const DAY_COLOR = 'rgba(51, 65, 85, 0.32)' // ~10:00–17:00 — самый светлый из тёмных, холодный синий (slate-700)
+const EVENING_COLOR = 'rgba(40, 26, 54, 0.42)' // ~21:00 — тёплое фиолетово-синее затемнение
+
+/**
+ * Стопы вертикального градиента «день/ночь» для фона зоны блоков шкалы, в процентах
+ * от высоты суток (минуты/1440) — не зависят от pxPerMinute или окна вида, поэтому
+ * применимы напрямую как проценты CSS linear-gradient, когда вид растянут на весь день
+ * (00:00–24:00, см. getCompressedTimelineWindow). Стопы монотонны по offsetPercent;
+ * 0% и 100% — одинаковый ночной цвет (полночь на обоих концах суток).
+ */
+export function getDayNightGradientStops(): DayNightGradientStop[] {
+  const stopAt = (minutes: number, color: string): DayNightGradientStop => ({
+    offsetPercent: Math.round((minutes / FULL_DAY_END_MINUTES) * 10000) / 100,
+    color,
+  })
+  return [
+    stopAt(0, NIGHT_COLOR), // 00:00
+    stopAt(5 * 60, NIGHT_COLOR), // 05:00 — конец плато ночи
+    stopAt(7 * 60 + 30, DAWN_WARM_COLOR), // 07:30 — тёплый пик рассвета
+    stopAt(10 * 60, DAY_COLOR), // 10:00 — начало плато дня
+    stopAt(17 * 60, DAY_COLOR), // 17:00 — конец плато дня
+    stopAt(21 * 60, EVENING_COLOR), // 21:00 — вечер
+    stopAt(FULL_DAY_END_MINUTES, NIGHT_COLOR), // 24:00
+  ]
+}
+
+export function buildDayNightGradientCss(stops: DayNightGradientStop[]): string {
+  return `linear-gradient(to bottom, ${stops.map(s => `${s.color} ${s.offsetPercent}%`).join(', ')})`
+}
+
+/**
+ * Окно вида шкалы. Вне сжатого режима вид всегда показывает весь день (00:00–24:00),
+ * а не schedule.dayStart/dayEndMinutes — план строится «с текущего момента», и его
+ * реальные границы (например 16:30–21:00) не должны ограничивать прокрутку: пользователь
+ * должен свободно долистать вверх к утру и вниз к ночи независимо от того, где лежат блоки.
+ * Границы плана (dayStart/dayEnd, planning/work/activity) остаются как есть — они
+ * используются только для пилюль статуса и для сжатого окна пустого расписания ниже.
+ */
 export function getCompressedTimelineWindow(schedule: DailySchedule, showFullDay: boolean): { startMinutes: number; endMinutes: number; isCompressed: boolean } {
   if (showFullDay || schedule.blocks.length > 0) {
-    return { startMinutes: schedule.dayStartMinutes, endMinutes: schedule.dayEndMinutes, isCompressed: false }
+    return { startMinutes: FULL_DAY_START_MINUTES, endMinutes: FULL_DAY_END_MINUTES, isCompressed: false }
   }
   const boundaries = getScheduleBoundaryMinutes(schedule)
   const startMinutes = Math.max(schedule.dayStartMinutes, boundaries.planningStartMinutes)
@@ -110,6 +162,29 @@ export function getCompressedTimelineWindow(schedule: DailySchedule, showFullDay
     startMinutes,
     endMinutes: Math.max(endMinutes, startMinutes + 180),
     isCompressed: true,
+  }
+}
+
+// Метки ближе этого расстояния (px) к плашке «сейчас» перекрываются ей и не рисуются —
+// совпадает с порогом, которым blockBoundaryMarks уже отсеивают совпадения с hourMarks.
+const AXIS_MARK_OVERLAP_PX = 14
+
+/**
+ * Прячет часовые и точные (границы блоков) метки оси, которые пиксельно накладываются
+ * на плашку текущего времени — она рисуется поверх и обязана оставаться читаемой.
+ * currentMinutes === null (линия «сейчас» не видна) — фильтрация не нужна, метки как есть.
+ */
+export function getVisibleAxisMarks(
+  hourMarks: number[],
+  boundaryMarks: number[],
+  currentMinutes: number | null,
+  pxPerMinute: number,
+): { hourMarks: number[]; boundaryMarks: number[] } {
+  if (currentMinutes === null) return { hourMarks, boundaryMarks }
+  const overlapsCurrent = (m: number) => Math.abs((m - currentMinutes) * pxPerMinute) < AXIS_MARK_OVERLAP_PX
+  return {
+    hourMarks: hourMarks.filter(m => !overlapsCurrent(m)),
+    boundaryMarks: boundaryMarks.filter(m => !overlapsCurrent(m)),
   }
 }
 
@@ -242,6 +317,14 @@ export default function DayTimeline({
   }, 0)
   const totalHeight = Math.max(totalMinutes * pxPerMinute, maxBlockBottom + 8)
   const viewportHeight = getTimelineViewportHeight(totalHeight, timelineWindow.isCompressed)
+  // День/ночь подложка растянута ровно на 00:00–24:00, поэтому она осмысленна только
+  // когда вид действительно показывает весь день (см. getCompressedTimelineWindow).
+  // В сжатом рабочем окне пустого расписания её не показываем — набор из пары часов
+  // окна не несёт смысла "утро/день/вечер/ночь", проще оставить нейтральный фон.
+  const dayNightGradientCss = useMemo(
+    () => (timelineWindow.isCompressed ? null : buildDayNightGradientCss(getDayNightGradientStops())),
+    [timelineWindow.isCompressed],
+  )
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   const showCurrentTimeLine = isCurrentTimeLineVisible(selectedDate, now, dayStart, dayEnd)
 
@@ -276,6 +359,13 @@ export default function DayTimeline({
     return marks
   }, [blocks, dayStart, dayEnd, pxPerMinute, hourMarks])
 
+  // Метки, которые плашка «сейчас» перекрывает своим пикселем, не рисуем — иначе
+  // час/точная граница блока становятся нечитаемыми под голубой капсулой времени.
+  const visibleAxisMarks = useMemo(
+    () => getVisibleAxisMarks(hourMarks, blockBoundaryMarks, showCurrentTimeLine ? currentMinutes : null, pxPerMinute),
+    [hourMarks, blockBoundaryMarks, showCurrentTimeLine, currentMinutes, pxPerMinute],
+  )
+
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 60000)
     return () => window.clearInterval(id)
@@ -292,7 +382,8 @@ export default function DayTimeline({
     .filter((x): x is { index: number; task: OpenTask } => Boolean(x.task))
 
   // При открытии дня лента сразу показывает «сейчас» (для сегодняшнего дня),
-  // иначе — первый блок; без этого шкала всегда открывалась с верха окна (6:00).
+  // иначе — первый блок; без этого шкала всегда открывалась с верха окна (теперь это
+  // 00:00 полного дня, а не только время начала плана).
   const initialScrollDateRef = useRef<string | null>(null)
   useEffect(() => {
     if (initialScrollDateRef.current === selectedDate) return
@@ -410,7 +501,7 @@ export default function DayTimeline({
       <div className="flex gap-2" style={{ height: totalHeight, minHeight: totalHeight }}>
         {/* Hour labels column */}
         <div className="relative h-full w-14 flex-shrink-0" aria-hidden>
-          {hourMarks.map(m => (
+          {visibleAxisMarks.hourMarks.map(m => (
             <div
               key={m}
               className="absolute right-1 -translate-y-1/2 text-xs leading-none text-gray-400"
@@ -419,7 +510,7 @@ export default function DayTimeline({
               {minutesToTimeLabel(m)}
             </div>
           ))}
-          {blockBoundaryMarks.map(m => (
+          {visibleAxisMarks.boundaryMarks.map(m => (
             <div
               key={`boundary-${m}`}
               className="absolute right-1 -translate-y-1/2 text-[10px] leading-none text-gray-500"
@@ -442,6 +533,7 @@ export default function DayTimeline({
         {/* Block area */}
         <div
           className="relative h-full min-w-0 flex-1 rounded-2xl border border-gray-800/70 bg-gradient-to-b from-gray-950/70 to-gray-900/30"
+          style={dayNightGradientCss ? { backgroundImage: dayNightGradientCss } : undefined}
           aria-label="Шкала дня. Перетащите задачу сюда, чтобы поставить её на выбранное время"
           onDragOver={event => {
             if (!canMutateTimeline(mutationLocked)) return

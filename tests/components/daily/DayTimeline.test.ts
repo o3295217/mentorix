@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canMutateTimeline, getCompressedTimelineWindow, getDropStartMinutesFromClientY, getScheduleBlockRenderKey, getTimelineAxisMarkerLabels, getTimelinePointerPreviewRange, getTimelineViewportHeight, getUnscheduledTrayViewConfig, isCurrentTimeLineVisible, isTaskHighlighted, shouldCommitPointerDrag, shouldStartTimelinePointerDrag } from '@/components/daily/DayTimeline'
+import { buildDayNightGradientCss, canMutateTimeline, getCompressedTimelineWindow, getDayNightGradientStops, getDropStartMinutesFromClientY, getScheduleBlockRenderKey, getTimelineAxisMarkerLabels, getTimelinePointerPreviewRange, getTimelineViewportHeight, getUnscheduledTrayViewConfig, getVisibleAxisMarks, isCurrentTimeLineVisible, isTaskHighlighted, shouldCommitPointerDrag, shouldStartTimelinePointerDrag } from '@/components/daily/DayTimeline'
 import type { DailySchedule } from '@/lib/daily-schedule'
 
 describe('getScheduleBlockRenderKey', () => {
@@ -108,9 +108,29 @@ describe('compressed timeline window', () => {
     blocks: [],
   }
 
-  it('compresses empty timeline around planning window and can show full day', () => {
+  it('compresses empty timeline around planning window and can show full 00:00-24:00 day', () => {
     expect(getCompressedTimelineWindow(emptySchedule, false)).toEqual({ startMinutes: 540, endMinutes: 1080, isCompressed: true })
-    expect(getCompressedTimelineWindow(emptySchedule, true)).toEqual({ startMinutes: 360, endMinutes: 1440, isCompressed: false })
+    expect(getCompressedTimelineWindow(emptySchedule, true)).toEqual({ startMinutes: 0, endMinutes: 1440, isCompressed: false })
+  })
+
+  it('always shows the full 00:00-24:00 day once the schedule has blocks, regardless of the plan\'s own day range', () => {
+    // Plan built "from the current moment" (e.g. 16:30-21:00) must not cap the view —
+    // the user needs to scroll freely up to morning and down to night.
+    const scheduleWithNarrowRange: DailySchedule = {
+      version: 3,
+      timezone: 'Europe/Moscow',
+      dayStartMinutes: 990, // 16:30
+      dayEndMinutes: 1260, // 21:00
+      planningBasis: 'current_time',
+      planningStartMinutes: 990,
+      workEndMinutes: 1260,
+      activityEndMinutes: 1260,
+      blocks: [
+        { id: 'b1', kind: 'task', taskIndex: 1, taskText: 'Задача', category: 'main', isFixed: false, startMinutes: 1000, durationMinutes: 60 },
+      ],
+    }
+    expect(getCompressedTimelineWindow(scheduleWithNarrowRange, false)).toEqual({ startMinutes: 0, endMinutes: 1440, isCompressed: false })
+    expect(getCompressedTimelineWindow(scheduleWithNarrowRange, true)).toEqual({ startMinutes: 0, endMinutes: 1440, isCompressed: false })
   })
 
   it('shows current time line only today and inside visible window', () => {
@@ -123,5 +143,98 @@ describe('compressed timeline window', () => {
     expect(getTimelineViewportHeight(3240, false)).toBe(560)
     expect(getTimelineViewportHeight(432, true)).toBe(432)
     expect(getTimelineViewportHeight(120, true)).toBe(240)
+  })
+})
+
+describe('getVisibleAxisMarks', () => {
+  const hourMarks = [9 * 60, 10 * 60, 11 * 60]
+  const boundaryMarks = [9 * 60 + 15, 10 * 60 + 45]
+
+  it('returns marks unchanged when the current-time line is not visible', () => {
+    expect(getVisibleAxisMarks(hourMarks, boundaryMarks, null, 3)).toEqual({ hourMarks, boundaryMarks })
+  })
+
+  it('hides an hour mark the current-time pill overlaps (within 14px at the given scale)', () => {
+    // 10:00 mark sits 3px away at PX_PER_MIN=3 (10:01 vs 10:00) — inside the 14px overlap band.
+    const result = getVisibleAxisMarks(hourMarks, boundaryMarks, 10 * 60 + 1, 3)
+    expect(result.hourMarks).toEqual([9 * 60, 11 * 60])
+    expect(result.boundaryMarks).toEqual(boundaryMarks)
+  })
+
+  it('hides a block-boundary mark the current-time pill overlaps', () => {
+    // 9:15 boundary sits 6px away at PX_PER_MIN=3 (9:17 vs 9:15) — inside the 14px overlap band.
+    const result = getVisibleAxisMarks(hourMarks, boundaryMarks, 9 * 60 + 17, 3)
+    expect(result.hourMarks).toEqual(hourMarks)
+    expect(result.boundaryMarks).toEqual([10 * 60 + 45])
+  })
+
+  it('keeps a mark that is far enough from the current-time pill even in the compressed scale', () => {
+    // At pxPerMinute=0.8, 14px covers 17.5 minutes — this mark is 30 min from the pill (24px), stays visible.
+    const result = getVisibleAxisMarks([9 * 60], [], 9 * 60 + 30, 0.8)
+    expect(result.hourMarks).toEqual([9 * 60])
+  })
+
+  it('hides a mark within the overlap band even at the compressed scale', () => {
+    // At pxPerMinute=0.8, 14px covers 17.5 minutes — this mark is 15 min from the pill (12px), hidden.
+    const result = getVisibleAxisMarks([9 * 60], [], 9 * 60 + 15, 0.8)
+    expect(result.hourMarks).toEqual([])
+  })
+})
+
+describe('getDayNightGradientStops', () => {
+  const parseRgbaAlpha = (color: string): number => {
+    const match = /rgba\([^)]+,\s*([\d.]+)\)/.exec(color)
+    if (!match) throw new Error(`not an rgba() color: ${color}`)
+    return Number(match[1])
+  }
+
+  it('produces stops with strictly ascending offsetPercent, spanning 0..100', () => {
+    const stops = getDayNightGradientStops()
+    expect(stops.length).toBeGreaterThanOrEqual(2)
+    expect(stops[0].offsetPercent).toBe(0)
+    expect(stops.at(-1)!.offsetPercent).toBe(100)
+    for (let i = 1; i < stops.length; i++) {
+      expect(stops[i].offsetPercent).toBeGreaterThan(stops[i - 1].offsetPercent)
+    }
+  })
+
+  it('uses the same night color at 0% and 100% (midnight on both ends of the day)', () => {
+    const stops = getDayNightGradientStops()
+    expect(stops[0].color).toBe(stops.at(-1)!.color)
+  })
+
+  it('keeps every stop as a low-opacity rgba mood layer, never an opaque fill', () => {
+    for (const stop of getDayNightGradientStops()) {
+      const alpha = parseRgbaAlpha(stop.color)
+      expect(alpha).toBeGreaterThan(0)
+      expect(alpha).toBeLessThanOrEqual(0.6)
+    }
+  })
+
+  it('places the day-plateau stops (~10:00-17:00) as the lightest/coolest and night as the darkest', () => {
+    const stops = getDayNightGradientStops()
+    const byOffset = (percent: number) => stops.find(s => Math.abs(s.offsetPercent - percent) < 0.5)
+    const night = byOffset(0)!
+    const day = byOffset((10 * 60 / 1440) * 100)!
+    expect(night.color).not.toBe(day.color)
+  })
+})
+
+describe('buildDayNightGradientCss', () => {
+  it('renders a top-to-bottom CSS linear-gradient listing every stop in order', () => {
+    const css = buildDayNightGradientCss([
+      { offsetPercent: 0, color: 'rgba(1, 2, 3, 0.5)' },
+      { offsetPercent: 50, color: 'rgba(4, 5, 6, 0.4)' },
+      { offsetPercent: 100, color: 'rgba(1, 2, 3, 0.5)' },
+    ])
+    expect(css).toBe('linear-gradient(to bottom, rgba(1, 2, 3, 0.5) 0%, rgba(4, 5, 6, 0.4) 50%, rgba(1, 2, 3, 0.5) 100%)')
+  })
+
+  it('round-trips the real day/night stops into a well-formed gradient string', () => {
+    const css = buildDayNightGradientCss(getDayNightGradientStops())
+    expect(css.startsWith('linear-gradient(to bottom, ')).toBe(true)
+    expect(css.endsWith(')')).toBe(true)
+    expect(css).toContain('0%')
+    expect(css).toContain('100%')
   })
 })
