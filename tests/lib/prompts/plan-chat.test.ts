@@ -260,9 +260,52 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сначала обнови draft')
   })
 
-  it('sets the final CTA depending on whether a schedule already exists', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если текущего расписания нет — «Разместить на шкале?»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если расписание уже есть — «Заменить текущее расписание?»')
+  it('sets the final CTA to the card button depending on whether a schedule already exists', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Финальный CTA всегда указывает на кнопку карточки, а не на твоё действие')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если текущего расписания нет — «Собрал расписание — проверь карточку и нажми „Применить“»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если расписание уже есть — «Собрал новый вариант — проверь карточку и нажми „Применить“; замена потребует подтверждения — кнопку нужно нажать дважды»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('Разместить на шкале?')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('Заменить текущее расписание?')
+  })
+
+  it('forbids claiming the schedule action as done or in progress by the assistant', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПРИМЕНЯЕТ КАРТОЧКУ ПОЛЬЗОВАТЕЛЬ, А НЕ ТЫ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Расписание дня меняется исключительно после того, как пользователь сам нажал в карточке кнопку «Применить»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ТЕКСТ НЕ ИМЕЕТ ПРАВА РАСХОДИТЬСЯ С ФАКТОМ ПРИМЕНЕНИЯ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«раскладываю на шкалу», «сейчас разложу по шкале», «поставил», «расставил», «применил», «добавил в расписание», «занёс в план», «обновил шкалу», «готово, расписание обновлено»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('шкала осталась прежней, а задачи — в «Не распределено»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Запрещены «разместил», «раскладываю», «применяю» и «готово» до успешного apply')
+  })
+
+  it('keeps the ban in force even when the proposal tool was called', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Запрет действует и когда tool вызван: вызов tool — это показ карточки, а не изменение дня')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('допустимы только с явной привязкой к предложению — «в карточке», «в черновике», «в этом варианте»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызванный tool тоже не делает эти глаголы правдой про шкалу')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сама шкала меняется только после нажатия «Применить»')
+  })
+
+  it('requires the apply CTA next to the proposal card', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Сопровождение карточки — одна короткая фраза: «Собрал расписание — проверь карточку и нажми „Применить“»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всей карточки и без обещаний за пользователя')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Расписание применяет пользователь кнопкой «Применить» в карточке, а не ты')
+  })
+
+  it('warns about the double confirmation when a schedule already exists', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если в контексте ТЕКУЩЕЕ РАСПИСАНИЕ: есть, честно предупреди в той же фразе: «замена потребует подтверждения — кнопку нужно нажать дважды»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT.match(/замена потребует подтверждения — кнопку нужно нажать дважды/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
+  })
+
+  it('aligns the honesty rule with the server note about moved fixed and unscheduled blocks', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Служебная строка про блоки, которые были помечены фиксированными и переставлены в свободное время, и про задачи, оставшиеся в «Не распределено», описывает содержимое той же непринятой карточки')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не делай из неё вывод, что день уже разложен')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Пока обновлённое расписание не пришло в контекст следующего хода, применение не состоялось')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('скажи, что предложение осталось в карточке и его нужно применить кнопкой')
+  })
+
+  it('keeps first-person wording elsewhere tied to the draft rather than the timeline', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«в черновике оставил запас после созвона, потому что там легко всплывают хвосты»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('явно скажи об этом как о предложении, а не как о совершённом переносе')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не говори «добавил/добавляю/применил» — tool это только предложение, которое пользователь ещё должен применить кнопкой')
   })
 
   it('keeps Russian plain-text style and prompt-injection resistance', () => {
@@ -339,6 +382,7 @@ describe('plan chat kickoff helpers', () => {
 
     expect(existingPlan).toContain('В плане уже есть задачи')
     expect(existingPlan).toContain('Не спрашивай "чем помочь?"')
+    expect(existingPlan).toContain('не заявляй, что уже разложил задачи по шкале: карточку применяет пользователь кнопкой «Применить»')
     expect(existingPlan).not.toContain('целей недели/месяца/мечты')
     expect(withGoals).toContain('План пустой, но есть опора: цели недели')
     expect(withGoals).not.toContain('цели месяца')
