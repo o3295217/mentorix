@@ -21,6 +21,9 @@ import {
 } from '@/hooks/daily/schedule-helpers'
 
 const PX_PER_MIN = 3 // 15-min block ≈ 45px (≥44px touch target)
+// Минимальная отрисованная высота блока (см. ScheduleBlock: max(height, 44) - 2).
+// Сетка обязана учитывать её, иначе короткие блоки в сжатом масштабе вылезают за низ.
+const MIN_BLOCK_RENDER_PX = 44
 const DEFAULT_UNSCHEDULED_DURATION_MINUTES = 30
 
 export function getScheduleBlockRenderKey(blockId: string, appliedAnimationKey: number): string {
@@ -229,7 +232,15 @@ export default function DayTimeline({
   const dayEnd = timelineWindow.endMinutes
   const pxPerMinute = timelineWindow.isCompressed ? 0.8 : PX_PER_MIN
   const totalMinutes = Math.max(0, dayEnd - dayStart)
-  const totalHeight = totalMinutes * pxPerMinute
+  // Высота сетки: по времени дня, но не меньше низа самого нижнего
+  // отрисованного блока (короткие блоки раздуваются до MIN_BLOCK_RENDER_PX
+  // и в сжатом масштабе вылезают за "минутную" высоту) + нижний отступ.
+  const maxBlockBottom = blocks.reduce((max, b) => {
+    const top = (b.startMinutes - dayStart) * pxPerMinute
+    const rendered = Math.max(b.durationMinutes * pxPerMinute, MIN_BLOCK_RENDER_PX)
+    return Math.max(max, top + rendered)
+  }, 0)
+  const totalHeight = Math.max(totalMinutes * pxPerMinute, maxBlockBottom + 8)
   const viewportHeight = getTimelineViewportHeight(totalHeight, timelineWindow.isCompressed)
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   const showCurrentTimeLine = isCurrentTimeLineVisible(selectedDate, now, dayStart, dayEnd)
@@ -356,7 +367,7 @@ export default function DayTimeline({
       {/* Timeline viewport: this element clips and scrolls the positioned hour grid and blocks. */}
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-none overflow-y-auto overscroll-contain rounded-2xl"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl"
         style={{ height: viewportHeight, maxHeight: 'min(62vh, 560px)' }}
       >
       {/* Timeline area + hour axis */}
@@ -372,7 +383,15 @@ export default function DayTimeline({
               {minutesToTimeLabel(m)}
             </div>
           ))}
-
+          {/* Плашка текущего времени живёт в жёлобе оси, не поверх карточек */}
+          {showCurrentTimeLine && (
+            <div
+              className="absolute right-0 z-10 -translate-y-1/2 rounded-full bg-cyan-400 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-950 shadow-sm"
+              style={{ top: (currentMinutes - dayStart) * pxPerMinute }}
+            >
+              {minutesToTimeLabel(currentMinutes)}
+            </div>
+          )}
         </div>
 
         {/* Block area */}
@@ -424,16 +443,15 @@ export default function DayTimeline({
             </div>
           )}
 
+          {/* Линия «сейчас» рисуется под карточками (без z-index блоки, идущие
+              позже в DOM, перекрывают её) — текст блоков она не пересекает,
+              а сквозь полупрозрачный фон мягко просвечивает */}
           {showCurrentTimeLine && (
             <div
-              className="pointer-events-none absolute left-0 right-0 z-20 border-t-2 border-cyan-300/90"
+              className="pointer-events-none absolute left-0 right-0 border-t-2 border-cyan-300/90"
               style={{ top: (currentMinutes - dayStart) * pxPerMinute }}
               aria-hidden="true"
-            >
-              <span className="absolute -top-3 left-2 rounded-full bg-cyan-400 px-2 py-0.5 text-[11px] font-semibold text-gray-950 shadow-sm">
-                сейчас {minutesToTimeLabel(currentMinutes)}
-              </span>
-            </div>
+            />
           )}
 
           {sortedBlocks.map((block, index) => (
@@ -712,10 +730,11 @@ function ScheduleBlock({
       aria-label={`Блок расписания: ${title}, с ${startLabel} до ${endLabel}, длительность ${formatDurationLabel(displayDuration)}.${fixed ? ' Фиксированное время.' : ''}${mutationLocked ? ' Редактирование временно заблокировано.' : ' Enter — редактировать, стрелки — сдвинуть, Delete — убрать. На сенсорном экране переносите за маркер.'}`}
       title={fixed ? 'Фиксированное время: другие блоки не могут на него наехать' : undefined}
       aria-disabled={mutationLocked}
-      className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-xl border px-2.5 py-1.5 shadow-sm outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${kindClass} ${mutationLocked ? 'cursor-not-allowed opacity-70' : ''} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''} ${isHighlighted ? 'schedule-block-new-task-highlight' : ''}`}
+      className={`absolute left-1 right-1 flex flex-col overflow-hidden rounded-xl border px-2.5 shadow-sm outline-none transition-colors focus:ring-2 focus:ring-blue-400 ${isVeryShortBlock ? 'py-0.5' : 'py-1.5'} ${kindClass} ${mutationLocked ? 'cursor-not-allowed opacity-70' : ''} ${appliedAnimationKey > 0 ? 'schedule-block-apply-enter' : ''} ${isHighlighted ? 'schedule-block-new-task-highlight' : ''}`}
       style={{
-        top,
-        height: Math.max(height, 44),
+        // +1/-2px — зазор между соседними блоками, чтобы границы не слипались
+        top: top + 1,
+        height: Math.max(height, 44) - 2,
         touchAction: 'pan-y',
         cursor: mutationLocked ? 'not-allowed' : 'grab',
         animationDelay: appliedAnimationKey > 0 ? `${Math.min(animationIndex, 12) * 70}ms` : undefined,
@@ -736,7 +755,7 @@ function ScheduleBlock({
           ⠿
         </span>
       )}
-      <div className={`min-h-0 flex-1 overflow-y-auto ${!editing && !mutationLocked ? 'pr-9' : 'pr-0.5'}`}>
+      <div className={`min-h-0 flex-1 ${isVeryShortBlock && !editing ? 'flex items-center overflow-hidden' : 'overflow-y-auto'} ${!editing && !mutationLocked ? 'pr-9' : 'pr-0.5'}`}>
         {isVeryShortBlock && !editing ? (
           <div className="flex min-w-0 items-center gap-2 leading-tight">
             {isTaskBlock && taskId !== null && (
