@@ -128,11 +128,15 @@ export default function Navigation() {
               <div className="hidden min-w-0 items-center space-x-1 overflow-x-clip lg:flex">
                 {desktopNavItems.map((item) => {
                   const active = isRouteActive(pathname, item.href)
+                  const profileTooltip = item.href === '/profile' && user
+                    ? `${user.name || 'Без имени'} · ${user.email}`
+                    : undefined
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       aria-current={active ? 'page' : undefined}
+                      title={profileTooltip}
                       className={`nav-menu-link whitespace-nowrap rounded-md px-3 py-2 transition-colors ${
                         active
                           ? 'bg-blue-500/15 text-blue-400'

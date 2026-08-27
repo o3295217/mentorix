@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import ExpandableInput from '@/components/ExpandableInput'
+import { useAuth } from '@/components/AuthProvider'
 
 // Базовый профиль (статичные поля)
 interface ProfileData {
@@ -22,6 +23,7 @@ interface ProfileData {
 }
 
 export default function ProfilePage() {
+  const { user } = useAuth()
   // Базовый профиль
   const [profile, setProfile] = useState<ProfileData>({
     name: '',
@@ -135,6 +137,19 @@ export default function ProfilePage() {
           </p>
         </div>
       </div>
+
+      {/* Аккаунт: под кем выполнен вход */}
+      {user && (
+        <div className="card flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-lg font-bold text-blue-400" aria-hidden="true">
+            {(user.name || user.email).charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-gray-100">{user.name || 'Имя не указано'}</div>
+            <div className="truncate text-sm text-gray-400">Вы вошли как {user.email}</div>
+          </div>
+        </div>
+      )}
 
       {/* ===== БАЗОВЫЙ ПРОФИЛЬ ===== */}
       <div className="card">
