@@ -255,6 +255,27 @@ export default function DayTimeline({
     return marks
   }, [dayStart, dayEnd])
 
+  // Точные границы блоков (15:13 и т.п.) на оси: старт и конец каждого блока,
+  // кроме совпадающих с часовыми метками и налезающих друг на друга по пикселям.
+  const blockBoundaryMarks = useMemo(() => {
+    const toPx = (m: number) => (m - dayStart) * pxPerMinute
+    const occupied = hourMarks.map(toPx)
+    const marks: number[] = []
+    const tryAdd = (m: number) => {
+      if (m < dayStart || m > dayEnd) return
+      if (m % 60 === 0) return
+      const y = toPx(m)
+      if (occupied.some(u => Math.abs(u - y) < 14)) return
+      occupied.push(y)
+      marks.push(m)
+    }
+    for (const b of blocks) {
+      tryAdd(b.startMinutes)
+      tryAdd(b.startMinutes + b.durationMinutes)
+    }
+    return marks
+  }, [blocks, dayStart, dayEnd, pxPerMinute, hourMarks])
+
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 60000)
     return () => window.clearInterval(id)
@@ -269,6 +290,21 @@ export default function DayTimeline({
   const unscheduledTasks = unscheduledTaskIndexes
     .map(i => ({ index: i, task: tasks[i] }))
     .filter((x): x is { index: number; task: OpenTask } => Boolean(x.task))
+
+  // При открытии дня лента сразу показывает «сейчас» (для сегодняшнего дня),
+  // иначе — первый блок; без этого шкала всегда открывалась с верха окна (6:00).
+  const initialScrollDateRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (initialScrollDateRef.current === selectedDate) return
+    const container = scrollContainerRef.current
+    if (!container) return
+    initialScrollDateRef.current = selectedDate
+    const anchorMinutes = showCurrentTimeLine
+      ? currentMinutes
+      : sortedBlocks[0]?.startMinutes
+    if (typeof anchorMinutes !== 'number') return
+    container.scrollTo({ top: Math.max(0, (anchorMinutes - dayStart) * pxPerMinute - 48) })
+  }, [selectedDate, showCurrentTimeLine, currentMinutes, sortedBlocks, dayStart, pxPerMinute])
 
   useEffect(() => {
     if (appliedAnimationKey <= 0) return
@@ -379,6 +415,15 @@ export default function DayTimeline({
               key={m}
               className="absolute right-1 -translate-y-1/2 text-xs leading-none text-gray-400"
                style={{ top: (m - dayStart) * pxPerMinute }}
+            >
+              {minutesToTimeLabel(m)}
+            </div>
+          ))}
+          {blockBoundaryMarks.map(m => (
+            <div
+              key={`boundary-${m}`}
+              className="absolute right-1 -translate-y-1/2 text-[10px] leading-none text-gray-500"
+              style={{ top: (m - dayStart) * pxPerMinute }}
             >
               {minutesToTimeLabel(m)}
             </div>
