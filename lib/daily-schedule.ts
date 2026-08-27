@@ -7,6 +7,15 @@ export const MIN_BLOCK_DURATION_MINUTES = MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINU
 export const MAX_MINUTES_IN_DAY = 1440
 const MAX_BLOCKS = 100
 
+// Пороги loadLevel в процентах занятого времени активного окна
+// [planningStartMinutes, activityEndMinutes]. Занятыми считаются ВСЕ блоки любой
+// категории, включая meal, rest и buffer. Значение — нижняя граница уровня:
+// scheduledPercent >= DAILY_SCHEDULE_OVERLOADED_LOAD_PERCENT даёт 'overloaded'.
+// Дубликат этой шкалы живёт в hooks/daily/schedule-helpers.ts (клиентский расчёт).
+export const DAILY_SCHEDULE_BALANCED_LOAD_PERCENT = 40
+export const DAILY_SCHEDULE_BUSY_LOAD_PERCENT = 70
+export const DAILY_SCHEDULE_OVERLOADED_LOAD_PERCENT = 90
+
 export { isTimeStep }
 
 export const DailySchedulePlanningBasisSchema = z.enum(['current_time', 'day_start', 'custom_time'])
@@ -245,9 +254,9 @@ function getClippedDuration(block: Pick<DailyScheduleBlock, 'startMinutes' | 'du
 
 function getLoadLevel(scheduledPercent: number): DailyScheduleLoadSummary['loadLevel'] {
   if (scheduledPercent === 0) return 'empty'
-  if (scheduledPercent < 40) return 'light'
-  if (scheduledPercent < 70) return 'balanced'
-  if (scheduledPercent < 90) return 'busy'
+  if (scheduledPercent < DAILY_SCHEDULE_BALANCED_LOAD_PERCENT) return 'light'
+  if (scheduledPercent < DAILY_SCHEDULE_BUSY_LOAD_PERCENT) return 'balanced'
+  if (scheduledPercent < DAILY_SCHEDULE_OVERLOADED_LOAD_PERCENT) return 'busy'
   return 'overloaded'
 }
 
