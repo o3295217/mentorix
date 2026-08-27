@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ExpandableInput from '@/components/ExpandableInput'
 import { useAuth } from '@/components/AuthProvider'
 
@@ -49,6 +49,15 @@ export default function ProfilePage() {
   useEffect(() => {
     loadProfile()
   }, [])
+
+  // Пока анкета не заполнялась, поле «Имя» предзаполняется именем аккаунта —
+  // один раз после загрузки, чтобы не спорить с ручными правками пользователя
+  const namePrefilled = useRef(false)
+  useEffect(() => {
+    if (loading || namePrefilled.current || !user?.name) return
+    namePrefilled.current = true
+    setProfile((prev) => (prev.name ? prev : { ...prev, name: user.name as string }))
+  }, [loading, user])
 
   const loadProfile = async () => {
     try {

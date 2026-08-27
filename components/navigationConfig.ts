@@ -1,3 +1,5 @@
+// «Профиль» на десктопе живёт не в списке разделов, а именной плашкой
+// справа в шапке (см. Navigation.tsx) — правый угол отвечает на вопрос «кто я».
 export const desktopNavItems = [
   { href: '/', label: 'Главная' },
   { href: '/daily', label: 'План дня' },
@@ -8,7 +10,6 @@ export const desktopNavItems = [
   { href: '/analytics', label: 'Аналитика' },
   { href: '/history', label: 'История' },
   { href: '/forecast', label: 'Прогнозы' },
-  { href: '/profile', label: 'Профиль' },
 ] as const
 
 export const primaryMobileNavItems = [
