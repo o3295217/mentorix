@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PLAN_CHAT_KICKOFF_MARKER,
+  PLAN_CHAT_PLANNING_PREFERENCES_MAX_LENGTH,
   PLAN_CHAT_SYSTEM_PROMPT,
+  buildPlanChatContext,
   buildPlanChatKickoffInstruction,
   getPlanChatKickoffMode,
   isPlanChatKickoffMessage,
+  isPlanChatPlanningPreferences,
+  parsePlanChatPlanningPreferencesToolResult,
   parsePlanChatScheduleProposalToolResult,
 } from '@/lib/prompts/plan-chat'
 import { DAILY_SCHEDULE_TIME_STEP_MINUTES, MIN_DAILY_SCHEDULE_BLOCK_DURATION_MINUTES } from '@/lib/daily-schedule-time'
@@ -42,6 +46,58 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('еду, отдых и буферы')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если всё не помещается, честно оставь часть задач вне графика')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Рекомендуй перенос/сокращение')
+  })
+
+  it('makes a 15-minute rest block after every task longer than an hour the default layout', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПЕРЕРЫВЫ И ПИТАНИЕ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Это дефолт раскладки. О нём не спрашивай')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('После каждой задачи длительностью БОЛЕЕ 1 часа (durationMinutes > 60) ставь перерыв 15 минут')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("block kind='rest', category='rest', isFixed=false, durationMinutes=15")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Задача 60 минут и короче перерыва не требует')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('не спрашивай разрешения на такие перерывы')
+  })
+
+  it('removes breaks on request and advises a day-level buffer instead without forcing it', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Удали перерывы», «без перерывов», «убери отдых» выполняй буквально')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("блоков kind='rest' по этому правилу нет")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('посоветуй заложить общий буферный запас на день под личные и неучтённые дела')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('завтрак, прогулка, обед, ужин, дорога')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Это совет, а не условие: не навязывай')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('не подставляй буфер молча вместо удалённых перерывов')
+  })
+
+  it('defaults to three meals fitted to the day window', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('По умолчанию у пользователя три приёма пищи: завтрак, обед, ужин')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("блоками kind='meal' либо явным буфером")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('включай только те приёмы пищи, которые попадают в окно [planningStartMinutes, activityEndMinutes]')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Короткий вечерний план не обязан включать завтрак')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Еда: три приёма пищи, ~1.5-2 часа суммарно')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Перерывы: 15 мин после каждой задачи длиннее часа')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('Перерывы: ~30-60 мин')
+  })
+
+  it('applies a user-stated meal regime immediately and remembers it for future days', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«я не завтракаю», «ем два раза», «обед строго в 14:00»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сразу применяй его в текущем предложении вместо дефолта')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Названное пользователем время приёма пищи — фиксированный блок: isFixed=true')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('тем же ходом вызови tool remember_planning_preferences')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('планирование СЛЕДУЮЩИХ дней исходило из его режима')
+  })
+
+  it('keeps break and meal defaults consistent with the existing food/rest/buffer rule', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Обязательно оставляй место на еду, отдых и буферы: перерывы и приёмы пищи — по блоку ПЕРЕРЫВЫ И ПИТАНИЕ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Перерыв 15 минут после каждой задачи длиннее часа и место под три приёма пищи — дефолт раскладки, а не вопрос пользователю')
+  })
+
+  it('stores only durable planning preferences through the memory tool, merged with known ones', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПАМЯТЬ О ПРЕДПОЧТЕНИЯХ — TOOL remember_planning_preferences')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('когда пользователь сообщает УСТОЙЧИВОЕ предпочтение планирования')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('НЕ вызывай его для разового: «сегодня без обеда»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('В поле preferences передавай ОБЪЕДИНЁННЫЙ текст')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Прежние предпочтения, которых новое сообщение не касается, обязаны остаться в тексте. Терять их запрещено')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('замени устаревший пункт, а не добавляй второй')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`до ${PLAN_CHAT_PLANNING_PREFERENCES_MAX_LENGTH} символов`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не больше одного вызова remember_planning_preferences на ответ')
   })
 
   it('requires proposal v3 planning fields, minute-level timing and fixed semantics', () => {
@@ -257,5 +313,72 @@ describe('plan chat schedule proposal tool parsing', () => {
     expect(parsed.success).toBe(true)
     if (!parsed.success) throw new Error('Expected valid v2 proposal')
     expect(parsed.data.version).toBe(2)
+  })
+})
+
+describe('plan chat planning preferences tool parsing', () => {
+  it('accepts a consolidated preferences string and trims it', () => {
+    const parsed = parsePlanChatPlanningPreferencesToolResult({ preferences: '  Не завтракает; обед в 14:00; перерывы не нужны  ' })
+
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) throw new Error('Expected valid preferences payload')
+    expect(parsed.data.preferences).toBe('Не завтракает; обед в 14:00; перерывы не нужны')
+  })
+
+  it('rejects broken, partial and oversized payloads', () => {
+    expect(parsePlanChatPlanningPreferencesToolResult({}).success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult({ preferences: '' }).success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult({ preferences: '   ' }).success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult({ preferences: 42 }).success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult({ preferences: ['не завтракает'] }).success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult(null).success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult('не завтракает').success).toBe(false)
+    expect(parsePlanChatPlanningPreferencesToolResult({ preferences: 'а'.repeat(PLAN_CHAT_PLANNING_PREFERENCES_MAX_LENGTH + 1) }).success).toBe(false)
+  })
+
+  it('exposes a type guard usable with extractJsonFromAIResponse', () => {
+    expect(isPlanChatPlanningPreferences({ preferences: 'Ужин не планирует' })).toBe(true)
+    expect(isPlanChatPlanningPreferences({ preference: 'Ужин не планирует' })).toBe(false)
+    expect(isPlanChatPlanningPreferences(undefined)).toBe(false)
+  })
+})
+
+describe('buildPlanChatContext insights section', () => {
+  const baseRequest = {
+    date: '2026-02-28',
+    dayOfWeek: 'суббота',
+    planTasks: [],
+    completedTasks: [],
+    weekGoals: [],
+    monthGoals: [],
+    dreamGoal: '',
+    messages: [],
+  }
+
+  it('shows preferences saved from the planning chat before the first day evaluation', () => {
+    const context = buildPlanChatContext({
+      ...baseRequest,
+      insights: { preferences: 'Не завтракает; обед строго в 14:00', evaluationCount: 0 },
+    })
+
+    expect(context).toContain('ПРОФИЛЬ ПОНИМАНИЯ:')
+    expect(context).toContain('• Предпочтения: Не завтракает; обед строго в 14:00')
+    expect(context).not.toContain('оценённых дней')
+  })
+
+  it('keeps the evaluated-days header once evaluations exist', () => {
+    const context = buildPlanChatContext({
+      ...baseRequest,
+      insights: { preferences: 'Ужин не планирует', patterns: 'Работает утром', evaluationCount: 3 },
+    })
+
+    expect(context).toContain('ПРОФИЛЬ ПОНИМАНИЯ (на основе 3 оценённых дней):')
+    expect(context).toContain('• Паттерны: Работает утром')
+    expect(context).toContain('• Предпочтения: Ужин не планирует')
+  })
+
+  it('omits the section entirely when insights are empty', () => {
+    expect(buildPlanChatContext({ ...baseRequest, insights: { evaluationCount: 0 } })).not.toContain('ПРОФИЛЬ ПОНИМАНИЯ')
+    expect(buildPlanChatContext(baseRequest)).not.toContain('ПРОФИЛЬ ПОНИМАНИЯ')
   })
 })

@@ -31,6 +31,19 @@ describe('buildUpdateInsightsPrompt', () => {
     expect(prompt).not.toMatch(/\{[a-z_]+\}/)
   })
 
+  it('protects planning preferences written by the planning chat from being overwritten', () => {
+    const prompt = buildUpdateInsightsPrompt(
+      makeRequest({ currentInsights: { preferences: 'Не завтракает; обед строго в 14:00' } })
+    )
+
+    expect(prompt).toContain('Не завтракает; обед строго в 14:00')
+    expect(prompt).toContain('Поле preferences текущего профиля мог записать чат планирования со слов пользователя')
+    expect(prompt).toContain('Перенеси эти пункты в новое preferences и только дополняй их')
+    expect(prompt).toContain('только если данные сегодняшнего дня ему прямо противоречат')
+    expect(prompt).toContain('верни его прежнее значение из текущего профиля, а не пустую строку')
+    expect(prompt).toContain('"preferences": "Предпочтения в планировании: ВСЕ пункты текущего профиля плюс новое"')
+  })
+
   it('uses fallback text when currentInsights/knowledgeCache/recentDays are absent', () => {
     const prompt = buildUpdateInsightsPrompt(makeRequest())
 

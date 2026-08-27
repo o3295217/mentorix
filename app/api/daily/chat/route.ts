@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { parseDateParam, toDateKey } from '@/lib/dates'
-import { safeParseJson, sanitizeUserInput } from '@/lib/api-utils'
+import { extractJsonFromAIResponse, safeParseJson, sanitizeUserInput } from '@/lib/api-utils'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import {
   PLAN_CHAT_SYSTEM_PROMPT,
@@ -10,10 +10,13 @@ import {
   buildPlanChatKickoffInstruction,
   getPlanChatKickoffMode,
   isPlanChatKickoffMessage,
+  isPlanChatPlanningPreferences,
   parsePlanChatScheduleProposalToolResult,
+  PLAN_CHAT_PLANNING_PREFERENCES_MAX_LENGTH,
   PlanChatRequest,
   DayHistory,
   GoalsProgress,
+  type PlanChatPlanningPreferences,
 } from '@/lib/prompts/plan-chat'
 import { getUserStatsForAI } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
@@ -105,6 +108,26 @@ const proposeDailyScheduleTool = {
             },
           ],
         },
+      },
+    },
+  },
+}
+
+const REMEMBER_PLANNING_PREFERENCES_TOOL_NAME = 'remember_planning_preferences'
+
+const rememberPlanningPreferencesTool = {
+  name: REMEMBER_PLANNING_PREFERENCES_TOOL_NAME,
+  description: 'Запомнить УСТОЙЧИВЫЕ предпочтения планирования пользователя (режим питания, отношение к перерывам, привычные окна и ритм дня), чтобы они действовали и в следующие дни. Не вызывай для разового («сегодня без обеда», «сегодня начну позже»), для задач, целей и событий конкретного дня. Поле preferences — консолидированный текст: возьми уже известные предпочтения из блока ПРОФИЛЬ ПОНИМАНИЯ в контексте и объедини их с новым, ничего из прежнего не теряя; противоречащий устаревший пункт заменяй, а не дублируй. Этот tool ничего не показывает пользователю и не меняет расписание; его можно вызвать в одном ответе вместе с propose_daily_schedule, но не более одного раза.',
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['preferences'],
+    properties: {
+      preferences: {
+        type: 'string',
+        minLength: 1,
+        maxLength: PLAN_CHAT_PLANNING_PREFERENCES_MAX_LENGTH,
+        description: 'Consolidated planning preferences in Russian: previously known preferences merged with the new one. Short connected text or items separated by "; ". Planning only — no tasks, goals, dates or single-day events.',
       },
     },
   },
@@ -257,6 +280,44 @@ function buildMovedFixedBlocksMessage(blocks: DailyScheduleProposalMovedFixedBlo
 
 function buildScheduleNormalizationMessage(input: { unscheduledBlocks: DailyScheduleProposalUnscheduledBlock[]; movedFixedBlocks: DailyScheduleProposalMovedFixedBlock[] }): string | null {
   return [buildUnscheduledBlocksMessage(input.unscheduledBlocks), buildMovedFixedBlocksMessage(input.movedFixedBlocks)].filter((message): message is string => Boolean(message)).join('\n') || null
+}
+
+// Разбор tool-инпута remember_planning_preferences: общий хелпер извлечения JSON
+// (балансировка скобок отсекает оборванный стрим) + типовой валидатор из промпта.
+export function extractPlanningPreferencesFromToolCalls(toolCalls: ScheduleToolCall[]): string | null {
+  for (const toolCall of toolCalls) {
+    if (toolCall.name !== REMEMBER_PLANNING_PREFERENCES_TOOL_NAME) continue
+    try {
+      const parsed = extractJsonFromAIResponse<PlanChatPlanningPreferences>(
+        toolCall.inputJson,
+        isPlanChatPlanningPreferences,
+        'Plan Chat planning preferences',
+      )
+      const preferences = sanitizeUserInput(parsed.preferences.trim(), PLAN_CHAT_PLANNING_PREFERENCES_MAX_LENGTH).trim()
+      return preferences.length > 0 ? preferences : null
+    } catch {
+      console.warn('[Plan Chat] Invalid planning preferences tool input')
+      return null
+    }
+  }
+  return null
+}
+
+// Профайл подопечного: пишем ровно в то же поле user_insights.preferences, которое
+// читает getPlanUserContext и обновляет вечерний пайплайн insights. Пишем через prisma,
+// чтобы сработал encryption middleware (UserInsights.preferences — шифруемое поле).
+async function savePlanningPreferences(userId: string, preferences: string): Promise<boolean> {
+  try {
+    await prisma.userInsights.upsert({
+      where: { userId },
+      create: { userId, preferences },
+      update: { preferences },
+    })
+    return true
+  } catch (error) {
+    console.error('[Plan Chat] Failed to save planning preferences:', error)
+    return false
+  }
 }
 
 // День недели на русском
@@ -555,7 +616,7 @@ export async function POST(request: NextRequest) {
     const stream = anthropicClient.messages.stream({
       model,
       max_tokens: 4096,
-      tools: [proposeDailyScheduleTool as never],
+      tools: [proposeDailyScheduleTool as never, rememberPlanningPreferencesTool as never],
       tool_choice: scheduleIssueAction !== null || (!isKickoff && isStrictScheduleChangeRequest(userMessage)) ? { type: 'tool', name: 'propose_daily_schedule' } : { type: 'auto' },
       system: systemBlocks as never,
       messages: fixedMessages,
@@ -668,6 +729,14 @@ export async function POST(request: NextRequest) {
             success: true,
           })
 
+          // Профайл подопечного: устойчивые предпочтения планирования из диалога.
+          // Не блокирует ответ: неудачная запись только логируется.
+          const planningPreferences = extractPlanningPreferencesFromToolCalls(firstStreamResult.toolCalls)
+          let planningPreferencesSaved = false
+          if (planningPreferences) {
+            planningPreferencesSaved = await savePlanningPreferences(userId, planningPreferences)
+          }
+
           if ((!proposalMetadata || proposalMetadata.type === 'daily_task_list_proposal') && firstValidation && !firstValidation.success) {
             const correctionStartTime = Date.now()
             const correctionMessages: ClaudeMessage[] = [
@@ -693,7 +762,7 @@ export async function POST(request: NextRequest) {
             const correctionStream = anthropicClient.messages.stream({
               model,
               max_tokens: 4096,
-              tools: [proposeDailyScheduleTool as never],
+              tools: [proposeDailyScheduleTool as never, rememberPlanningPreferencesTool as never],
               tool_choice: { type: 'tool', name: 'propose_daily_schedule' },
               system: systemBlocks as never,
               messages: correctionMessages as never,
@@ -752,7 +821,9 @@ export async function POST(request: NextRequest) {
                 : 'Я подготовил черновик расписания. Проверьте карточку ниже.'
               : rejectedScheduleProposal
                 ? FALLBACK_INVALID_PROPOSAL_MESSAGE
-                : 'Не удалось сформировать ответ. Попросите меня повторить.'
+                : planningPreferencesSaved
+                  ? 'Запомнил ваши предпочтения по планированию — учту их и в следующие дни.'
+                  : 'Не удалось сформировать ответ. Попросите меня повторить.'
             controller.enqueue(sseEvent('text', { text: assistantMessage }))
           }
 
