@@ -119,6 +119,16 @@ describe('DailyScheduleProposalCard view helpers', () => {
     expect(getProposalApplyButtonLabel({ isApplied: true, isApplying: false, hasExistingSchedule: true })).toBe('Применено')
   })
 
+  it('switches to an explicit confirmation label while waiting for the second click', () => {
+    expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: false, hasExistingSchedule: true, isConfirmingReplace: true }))
+      .toBe('Заменить текущее расписание?')
+    // Applying/applied still win over the confirm state once the click actually went through.
+    expect(getProposalApplyButtonLabel({ isApplied: false, isApplying: true, hasExistingSchedule: true, isConfirmingReplace: true }))
+      .toBe('Применяем…')
+    expect(getProposalApplyButtonLabel({ isApplied: true, isApplying: false, hasExistingSchedule: true, isConfirmingReplace: true }))
+      .toBe('Применено')
+  })
+
   it('selects proposal titles and summary text for new tasks and replacement', () => {
     expect(getProposalTitle({ hasExistingSchedule: false, newTaskCount: 0 })).toBe('Черновик расписания')
     expect(getProposalTitle({ hasExistingSchedule: false, newTaskCount: 2 })).toBe('Черновик расписания с новыми задачами')
@@ -150,6 +160,17 @@ describe('DailyScheduleProposalCard view helpers', () => {
       applyDisabled: true,
       discussDisabled: true,
       dismissDisabled: true,
+    })
+  })
+
+  it('relabels apply and dismiss while a replace confirmation is pending', () => {
+    expect(getProposalActionSemantics({ messageId: 'm1', isApplying: false, isApplied: false, hasExistingSchedule: true, isConfirmingReplace: true })).toEqual({
+      applyLabel: 'Заменить текущее расписание?',
+      applyDisabled: false,
+      discussLabel: 'Обсудить изменения',
+      discussDisabled: false,
+      dismissLabel: 'Не заменять',
+      dismissDisabled: false,
     })
   })
 })

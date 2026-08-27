@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getDailyPlanCounters } from '@/app/daily/page'
+import { getDailyChatMessageAnchorId, getDailyPlanCounters } from '@/app/daily/page'
 import { getDailyPhase } from '@/hooks/daily/phase-helpers'
 import type { Habit } from '@/hooks/daily/types'
 import type { OpenTask } from '@/lib/types'
@@ -64,5 +64,12 @@ describe('daily plan counters', () => {
         workEndMinutes: 18 * 60,
       }),
     ).toBe('execution')
+  })
+})
+
+describe('getDailyChatMessageAnchorId', () => {
+  it('builds a stable DOM anchor id from a persisted chat message id', () => {
+    expect(getDailyChatMessageAnchorId('55')).toBe('daily-chat-message-55')
+    expect(getDailyChatMessageAnchorId('local-user-1-abc')).toBe('daily-chat-message-local-user-1-abc')
   })
 })

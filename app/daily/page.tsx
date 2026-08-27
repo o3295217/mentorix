@@ -26,7 +26,7 @@ import type { DailyScheduleProposalMetadata, DailyTaskListProposalMetadata } fro
 import type { DailyScheduleIssueAction } from '@/lib/daily-chat-constants'
 import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
 import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
-import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
+import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, findLatestUnappliedScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 import { getTaskTimeChipLabel, getTaskTimeChips, sortTasksByScheduleTime } from '@/hooks/daily/list-lens-helpers'
 import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
 import { getScheduleBoundaryMinutes } from '@/hooks/daily/schedule-helpers'
@@ -59,6 +59,10 @@ function parseDateKey(dateKey: string) {
 
 function normalizeTaskText(text: string) {
   return text.trim().toLowerCase()
+}
+
+export function getDailyChatMessageAnchorId(messageId: string): string {
+  return `daily-chat-message-${messageId}`
 }
 
 export function getDailyPlanCounters(
@@ -130,6 +134,7 @@ export default function DailyPage() {
   const mobileAssistantTabRef = useRef<HTMLButtonElement>(null)
   const newTaskTextareaRef = useRef<HTMLTextAreaElement>(null)
   const timelineHighlightTimeoutRef = useRef<number | null>(null)
+  const goToProposalFrameRef = useRef<number | null>(null)
   const activeTaskActionRowRef = useRef<HTMLDivElement | null>(null)
   const habitEditorRef = useRef<HTMLDivElement | null>(null)
   const tasksContainerRef = useRef<HTMLDivElement | null>(null)
@@ -143,6 +148,16 @@ export default function DailyPage() {
   const [assistantOperationError, setAssistantOperationError] = useState('')
   const [mobileView, setMobileView] = useState<'plan' | 'assistant'>('plan')
   const [showMobileContext, setShowMobileContext] = useState(false)
+  // Свёрнутое состояние блока «Контекст недели/месяца» на десктопе (lg+) — запоминается
+  // per-browser, не путать с мобильным аккордеоном (showMobileContext), который живёт своей жизнью.
+  const [isContextCollapsed, setIsContextCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return window.localStorage.getItem('daily-context-collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
   const [highlightedTimelineTaskIndexes, setHighlightedTimelineTaskIndexes] = useState<Set<number>>(() => new Set())
   const isSubmittingChatRef = useRef(false)
   const directChatOperationRef = useRef<{ assistantMessageCount: number } | null>(null)
@@ -190,6 +205,16 @@ export default function DailyPage() {
       localStorage.setItem('dismissedHabitSuggestions', JSON.stringify([...dismissedSuggestions]))
     }
   }, [dismissedSuggestions])
+
+  // Сохраняем свёрнутое состояние блока контекста в localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem('daily-context-collapsed', isContextCollapsed ? '1' : '0')
+    } catch {
+      // Storage может быть недоступен в privacy mode.
+    }
+  }, [isContextCollapsed])
 
   // Автоскролл полотна задач к низу при раскрытии блока «Выполнено»
   useEffect(() => {
@@ -661,6 +686,33 @@ export default function DailyPage() {
     })
   }, [ensureChatComposerVisible, resizeChatTextarea, setChatInput])
 
+  // Последнее неприменённое предложение расписания в чате (для подсказки в «Не распределено»)
+  const unappliedScheduleProposal = useMemo(
+    () => findLatestUnappliedScheduleProposal(chatMessages, dismissedProposalIds),
+    [chatMessages, dismissedProposalIds],
+  )
+
+  // Переключить на чат и проскроллить к карточке неприменённого предложения — сама
+  // кнопка ничего не применяет, только показывает карточку, чтобы решение оставалось
+  // явным действием пользователя внутри DailyScheduleProposalCard.
+  const handleGoToUnappliedScheduleProposal = useCallback(() => {
+    const target = unappliedScheduleProposal
+    if (!target) return
+    setMobileView('assistant')
+    if (goToProposalFrameRef.current !== null) {
+      window.cancelAnimationFrame(goToProposalFrameRef.current)
+    }
+    goToProposalFrameRef.current = window.requestAnimationFrame(() => {
+      goToProposalFrameRef.current = null
+      const targetElement = document.getElementById(getDailyChatMessageAnchorId(target.messageId))
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else {
+        scrollChatToBottom()
+      }
+    })
+  }, [scrollChatToBottom, unappliedScheduleProposal])
+
   useEffect(() => () => {
     if (chatFocusFrameRef.current !== null) {
       window.cancelAnimationFrame(chatFocusFrameRef.current)
@@ -670,6 +722,9 @@ export default function DailyPage() {
     }
     if (timelineHighlightTimeoutRef.current !== null) {
       window.clearTimeout(timelineHighlightTimeoutRef.current)
+    }
+    if (goToProposalFrameRef.current !== null) {
+      window.cancelAnimationFrame(goToProposalFrameRef.current)
     }
   }, [])
 
@@ -1104,7 +1159,20 @@ export default function DailyPage() {
         <span aria-hidden="true">{showMobileContext ? '−' : '+'}</span>
       </button>
 
-      <div id="daily-context" className={`${showMobileContext ? 'space-y-4' : 'hidden'} lg:block lg:space-y-6`}>
+      <div
+        id="daily-context"
+        className={`${showMobileContext ? 'space-y-4' : 'hidden'} lg:space-y-6 ${isContextCollapsed ? 'lg:hidden' : 'lg:block'}`}
+      >
+      <div className="hidden justify-end lg:flex">
+        <button
+          type="button"
+          onClick={() => setIsContextCollapsed(true)}
+          className="min-h-9 rounded-lg px-2 text-xs font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+        >
+          Скрыть ▲
+        </button>
+      </div>
+
       <DailyPeriodContext
         hasGoalContext={hasGoalContext}
         weekLabel={weekLabel}
@@ -1128,6 +1196,17 @@ export default function DailyPage() {
         onToggleMonthFacts={() => setShowMonthFacts(!showMonthFacts)}
       />
       </div>
+
+      {isContextCollapsed && (
+        <button
+          type="button"
+          onClick={() => setIsContextCollapsed(false)}
+          className="hidden min-h-11 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900/60 px-4 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
+        >
+          <span>Контекст недели и месяца</span>
+          <span className="text-xs text-gray-500">▼ показать</span>
+        </button>
+      )}
 
       <div
         className="daily-mobile-tabs grid grid-cols-2 rounded-xl border border-gray-700 bg-gray-900/70 p-1 lg:hidden"
@@ -1176,7 +1255,7 @@ export default function DailyPage() {
           role={hasMobileTabSemantics ? 'tabpanel' : undefined}
           aria-labelledby={hasMobileTabSemantics ? 'daily-plan-tab' : undefined}
           tabIndex={hasMobileTabSemantics ? 0 : undefined}
-          className={`${mobileView === 'plan' ? 'flex' : 'hidden'} card daily-phase-accent min-h-0 max-h-none min-w-0 flex-col overflow-hidden !p-4 lg:col-span-3 lg:flex lg:min-h-[500px] lg:max-h-[80vh] lg:!p-6 lg:!pr-0 ${dailyPhase === 'planning' ? 'opacity-95' : ''}`}
+          className={`${mobileView === 'plan' ? 'flex' : 'hidden'} card daily-phase-accent min-h-0 max-h-none min-w-0 flex-col overflow-hidden !p-4 lg:col-span-3 lg:flex lg:min-h-[500px] ${isContextCollapsed ? 'lg:max-h-[calc(100vh-8rem)]' : 'lg:max-h-[80vh]'} lg:!p-6 lg:!pr-0 ${dailyPhase === 'planning' ? 'opacity-95' : ''}`}
           data-phase={dailyPhase}
         >
           <DailyPlanCardHeader
@@ -2158,6 +2237,8 @@ export default function DailyPage() {
                   appliedAnimationKey={appliedAnimationKey}
                   highlightedTaskIndexes={highlightedTimelineTaskIndexes}
                   mutationLocked={timelineMutationLocked}
+                  hasUnappliedScheduleProposal={Boolean(unappliedScheduleProposal)}
+                  onGoToUnappliedScheduleProposal={handleGoToUnappliedScheduleProposal}
                   selectedDate={selectedDate}
                   onToggleTask={toggleTaskSelection}
                   editingTaskId={editingTaskId}
@@ -2278,6 +2359,7 @@ export default function DailyPage() {
               chatMessages.map((msg, index) => (
                 <div
                   key={getDailyChatMessageRenderKey(msg, index)}
+                  id={msg.id ? getDailyChatMessageAnchorId(msg.id) : undefined}
                   className={msg.role === 'user'
                     ? 'flex justify-end'
                     : ''

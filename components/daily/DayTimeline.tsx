@@ -225,6 +225,8 @@ export interface DayTimelineProps {
   appliedAnimationKey?: number
   highlightedTaskIndexes?: Set<number>
   mutationLocked?: boolean
+  hasUnappliedScheduleProposal?: boolean
+  onGoToUnappliedScheduleProposal?: () => void
   selectedDate: string
   onToggleTask: (taskId: number) => void
   editingTaskId: number | null
@@ -284,6 +286,8 @@ export default function DayTimeline({
   appliedAnimationKey = 0,
   highlightedTaskIndexes = new Set<number>(),
   mutationLocked = false,
+  hasUnappliedScheduleProposal = false,
+  onGoToUnappliedScheduleProposal,
   selectedDate,
   onToggleTask,
   editingTaskId,
@@ -457,6 +461,16 @@ export default function DayTimeline({
             <h4 className="text-sm font-medium text-gray-200">Не распределено ({unscheduledTasks.length})</h4>
             <span className="hidden text-right text-xs text-gray-500 sm:inline">{trayConfig.hint}</span>
           </div>
+          {hasUnappliedScheduleProposal && onGoToUnappliedScheduleProposal && (
+            <button
+              type="button"
+              onClick={onGoToUnappliedScheduleProposal}
+              className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-left text-xs text-cyan-100 transition-colors hover:bg-cyan-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <span>В чате есть неприменённое расписание</span>
+              <span className="shrink-0 font-medium underline decoration-dotted underline-offset-2">Показать в чате</span>
+            </button>
+          )}
           <ul className="flex gap-2 overflow-x-auto px-1 pb-1 pr-3" aria-label="Не распределённые задачи для перетаскивания на шкалу">
             {unscheduledTasks.map(({ index, task }) => (
               <li key={`${index}-${task.id}`} className={trayConfig.chipItemClassName}>

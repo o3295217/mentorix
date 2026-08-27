@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { applyDailyScheduleProposal, buildApplyProposalRequestBody, buildProposalApplyOptions, getProposalLoadSummary, getProposalNewTasks, parsePersistedNumericMessageId, proposalHasExistingSchedule, proposalMetadataToSchedule } from '@/hooks/daily/proposal-helpers'
+import { applyDailyScheduleProposal, buildApplyProposalRequestBody, buildProposalApplyOptions, findLatestUnappliedScheduleProposal, getProposalLoadSummary, getProposalNewTasks, parsePersistedNumericMessageId, proposalHasExistingSchedule, proposalMetadataToSchedule } from '@/hooks/daily/proposal-helpers'
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
 import type { DailySchedule } from '@/lib/daily-schedule'
+import type { ChatMessage } from '@/hooks/daily/types'
 
 const schedule: DailySchedule = {
   version: 2,
@@ -277,5 +278,64 @@ describe('proposal-helpers', () => {
     expect(summary.scheduledMinutes).toBe(45)
     expect(summary.scheduledPercent).toBe(8.33)
     expect(summary.categories.main.minutes).toBe(45)
+  })
+})
+
+describe('findLatestUnappliedScheduleProposal', () => {
+  function makeProposalMetadata(appliedAt: string | null): DailyScheduleProposalMetadata {
+    return {
+      type: 'daily_schedule_proposal',
+      schemaVersion: 1,
+      date: '2026-07-16',
+      createdAt: '2026-07-16T08:00:00.000Z',
+      currentScheduleExists: false,
+      currentScheduleHash: null,
+      appliedAt,
+      proposal: {
+        version: 1,
+        date: '2026-07-16',
+        timezone: 'Europe/Moscow',
+        dayStartMinutes: 540,
+        dayEndMinutes: 1080,
+        blocks: [{ kind: 'task', taskIndex: 1, taskText: 'Фокус', startMinutes: 570, durationMinutes: 45 }],
+      },
+    }
+  }
+
+  it('finds the latest unapplied proposal even if the user kept chatting afterwards', () => {
+    const messages: ChatMessage[] = [
+      { id: '10', role: 'assistant', content: 'Вот черновик', metadata: makeProposalMetadata(null) },
+      { id: '11', role: 'user', content: 'А сдвинь на час' },
+      { id: '12', role: 'assistant', content: 'Готово, вот новый вариант', metadata: makeProposalMetadata(null) },
+      { id: '13', role: 'user', content: 'Спасибо, пока не буду применять' },
+    ]
+
+    expect(findLatestUnappliedScheduleProposal(messages, new Set())).toEqual({ messageId: '12' })
+  })
+
+  it('returns null once the only proposal has been applied', () => {
+    const messages: ChatMessage[] = [
+      { id: '10', role: 'assistant', content: 'Вот черновик', metadata: makeProposalMetadata('2026-07-16T09:00:00.000Z') },
+    ]
+
+    expect(findLatestUnappliedScheduleProposal(messages, new Set())).toBeNull()
+  })
+
+  it('skips proposals dismissed locally and pending messages without a persisted id', () => {
+    const messages: ChatMessage[] = [
+      { id: '10', role: 'assistant', content: 'Первый черновик', metadata: makeProposalMetadata(null) },
+      { id: 'pending-1', role: 'assistant', content: 'Ещё печатается', metadata: makeProposalMetadata(null) },
+    ]
+
+    expect(findLatestUnappliedScheduleProposal(messages, new Set(['10']))).toBeNull()
+  })
+
+  it('ignores task-list proposals and plain assistant replies', () => {
+    const messages: ChatMessage[] = [
+      { id: '5', role: 'assistant', content: 'Просто ответ' },
+      { id: '6', role: 'user', content: 'Ок' },
+    ]
+
+    expect(findLatestUnappliedScheduleProposal(messages, new Set())).toBeNull()
   })
 })

@@ -1,6 +1,8 @@
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
 import type { DailySchedule, DailyScheduleLoadSummary } from '@/lib/daily-schedule'
 import { computeClientScheduleLoadSummary } from './schedule-helpers'
+import { isPendingChatMessageId } from './chat-helpers'
+import type { ChatMessage } from './types'
 
 export type ProposalApplyOptions = { confirmed: true; replaceExisting: boolean }
 
@@ -56,6 +58,34 @@ export function buildApplyProposalRequestBody(input: {
     replaceExisting: input.options.replaceExisting,
     expectedCurrentScheduleHash: input.expectedCurrentScheduleHash,
   }
+}
+
+export type UnappliedScheduleProposalSelection = {
+  messageId: string
+}
+
+/**
+ * Ищет последнее предложение расписания в чате, которое ещё не применено (нет
+ * metadata.appliedAt) и видимо пользователю (сообщение сохранено на сервере — не
+ * pending, и не скрыто локальной кнопкой «Отменить»). В отличие от
+ * selectLatestVisiblePendingScheduleProposal (schedule-confirmation-helpers.ts),
+ * которая проверяет только последнее сообщение чата для строгого текстового
+ * подтверждения, здесь сканируется вся история — карточка могла остаться
+ * неприменённой, даже если пользователь продолжил диалог дальше.
+ */
+export function findLatestUnappliedScheduleProposal(
+  messages: Pick<ChatMessage, 'id' | 'role' | 'metadata'>[],
+  dismissedProposalIds: ReadonlySet<string>,
+): UnappliedScheduleProposalSelection | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role !== 'assistant') continue
+    const metadata = message.metadata
+    if (!metadata || metadata.type !== 'daily_schedule_proposal' || metadata.appliedAt) continue
+    if (!message.id || isPendingChatMessageId(message.id) || dismissedProposalIds.has(message.id)) continue
+    return { messageId: message.id }
+  }
+  return null
 }
 
 export function getProposalNewTasks(metadata: DailyScheduleProposalMetadata): string[] {

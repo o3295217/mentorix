@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
 import { formatDurationLabel, minutesToTimeLabel } from '@/hooks/daily/schedule-helpers'
 import { buildProposalApplyOptions, getProposalLoadSummary, getProposalNewTasks, proposalHasExistingSchedule, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
@@ -59,19 +59,20 @@ export function getProposalBlockMetaLabel(block: ProposalBlock): string {
   return `${primaryLabel} · ${formatDurationLabel(block.durationMinutes)}${fixed ? ' · фиксированное время' : ''}`
 }
 
-export function getProposalApplyButtonLabel(input: { isApplied: boolean; isApplying: boolean; hasExistingSchedule: boolean; hasNewTasks?: boolean }): string {
+export function getProposalApplyButtonLabel(input: { isApplied: boolean; isApplying: boolean; hasExistingSchedule: boolean; hasNewTasks?: boolean; isConfirmingReplace?: boolean }): string {
   if (input.isApplied) return 'Применено'
   if (input.isApplying) return 'Применяем…'
+  if (input.isConfirmingReplace) return 'Заменить текущее расписание?'
   return input.hasNewTasks ? 'Добавить и применить' : 'Применить'
 }
 
-export function getProposalActionSemantics(input: { messageId?: string; isApplying: boolean; isApplied: boolean; hasExistingSchedule: boolean; hasNewTasks?: boolean }) {
+export function getProposalActionSemantics(input: { messageId?: string; isApplying: boolean; isApplied: boolean; hasExistingSchedule: boolean; hasNewTasks?: boolean; isConfirmingReplace?: boolean }) {
   return {
     applyLabel: getProposalApplyButtonLabel(input),
     applyDisabled: !input.messageId || input.isApplying || input.isApplied,
     discussLabel: 'Обсудить изменения',
     discussDisabled: input.isApplying,
-    dismissLabel: 'Отменить',
+    dismissLabel: input.isConfirmingReplace ? 'Не заменять' : 'Отменить',
     dismissDisabled: input.isApplying,
   }
 }
@@ -86,6 +87,7 @@ export default function DailyScheduleProposalCard({
 }: DailyScheduleProposalCardProps) {
   const [confirmReplace, setConfirmReplace] = useState(false)
   const [error, setError] = useState('')
+  const sectionRef = useRef<HTMLElement | null>(null)
   const hasExistingSchedule = proposalHasExistingSchedule(metadata)
   const isApplied = Boolean(metadata.appliedAt)
   const newTasks = useMemo(() => getProposalNewTasks(metadata), [metadata])
@@ -95,6 +97,29 @@ export default function DailyScheduleProposalCard({
     () => [...metadata.proposal.blocks].sort((a, b) => a.startMinutes - b.startMinutes),
     [metadata.proposal.blocks],
   )
+  const isConfirmingReplace = confirmReplace && !isApplied
+
+  // Клик мимо карточки или Escape во время подтверждения замены возвращают кнопку
+  // в исходное состояние — второй клик применяет только намеренно, а не случайно.
+  useEffect(() => {
+    if (!isConfirmingReplace) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (sectionRef.current && !sectionRef.current.contains(event.target as Node)) {
+        setConfirmReplace(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setConfirmReplace(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isConfirmingReplace])
 
   const handleClick = async () => {
     if (!messageId || isApplying || isApplied) return
@@ -105,13 +130,26 @@ export default function DailyScheduleProposalCard({
     }
     try {
       await onApply(buildProposalApplyOptions(metadata))
+      setConfirmReplace(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось применить расписание')
     }
   }
 
+  const handleDismissClick = () => {
+    if (isConfirmingReplace) {
+      setConfirmReplace(false)
+      return
+    }
+    onDismiss()
+  }
+
   return (
-    <section className="mt-3 border-l-2 border-primary-500/40 py-1 pl-3" aria-label="Предложение расписания">
+    <section
+      ref={sectionRef}
+      className={`mt-3 rounded-lg border-l-2 py-1 pl-3 transition-colors ${isConfirmingReplace ? 'border-amber-400/80 bg-amber-500/5' : 'border-primary-500/40'}`}
+      aria-label="Предложение расписания"
+    >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-gray-100">{getProposalTitle({ hasExistingSchedule, newTaskCount: newTasks.length })}</h3>
@@ -160,9 +198,10 @@ export default function DailyScheduleProposalCard({
       )}
 
       {error && <p className="mt-2 text-sm text-red-300" role="alert">{error}</p>}
-      {hasExistingSchedule && confirmReplace && !isApplied && (
-        <p className="mt-2 text-xs text-amber-300" role="status">
-          Уже есть расписание на этот день. Нажмите ещё раз, чтобы заменить его этим вариантом.
+      {isConfirmingReplace && (
+        <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/10 px-2.5 py-2 text-xs font-medium leading-5 text-amber-200" role="status">
+          <span aria-hidden>⚠</span>
+          <span>Текущая шкала дня будет заменена. Нажмите «Заменить текущее расписание?» ещё раз, чтобы подтвердить, или «Не заменять», чтобы отменить.</span>
         </p>
       )}
 
@@ -171,16 +210,16 @@ export default function DailyScheduleProposalCard({
           type="button"
           onClick={handleClick}
           disabled={!messageId || isApplying || isApplied}
-          className="min-h-11 rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:min-h-0"
+          className={`min-h-11 rounded-xl px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:min-h-0 ${isConfirmingReplace ? 'btn-dirty-attention bg-amber-500 text-gray-950 hover:bg-amber-400' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
           aria-disabled={!messageId || isApplying || isApplied}
         >
-          {getProposalApplyButtonLabel({ isApplied, isApplying, hasExistingSchedule, hasNewTasks })}
+          {getProposalApplyButtonLabel({ isApplied, isApplying, hasExistingSchedule, hasNewTasks, isConfirmingReplace })}
         </button>
         <button type="button" onClick={onDiscuss} disabled={isApplying} className="min-h-11 rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-100 hover:bg-gray-800 disabled:opacity-50 sm:min-h-0">
           Обсудить изменения
         </button>
-        <button type="button" onClick={onDismiss} disabled={isApplying} className="min-h-11 rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50 sm:col-span-2 sm:min-h-0">
-          Отменить
+        <button type="button" onClick={handleDismissClick} disabled={isApplying} className="min-h-11 rounded-xl border border-gray-700 px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50 sm:col-span-2 sm:min-h-0">
+          {isConfirmingReplace ? 'Не заменять' : 'Отменить'}
         </button>
       </div>
       {!messageId && <p className="mt-1 text-xs text-gray-500">Кнопка станет доступна после сохранения ответа ассистента.</p>}
