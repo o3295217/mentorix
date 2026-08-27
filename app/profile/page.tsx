@@ -140,14 +140,14 @@ export default function ProfilePage() {
 
       {/* Аккаунт: под кем выполнен вход */}
       {user && (
-        <div className="card flex flex-wrap items-center gap-x-4 gap-y-1">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-lg font-bold text-blue-400" aria-hidden="true">
+        <div className="card flex items-center gap-3 !py-3">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-sm font-bold text-blue-400" aria-hidden="true">
             {(user.name || user.email).charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0">
-            <div className="truncate font-semibold text-gray-100">{user.name || 'Имя не указано'}</div>
-            <div className="truncate text-sm text-gray-400">Вы вошли как {user.email}</div>
-          </div>
+          <p className="min-w-0 truncate text-sm">
+            <span className="font-semibold text-gray-100">{user.name || 'Имя не указано'}</span>
+            <span className="text-gray-400"> · вы вошли как {user.email}</span>
+          </p>
         </div>
       )}
 
