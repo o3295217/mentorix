@@ -1268,7 +1268,7 @@ export default function DailyPage() {
 
           {/* Добавление новой задачи */}
           {scheduleMode === 'list' ? (
-            <div key="list-lens" className="daily-lens-panel">
+            <div key="list-lens" className="daily-lens-panel lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
           <div className="mb-4 flex flex-shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-start lg:pr-6">
             <textarea
               ref={newTaskTextareaRef}
@@ -1300,6 +1300,9 @@ export default function DailyPage() {
               Добавить
             </button>
           </div>
+
+          {/* Единая прокручиваемая зона: привычки, предложения, список задач, «Выполнено» */}
+          <div ref={tasksContainerRef} className="flex min-h-0 flex-none flex-col gap-2 overflow-visible lg:flex-1 lg:overflow-y-auto lg:pr-6 lg:chat-scrollbar">
 
           {/* Блок привычек — всегда показываем если есть привычки */}
           {habits.length > 0 && (() => {
@@ -1540,7 +1543,6 @@ export default function DailyPage() {
           )}
 
           {/* Список задач */}
-          <div ref={tasksContainerRef} className="flex min-h-0 flex-none flex-col gap-2 overflow-visible lg:flex-1 lg:overflow-y-auto lg:pr-6 lg:chat-scrollbar">
             {tasks.length === 0 ? (
               <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 text-center shadow-sm">
                 <h3 className="text-base font-semibold text-gray-100">План на день пока пустой</h3>
