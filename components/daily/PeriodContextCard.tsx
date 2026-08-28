@@ -126,7 +126,7 @@ export default function PeriodContextCard({
             <span className={`text-xs ${c.factsToggle}`}>{showFacts ? '▲ скрыть' : '▼ показать'}</span>
           </button>
           {showFacts && (
-            <div className="mt-2 space-y-1 lg:max-h-48 lg:overflow-y-auto">
+            <div className="chat-scrollbar mt-2 space-y-1 lg:max-h-48 lg:overflow-y-auto lg:pr-2">
               {facts.map(item => (
                 <div key={item.id} className="flex items-center gap-2 text-sm">
                   <span className={c.factsCheck}>✓</span>
