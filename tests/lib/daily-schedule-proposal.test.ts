@@ -658,6 +658,47 @@ describe('daily schedule proposal', () => {
     })
   })
 
+  it('lays out a retro window from a past start without clamping anything to the wall clock', () => {
+    // Живой кейс: сейчас 16:00, пользователь заполняет день задним числом с 09:00.
+    // Раскладка обязана зависеть только от окна предложения, а не от текущего времени.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-02-28T13:00:00.000Z')) // 16:00 Europe/Moscow
+    try {
+      const retroProposal: DailyScheduleProposalV3 = {
+        version: 3,
+        date: '2026-02-28',
+        timezone: 'Europe/Moscow',
+        dayStartMinutes: 9 * 60,
+        dayEndMinutes: 21 * 60,
+        planningBasis: 'custom_time',
+        planningStartMinutes: 9 * 60,
+        workEndMinutes: 18 * 60,
+        activityEndMinutes: 21 * 60,
+        newTasks: [],
+        blocks: [
+          { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 9 * 60, durationMinutes: 90 },
+          { kind: 'buffer', title: 'Созвон', category: 'operational', isFixed: true, startMinutes: 11 * 60, durationMinutes: 60 },
+          { kind: 'meal', title: 'Обед', category: 'meal', isFixed: false, startMinutes: 13 * 60, durationMinutes: 45 },
+        ],
+      }
+
+      const normalized = normalizeDailyScheduleProposalToolInput(retroProposal) as DailyScheduleProposalV3
+      const validation = DailyScheduleProposalV3Schema.safeParse(normalized)
+
+      expect(validation.success).toBe(true)
+      expect(normalized.planningStartMinutes).toBe(9 * 60)
+      expect(normalized.dayStartMinutes).toBe(9 * 60)
+      // Фиксированный блок в прошлом остаётся ровно на своём времени
+      expect(normalized.blocks[1]).toMatchObject({ isFixed: true, startMinutes: 11 * 60 })
+      // Ни один блок не подтянут к «сейчас» (16:00 = 960)
+      expect(normalized.blocks.every(block => block.startMinutes < 16 * 60)).toBe(true)
+      expect(getDailyScheduleProposalNormalizationResult(normalized)?.unscheduledBlocks).toEqual([])
+      expect(validateProposalAgainstCurrentPlan(normalized as DailyScheduleProposalV3, { date: '2026-02-28', timezone: 'Europe/Moscow', planTasks: ['Deep work'] }).success).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('hashes plan tasks stably and remains sensitive to order and text', () => {
     const hash = hashDailyPlanTasks(['Deep work', 'Review'])
 

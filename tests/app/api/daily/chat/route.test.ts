@@ -189,6 +189,10 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     const toolSchema = mocks.stream.mock.calls[0][0].tools[0].input_schema
     expect(toolSchema.properties.blocks.items.oneOf[0].required).toContain('taskSource')
     expect(toolSchema.properties.blocks.items.oneOf[1].properties.category.enum).toEqual(expect.arrayContaining(['personal', 'travel', 'meal', 'rest', 'buffer']))
+    // Ретро-заполнение дня: старт, названный пользователем, может быть в прошлом и не подтягивается к «сейчас»
+    expect(toolSchema.properties.planningBasis.description).toContain('for today that start may be earlier than the current time (retro filling of an already-started day) and stays exactly as named')
+    expect(toolSchema.properties.planningStartMinutes.description).toContain('Never clamp it forward to the current time')
+    expect(toolSchema.properties.planningStartMinutes.description).toContain('planningBasis=custom_time or day_start it may legitimately be in the past for today')
     expect(mocks.stream).toHaveBeenCalledTimes(1)
   })
 

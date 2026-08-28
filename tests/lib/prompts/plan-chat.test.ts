@@ -59,6 +59,36 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('фиксированные события, еда/отдых/буферы')
   })
 
+  it('asks about the planning start with a concrete question, exactly once', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Планируем с текущего времени или указать другое время старта?»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ВОПРОС О СТАРТЕ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Спрашивай один раз — перед первой раскладкой — и больше не переспрашивай')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если старт уже назван (в сообщении, в истории диалога или в предпочтениях), вопрос не задавай вовсе')
+    // Вопрос живёт внутри разрешённого уточнения (1), а не как отдельный четвёртый вопрос
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(1) границы дня и откуда планировать — сюда входит и прямой вопрос «Планируем с текущего времени или указать другое время старта?», когда старт не назван')
+  })
+
+  it('allows retro planning from a start time that has already passed today', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('РЕТРО-ЗАПОЛНЕНИЕ ДНЯ — ЗАКОННЫЙ И ЧАСТЫЙ СЦЕНАРИЙ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("это planningBasis='custom_time', planningStartMinutes = ровно названное время, и раскладывай от него как ни в чём не бывало")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ему нужна статистика и честная вечерняя оценка дня')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('В ретро-раскладке прошедшее время валидно для всех блоков, включая фиксированные')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«это время уже прошло», «день почти закончился», «сейчас уже 16:00», «успеть уже нельзя»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('молча подтягивать planningStartMinutes или блоки к текущему времени')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Названный пользователем старт важнее текущего времени')
+  })
+
+  it('keeps the retro plan under the same load, breaks and coherence rules', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Ретро-план подчиняется всем остальным правилам наравне с обычным: загрузка не выше ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}% окна`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('окно считается от названного старта, а не от текущего времени')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('перерывы и приёмы пищи по блоку ПЕРЕРЫВЫ И ПИТАНИЕ, связанные задачи подряд, фиксированные блоки на своих временах')
+  })
+
+  it('describes custom_time as a possibly past start for today in the proposal contract', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('custom_time — пользователь назвал конкретное время старта; для сегодняшней даты это время может быть в прошлом (ретро-заполнение)')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('planningStartMinutes равен названному времени буквально, без подтягивания к текущему')
+  })
+
   it('forbids asking about task durations and makes the estimate the model own duty', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАПРЕЩЕНО спрашивать длительности задач: «сколько времени на X — час, полтора?»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Оценка длительностей — твоя обязанность, а не вопрос пользователю')
@@ -263,11 +293,27 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   })
 
   it('handles current time without dropping overdue unfinished tasks', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('никогда не размещай новые блоки в уже прошедшем времени')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('не размещай новые блоки в уже прошедшем времени')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('невыполненная задача была запланирована/ожидалась раньше')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('перенеси её в доступный будущий слот')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Для будущей даты не применяй ограничение текущего времени')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Для будущей даты ограничение текущего времени не применяется вовсе')
     expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('задачи до текущего момента не планируй заново')
+  })
+
+  it('scopes the no-past-blocks rule to forward planning from now', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("ОГРАНИЧЕНИЕ «НЕ РАНЬШЕ ТЕКУЩЕГО ВРЕМЕНИ» ДЕЙСТВУЕТ ТОЛЬКО ПРИ planningBasis='current_time' НА СЕГОДНЯ")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если в режиме current_time невыполненная задача была запланирована/ожидалась раньше')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("planningBasis='day_start' на сегодня работает так же: текущее время игнорируется")
+    // Прежняя безусловная формулировка снята: она запрещала любую раскладку в прошлое
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('Для плана на сегодня учитывай текущее время: никогда не размещай новые блоки в уже прошедшем времени')
+  })
+
+  it('narrows the passed-time exception for fixed blocks to forward planning', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("(1) это время уже прошло, И ПРИ ЭТОМ ты планируешь вперёд от «сейчас» (planningBasis='current_time' на сегодняшнюю дату)")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("при явно названном ретро-старте (planningBasis='custom_time' или 'day_start') прошедшее время валидно, и блок встаёт ровно на него")
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(2) оно выходит за окно дня; (3) оно накладывается на другой фиксированный блок пользователя')
+    // Прежняя формулировка делала «время уже прошло» безусловным исключением
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('только в трёх случаях: это время уже прошло, оно выходит за окно дня')
   })
 
   it('requires the proposal tool call without claiming persistence', () => {
@@ -459,6 +505,7 @@ describe('plan chat kickoff helpers', () => {
     expect(existingPlan).toContain('Не спрашивай "чем помочь?"')
     expect(existingPlan).toContain('не заявляй, что уже разложил задачи по шкале: карточку применяет пользователь кнопкой «Применить»')
     expect(existingPlan).not.toContain('целей недели/месяца/мечты')
+    expect(existingPlan).toContain('откуда планировать — «Планируем с текущего времени или указать другое время старта?»')
     expect(withGoals).toContain('План пустой, но есть опора: цели недели')
     expect(withGoals).not.toContain('цели месяца')
     expect(withGoals).not.toContain('мечта')

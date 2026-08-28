@@ -61,8 +61,8 @@ const proposeDailyScheduleTool = {
       timezone: { type: 'string', minLength: 1, maxLength: 100, pattern: '^([A-Za-z_]+\\/[A-Za-z0-9_+.-]+(?:\\/[A-Za-z0-9_+.-]+)*|UTC)$', description: 'Must exactly match the timezone value from the request context.' },
       dayStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Must equal planningStartMinutes.' },
       dayEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Must equal activityEndMinutes.' },
-      planningBasis: { enum: ['current_time', 'day_start', 'custom_time'], description: 'today: current_time/day_start/custom_time; future date: day_start/custom_time only.' },
-      planningStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Start minute chosen for planning; preserve exact HH:MM such as 09:30.' },
+      planningBasis: { enum: ['current_time', 'day_start', 'custom_time'], description: 'today: current_time/day_start/custom_time; future date: day_start/custom_time only. custom_time means the user named an explicit start time; for today that start may be earlier than the current time (retro filling of an already-started day) and stays exactly as named.' },
+      planningStartMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'Start minute chosen for planning; preserve exact HH:MM such as 09:30. Never clamp it forward to the current time: with planningBasis=custom_time or day_start it may legitimately be in the past for today.' },
       workEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'End of work activity; must be > planningStartMinutes and <= activityEndMinutes.' },
       activityEndMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'End of the whole active day; must be >= workEndMinutes.' },
       newTasks: {
