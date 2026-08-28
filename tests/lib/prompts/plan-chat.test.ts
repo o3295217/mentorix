@@ -48,6 +48,41 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('истории диалога')
   })
 
+  it('limits clarifying questions to facts the model cannot know, scope included', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('только о том, чего ты знать не можешь')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(1) границы дня и откуда планировать')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(2) фиксированные события — встречи, созвоны, еда в конкретное время')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(3) СУТЬ задачи, когда от ответа меняется характер работы')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«вычитка или переработка?», «анализ или первые шаги реализации?»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('это уточнение объёма, и оно законно')
+    // Еда, отдых и буферы — дефолт из блока ПЕРЕРЫВЫ И ПИТАНИЕ, а не тема для уточняющего вопроса
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('фиксированные события, еда/отдых/буферы')
+  })
+
+  it('forbids asking about task durations and makes the estimate the model own duty', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАПРЕЩЕНО спрашивать длительности задач: «сколько времени на X — час, полтора?»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Оценка длительностей — твоя обязанность, а не вопрос пользователю')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('выводи их из целей и контекста, а если целей и истории нет — по здравому смыслу опытного тайм-менеджера')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Режим обязан работать и без истории, и без целей')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('длительности ключевых задач')
+  })
+
+  it('requires an uncertain duration to become a stated assumption instead of a question', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Неуверенная оценка — не повод для вопроса')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«на сбор списка заложил полтора часа — поправь, если иначе»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Карточка редактируется, пользователь поправит сам')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Длительности задач оцениваешь ты, а не пользователь: вопрос «сколько времени на X?» запрещён')
+  })
+
+  it('keeps semantically related tasks next to each other with a stated reason', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('СВЯЗНОСТЬ ЗАДАЧ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('одна тема, один продукт, одна цель; подготовка перед основной работой')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«чтение текста сайта» перед «правкой текстов»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Связанные задачи ставь рядом, подряд, а не вразброс по дню')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Порядок объясни одной фразой')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Связанные по смыслу задачи (одна тема/продукт/цель, подготовка перед основной работой) ставь подряд')
+  })
+
   it('defines realistic schedule placement rules and leaves overflowing tasks out', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('учитывай текущее время')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Выполненные задачи не ставь в будущий график')
@@ -112,6 +147,23 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('это свободное время без единого блока, а не «блок отдыха»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('блоки buffer, rest и meal тоже считаются занятыми. Добавляя буфер, ты не снижаешь загрузку, а повышаешь её')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`сумма durationMinutes всех блоков не больше ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}% от (activityEndMinutes − planningStartMinutes)`)
+  })
+
+  it('forbids claiming any load level, percentage or spare time in the reply text', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАГРУЗКУ В ТЕКСТЕ НЕ ЗАЯВЛЯЙ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`«загрузка в пределах ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}%», «день не перегружен», «плотно, но нормально») не называй никогда`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('это метрика сервера, и её печатает карточка')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«итого 8 часов плотной работы», «запас есть», «свободно два часа», «всё помещается» запрещены')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('пользователь увидит «Занято 8ч43м, свободно 0 мин» рядом с твоим обещанием запаса')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Говорить о загрузке в тексте можно только как о намерении, когда задачи не помещаются')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('И одной фразой о перегрузе, когда пользователь сам попросил вместить всё (пункт 3). Больше поводов говорить о загрузке нет')
+  })
+
+  it('requires summing block durations before the tool call and rebuilding on overload', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Считай ДО вызова tool, поблочно и по всем блокам без исключения (задачи, еда, отдых, буферы, личные и дорожные)')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Превышает ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}% — пересобери план прямо сейчас по пункту 2 (убери или сократи состав задач) и только потом вызывай tool`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызвать tool с перегрузом и оправдаться в тексте запрещено: карточка посчитает сама и покажет «День перегружен»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Сумму длительностей всех блоков проверяй до вызова tool: не помещается в ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}% окна — пересобери план, а не оправдывайся в тексте`)
   })
 
   it('offers explicit options instead of cramming when tasks do not fit the reserve', () => {
@@ -179,6 +231,30 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Верни блок ровно на это время с isFixed=true и не повторяй сдвиг')
   })
 
+  it('narrows the tool accompaniment text to assumptions, ordering logic and the CTA', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('СОПРОВОДИТЕЛЬНЫЙ ТЕКСТ К ВЫЗОВУ TOOL — ЭТО ТОЛЬКО ТРИ ВЕЩИ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(а) принятые допущения — какие длительности ты назначил незнакомым задачам и почему, с оговоркой «поправь, если иначе»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(б) логика порядка в одну-две фразы')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(в) CTA «проверь карточку и нажми „Применить“»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('исключение одно — задачи не помещаются в запас, тогда добавляется разбор и вопрос по блоку ЦЕЛЕВАЯ ЗАГРУЗКА ДНЯ')
+  })
+
+  it('forbids retelling the card as a list of blocks with times', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАПРЕЩЕНО перечислять в тексте блоки с временами')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Расписание показывает карточка, текст его не дублирует')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«11:17–12:47 — тестирование», «12:47–13:02 — перерыв» — нарушение')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('даже если времена в точности совпадают с tool, и даже если блоков всего два')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не выдавай список блоков ни целиком, ни выборочно «для наглядности»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Текст рядом с карточкой не дублирует её: ни списка блоков с временами, ни процентов и итогов загрузки')
+    // Прежняя формулировка прямо требовала перечислить блоки текстом — она снята
+    expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('перечисли блоки по порядку с длительностями')
+  })
+
+  it('allows flexible block wording only inside assumptions, not as a full-day listing', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('только по делу — подтвердить жёсткое время или назвать конфликт, а не чтобы показать расписание')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('но лишь внутри допущений и логики порядка, а не сплошным перечнем на весь день')
+  })
+
   it('forbids stating block times that differ from the tool payload', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ТЕКСТ НЕ ИМЕЕТ ПРАВА РАСХОДИТЬСЯ С ДАННЫМИ TOOL')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Любое время, названное в тексте, обязано совпадать с тем, что ты передал в блоке')
@@ -194,8 +270,7 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('задачи до текущего момента не планируй заново')
   })
 
-  it('requires a compact textual schedule and proposal tool call without claiming persistence', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Дай текстом компактный согласованный график')
+  it('requires the proposal tool call without claiming persistence', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('используй tool propose_daily_schedule')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Tool — это только предложение для размещения, не сохранение')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Никогда не говори, что расписание уже сохранено')
@@ -285,8 +360,8 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   })
 
   it('requires the apply CTA next to the proposal card', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Сопровождение карточки — одна короткая фраза: «Собрал расписание — проверь карточку и нажми „Применить“»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всей карточки и без обещаний за пользователя')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Сопровождение карточки — короткое: допущения по длительностям, логика порядка и фраза «Собрал расписание — проверь карточку и нажми „Применить“»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всей карточки, без списка блоков с временами, без итогов загрузки и без обещаний за пользователя')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Расписание применяет пользователь кнопкой «Применить» в карточке, а не ты')
   })
 
