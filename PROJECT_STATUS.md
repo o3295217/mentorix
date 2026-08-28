@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-08-27**
+> Последнее обновление: **2026-08-28**
 
 ## Общая информация
 
@@ -112,12 +112,12 @@
 - `Speedometer`
 - `ThemeProvider`
 - `UncompletedTasksModal`
-- `daily/DailyCompletedWorkWidgets`
 - `daily/DailyPeriodContext`
 - `daily/DailyPlanCardHeader`
 - `daily/DailyScheduleProposalCard`
 - `daily/DailyTaskListProposalCard`
 - `daily/DayTimeline`
+- `daily/PeriodContextCard`
 - `daily/PlanLensSwitch`
 - `daily/ScheduleLoadSummary`
 - `daily/TimeField`

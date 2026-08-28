@@ -13,7 +13,6 @@ import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalC
 import DailyTaskListProposalCard from '@/components/daily/DailyTaskListProposalCard'
 import DailyPlanCardHeader from '@/components/daily/DailyPlanCardHeader'
 import DailyPeriodContext from '@/components/daily/DailyPeriodContext'
-import DailyCompletedWorkWidgets from '@/components/daily/DailyCompletedWorkWidgets'
 import type { PlanLens } from '@/components/daily/PlanLensSwitch'
 import { isInvalidProposalFallbackMessage, renderAssistantMessageContent } from '@/components/daily/chat-render-helpers'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
@@ -743,7 +742,7 @@ export default function DailyPage() {
     const startDay = format(weekStart, 'd', { locale: ru })
     const endDay = format(weekEnd, 'd', { locale: ru })
     const month = format(weekEnd, 'MMM', { locale: ru }).replace('.', '')
-    return `План на неделю ${startDay}-${endDay} ${month}`
+    return `Неделя ${startDay}-${endDay} ${month}`
   }, [selectedDate])
 
   // Заголовок для блока целей месяца
@@ -751,7 +750,7 @@ export default function DailyPage() {
     const date = parseDateKey(selectedDate)
     const monthName = format(date, 'LLLL', { locale: ru })
     // Первая буква заглавная
-    return `План на ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`
+    return monthName.charAt(0).toUpperCase() + monthName.slice(1)
   }, [selectedDate])
 
   // Проверить, является ли задача привычкой
@@ -1161,52 +1160,43 @@ export default function DailyPage() {
 
       <div
         id="daily-context"
-        className={`${showMobileContext ? 'space-y-4' : 'hidden'} lg:space-y-6 ${isContextCollapsed ? 'lg:hidden' : 'lg:block'}`}
+        className={`${showMobileContext ? 'block' : 'hidden'} lg:block`}
       >
-      <div className="hidden justify-end lg:flex">
         <button
           type="button"
-          onClick={() => setIsContextCollapsed(true)}
-          className="min-h-9 rounded-lg px-2 text-xs font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
-        >
-          Скрыть ▲
-        </button>
-      </div>
-
-      <DailyPeriodContext
-        hasGoalContext={hasGoalContext}
-        weekLabel={weekLabel}
-        weekGoals={weekGoals}
-        monthLabel={monthLabel}
-        monthGoals={monthGoals}
-        planTaskMutationLocked={planTaskMutationLocked}
-        isGoalCompleted={isGoalCompleted}
-        addGoalToTasks={addGoalToTasks}
-      />
-
-      {/* Виджеты «Сделано за неделю» и «Сделано за месяц» */}
-      <DailyCompletedWorkWidgets
-        weekFactsTotal={weekFactsTotal}
-        monthFactsTotal={monthFactsTotal}
-        weekFacts={weekFacts}
-        monthFacts={monthFacts}
-        showWeekFacts={showWeekFacts}
-        showMonthFacts={showMonthFacts}
-        onToggleWeekFacts={() => setShowWeekFacts(!showWeekFacts)}
-        onToggleMonthFacts={() => setShowMonthFacts(!showMonthFacts)}
-      />
-      </div>
-
-      {isContextCollapsed && (
-        <button
-          type="button"
-          onClick={() => setIsContextCollapsed(false)}
-          className="hidden min-h-11 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900/60 px-4 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
+          onClick={() => setIsContextCollapsed((collapsed) => !collapsed)}
+          className="hidden min-h-11 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900/60 px-4 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
+          aria-expanded={!isContextCollapsed}
+          aria-controls="daily-context-cards"
         >
           <span>Контекст недели и месяца</span>
-          <span className="text-xs text-gray-500">▼ показать</span>
+          <span className="text-xs text-gray-500">{isContextCollapsed ? '▼ показать' : 'Скрыть ▲'}</span>
         </button>
-      )}
+
+        <div
+          id="daily-context-cards"
+          className={`lg:mt-3 ${isContextCollapsed ? 'lg:hidden' : 'lg:block'}`}
+        >
+          <DailyPeriodContext
+            hasGoalContext={hasGoalContext}
+            weekLabel={weekLabel}
+            weekGoals={weekGoals}
+            weekFactsTotal={weekFactsTotal}
+            weekFacts={weekFacts}
+            showWeekFacts={showWeekFacts}
+            onToggleWeekFacts={() => setShowWeekFacts(!showWeekFacts)}
+            monthLabel={monthLabel}
+            monthGoals={monthGoals}
+            monthFactsTotal={monthFactsTotal}
+            monthFacts={monthFacts}
+            showMonthFacts={showMonthFacts}
+            onToggleMonthFacts={() => setShowMonthFacts(!showMonthFacts)}
+            planTaskMutationLocked={planTaskMutationLocked}
+            isGoalCompleted={isGoalCompleted}
+            addGoalToTasks={addGoalToTasks}
+          />
+        </div>
+      </div>
 
       <div
         className="daily-mobile-tabs grid grid-cols-2 rounded-xl border border-gray-700 bg-gray-900/70 p-1 lg:hidden"
