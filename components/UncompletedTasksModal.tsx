@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { format, addDays } from 'date-fns'
-import { ru } from 'date-fns/locale'
 
 export interface UncompletedTask {
   id: number
@@ -10,7 +9,7 @@ export interface UncompletedTask {
   transferCount?: number // сколько раз уже переносилась
 }
 
-export type TaskAction = 
+export type TaskAction =
   | { type: 'transfer'; date: string }
   | { type: 'backlog' }
   | { type: 'completed' }
@@ -22,6 +21,90 @@ export interface TaskDecision {
   action: TaskAction
 }
 
+/** Ключ чипа-переключателя действия для одной задачи. */
+export type ChipKey = 'tomorrow' | 'custom' | 'backlog' | 'completed' | 'skip'
+
+/** Текущий выбор действия по одной строке-задаче. */
+export interface RowSelection {
+  chip: ChipKey
+  /** Дата в формате yyyy-MM-dd, актуальна только при chip === 'custom'. */
+  customDate?: string
+}
+
+export const CHIP_CONFIG: { key: ChipKey; label: string }[] = [
+  { key: 'tomorrow', label: 'Завтра' },
+  { key: 'custom', label: 'Другая дата' },
+  { key: 'backlog', label: 'В задачи' },
+  { key: 'completed', label: 'Выполнено' },
+  { key: 'skip', label: 'Пропустить' },
+]
+
+/** Дефолт для новой строки — «Завтра», чтобы типовой сценарий закрывался одним кликом. */
+export function getDefaultRowSelection(): RowSelection {
+  return { chip: 'tomorrow' }
+}
+
+export function getInitialSelections(tasks: UncompletedTask[]): Record<number, RowSelection> {
+  const initial: Record<number, RowSelection> = {}
+  tasks.forEach(task => {
+    initial[task.id] = getDefaultRowSelection()
+  })
+  return initial
+}
+
+/** «Другая дата» без выбранной даты — невалидный выбор; остальные чипы валидны всегда. */
+export function isRowSelectionValid(selection: RowSelection | undefined): boolean {
+  if (!selection) return false
+  if (selection.chip === 'custom') return Boolean(selection.customDate)
+  return true
+}
+
+export function areAllSelectionsValid(
+  tasks: UncompletedTask[],
+  selections: Record<number, RowSelection>,
+): boolean {
+  return tasks.every(task => isRowSelectionValid(selections[task.id]))
+}
+
+export function buildTaskAction(selection: RowSelection, tomorrow: string): TaskAction {
+  switch (selection.chip) {
+    case 'tomorrow':
+      return { type: 'transfer', date: tomorrow }
+    case 'custom':
+      return { type: 'transfer', date: selection.customDate || tomorrow }
+    case 'backlog':
+      return { type: 'backlog' }
+    case 'completed':
+      return { type: 'completed' }
+    case 'skip':
+      return { type: 'skip' }
+  }
+}
+
+export function buildDecisions(
+  tasks: UncompletedTask[],
+  selections: Record<number, RowSelection>,
+  tomorrow: string,
+): TaskDecision[] {
+  return tasks.map(task => ({
+    taskId: task.id,
+    taskText: task.taskText,
+    action: buildTaskAction(selections[task.id] ?? getDefaultRowSelection(), tomorrow),
+  }))
+}
+
+/** Массовое действие «Все: завтра / в задачи» — сбрасывает выбор всех строк на один чип. */
+export function applyBulkChip(
+  tasks: UncompletedTask[],
+  chip: 'tomorrow' | 'backlog',
+): Record<number, RowSelection> {
+  const next: Record<number, RowSelection> = {}
+  tasks.forEach(task => {
+    next[task.id] = { chip }
+  })
+  return next
+}
+
 interface Props {
   tasks: UncompletedTask[]
   currentDate: string
@@ -30,16 +113,14 @@ interface Props {
 }
 
 export default function UncompletedTasksModal({ tasks, currentDate, onComplete, onCancel }: Props) {
-  const [decisions, setDecisions] = useState<Record<number, TaskAction>>({})
-  const [expandedTask, setExpandedTask] = useState<number | null>(null)
-  const [customDate, setCustomDate] = useState<Record<number, string>>({})
+  const [selections, setSelections] = useState<Record<number, RowSelection>>(() => getInitialSelections(tasks))
   const [isProcessing, setIsProcessing] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const dialogRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
 
   const tomorrow = format(addDays(new Date(currentDate), 1), 'yyyy-MM-dd')
-  const allResolved = tasks.every(task => decisions[task.id] !== undefined)
+  const allValid = areAllSelectionsValid(tasks, selections)
 
   useEffect(() => {
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -119,18 +200,25 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isProcessing, onCancel])
 
-  const setAction = (taskId: number, action: TaskAction) => {
-    setDecisions(prev => ({ ...prev, [taskId]: action }))
-    setExpandedTask(null)
+  const setRowChip = (taskId: number, chip: ChipKey) => {
+    setSelections(prev => {
+      const previous = prev[taskId]
+      const customDate = chip === 'custom' ? previous?.customDate : undefined
+      return { ...prev, [taskId]: { chip, customDate } }
+    })
+  }
+
+  const setRowCustomDate = (taskId: number, date: string) => {
+    setSelections(prev => ({ ...prev, [taskId]: { chip: 'custom', customDate: date } }))
+  }
+
+  const handleBulkChip = (chip: 'tomorrow' | 'backlog') => {
+    setSelections(applyBulkChip(tasks, chip))
   }
 
   const handleSubmit = async () => {
-    if (!allResolved || isProcessing) return
-    const result: TaskDecision[] = tasks.map(task => ({
-      taskId: task.id,
-      taskText: task.taskText,
-      action: decisions[task.id]!,
-    }))
+    if (!allValid || isProcessing) return
+    const result = buildDecisions(tasks, selections, tomorrow)
     setSubmitError('')
     setIsProcessing(true)
     try {
@@ -139,24 +227,6 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
       setSubmitError(error instanceof Error ? error.message : 'Не удалось обработать решения. Попробуйте ещё раз.')
     } finally {
       setIsProcessing(false)
-    }
-  }
-
-  const handleTransferAll = () => {
-    const newDecisions: Record<number, TaskAction> = {}
-    tasks.forEach(task => {
-      newDecisions[task.id] = { type: 'transfer', date: tomorrow }
-    })
-    setDecisions(newDecisions)
-  }
-
-  const getActionLabel = (action: TaskAction | undefined) => {
-    if (!action) return '—'
-    switch (action.type) {
-      case 'transfer': return `→ ${format(new Date(action.date), 'd MMM', { locale: ru })}`
-      case 'backlog': return ' В задачи'
-      case 'completed': return ' Выполнено'
-      case 'skip': return 'Пропустить'
     }
   }
 
@@ -176,17 +246,17 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
         aria-describedby="uncompleted-modal-description"
         aria-busy={isProcessing}
         tabIndex={-1}
-        className="uncompleted-modal-panel flex w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-gray-900/95 shadow-xl outline-none"
+        className="uncompleted-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-xl bg-gray-900/95 shadow-xl outline-none"
       >
         {/* Header */}
         <div className="flex flex-shrink-0 items-start gap-2 border-b border-gray-700 p-3 sm:p-4">
           <div className="min-w-0 flex-1">
-          <h2 id="uncompleted-modal-title" className="text-xl font-bold text-white">
-             Невыполненные задачи
-          </h2>
-          <p id="uncompleted-modal-description" className="mt-1 text-sm text-gray-400">
-            Что делать с задачами, которые не были выполнены?
-          </p>
+            <h2 id="uncompleted-modal-title" className="text-xl font-bold text-white">
+              Невыполненные задачи
+            </h2>
+            <p id="uncompleted-modal-description" className="mt-1 text-sm text-gray-400">
+              Что делать с задачами, которые не были выполнены?
+            </p>
           </div>
           <button
             type="button"
@@ -199,140 +269,89 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
           </button>
         </div>
 
-        {/* Quick actions */}
-        <div className="flex-shrink-0 border-b border-gray-700 bg-gray-700/50 p-3 sm:p-4">
+        {/* Bulk actions */}
+        <div className="flex flex-shrink-0 items-center gap-1.5 border-b border-gray-700 px-3 py-2 text-xs text-gray-400 sm:px-4">
+          <span>Все:</span>
           <button
             type="button"
-            onClick={handleTransferAll}
+            onClick={() => handleBulkChip('tomorrow')}
             disabled={isProcessing}
-            className="min-h-11 rounded-lg bg-blue-900/30 px-3 py-2 text-blue-300 transition hover:bg-blue-900/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded text-blue-300 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-             Все на завтра
+            завтра
+          </button>
+          <span aria-hidden="true">·</span>
+          <button
+            type="button"
+            onClick={() => handleBulkChip('backlog')}
+            disabled={isProcessing}
+            className="rounded text-blue-300 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            в задачи
           </button>
         </div>
 
         {/* Task list */}
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-4">
-          {tasks.map(task => (
-            <div 
-              key={task.id}
-              className="bg-gray-700/50 rounded-lg p-3"
-            >
-              <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="break-words text-sm text-white">
-                    {task.taskText}
+        <div className="min-h-0 flex-1 divide-y divide-gray-800 overflow-y-auto overscroll-contain px-3 sm:px-4">
+          {tasks.map(task => {
+            const selection = selections[task.id] ?? getDefaultRowSelection()
+            return (
+              <div key={task.id} className="py-2.5">
+                <p className="break-words text-sm text-gray-100">
+                  {task.taskText}
+                </p>
+                {task.transferCount && task.transferCount >= 3 && (
+                  <p className="mt-0.5 text-xs text-amber-400">
+                    Переносится {task.transferCount}-й раз. Может разбить на шаги?
                   </p>
-                  {task.transferCount && task.transferCount >= 3 && (
-                    <p className="text-xs text-amber-400 mt-1">
-                       Переносится {task.transferCount}-й раз. Может разбить на шаги?
-                    </p>
-                  )}
-                </div>
-                <div className="flex-shrink-0">
-                  <span className="text-xs text-gray-400">
-                    {getActionLabel(decisions[task.id])}
-                  </span>
-                </div>
-              </div>
+                )}
 
-              {/* Action buttons */}
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(() => {
-                  const decision = decisions[task.id]
-                  const isTransferTomorrow = decision?.type === 'transfer' && decision.date === tomorrow
-                  const isTransferOtherDate = decision?.type === 'transfer' && decision.date !== tomorrow
-                  return (
-                    <>
-                       <button
-                          type="button"
-                          onClick={() => setAction(task.id, { type: 'transfer', date: tomorrow })}
-                          disabled={isProcessing}
-                         className={`min-h-11 rounded px-3 py-2 text-sm transition sm:text-xs ${isTransferTomorrow ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
-                         aria-pressed={isTransferTomorrow}
+                <div
+                  className="mt-1.5 flex flex-wrap gap-1.5"
+                  role="group"
+                  aria-label={`Действие для задачи «${task.taskText}»`}
+                >
+                  {CHIP_CONFIG.map(chip => {
+                    const isSelected = selection.chip === chip.key
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => setRowChip(task.id, chip.key)}
+                        disabled={isProcessing}
+                        aria-pressed={isSelected}
+                        className={`rounded-full border px-2.5 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isSelected
+                            ? 'border-blue-400/50 bg-blue-500/20 text-blue-300'
+                            : 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
                       >
-                         Завтра
+                        {chip.label}
                       </button>
-
-                       <button
-                          type="button"
-                          onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                          disabled={isProcessing}
-                         className={`min-h-11 rounded px-3 py-2 text-sm transition sm:text-xs ${isTransferOtherDate ? 'bg-blue-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
-                         aria-expanded={expandedTask === task.id}
-                         aria-controls={`uncompleted-date-${task.id}`}
-                      >
-                         Другая дата
-                      </button>
-                    </>
-                  )
-                })()}
-
-                <button
-                  type="button"
-                  onClick={() => setAction(task.id, { type: 'backlog' })}
-                  disabled={isProcessing}
-                  className={`min-h-11 rounded px-3 py-2 text-sm transition sm:text-xs ${ decisions[task.id]?.type === 'backlog' ? 'bg-purple-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
-                  aria-pressed={decisions[task.id]?.type === 'backlog'}
-                >
-                   В задачи
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAction(task.id, { type: 'completed' })}
-                  disabled={isProcessing}
-                  className={`min-h-11 rounded px-3 py-2 text-sm transition sm:text-xs ${ decisions[task.id]?.type === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
-                  aria-pressed={decisions[task.id]?.type === 'completed'}
-                >
-                   Выполнено
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAction(task.id, { type: 'skip' })}
-                  disabled={isProcessing}
-                  className={`min-h-11 rounded px-3 py-2 text-sm transition sm:text-xs ${ decisions[task.id]?.type === 'skip' ? 'bg-gray-500 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
-                  aria-pressed={decisions[task.id]?.type === 'skip'}
-                >
-                  Пропустить
-                </button>
-              </div>
-
-              {/* Date picker */}
-              {expandedTask === task.id && (
-                <div id={`uncompleted-date-${task.id}`} className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    type="date"
-                    disabled={isProcessing}
-                    value={customDate[task.id] || tomorrow}
-                    onChange={(e) => setCustomDate(prev => ({ ...prev, [task.id]: e.target.value }))}
-                    min={tomorrow}
-                    className="min-h-11 min-w-0 rounded border border-gray-700 bg-gray-700 px-2 py-2 text-base text-white sm:text-sm"
-                    aria-label={`Дата переноса задачи «${task.taskText}»`}
-                  />
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={() => {
-                      setAction(task.id, { type: 'transfer', date: customDate[task.id] || tomorrow })
-                    }}
-                    className="min-h-11 rounded bg-blue-500 px-3 py-2 text-sm text-white transition hover:bg-blue-600 sm:text-xs"
-                  >
-                    Выбрать
-                  </button>
+                    )
+                  })}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {selection.chip === 'custom' && (
+                  <div className="mt-1.5">
+                    <input
+                      type="date"
+                      disabled={isProcessing}
+                      value={selection.customDate ?? ''}
+                      onChange={(e) => setRowCustomDate(task.id, e.target.value)}
+                      min={tomorrow}
+                      className="min-h-9 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-white"
+                      aria-label={`Дата переноса задачи «${task.taskText}»`}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* Footer */}
         <div className="flex flex-shrink-0 flex-col gap-2 border-t border-gray-700 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-          <div className="sm:order-2 sm:flex-1">
-            {isProcessing && <p className="text-sm text-blue-300" role="status" aria-live="polite">Обрабатываем решения…</p>}
-            {!isProcessing && submitError && <p className="text-sm text-red-300" role="alert">{submitError}</p>}
-          </div>
           <button
             type="button"
             onClick={onCancel}
@@ -341,23 +360,18 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
           >
             Отмена
           </button>
-          <div className="flex flex-col gap-2 sm:order-3 sm:flex-row sm:items-center sm:gap-3">
-            <span className="text-sm text-gray-400">
-              {Object.keys(decisions).length}/{tasks.length} задач
-            </span>
-            <button
-              type="button"
-              onClick={() => void handleSubmit()}
-              disabled={!allResolved || isProcessing}
-              className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
-            >
-              {isProcessing
-                ? 'Обработка…'
-                : allResolved
-                  ? 'Продолжить оценку'
-                  : 'Выберите действие для каждой задачи'}
-            </button>
+          <div className="sm:order-2 sm:flex-1 sm:px-3">
+            {isProcessing && <p className="text-sm text-blue-300" role="status" aria-live="polite">Обрабатываем решения…</p>}
+            {!isProcessing && submitError && <p className="text-sm text-red-300" role="alert">{submitError}</p>}
           </div>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={!allValid || isProcessing}
+            className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:order-3"
+          >
+            {isProcessing ? 'Обработка…' : `Применить (${tasks.length})`}
+          </button>
         </div>
       </div>
     </div>
