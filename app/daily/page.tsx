@@ -2162,7 +2162,9 @@ export default function DailyPage() {
                   {saving ? 'Сохранение...' : 'Сохранить план'}
                 </button>
 
-                {!hasEvaluation && dailyPhase !== 'summary' ? (
+                {/* Пара «Посмотреть/Получить заново» — только при реально существующей
+                    оценке; вечерняя фаза «итог дня» сама по себе оценку не создаёт */}
+                {!hasEvaluation ? (
                   <button
                     onClick={handleEvaluateClick}
                     disabled={evaluating || selectedTasks.size === 0}
