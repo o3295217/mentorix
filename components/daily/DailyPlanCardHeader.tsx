@@ -16,9 +16,6 @@ type DailyPlanCardHeaderProps = {
   timelineDisabled: boolean
   timelineBusy: boolean
   phase: DailyPhase
-  evaluating: boolean
-  canEvaluate: boolean
-  onEvaluate: () => void
 }
 
 export default function DailyPlanCardHeader({
@@ -34,12 +31,8 @@ export default function DailyPlanCardHeader({
   timelineDisabled,
   timelineBusy,
   phase,
-  evaluating,
-  canEvaluate,
-  onEvaluate,
 }: DailyPlanCardHeaderProps) {
   const isExecution = phase === 'execution'
-  const isSummary = phase === 'summary'
   return (
     <div className="daily-phase-accent mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 lg:pr-6" data-phase={phase}>
       <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
@@ -73,16 +66,7 @@ export default function DailyPlanCardHeader({
             привычки {habitCompletedCount}/{habitTotalCount}
           </span>
         )}
-        {isSummary && (
-          <button
-            type="button"
-            onClick={onEvaluate}
-            disabled={!canEvaluate || evaluating}
-            className="btn-primary min-h-10 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {evaluating ? 'Анализирую…' : 'Оценить день'}
-          </button>
-        )}
+        {/* Кнопка «Оценить день» живёт только в футере карточки — дубль в шапке убран */}
         <PlanLensSwitch
           value={lens}
           onChange={onLensChange}

@@ -1275,9 +1275,6 @@ export default function DailyPage() {
             timelineDisabled={tasks.length === 0 || scheduleExiting}
             timelineBusy={scheduleEntering || scheduleLoading}
             phase={dailyPhase}
-            evaluating={evaluating}
-            canEvaluate={selectedTasks.size > 0}
-            onEvaluate={handleEvaluateClick}
           />
 
           {/* Добавление новой задачи */}
