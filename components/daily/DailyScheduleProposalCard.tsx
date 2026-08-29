@@ -35,13 +35,13 @@ function getProposalBlockCategoryKey(block: ProposalBlock): DailyScheduleBlockCa
 // Полные литеральные классы — Tailwind генерирует CSS только для классов,
 // которые видит в коде буквально; собранный заменой строки класс останется без стилей.
 const CATEGORY_STRIPE_CLASS: Record<keyof typeof CATEGORY_BAR_COLOR, string> = {
-  main: 'border-primary-500',
-  operational: 'border-purple-500',
-  travel: 'border-cyan-500',
-  personal: 'border-pink-500',
-  meal: 'border-orange-500',
-  rest: 'border-emerald-500',
-  buffer: 'border-gray-500',
+  main: 'border-l-primary-500',
+  operational: 'border-l-purple-500',
+  travel: 'border-l-cyan-500',
+  personal: 'border-l-pink-500',
+  meal: 'border-l-orange-500',
+  rest: 'border-l-emerald-500',
+  buffer: 'border-l-gray-500',
 }
 
 export function getProposalBlockStripeClass(block: ProposalBlock): string {
@@ -196,7 +196,7 @@ export default function DailyScheduleProposalCard({
 
       <ScheduleLoadSummary summary={summary} className="mb-2" />
 
-      <div className="divide-y divide-gray-800/60">
+      <div>
         {blocks.map((block, index) => {
           const title = block.kind === 'task' ? block.taskText : block.title
           const fixed = isProposalBlockFixed(block)
@@ -204,7 +204,7 @@ export default function DailyScheduleProposalCard({
           return (
             <div
               key={`${block.kind}-${block.startMinutes}-${index}`}
-              className={`flex items-start gap-3 border-l-2 py-1.5 pl-2.5 pr-0.5 ${getProposalBlockStripeClass(block)}`}
+              className={`flex items-start gap-3 border-l-2 border-t border-t-gray-800/60 first:border-t-0 py-1.5 pl-2.5 pr-0.5 ${getProposalBlockStripeClass(block)}`}
               title={fixed ? 'Фиксированное время' : undefined}
               aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}
             >
