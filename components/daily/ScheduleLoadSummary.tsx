@@ -15,7 +15,9 @@ export const SCHEDULE_LOAD_CATEGORY_LABELS: Record<DailyScheduleBlockCategory, s
   buffer: 'буфер',
 }
 
-const CATEGORY_BAR_COLOR: Record<DailyScheduleBlockCategory, string> = {
+// Exported so other views of the same schedule data (e.g. the chat proposal card's
+// block rows) can reuse the exact same category colors instead of inventing new ones.
+export const CATEGORY_BAR_COLOR: Record<DailyScheduleBlockCategory, string> = {
   main: 'bg-primary-500',
   operational: 'bg-purple-500',
   travel: 'bg-cyan-500',

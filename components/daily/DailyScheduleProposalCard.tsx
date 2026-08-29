@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DailyScheduleProposalMetadata } from '@/lib/daily-schedule-proposal'
+import type { DailyScheduleBlockCategory } from '@/lib/daily-schedule'
 import { formatDurationLabel, minutesToTimeLabel } from '@/hooks/daily/schedule-helpers'
 import { buildProposalApplyOptions, getProposalLoadSummary, getProposalNewTasks, proposalHasExistingSchedule, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
-import ScheduleLoadSummary from '@/components/daily/ScheduleLoadSummary'
+import ScheduleLoadSummary, { CATEGORY_BAR_COLOR } from '@/components/daily/ScheduleLoadSummary'
 
 export interface DailyScheduleProposalCardProps {
   metadata: DailyScheduleProposalMetadata
@@ -17,14 +18,23 @@ export interface DailyScheduleProposalCardProps {
 
 const kindLabel = { task: 'задача', meal: 'еда', rest: 'отдых', buffer: 'буфер' } as const
 const categoryLabel = { main: 'главное', operational: 'операц.', travel: 'дорога', personal: 'личное', meal: 'еда', rest: 'отдых', buffer: 'буфер' } as const
-const kindClass = {
-  task: 'border-blue-400/25 bg-blue-500/10 text-blue-100',
-  meal: 'border-orange-400/25 bg-orange-500/10 text-orange-100',
-  rest: 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100',
-  buffer: 'border-purple-400/25 bg-purple-500/10 text-purple-100',
-} as const
 
 type ProposalBlock = DailyScheduleProposalMetadata['proposal']['blocks'][number]
+
+// v2/v3 blocks carry an explicit `category`; v1 blocks only have `kind`. For those,
+// `meal`/`rest`/`buffer` map 1:1 onto category keys, and a plain `task` (no category
+// info at all) is treated as generic work — same bucket as `main`.
+function getProposalBlockCategoryKey(block: ProposalBlock): DailyScheduleBlockCategory {
+  if ('category' in block) return block.category
+  if (block.kind === 'meal' || block.kind === 'rest' || block.kind === 'buffer') return block.kind
+  return 'main'
+}
+
+// Reuses ScheduleLoadSummary's category colors (bg-* utility) as a left border stripe,
+// so the row's category indicator and the load summary bar always agree.
+export function getProposalBlockStripeClass(block: ProposalBlock): string {
+  return CATEGORY_BAR_COLOR[getProposalBlockCategoryKey(block)].replace('bg-', 'border-')
+}
 
 export function isProposalBlockFixed(block: ProposalBlock): boolean {
   return 'isFixed' in block && block.isFixed === true
@@ -174,20 +184,29 @@ export default function DailyScheduleProposalCard({
 
       <ScheduleLoadSummary summary={summary} className="mb-2" />
 
-      <div className="space-y-1.5">
+      <div className="divide-y divide-gray-800/60">
         {blocks.map((block, index) => {
           const title = block.kind === 'task' ? block.taskText : block.title
           const fixed = isProposalBlockFixed(block)
           const isNewTaskBlock = block.kind === 'task' && 'taskSource' in block && block.taskSource === 'new'
           return (
-            <div key={`${block.kind}-${block.startMinutes}-${index}`} className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border px-2 py-1 ${kindClass[block.kind]}`} title={fixed ? 'Фиксированное время' : undefined} aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}>
-              <span className="shrink-0 text-[11px] font-medium tabular-nums opacity-75">
+            <div
+              key={`${block.kind}-${block.startMinutes}-${index}`}
+              className={`flex items-start gap-3 border-l-2 py-1.5 pl-2 pr-1 ${getProposalBlockStripeClass(block)}`}
+              title={fixed ? 'Фиксированное время' : undefined}
+              aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}
+            >
+              <span className="w-[6.5rem] shrink-0 whitespace-nowrap pt-0.5 text-[13px] tabular-nums text-gray-400">
                 {minutesToTimeLabel(block.startMinutes)}–{minutesToTimeLabel(block.startMinutes + block.durationMinutes)}
               </span>
-              <span className="min-w-0 flex-1 break-words text-sm">{title}</span>
-              {isNewTaskBlock && <span className="shrink-0 rounded-full border border-cyan-300/50 bg-cyan-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-100">новая</span>}
-              {fixed && <span className="shrink-0 rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100">фикс.</span>}
-              <span className="w-full break-words text-[11px] opacity-70">{getProposalBlockMetaLabel(block)}</span>
+              <span className="min-w-0 flex-1 break-words text-sm text-gray-100">
+                {title}
+                {isNewTaskBlock && <span className="ml-1.5 inline-block shrink-0 rounded-full border border-cyan-300/50 bg-cyan-400/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-cyan-100">новая</span>}
+                {fixed && <span className="ml-1.5 inline-block shrink-0 rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-100">фикс.</span>}
+              </span>
+              <span className="shrink-0 whitespace-nowrap pt-0.5 text-right text-xs text-gray-400">
+                {formatDurationLabel(block.durationMinutes)}
+              </span>
             </div>
           )
         })}
