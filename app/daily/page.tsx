@@ -23,7 +23,13 @@ import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-jso
 import type { DailySchedule, DailyScheduleLoadSummary } from '@/lib/daily-schedule'
 import type { DailyScheduleProposalMetadata, DailyTaskListProposalMetadata } from '@/lib/daily-schedule-proposal'
 import type { DailyScheduleIssueAction } from '@/lib/daily-chat-constants'
-import { isPendingChatMessageId } from '@/hooks/daily/chat-helpers'
+import {
+  getChatProcessingPlaceholderText,
+  isEmptyStreamingAssistantShell,
+  isPendingChatMessageId,
+  shouldShowChatProcessingPlaceholder,
+} from '@/hooks/daily/chat-helpers'
+import ChatProcessingIndicator from '@/components/daily/ChatProcessingIndicator'
 import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helpers'
 import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, findLatestUnappliedScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 import { getTaskTimeChipLabel, getTaskTimeChips, sortTasksByScheduleTime } from '@/hooks/daily/list-lens-helpers'
@@ -361,6 +367,12 @@ export default function DailyPage() {
       && msg.role === 'assistant'
       && msg.content.trim().length > 0
     ))
+
+  const showChatProcessingPlaceholder = shouldShowChatProcessingPlaceholder({
+    sendingChat,
+    isSubmittingChat,
+    hasStreamingAssistantResponse,
+  })
 
   const {
     viewportMetrics: chatViewportMetrics,
@@ -2286,8 +2298,11 @@ export default function DailyPage() {
             </div>
           )}
           {(sendingChat || isSubmittingChat) && (
-            <div className="mb-2 text-sm text-blue-300" role="status" aria-live="polite">
-              {applyingProposalId ? 'Применяем расписание…' : 'Ассистент обрабатывает запрос…'}
+            // Дублирует видимый плейсхолдер-сообщение в конце ленты (ChatProcessingIndicator) —
+            // тот отмечен aria-hidden, поэтому единственный источник озвучивания для
+            // скринридеров о ходе обработки запроса остаётся здесь.
+            <div className="sr-only" role="status" aria-live="polite">
+              {getChatProcessingPlaceholderText(applyingProposalId)}
             </div>
           )}
 
@@ -2348,7 +2363,15 @@ export default function DailyPage() {
                 )}
               </div>
             ) : (
-              chatMessages.map((msg, index) => (
+              chatMessages.map((msg, index) => {
+                // Пока плейсхолдер-индикатор занимает конец ленты, прячем "пустую"
+                // ассистентскую запись, которую sendChatMessage успевает добавить
+                // в chatMessages до первых токенов стрима — иначе два подряд
+                // заголовка «Ассистент» (пустой и плейсхолдер).
+                if (index === chatMessages.length - 1 && showChatProcessingPlaceholder && isEmptyStreamingAssistantShell(msg)) {
+                  return null
+                }
+                return (
                 <div
                   key={getDailyChatMessageRenderKey(msg, index)}
                   id={msg.id ? getDailyChatMessageAnchorId(msg.id) : undefined}
@@ -2398,13 +2421,11 @@ export default function DailyPage() {
                     </div>
                   )}
                 </div>
-              ))
+                )
+              })
             )}
-            {sendingChat && !hasStreamingAssistantResponse && (
-              <div className="py-1">
-                <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
-                <span className="text-sm text-gray-500">печатает...</span>
-              </div>
+            {showChatProcessingPlaceholder && (
+              <ChatProcessingIndicator text={getChatProcessingPlaceholderText(applyingProposalId)} />
             )}
           </div>
 
