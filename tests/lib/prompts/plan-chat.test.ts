@@ -749,4 +749,9 @@ describe('buildPlanChatContext insights section', () => {
     expect(buildPlanChatContext({ ...baseRequest, insights: { evaluationCount: 0 } })).not.toContain('ПРОФИЛЬ ПОНИМАНИЯ')
     expect(buildPlanChatContext(baseRequest)).not.toContain('ПРОФИЛЬ ПОНИМАНИЯ')
   })
+
+  it('numbers clarifying questions so the user can answer by number', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('НУМЕРУЙ ВОПРОСЫ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сопоставь ответы с вопросами по номерам и не переспрашивай')
+  })
 })
