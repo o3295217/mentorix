@@ -32,8 +32,20 @@ function getProposalBlockCategoryKey(block: ProposalBlock): DailyScheduleBlockCa
 
 // Reuses ScheduleLoadSummary's category colors (bg-* utility) as a left border stripe,
 // so the row's category indicator and the load summary bar always agree.
+// Полные литеральные классы — Tailwind генерирует CSS только для классов,
+// которые видит в коде буквально; собранный заменой строки класс останется без стилей.
+const CATEGORY_STRIPE_CLASS: Record<keyof typeof CATEGORY_BAR_COLOR, string> = {
+  main: 'border-primary-500',
+  operational: 'border-purple-500',
+  travel: 'border-cyan-500',
+  personal: 'border-pink-500',
+  meal: 'border-orange-500',
+  rest: 'border-emerald-500',
+  buffer: 'border-gray-500',
+}
+
 export function getProposalBlockStripeClass(block: ProposalBlock): string {
-  return CATEGORY_BAR_COLOR[getProposalBlockCategoryKey(block)].replace('bg-', 'border-')
+  return CATEGORY_STRIPE_CLASS[getProposalBlockCategoryKey(block)]
 }
 
 export function isProposalBlockFixed(block: ProposalBlock): boolean {
@@ -157,7 +169,7 @@ export default function DailyScheduleProposalCard({
   return (
     <section
       ref={sectionRef}
-      className={`mt-3 rounded-lg border-l-2 py-1 pl-3 transition-colors ${isConfirmingReplace ? 'border-amber-400/80 bg-amber-500/5' : 'border-primary-500/40'}`}
+      className={`mt-3 rounded-lg py-1 transition-colors ${isConfirmingReplace ? 'border-l-2 border-amber-400/80 bg-amber-500/5 pl-3' : ''}`}
       aria-label="Предложение расписания"
     >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -192,7 +204,7 @@ export default function DailyScheduleProposalCard({
           return (
             <div
               key={`${block.kind}-${block.startMinutes}-${index}`}
-              className={`flex items-start gap-3 border-l-2 py-1.5 pl-2 pr-1 ${getProposalBlockStripeClass(block)}`}
+              className={`flex items-start gap-3 border-l-2 py-1.5 pl-2.5 pr-0.5 ${getProposalBlockStripeClass(block)}`}
               title={fixed ? 'Фиксированное время' : undefined}
               aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}
             >
