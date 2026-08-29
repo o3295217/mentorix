@@ -94,7 +94,7 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (46)
+## Компоненты (47)
 
 - `AppShell`
 - `AuthGuard`
@@ -112,6 +112,7 @@
 - `Speedometer`
 - `ThemeProvider`
 - `UncompletedTasksModal`
+- `daily/ChatProcessingIndicator`
 - `daily/DailyPeriodContext`
 - `daily/DailyPlanCardHeader`
 - `daily/DailyScheduleProposalCard`

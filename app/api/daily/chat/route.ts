@@ -29,6 +29,7 @@ import { createProposalMetadata, createTaskListProposalMetadata, getDailySchedul
 import { buildScheduleMachineContext } from '@/lib/daily-schedule-context'
 import { isStrictScheduleChangeRequest } from '@/lib/daily-schedule-intent'
 import { AuthError } from '@/lib/auth'
+import { createAssistantTextSanitizer, sanitizeAssistantText } from '@/lib/assistant-text'
 import { buildTaskListProposalWithRejectedScheduleMessage, DEFAULT_REJECTED_SCHEDULE_HUMAN_REASON, FALLBACK_INVALID_PROPOSAL_MESSAGE, getDailyScheduleIssueActionByMarker, humanizeScheduleProposalDiagnostics } from '@/lib/daily-chat-constants'
 
 const ChatSchema = z.object({
@@ -101,7 +102,7 @@ const proposeDailyScheduleTool = {
                 kind: { enum: ['meal', 'rest', 'buffer'] },
                 title: { type: 'string', minLength: 1, maxLength: 120 },
                 category: { enum: ['main', 'operational', 'travel', 'personal', 'meal', 'rest', 'buffer'], description: 'Semantic category. Use personal/travel for user-stated fixed commitments that are not plan tasks.' },
-                isFixed: { type: 'boolean', description: 'true only for hard-time service events explicitly fixed by the user or current schedule. A fixed block keeps the exact time the user named.' },
+                isFixed: { type: 'boolean', description: 'true only for hard-time service events explicitly fixed by the user or current schedule. A fixed block keeps the exact time the user named. Default meals, rests and buffers you added yourself are always false: a meal may be fixed only when the user named its time.' },
                 startMinutes: { type: 'integer', minimum: 0, maximum: 1440, description: 'When isFixed=true: exactly the time the user demanded, never shifted to dodge another block. When isFixed=false: an indicative time expressing the desired order; the server may move it.' },
                 durationMinutes: { type: 'integer', minimum: 15, maximum: 1440 },
               },
@@ -631,6 +632,15 @@ export async function POST(request: NextRequest) {
             const toolInputs = new Map<number, string>()
             const toolNames = new Map<number, string>()
             const toolIds = new Map<number, string>()
+            // Огрызки служебного tool-синтаксиса модели («</invoke>», «</anionale>») иногда
+            // попадают в текстовый блок. Чистим до отправки в SSE, а не только перед сохранением.
+            const textSanitizer = createAssistantTextSanitizer()
+
+            const emitText = (text: string) => {
+              if (!text) return
+              assistantMessage += text
+              controller.enqueue(sseEvent('text', { text }))
+            }
 
             for await (const rawEvent of activeStream as AsyncIterable<unknown>) {
               const event = rawEvent as StreamEvent
@@ -640,13 +650,14 @@ export async function POST(request: NextRequest) {
                 toolInputs.set(event.index, '')
               }
               if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
-                assistantMessage += event.delta.text
-                controller.enqueue(sseEvent('text', { text: event.delta.text }))
+                emitText(textSanitizer.push(event.delta.text))
               }
               if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta' && typeof event.index === 'number') {
                 toolInputs.set(event.index, (toolInputs.get(event.index) ?? '') + (event.delta.partial_json ?? ''))
               }
             }
+
+            emitText(textSanitizer.flush())
 
             const finalMessage = await activeStream.finalMessage()
             return {
@@ -791,6 +802,10 @@ export async function POST(request: NextRequest) {
               success: true,
             })
           }
+
+          // Финальная страховка перед сохранением: дельты уже очищены, здесь снимаются
+          // остатки — оборванный хвост тега и пробелы, оставшиеся на месте вырезанного.
+          assistantMessage = sanitizeAssistantText(assistantMessage)
 
           if (proposalMetadata) controller.enqueue(sseEvent('proposal', { metadata: proposalMetadata }))
 

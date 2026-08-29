@@ -699,6 +699,67 @@ describe('daily schedule proposal', () => {
     }
   })
 
+  // Живой случай: модель поставила перерывы после разных задач, но сервер уплотнил гибкие блоки,
+  // и в применённой раскладке два «Перерыва» по 15 минут встали подряд (11:17-11:32 и 11:32-11:47).
+  it('merges rest blocks that became neighbours after the server reflow', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      newTasks: [],
+      blocks: [
+        { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 9 * 60, durationMinutes: 90 },
+        { kind: 'rest', title: 'Перерыв', category: 'rest', isFixed: false, startMinutes: 10 * 60 + 30, durationMinutes: 15 },
+        { kind: 'task', taskSource: 'existing', taskIndex: 2, taskText: 'Review', category: 'main', isFixed: true, startMinutes: 14 * 60, durationMinutes: 90 },
+        { kind: 'rest', title: 'Перерыв', category: 'rest', isFixed: false, startMinutes: 15 * 60 + 30, durationMinutes: 15 },
+      ],
+    }) as DailyScheduleProposalV3
+
+    const restBlocks = normalized.blocks.filter(block => block.kind === 'rest')
+    expect(restBlocks).toHaveLength(1)
+    expect(restBlocks[0]).toMatchObject({ title: 'Перерыв', startMinutes: 10 * 60 + 30, durationMinutes: 30, isFixed: false })
+    expect(normalized.blocks).toHaveLength(3)
+    expect(getDailyScheduleProposalNormalizationResult(normalized)?.layoutIssues).toContain('merged adjacent rest blocks 2 and 4')
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 2 })).success).toBe(true)
+  })
+
+  it('merges adjacent flexible buffer blocks the same way', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      newTasks: [],
+      blocks: [
+        { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 9 * 60, durationMinutes: 60 },
+        { kind: 'buffer', title: 'Запас', category: 'buffer', isFixed: false, startMinutes: 10 * 60, durationMinutes: 30 },
+        { kind: 'buffer', title: 'Запас на хвосты', category: 'buffer', isFixed: false, startMinutes: 12 * 60, durationMinutes: 30 },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks.filter(block => block.kind === 'buffer')).toEqual([
+      expect.objectContaining({ title: 'Запас', startMinutes: 10 * 60, durationMinutes: 60 }),
+    ])
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
+  })
+
+  it('keeps rest blocks separate when one is fixed, of another kind or not adjacent', () => {
+    const normalized = normalizeDailyScheduleProposalToolInput({
+      ...proposalV3,
+      newTasks: [],
+      blocks: [
+        { kind: 'task', taskSource: 'existing', taskIndex: 1, taskText: 'Deep work', category: 'main', isFixed: false, startMinutes: 9 * 60, durationMinutes: 90 },
+        { kind: 'rest', title: 'Перерыв', category: 'rest', isFixed: false, startMinutes: 10 * 60 + 30, durationMinutes: 15 },
+        { kind: 'rest', title: 'Прогулка', category: 'rest', isFixed: true, startMinutes: 10 * 60 + 45, durationMinutes: 15 },
+        { kind: 'meal', title: 'Обед', category: 'meal', isFixed: false, startMinutes: 13 * 60, durationMinutes: 30 },
+        { kind: 'meal', title: 'Ужин', category: 'meal', isFixed: false, startMinutes: 18 * 60, durationMinutes: 30 },
+      ],
+    }) as DailyScheduleProposalV3
+
+    expect(normalized.blocks.filter(block => block.kind === 'rest')).toEqual([
+      expect.objectContaining({ title: 'Перерыв', startMinutes: 10 * 60 + 30, durationMinutes: 15 }),
+      expect.objectContaining({ title: 'Прогулка', startMinutes: 10 * 60 + 45, durationMinutes: 15, isFixed: true }),
+    ])
+    // Приёмы пищи не сливаются даже встык: «Обед» и «Ужин» — разные события, а не один блок
+    expect(normalized.blocks.filter(block => block.kind === 'meal')).toHaveLength(2)
+    expect(DailyScheduleSchema.safeParse(proposalToDailySchedule(normalized, { currentPlanTaskCount: 1 })).success).toBe(true)
+  })
+
   it('hashes plan tasks stably and remains sensitive to order and text', () => {
     const hash = hashDailyPlanTasks(['Deep work', 'Review'])
 

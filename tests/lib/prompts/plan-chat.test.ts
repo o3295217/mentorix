@@ -157,6 +157,77 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('планирование СЛЕДУЮЩИХ дней исходило из его режима')
   })
 
+  it('keeps default meals flexible and allows a fixed meal only at a user-named time', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПИТАНИЕ — ТРЁХРАЗОВОЕ ПО УМОЛЧАНИЮ, И ВСЕГДА ГИБКОЕ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ДЕФОЛТНЫЙ ПРИЁМ ПИЩИ ВСЕГДА isFixed=false')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('это ориентир, который сервер вправе подвинуть. Фиксировать своё предположение запрещено')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('isFixed=true у еды допустим ТОЛЬКО в этом случае — когда время назвал сам пользователь')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Приёмы пищи, перерывы и буферы, которые ты добавил сам по дефолту, ВСЕГДА isFixed=false')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Дефолтная еда, перерывы и буферы всегда isFixed=false; фиксируешь еду только если время назвал сам пользователь')
+  })
+
+  it('makes defaults yield to an explicit user event instead of colliding with it', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ДЕФОЛТ УСТУПАЕТ ЯВНОМУ СОБЫТИЮ ПОЛЬЗОВАТЕЛЯ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Сначала расставляй названные пользователем события, и только потом раскладывай вокруг них дефолты')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Магазин в 12:00, полтора часа, фикс» означает: магазин — фиксированный блок 12:00-13:30, а дефолтный обед двигается, укорачивается или исчезает')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Ставить на 12:00 фиксированный обед и уносить магазин на 13:30 — грубая ошибка')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не оправдывай столкновение в тексте («обед — ориентир, но магазин займёт это время»)')
+  })
+
+  it('treats every user statement in the dialogue as a binding input', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ВВОДНЫЕ ПОЛЬЗОВАТЕЛЯ — ИСТОЧНИК ИСТИНЫ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('КАЖДОЕ утверждение пользователя из диалога — обязательная вводная, а не фон разговора')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вводная действует до конца диалога, пока пользователь сам её не изменит, и она важнее любого твоего дефолта')
+  })
+
+  it('requires a self-check of user inputs before every tool call', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЧЕК-ЛИСТ ПЕРЕД КАЖДЫМ ВЫЗОВОМ TOOL')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('молча пройди весь диалог, а не только последнее сообщение, и выпиши вводные')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(а) все названные времена и длительности')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(б) все объединения и разделения задач')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(в) все границы и отказы')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(г) не исчезла ли молча из раскладки хоть одна названная пользователем задача')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('исправь блоки ДО вызова tool')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Сам чек-лист пользователю не пересказывай')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Перед самим вызовом молча пройди чек-лист вводных из блока ВВОДНЫЕ ПОЛЬЗОВАТЕЛЯ — ИСТОЧНИК ИСТИНЫ')
+  })
+
+  it('executes an explicit merge instruction as exactly one block', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ОБЪЕДИНЕНИЕ ЗАДАЧ ВЫПОЛНЯЕТСЯ БУКВАЛЬНО')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«пока баня топится, занимаюсь бассейном» = РОВНО ОДИН блок с общим заголовком')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не два блока подряд, не два параллельных и тем более не выброс одной из частей в «Не распределено»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Длительность такого блока — на весь совмещённый процесс целиком')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сказал «раздели» — делай два блока')
+  })
+
+  it('takes day boundaries literally from what the user said', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Работаю до 16:00» = workEndMinutes ровно 960')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Активная фаза до 22:00» = activityEndMinutes=1320')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«домашние дела — не работа»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('их место между workEnd и activityEnd')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Свою прежнюю догадку о границах («работа до 17:00») сразу замени названной цифрой')
+  })
+
+  it('requires saying out loud when an input cannot be honoured', () => {
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЕСЛИ ВВОДНУЮ ВЫПОЛНИТЬ НЕЛЬЗЯ — СКАЖИ ОБ ЭТОМ ЯВНО')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('назови конфликт прямо, одной фразой, и предложи выбор')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Молча проигнорировать её, «округлить» или подменить своим вариантом запрещено')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Пользователь повторяет вводную второй раз — значит прошлое предложение её нарушило')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вводную, которую выполнить нельзя, назови вслух и предложи выбор')
+  })
+
+  it('keeps the user-input rules consistent with retro start, questions and load rules', () => {
+    // Ретро-старт и вопрос о старте остаются на месте: вводные их не отменяют
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('РЕТРО-ЗАПОЛНЕНИЕ ДНЯ — ЗАКОННЫЙ И ЧАСТЫЙ СЦЕНАРИЙ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Планируем с текущего времени или указать другое время старта?»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Спроси только 1-3 самых важных уточнения')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('это вводные из блока ВВОДНЫЕ ПОЛЬЗОВАТЕЛЯ — ИСТОЧНИК ИСТИНЫ, они важнее твоих дефолтов')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Каждое утверждение пользователя из диалога — обязательная вводная: перед вызовом tool пройди чек-лист')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Объедини X и Y в один блок» выполняется буквально: ровно один блок с общим заголовком')
+    // Целевая загрузка не отменена вводными
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`План, который ты собрал сам, обязан укладываться максимум в ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}% окна дня`)
+  })
+
   it('keeps break and meal defaults consistent with the existing food/rest/buffer rule', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Обязательно оставляй место на еду, отдых и буферы: перерывы и приёмы пищи — по блоку ПЕРЕРЫВЫ И ПИТАНИЕ')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Перерыв 15 минут после каждой задачи длиннее часа и место под три приёма пищи — дефолт раскладки, а не вопрос пользователю')

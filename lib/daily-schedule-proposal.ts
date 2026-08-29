@@ -518,6 +518,45 @@ function repairPlacedBlocks(blocks: LayoutBlock[], dayWindow: FreeInterval, unsc
   return sortLayoutBlocksByStart(repairedBlocks)
 }
 
+// Виды служебных блоков, у которых два соседних блока подряд бессмысленны для пользователя:
+// «Перерыв 15 мин» + «Перерыв 15 мин» встык — это один перерыв на 30 минут.
+const MERGEABLE_ADJACENT_BLOCK_KINDS = new Set(['rest', 'buffer'])
+
+// Модель ставит отдых после разных задач и соседями их не видит: соседями они становятся уже
+// после серверной раскладки, когда гибкие блоки уплотняются в свободные промежутки. Поэтому
+// склейка — обязанность сервера, финальным проходом после раскладки и ремонта.
+// Сливаются только гибкие блоки одного вида, стоящие ВСТЫК (end == start): фиксированный блок
+// пользователь прибил к конкретному времени, его длительность менять нельзя.
+function mergeAdjacentServiceBlocks(blocks: LayoutBlock[], layoutIssues: string[]): LayoutBlock[] {
+  const mergedBlocks: LayoutBlock[] = []
+
+  for (const block of blocks) {
+    const previous = mergedBlocks[mergedBlocks.length - 1]
+    const kind = block.block.kind
+    const canMerge = previous
+      && typeof kind === 'string'
+      && MERGEABLE_ADJACENT_BLOCK_KINDS.has(kind)
+      && previous.block.kind === kind
+      && !previous.isFixed
+      && !block.isFixed
+      && getBlockEndMinutes(previous) === block.startMinutes
+      && previous.durationMinutes + block.durationMinutes <= 1440
+
+    if (!canMerge) {
+      mergedBlocks.push(block)
+      continue
+    }
+
+    const durationMinutes = previous.durationMinutes + block.durationMinutes
+    previous.durationMinutes = durationMinutes
+    previous.endMinutes = previous.startMinutes + durationMinutes
+    previous.block.durationMinutes = durationMinutes
+    layoutIssues.push(`merged adjacent ${kind} blocks ${previous.originalIndex + 1} and ${block.originalIndex + 1}`)
+  }
+
+  return mergedBlocks
+}
+
 function createFallbackBlock(dayWindow: FreeInterval): NormalizedProposalBlock {
   return { kind: 'buffer', title: 'Свободное планирование', category: 'buffer', isFixed: false, startMinutes: dayWindow.startMinutes, durationMinutes: MIN_BLOCK_DURATION_MINUTES }
 }
@@ -605,7 +644,8 @@ function placeFlexibleBlocksInFreeIntervals(blocks: unknown[], candidate: Record
     layoutIssues.push('added fallback buffer block because no model block could be scheduled')
   }
 
-  return { blocks: sortLayoutBlocksByStart(repairedBlocks).map(block => block.block), dayWindow, unscheduledBlocks, movedFixedBlocks, layoutIssues }
+  const finalBlocks = mergeAdjacentServiceBlocks(sortLayoutBlocksByStart(repairedBlocks), layoutIssues)
+  return { blocks: finalBlocks.map(block => block.block), dayWindow, unscheduledBlocks, movedFixedBlocks, layoutIssues }
 }
 
 function separateOverlappingScheduleBlocks(blocks: unknown[]): unknown[] {
