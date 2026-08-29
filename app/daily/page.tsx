@@ -402,13 +402,15 @@ export default function DailyPage() {
     if (view !== 'assistant') return
 
     setShowMobileContext(false)
-    void requestPlanChatKickoff(isSubmittingChatRef.current)
+    // Авто-kickoff убран: планирование стартует только по явному действию
+    // пользователя (кнопка или сообщение) — молчаливый вызов модели при
+    // открытии таба выглядел как зависание.
     mobileViewFrameRef.current = window.requestAnimationFrame(() => {
       mobileViewFrameRef.current = null
       scrollChatToBottom()
       ensureChatComposerVisible()
     })
-  }, [ensureChatComposerVisible, requestPlanChatKickoff, scrollChatToBottom])
+  }, [ensureChatComposerVisible, scrollChatToBottom])
 
   const handleMobileTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
     let nextView: 'plan' | 'assistant' | null = null
@@ -2311,7 +2313,11 @@ export default function DailyPage() {
             ref={chatContainerRef}
             className="-mr-4 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain py-2 pr-2 chat-scrollbar lg:-mr-6 lg:pr-3"
           >
-            {chatMessages.length === 0 ? (
+            {chatMessages.length === 0 && showChatProcessingPlaceholder ? (
+              /* Пустой чат + идёт запрос (kickoff): вместо CTA-заглушки — живой индикатор,
+                 иначе вызов модели выглядит как зависание без какой-либо индикации */
+              <ChatProcessingIndicator text={getChatProcessingPlaceholderText(applyingProposalId)} />
+            ) : chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
                 {!canPlanWithMentrix && (
                   <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2 text-sm text-gray-400">

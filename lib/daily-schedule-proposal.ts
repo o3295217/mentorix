@@ -542,6 +542,23 @@ function mergeAdjacentServiceBlocks(blocks: LayoutBlock[], layoutIssues: string[
       && getBlockEndMinutes(previous) === block.startMinutes
       && previous.durationMinutes + block.durationMinutes <= 1440
 
+    // Гибкий отдых вплотную к приёму пищи избыточен: еда сама по себе передышка
+    // («перерыв-обед-перерыв» из живого бага). Такой отдых удаляется.
+    const isFlexibleRest = (b: LayoutBlock) => b.block.kind === 'rest' && !b.isFixed
+    const isMeal = (b: LayoutBlock) => b.block.kind === 'meal'
+    if (previous && getBlockEndMinutes(previous) === block.startMinutes) {
+      if (isFlexibleRest(previous) && isMeal(block)) {
+        mergedBlocks.pop()
+        layoutIssues.push(`dropped rest block ${previous.originalIndex + 1} adjacent to meal`)
+        mergedBlocks.push(block)
+        continue
+      }
+      if (isMeal(previous) && isFlexibleRest(block)) {
+        layoutIssues.push(`dropped rest block ${block.originalIndex + 1} adjacent to meal`)
+        continue
+      }
+    }
+
     if (!canMerge) {
       mergedBlocks.push(block)
       continue

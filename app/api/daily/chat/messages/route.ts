@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeAssistantText } from '@/lib/assistant-text'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
 import { safeParseDailyChatProposalMetadata } from '@/lib/daily-schedule-proposal'
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ messages: messages.map(message => ({
       ...message,
+      // Старые сообщения могли попасть в базу до санитизации — чистим и при отдаче
+      content: message.role === 'assistant' ? sanitizeAssistantText(message.content) : message.content,
       metadata: safeParseDailyChatProposalMetadata(message.metadataJson),
       metadataJson: undefined,
     })) })

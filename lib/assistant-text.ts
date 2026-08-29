@@ -22,7 +22,7 @@ const SERVICE_TAG_WORDS = [
 ] as const
 
 // Любой закрывающий тег с латинским именем: </invoke>, </anionale>, </invoke>.
-const CLOSING_TAG_PATTERN = /<\/[A-Za-z][A-Za-z0-9_:.-]*\s*>/g
+const CLOSING_TAG_PATTERN = /<\s*\/\s*[A-Za-z][A-Za-z0-9_:.-]*\s*>/g
 
 // Открывающие теги — только служебные имена, с атрибутами или без:
 // <invoke name="...">, <parameter name="x">, <anionale>, <thinking/>.

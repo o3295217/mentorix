@@ -768,4 +768,22 @@ describe('daily schedule proposal', () => {
     expect(hashDailyPlanTasks(['Review', 'Deep work'])).not.toBe(hash)
     expect(hashDailyPlanTasks(['Deep work', 'Review!'])).not.toBe(hash)
   })
+
+  it('drops a flexible rest block standing right next to a meal', () => {
+    const result = normalizeDailyScheduleProposalToolInput({
+      version: 3, date: '2026-08-29', timezone: 'Asia/Yekaterinburg',
+      dayStartMinutes: 600, dayEndMinutes: 1320,
+      planningBasis: 'custom_time', planningStartMinutes: 600,
+      workEndMinutes: 960, activityEndMinutes: 1320,
+      newTasks: [],
+      blocks: [
+        { kind: 'rest', title: 'Перерыв', category: 'rest', isFixed: false, startMinutes: 930, durationMinutes: 15 },
+        { kind: 'meal', title: 'Обед', category: 'meal', isFixed: false, startMinutes: 945, durationMinutes: 60 },
+        { kind: 'rest', title: 'Перерыв', category: 'rest', isFixed: false, startMinutes: 1005, durationMinutes: 15 },
+      ],
+    })
+    const blocks = (result as { blocks: Array<{ kind?: string }> }).blocks
+    expect(blocks.filter(b => b.kind === 'rest')).toHaveLength(0)
+    expect(blocks.filter(b => b.kind === 'meal')).toHaveLength(1)
+  })
 })

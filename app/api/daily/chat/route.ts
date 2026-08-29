@@ -595,7 +595,8 @@ export async function POST(request: NextRequest) {
     // Вызов Claude API со стримингом — ответ идёт постепенно, без ожидания всего текста
     const startTime = Date.now()
     // Чат о плане дня — частая простая задача, используем FAST-модель
-    const model = getAiModel('fast')
+    // Планирование — флагманская функция: лёгкая модель теряет правила и арифметику окна
+    const model = getAiModel('smart')
     const systemBlocks = [
       {
         // Статический промпт - кешируется
