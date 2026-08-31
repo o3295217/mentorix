@@ -10,6 +10,7 @@ import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { getDailyEvaluationGoalsContext, getLatestDreamGoal, mapUserProfile } from '@/lib/user-context'
+import { getObservedDayRhythm } from '@/lib/observed-day-rhythm'
 
 // In-memory lock и прогресс для предотвращения параллельных batch запросов
 interface BatchProgress {
@@ -151,8 +152,10 @@ export async function POST(request: NextRequest) {
       lastDate: null,
     })
 
-    // Загрузить общие данные для оценки
-    const [dream, userProfile, openTasks] = await Promise.all([
+    // Загрузить общие данные для оценки.
+    // Наблюдённое окно активности — свойство пользователя, а не конкретного дня:
+    // считаем один раз от текущего момента и переиспользуем для всех дней батча.
+    const [dream, userProfile, openTasks, observedRhythm] = await Promise.all([
       getLatestDreamGoal(userId),
       prisma.userProfile.findFirst({
         where: { userId },
@@ -161,6 +164,7 @@ export async function POST(request: NextRequest) {
       prisma.openTask.findMany({
         where: { userId, isClosed: false },
       }),
+      getObservedDayRhythm(userId),
     ])
     const mappedUserProfile = mapUserProfile(userProfile)
 
@@ -221,6 +225,7 @@ export async function POST(request: NextRequest) {
             familyTime: dailyEntry.familyTime || undefined,
             exerciseTime: dailyEntry.exerciseTime || undefined,
           },
+          observedRhythm,
           openTasks: openTasks.map((t) => `[${t.taskType}] ${t.taskText}`),
         }
 

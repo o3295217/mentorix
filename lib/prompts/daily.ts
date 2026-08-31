@@ -5,6 +5,7 @@ import {
 import {
   formatUserProfile,
   formatDailyContext,
+  formatObservedDayRhythm,
   getDreamHorizonLabel,
   NO_EMOJI_OUTPUT_RULE,
   NO_DREAM_RESPONSE,
@@ -162,7 +163,10 @@ ${NO_EMOJI_OUTPUT_RULE}
 11. Дай 1-2 КОНКРЕТНЫЕ рекомендации на ЗАВТРА:
 
     ГРАНИЦЫ РЕКОМЕНДАЦИЙ (НАРУШАТЬ НЕЛЬЗЯ):
-    - Рекомендации — на ЗАВТРА, не на «сегодня ночью». Вечерняя оценка закрывает день: НИКОГДА не предлагай сесть работать сейчас, ночью или «пока есть время до сна» — сон и восстановление неприкосновенны.
+    - Рекомендации — на ЗАВТРА. Оценка закрывает день: НИКОГДА не предлагай «сядь поработай прямо сейчас».
+    - Единственная граница «поздно/рано» — секция «НАБЛЮДЁННЫЙ РЕЖИМ ДНЯ» в данных. Рекомендации НЕ выводят работу за пределы наблюдённого окна активности пользователя. Внутри окна поздние часы ЛЕГИТИМНЫ: если человек так живёт, это его норма, а не нарушение. Универсального правила «после 22:00 нельзя» не существует.
+    - Время выполнения самой оценки — НЕ сигнал о режиме пользователя. Никаких выводов «уже поздно», «ночь на дворе», «пора спать» из него не делай.
+    - Если режим НЕ наблюдён (мало данных) — действуй консервативно: опирайся на профиль понимания (например «работает утром») и НЕ изобретай хронотип.
     - Утверждения о хронотипе и «сильном времени» пользователя бери ТОЛЬКО из его профиля понимания (preferences/patterns) или его прямых слов. Выдумывать «ночь — твоё сильное время» запрещено; если в профиле записано «работает утром» — рекомендации опираются на утро.
     - Рекомендация не имеет права противоречить профилю понимания пользователя.
 
@@ -268,6 +272,7 @@ ${NO_EMOJI_OUTPUT_RULE}
 // Построение USER промпта со всеми данными пользователя (НЕ кэшируется - всегда актуальные данные)
 export function buildUserDataPrompt(request: DailyEvaluationRequest): string {
   const userProfileSection = formatUserProfile(request.userProfile)
+  const observedRhythmSection = formatObservedDayRhythm(request.observedRhythm)
   const contextSection = formatDailyContext(request.context)
 
   // Форматируем ВСЕ цели - от мечты до недели
@@ -289,7 +294,7 @@ export function buildUserDataPrompt(request: DailyEvaluationRequest): string {
 
   const horizonLabel = getDreamHorizonLabel(request.goals)
 
-  return `${userProfileSection}
+  return `${userProfileSection}${observedRhythmSection}
 🎯 МЕЧТА ПОЛЬЗОВАТЕЛЯ (${horizonLabel}):
 ${request.goals.dreamGoal}
 

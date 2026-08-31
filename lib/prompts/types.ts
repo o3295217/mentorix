@@ -92,6 +92,15 @@ export interface DailyEvaluationResponse {
   suggested_tasks?: SuggestedTask[] // Предложенные задачи
 }
 
+// Наблюдённое окно активности пользователя (см. lib/observed-day-rhythm.ts).
+// Выведено из принятых расписаний и времени заполнения планов, а не из времени оценки.
+export interface ObservedDayRhythmContext {
+  observedStartMinutes: number
+  observedEndMinutes: number
+  sampleDays: number
+  windowDays: number
+}
+
 // Запрос для дневной оценки
 export interface DailyEvaluationRequest {
   date: string
@@ -102,6 +111,7 @@ export interface DailyEvaluationRequest {
   goals: GoalsHierarchy
   userProfile?: UserProfile
   context?: DailyContext
+  observedRhythm?: ObservedDayRhythmContext | null // null/undefined = режим не наблюдён
   openTasks: string[]
   previousFeedback?: PreviousDayFeedback[] // Рекомендации и фидбэк прошлых дней
 }

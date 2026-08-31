@@ -12,6 +12,7 @@ import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { recalculateWorkSummary } from '@/lib/completed-work'
 import { getDailyEvaluationUserContext } from '@/lib/user-context'
+import { getObservedDayRhythm } from '@/lib/observed-day-rhythm'
 
 const EvaluateSchema = z.object({
   dailyEntryId: z.number().int().positive(),
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
     const date = dailyEntry.date
     const userContext = await getDailyEvaluationUserContext(userId, date)
 
+    // Наблюдённое окно активности пользователя: персональная граница «поздно/рано»
+    // для рекомендаций. Считается по принятым расписаниям и времени заполнения планов.
+    const observedRhythm = await getObservedDayRhythm(userId)
+
     // Получить незакрытые задачи
     const openTasks = await prisma.openTask.findMany({
       where: { userId, isClosed: false },
@@ -130,6 +135,7 @@ export async function POST(request: NextRequest) {
         familyTime: dailyEntry.familyTime || undefined,
         exerciseTime: dailyEntry.exerciseTime || undefined,
       },
+      observedRhythm,
       openTasks: openTasks.map((t) => `[${t.taskType}] ${t.taskText}`),
       previousFeedback: previousFeedback.length > 0 ? previousFeedback : undefined,
     }

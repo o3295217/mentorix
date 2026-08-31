@@ -1,4 +1,4 @@
-import { UserProfile, GoalsHierarchy, DailyContext, DailyEvaluationResponse } from './types'
+import { UserProfile, GoalsHierarchy, DailyContext, DailyEvaluationResponse, ObservedDayRhythmContext } from './types'
 import { formatHorizon } from '@/lib/dates'
 
 // Единое правило для пользовательских AI-ответов.
@@ -89,6 +89,28 @@ export function formatDailyContext(context?: DailyContext): string {
   return `
 🌍 КОНТЕКСТ ДНЯ:
 ${parts.join('\n')}
+
+---
+`
+}
+
+// Часы:минуты из минут от начала суток (1440 показываем как 24:00)
+export function formatDayMinutes(minutes: number): string {
+  const normalized = Math.max(0, Math.min(1440, Math.round(minutes)))
+  const hours = Math.floor(normalized / 60)
+  const rest = normalized % 60
+  return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
+}
+
+// Наблюдённый режим дня: персональная граница «поздно/рано» для рекомендаций.
+// Секция присутствует всегда — модель должна явно знать, наблюдено окно или нет.
+export function formatObservedDayRhythm(rhythm?: ObservedDayRhythmContext | null): string {
+  const line = rhythm
+    ? `активность примерно ${formatDayMinutes(rhythm.observedStartMinutes)}–${formatDayMinutes(rhythm.observedEndMinutes)} (по ${rhythm.sampleDays} принятым планам за ${rhythm.windowDays} дней)`
+    : 'режим не наблюдён (мало данных)'
+
+  return `
+🕒 НАБЛЮДЁННЫЙ РЕЖИМ ДНЯ: ${line}
 
 ---
 `
