@@ -1176,18 +1176,18 @@ export default function DailyPage() {
         id="daily-context"
         className={`${showMobileContext ? 'block' : 'hidden'} lg:block`}
       >
-        <div className="lg:rounded-2xl lg:border lg:border-gray-800 lg:bg-gray-900/40 lg:p-3">
+        <div className="lg:rounded-2xl lg:border lg:border-gray-800 lg:bg-gray-900/40 lg:px-3 lg:py-1.5">
           <button
             type="button"
             onClick={() => setIsContextCollapsed((collapsed) => !collapsed)}
-            className="hidden min-h-11 w-full items-center justify-between rounded-lg px-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
+            className="hidden w-full items-center justify-between rounded-lg px-1 py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
             aria-expanded={!isContextCollapsed}
             aria-controls="daily-context-cards"
           >
             {/* Единая типографика заголовков секций страницы: text-xl font-bold,
                 как у «План на день» и «Обсуждаем с mentorix» */}
             <span className="text-xl font-bold text-gray-100">Цели периода</span>
-            <span className="text-sm text-gray-400 transition-colors hover:text-gray-200">{isContextCollapsed ? '▼ показать' : 'Скрыть ▲'}</span>
+            <span className="text-sm font-medium text-gray-300 transition-colors hover:text-gray-100">{isContextCollapsed ? '▾ показать' : 'скрыть ▴'}</span>
           </button>
 
           <div
