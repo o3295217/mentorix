@@ -1168,7 +1168,7 @@ export default function DailyPage() {
         aria-expanded={showMobileContext}
         aria-controls="daily-context"
       >
-        <span>Контекст дня</span>
+        <span>Цели периода</span>
         <span aria-hidden="true">{showMobileContext ? '−' : '+'}</span>
       </button>
 
@@ -1176,39 +1176,41 @@ export default function DailyPage() {
         id="daily-context"
         className={`${showMobileContext ? 'block' : 'hidden'} lg:block`}
       >
-        <button
-          type="button"
-          onClick={() => setIsContextCollapsed((collapsed) => !collapsed)}
-          className="hidden min-h-11 w-full items-center justify-between rounded-xl border border-gray-800 bg-gray-900/60 px-4 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
-          aria-expanded={!isContextCollapsed}
-          aria-controls="daily-context-cards"
-        >
-          <span>Контекст недели и месяца</span>
-          <span className="text-xs text-gray-500">{isContextCollapsed ? '▼ показать' : 'Скрыть ▲'}</span>
-        </button>
+        <div className="lg:rounded-2xl lg:border lg:border-gray-800 lg:bg-gray-900/40 lg:p-3">
+          <button
+            type="button"
+            onClick={() => setIsContextCollapsed((collapsed) => !collapsed)}
+            className="hidden min-h-11 w-full items-center justify-between rounded-lg px-1 text-left text-sm text-gray-400 transition-colors hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
+            aria-expanded={!isContextCollapsed}
+            aria-controls="daily-context-cards"
+          >
+            <span>Цели периода</span>
+            <span className="text-xs text-gray-500">{isContextCollapsed ? '▼ показать' : 'Скрыть ▲'}</span>
+          </button>
 
-        <div
-          id="daily-context-cards"
-          className={`lg:mt-3 ${isContextCollapsed ? 'lg:hidden' : 'lg:block'}`}
-        >
-          <DailyPeriodContext
-            hasGoalContext={hasGoalContext}
-            weekLabel={weekLabel}
-            weekGoals={weekGoals}
-            weekFactsTotal={weekFactsTotal}
-            weekFacts={weekFacts}
-            showWeekFacts={showWeekFacts}
-            onToggleWeekFacts={() => setShowWeekFacts(!showWeekFacts)}
-            monthLabel={monthLabel}
-            monthGoals={monthGoals}
-            monthFactsTotal={monthFactsTotal}
-            monthFacts={monthFacts}
-            showMonthFacts={showMonthFacts}
-            onToggleMonthFacts={() => setShowMonthFacts(!showMonthFacts)}
-            planTaskMutationLocked={planTaskMutationLocked}
-            isGoalCompleted={isGoalCompleted}
-            addGoalToTasks={addGoalToTasks}
-          />
+          <div
+            id="daily-context-cards"
+            className={`lg:mt-3 ${isContextCollapsed ? 'lg:hidden' : 'lg:block'}`}
+          >
+            <DailyPeriodContext
+              hasGoalContext={hasGoalContext}
+              weekLabel={weekLabel}
+              weekGoals={weekGoals}
+              weekFactsTotal={weekFactsTotal}
+              weekFacts={weekFacts}
+              showWeekFacts={showWeekFacts}
+              onToggleWeekFacts={() => setShowWeekFacts(!showWeekFacts)}
+              monthLabel={monthLabel}
+              monthGoals={monthGoals}
+              monthFactsTotal={monthFactsTotal}
+              monthFacts={monthFacts}
+              showMonthFacts={showMonthFacts}
+              onToggleMonthFacts={() => setShowMonthFacts(!showMonthFacts)}
+              planTaskMutationLocked={planTaskMutationLocked}
+              isGoalCompleted={isGoalCompleted}
+              addGoalToTasks={addGoalToTasks}
+            />
+          </div>
         </div>
       </div>
 
