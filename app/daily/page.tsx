@@ -2458,7 +2458,7 @@ export default function DailyPage() {
               aria-label="Сообщение Ассистенту"
               disabled={sendingChat || isSubmittingChat}
               rows={1}
-              className="min-h-11 max-h-40 flex-1 resize-none overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800 md:text-sm"
+              className="min-h-11 max-h-40 flex-1 resize-none overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800"
               style={{ height: '44px' }}
             />
             <button
