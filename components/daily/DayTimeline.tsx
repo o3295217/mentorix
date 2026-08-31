@@ -417,9 +417,9 @@ export default function DayTimeline({
   return (
     <div className="day-timeline flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pr-2">
       {/* Status bar */}
-      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-5 text-gray-500 sm:text-sm">
+      <div className="type-secondary flex flex-wrap items-center gap-x-1.5 gap-y-1 leading-5">
         {getTimelineBoundaryPills(schedule).map(label => (
-          <span key={label} className="rounded-full border border-gray-800/70 bg-gray-950/60 px-2 py-0.5 text-xs text-gray-300 tabular-nums">{label}</span>
+          <span key={label} className="type-caption rounded-full border border-gray-800/70 bg-gray-950/60 px-2 py-0.5 tabular-nums">{label}</span>
         ))}
         <span className="ml-1 truncate text-gray-500 sm:max-w-none">
           {timezone}
@@ -439,7 +439,7 @@ export default function DayTimeline({
       {!isScheduleEmpty && <ScheduleLoadSummary summary={loadSummary} className="px-1" />}
 
       {isScheduleEmpty && (
-        <div className="rounded-2xl border border-primary-500/20 bg-primary-500/10 px-3 py-2 text-sm text-gray-300">
+        <div className="type-body rounded-2xl border border-primary-500/20 bg-primary-500/10 px-3 py-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p>{timelineWindow.isCompressed ? 'Расписание пустое — показываю рабочее окно, чтобы сразу было видно шкалу.' : 'Расписание пустое — весь день открыт на шкале.'}</p>
             {timelineWindow.isCompressed && (
@@ -458,14 +458,14 @@ export default function DayTimeline({
       {unscheduledTasks.length > 0 && (
         <div className="flex-shrink-0 rounded-2xl border border-gray-800/70 bg-gray-950/50 p-2 pr-3">
           <div className="mb-1 flex items-center justify-between gap-3">
-            <h4 className="text-sm font-medium text-gray-200">Не распределено ({unscheduledTasks.length})</h4>
-            <span className="hidden text-right text-xs text-gray-500 sm:inline">{trayConfig.hint}</span>
+            <h4 className="type-secondary font-medium text-gray-200">Не распределено ({unscheduledTasks.length})</h4>
+            <span className="type-caption hidden text-right sm:inline">{trayConfig.hint}</span>
           </div>
           {hasUnappliedScheduleProposal && onGoToUnappliedScheduleProposal && (
             <button
               type="button"
               onClick={onGoToUnappliedScheduleProposal}
-              className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-left text-xs text-cyan-100 transition-colors hover:bg-cyan-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="type-caption mb-2 flex w-full items-center justify-between gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-left text-cyan-100 transition-colors hover:bg-cyan-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               <span>В чате есть неприменённое расписание</span>
               <span className="shrink-0 font-medium underline decoration-dotted underline-offset-2">Показать в чате</span>
@@ -491,7 +491,7 @@ export default function DayTimeline({
                     setDropPreview(null)
                   }}
                   disabled={mutationLocked}
-                  className={`group flex w-full cursor-grab items-center gap-2 rounded-xl border border-gray-800/80 bg-gray-900/70 px-3 py-1.5 text-left text-sm text-gray-200 shadow-sm transition hover:border-blue-400/50 hover:bg-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-400 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50 ${draggingTaskIndex === index ? 'scale-[0.98] border-blue-400/70 bg-blue-500/15' : ''}`}
+                  className={`type-body group flex w-full cursor-grab items-center gap-2 rounded-xl border border-gray-800/80 bg-gray-900/70 px-3 py-1.5 text-left shadow-sm transition hover:border-blue-400/50 hover:bg-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-400 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50 ${draggingTaskIndex === index ? 'scale-[0.98] border-blue-400/70 bg-blue-500/15' : ''}`}
                   title={`Перетащить «${task.taskText}» на шкалу или нажать для ближайшего слота`}
                   aria-label={`Задача «${task.taskText}». Перетащите на шкалу или нажмите, чтобы поставить в ближайший свободный слот на 30 минут`}
                   aria-grabbed={draggingTaskIndex === index}
@@ -514,6 +514,9 @@ export default function DayTimeline({
       {/* Timeline area + hour axis */}
       <div className="flex gap-2" style={{ height: totalHeight, minHeight: totalHeight }}>
         {/* Hour labels column */}
+        {/* Вне шкалы: циферблатные метки оси (часы, точные границы блоков, плашка
+            «сейчас») — плотный числовой жёлоб шкалы времени, читаются как деления
+            линейки, а не как текст с ролью в типографической иерархии. */}
         <div className="relative h-full w-14 flex-shrink-0" aria-hidden>
           {visibleAxisMarks.hourMarks.map(m => (
             <div
@@ -585,7 +588,7 @@ export default function DayTimeline({
 
           {dropPreview && (
             <div
-              className="pointer-events-none absolute left-2 right-2 z-10 rounded-xl border border-blue-300/70 bg-blue-500/20 px-3 py-2 text-sm font-medium text-blue-50 shadow-lg shadow-blue-950/30"
+              className="type-secondary pointer-events-none absolute left-2 right-2 z-10 rounded-xl border border-blue-300/70 bg-blue-500/20 px-3 py-2 font-medium text-blue-50 shadow-lg shadow-blue-950/30"
               style={{ top: (dropPreview.startMinutes - dayStart) * pxPerMinute, height: Math.max(44, DEFAULT_UNSCHEDULED_DURATION_MINUTES * pxPerMinute) }}
               role="status"
               aria-live="polite"
@@ -922,10 +925,12 @@ function ScheduleBlock({
                 aria-label={`Отметить задачу «${title}» выполненной`}
               />
             )}
-            <div className={`min-w-0 flex-1 truncate text-[13px] font-medium text-gray-100 sm:text-sm ${isCompleted && isTaskBlock ? 'text-gray-400 line-through' : ''}`}>
+            <div className={`type-body min-w-0 flex-1 truncate font-medium ${isCompleted && isTaskBlock ? 'text-gray-400 line-through' : ''}`}>
               {title}
             </div>
             {isTaskBlock && taskId !== null && !mutationLocked && (
+              // Вне шкалы: компактная кнопка-иконка правки, размер задан плотностью
+              // строки блока, а не текстовой ролью.
               <button
                 type="button"
                 className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
@@ -939,8 +944,9 @@ function ScheduleBlock({
                 ✎
               </button>
             )}
-            <div className="shrink-0 text-xs font-medium text-gray-300">
+            <div className="type-secondary shrink-0 font-medium">
               {startLabel}–{endLabel} · {formatDurationLabel(displayDuration)}
+              {/* Вне шкалы: бейдж «фикс.», как в карточке предложения расписания. */}
               {fixed && <span className="ml-1 rounded border border-amber-400/60 bg-amber-500/15 px-1 text-[10px] font-semibold text-amber-100">фикс.</span>}
             </div>
           </div>
@@ -960,7 +966,7 @@ function ScheduleBlock({
                   aria-label={`Отметить задачу «${title}» выполненной`}
                 />
               )}
-              <div className={`min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-gray-100 ${isCompleted && isTaskBlock ? 'text-gray-400 line-through' : ''}`}>
+              <div className={`type-body min-w-0 flex-1 truncate font-medium leading-tight ${isCompleted && isTaskBlock ? 'text-gray-400 line-through' : ''}`}>
                 {title}
               </div>
               {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
@@ -977,7 +983,9 @@ function ScheduleBlock({
                 </button>
               )}
             </div>
-            <div className={`${isShortBlock ? 'text-xs leading-tight' : 'text-[13px] leading-5'} text-gray-300`}>
+            <div className={`type-secondary ${isShortBlock ? 'leading-tight' : 'leading-5'}`}>
+              {/* Вне шкалы: бейджи категории и «фикс.» — компактные цветовые метки,
+                  как в карточке предложения расписания, а не текстовая роль. */}
               <span className="mr-1 rounded bg-gray-950/30 px-1.5 py-0.5 text-[11px] uppercase tracking-wide">{categoryLabels[category]}</span>
               {fixed && <span className="mr-1 rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-100">фикс.</span>}
               {startLabel}–{endLabel} · {formatDurationLabel(displayDuration)}
@@ -986,6 +994,9 @@ function ScheduleBlock({
         )}
 
         {editing && (
+          // Вне шкалы (вся инлайн-форма ниже): плотный редактор блока встраивается
+          // прямо в карточку шкалы, чья ширина не гарантирована — тот же случай
+          // плотности, что и у TimeField (см. components/daily/TimeField.tsx).
           <div
             className="mt-1.5 flex flex-col gap-1.5"
             onPointerDown={e => e.stopPropagation()}

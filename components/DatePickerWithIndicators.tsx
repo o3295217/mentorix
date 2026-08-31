@@ -291,7 +291,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
   }
 
   const renderLegendHeading = (label: string) => (
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+    <div className="type-caption grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-2 font-medium uppercase tracking-wide">
       <span aria-hidden="true" />
       <span>{label}</span>
     </div>
@@ -309,7 +309,9 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
   const getDayClassName = (date: Date) => {
     const state = getDateState(date)
 
-    let className = 'relative flex h-11 min-w-0 w-full cursor-pointer items-center justify-center rounded text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 '
+    // Роль — «подпись даты» (как «подписи времени» в шкале), поэтому type-secondary,
+    // а не type-body: цвет ниже переопределяется по состоянию дня (выбран/сегодня/чужой месяц).
+    let className = 'relative flex h-11 min-w-0 w-full cursor-pointer items-center justify-center rounded type-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 '
 
     if (state.isSelected) {
       className += 'bg-blue-500 text-white font-bold '
@@ -379,7 +381,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
         ref={triggerRef}
         type="button"
         onClick={toggleCalendar}
-        className="input flex min-h-11 w-auto min-w-0 cursor-pointer items-center justify-between gap-2 text-left text-base"
+        className="input type-body flex min-h-11 w-auto min-w-0 cursor-pointer items-center justify-between gap-2 text-left"
         aria-expanded={isOpen}
         aria-controls="daily-date-picker-calendar"
         aria-haspopup="dialog"
@@ -401,7 +403,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
             <button type="button" onClick={goToPreviousMonth} className="flex h-11 min-w-11 items-center justify-center rounded text-gray-300 hover:bg-gray-700" aria-label="Предыдущий месяц">
               ↑
             </button>
-            <h2 id="daily-date-picker-month" className="min-w-0 flex-1 px-1 text-center text-base font-semibold text-white sm:text-lg" aria-live="polite">
+            <h2 id="daily-date-picker-month" className="type-card-title min-w-0 flex-1 px-1 text-center" aria-live="polite">
               {format(currentMonth, 'LLLL yyyy', { locale: ru })}
             </h2>
             <button type="button" onClick={goToNextMonth} className="flex h-11 min-w-11 items-center justify-center rounded text-gray-300 hover:bg-gray-700" aria-label="Следующий месяц">
@@ -409,7 +411,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
             </button>
           </div>
 
-          <div className="min-h-5 px-1 text-center text-xs sm:px-0" aria-live="polite" aria-atomic="true">
+          <div className="type-caption min-h-5 px-1 text-center sm:px-0" aria-live="polite" aria-atomic="true">
             {isLoading && <span className="text-gray-400" role="status">Загрузка отметок…</span>}
             {!isLoading && loadError && <span className="text-red-300" role="alert">{loadError}</span>}
           </div>
@@ -417,7 +419,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
           {/* Week days */}
           <div className="mb-1 grid grid-cols-7 gap-0 sm:mb-2 sm:gap-1">
             {weekDays.map((day) => (
-              <div key={day} className="text-center text-xs font-semibold text-gray-400">
+              <div key={day} className="type-caption text-center font-semibold">
                 {day}
               </div>
             ))}
@@ -461,7 +463,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
             </button>
           </div>
 
-          <div className="border-t border-gray-700 px-2 py-2 text-xs text-gray-400 sm:mt-3 sm:px-0 sm:pb-0 sm:pt-3">
+          <div className="type-caption border-t border-gray-700 px-2 py-2 sm:mt-3 sm:px-0 sm:pb-0 sm:pt-3">
             <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-5">
               <div className="space-y-2">
                 {renderLegendHeading('День')}

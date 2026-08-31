@@ -43,7 +43,7 @@ export default function DailyPeriodContext({
 }: DailyPeriodContextProps) {
   if (!hasGoalContext) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3 text-sm text-gray-400">
+      <div className="type-secondary rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3">
         Цели недели и месяца пока не заданы. <Link href="/goals" className="font-medium text-primary-300 hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">Добавьте цели</Link>, чтобы Ментрикс точнее собирал план дня.
       </div>
     )

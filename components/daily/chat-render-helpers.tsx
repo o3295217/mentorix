@@ -30,7 +30,7 @@ export function renderAssistantMessageContent(content: string): ReactNode[] {
     if (listItems.length === 0) return
     const key = `list-${nodes.length}`
     nodes.push(
-      <ul key={key} className="my-2 space-y-1 pl-5 text-[15px] leading-6 text-gray-100">
+      <ul key={key} className="type-body my-2 space-y-1 pl-5 leading-6">
         {listItems.map((item, index) => <li key={index} className="list-disc">{item}</li>)}
       </ul>,
     )
@@ -49,7 +49,7 @@ export function renderAssistantMessageContent(content: string): ReactNode[] {
       return
     }
     flushList()
-    nodes.push(<p key={`p-${index}`} className="whitespace-pre-wrap text-[15px] leading-6">{renderInlineStrong(trimmed, `p-${index}`)}</p>)
+    nodes.push(<p key={`p-${index}`} className="type-body whitespace-pre-wrap leading-6">{renderInlineStrong(trimmed, `p-${index}`)}</p>)
   })
   flushList()
   return nodes

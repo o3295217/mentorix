@@ -82,10 +82,10 @@ export default function PeriodContextCard({
 
   return (
     <div className={`rounded-lg border p-4 ${c.card}`}>
-      <h3 className={`mb-3 text-lg font-semibold ${c.title}`}>{label}</h3>
+      <h3 className={`type-card-title mb-3 ${c.title}`}>{label}</h3>
 
       {goals.length > 0 && (
-        <ul className={`space-y-1.5 text-base ${c.list}`}>
+        <ul className={`type-body space-y-1.5 ${c.list}`}>
           {goals.map((goal, index) => {
             const completedInPeriod = goal.completed
             const completedToday = isGoalCompleted(goal.text)
@@ -122,16 +122,18 @@ export default function PeriodContextCard({
             className="flex w-full items-center justify-between gap-2 py-1.5 text-left"
             aria-expanded={showFacts}
           >
-            <span className={`text-xs font-medium ${c.factsLabel}`}>{getFactsSummaryLabel(factsTotal)}</span>
-            <span className={`text-xs ${c.factsToggle}`}>{showFacts ? '▲ скрыть' : '▼ показать'}</span>
+            <span className={`type-secondary font-medium ${c.factsLabel}`}>{getFactsSummaryLabel(factsTotal)}</span>
+            <span className={`type-secondary ${c.factsToggle}`}>{showFacts ? '▲ скрыть' : '▼ показать'}</span>
           </button>
           {showFacts && (
             <div className="chat-scrollbar mt-2 space-y-1 lg:max-h-48 lg:overflow-y-auto lg:pr-2">
               {facts.map(item => (
-                <div key={item.id} className="flex items-center gap-2 text-sm">
+                <div key={item.id} className="type-secondary flex items-center gap-2">
                   <span className={c.factsCheck}>✓</span>
-                  <span className="min-w-0 break-words text-gray-300">{item.text}</span>
+                  <span className="min-w-0 break-words">{item.text}</span>
                   {item.category && (
+                    // Вне шкалы: цветовой бейдж категории факта (как «фикс.»/«новая» в расписании) —
+                    // не текстовая роль, а компактная цветовая метка фиксированного размера.
                     <span className={`ml-auto text-[10px] ${
                       item.category === 'стратегические' ? 'text-orange-400' :
                       item.category === 'операционные' ? 'text-blue-400' : 'text-gray-500'

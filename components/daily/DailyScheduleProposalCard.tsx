@@ -174,12 +174,14 @@ export default function DailyScheduleProposalCard({
     >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-gray-100">{getProposalTitle({ hasExistingSchedule, newTaskCount: newTasks.length })}</h3>
-          <p className="text-xs text-gray-400">
+          <h3 className="type-card-title">{getProposalTitle({ hasExistingSchedule, newTaskCount: newTasks.length })}</h3>
+          <p className="type-secondary">
             {getProposalSummaryText({ boundaryText: getProposalBoundaryText(metadata), blockCount: blocks.length, newTaskCount: newTasks.length })}
           </p>
         </div>
         {isApplied && (
+          // Вне шкалы: статусный бейдж-пилюля, как «фикс.»/«новая» — компактная метка,
+          // а не текстовая роль.
           <span className="rounded-full border border-green-500/40 bg-green-500/10 px-2 py-1 text-xs font-medium text-green-300" role="status">
             Применено
           </span>
@@ -187,7 +189,7 @@ export default function DailyScheduleProposalCard({
       </div>
 
       {(hasNewTasks || hasExistingSchedule) && (
-        <p className={`mb-2 rounded-lg border px-2.5 py-2 text-xs leading-5 ${hasExistingSchedule ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-blue-500/30 bg-blue-500/10 text-blue-100'}`}>
+        <p className={`type-caption mb-2 rounded-lg border px-2.5 py-2 leading-5 ${hasExistingSchedule ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-blue-500/30 bg-blue-500/10 text-blue-100'}`}>
           {hasExistingSchedule
             ? 'Уже есть расписание на этот день. Этот вариант заменит текущую шкалу после подтверждения.'
             : 'Ментрикс предлагает добавить новые задачи и сразу поставить их в расписание. Ничего не изменится, пока вы не нажмёте "Применить".'}
@@ -208,15 +210,16 @@ export default function DailyScheduleProposalCard({
               title={fixed ? 'Фиксированное время' : undefined}
               aria-label={`${title}, ${getProposalBlockMetaLabel(block)}`}
             >
-              <span className="w-[6.5rem] shrink-0 whitespace-nowrap pt-0.5 text-[13px] tabular-nums text-gray-400">
+              <span className="type-secondary w-[6.5rem] shrink-0 whitespace-nowrap pt-0.5 tabular-nums">
                 {minutesToTimeLabel(block.startMinutes)}–{minutesToTimeLabel(block.startMinutes + block.durationMinutes)}
               </span>
-              <span className="min-w-0 flex-1 break-words text-sm text-gray-100">
+              <span className="type-body min-w-0 flex-1 break-words">
                 {title}
+                {/* Вне шкалы: бейджи «новая»/«фикс.» — компактные цветовые метки состояния блока. */}
                 {isNewTaskBlock && <span className="ml-1.5 inline-block shrink-0 rounded-full border border-cyan-300/50 bg-cyan-400/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-cyan-100">новая</span>}
                 {fixed && <span className="ml-1.5 inline-block shrink-0 rounded border border-amber-400/60 bg-amber-500/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-amber-100">фикс.</span>}
               </span>
-              <span className="shrink-0 whitespace-nowrap pt-0.5 text-right text-xs text-gray-400">
+              <span className="type-secondary shrink-0 whitespace-nowrap pt-0.5 text-right">
                 {formatDurationLabel(block.durationMinutes)}
               </span>
             </div>
@@ -225,12 +228,12 @@ export default function DailyScheduleProposalCard({
       </div>
 
       {metadata.proposal.rationale && (
-        <p className="mt-2 text-xs leading-5 text-gray-400">{metadata.proposal.rationale}</p>
+        <p className="type-secondary mt-2 leading-5">{metadata.proposal.rationale}</p>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-300" role="alert">{error}</p>}
+      {error && <p className="type-body mt-2 text-red-300" role="alert">{error}</p>}
       {isConfirmingReplace && (
-        <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/10 px-2.5 py-2 text-xs font-medium leading-5 text-amber-200" role="status">
+        <p className="type-caption mt-2 flex items-start gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/10 px-2.5 py-2 font-medium leading-5 text-amber-200" role="status">
           <span aria-hidden>⚠</span>
           <span>Текущая шкала дня будет заменена. Нажмите «Заменить текущее расписание?» ещё раз, чтобы подтвердить, или «Не заменять», чтобы отменить.</span>
         </p>
@@ -253,8 +256,8 @@ export default function DailyScheduleProposalCard({
           {isConfirmingReplace ? 'Не заменять' : 'Отменить'}
         </button>
       </div>
-      {!messageId && <p className="mt-1 text-xs text-gray-500">Кнопка станет доступна после сохранения ответа ассистента.</p>}
-      {isApplied && <p className="mt-2 text-sm text-green-300" role="status">{hasNewTasks ? 'Новые задачи добавлены, расписание применено.' : 'Расписание применено, шкала дня обновлена.'}</p>}
+      {!messageId && <p className="type-caption mt-1">Кнопка станет доступна после сохранения ответа ассистента.</p>}
+      {isApplied && <p className="type-body mt-2 text-green-300" role="status">{hasNewTasks ? 'Новые задачи добавлены, расписание применено.' : 'Расписание применено, шкала дня обновлена.'}</p>}
     </section>
   )
 }

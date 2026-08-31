@@ -251,10 +251,10 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
         {/* Header */}
         <div className="flex flex-shrink-0 items-start gap-2 border-b border-gray-700 p-3 sm:p-4">
           <div className="min-w-0 flex-1">
-            <h2 id="uncompleted-modal-title" className="text-xl font-bold text-white">
+            <h2 id="uncompleted-modal-title" className="type-section-title">
               Невыполненные задачи
             </h2>
-            <p id="uncompleted-modal-description" className="mt-1 text-sm text-gray-400">
+            <p id="uncompleted-modal-description" className="type-secondary mt-1">
               Что делать с задачами, которые не были выполнены?
             </p>
           </div>
@@ -270,7 +270,7 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
         </div>
 
         {/* Bulk actions */}
-        <div className="flex flex-shrink-0 items-center gap-1.5 border-b border-gray-700 px-3 py-2 text-xs text-gray-400 sm:px-4">
+        <div className="type-caption flex flex-shrink-0 items-center gap-1.5 border-b border-gray-700 px-3 py-2 sm:px-4">
           <span>Все:</span>
           <button
             type="button"
@@ -297,11 +297,11 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
             const selection = selections[task.id] ?? getDefaultRowSelection()
             return (
               <div key={task.id} className="py-2.5">
-                <p className="break-words text-sm text-gray-100">
+                <p className="type-body break-words">
                   {task.taskText}
                 </p>
                 {task.transferCount && task.transferCount >= 3 && (
-                  <p className="mt-0.5 text-xs text-amber-400">
+                  <p className="type-caption mt-0.5 text-amber-400">
                     Переносится {task.transferCount}-й раз. Может разбить на шаги?
                   </p>
                 )}
@@ -340,7 +340,7 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
                       value={selection.customDate ?? ''}
                       onChange={(e) => setRowCustomDate(task.id, e.target.value)}
                       min={tomorrow}
-                      className="min-h-9 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-white"
+                      className="type-body min-h-9 rounded border border-gray-700 bg-gray-800 px-2 py-1"
                       aria-label={`Дата переноса задачи «${task.taskText}»`}
                     />
                   </div>
@@ -361,8 +361,8 @@ export default function UncompletedTasksModal({ tasks, currentDate, onComplete, 
             Отмена
           </button>
           <div className="sm:order-2 sm:flex-1 sm:px-3">
-            {isProcessing && <p className="text-sm text-blue-300" role="status" aria-live="polite">Обрабатываем решения…</p>}
-            {!isProcessing && submitError && <p className="text-sm text-red-300" role="alert">{submitError}</p>}
+            {isProcessing && <p className="type-body text-blue-300" role="status" aria-live="polite">Обрабатываем решения…</p>}
+            {!isProcessing && submitError && <p className="type-body text-red-300" role="alert">{submitError}</p>}
           </div>
           <button
             type="button"

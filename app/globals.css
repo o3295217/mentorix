@@ -182,6 +182,48 @@
 }
 
 @layer components {
+  /* ====== TYPOGRAPHY SCALE ======
+   * Единый источник правды для текстовой иерархии приложения. Любой новый текст
+   * обязан использовать один из этих классов вместо ad-hoc text-* /
+   * произвольных text-[Npx]. Роль элемента важнее визуального совпадения с
+   * тем, что было раньше — одинаковые по роли элементы обязаны выглядеть
+   * одинаково везде, а не по месту.
+   *
+   *   .type-page-title    — заголовок страницы («Ежедневное планирование»)
+   *   .type-section-title — заголовок секции («План на день», «Цели периода»)
+   *   .type-card-title    — заголовок карточки/подраздела («Неделя 31-6 сент»)
+   *   .type-body          — основной текст (задачи, сообщения чата, инпуты)
+   *   .type-secondary     — вторичный текст (метаданные, «Сделано: 3», время)
+   *   .type-caption       — служебный мелкий текст (легенды, подсказки)
+   *
+   * Явно вне шкалы (осознанные исключения, см. комментарии по месту
+   * использования): цифровые метки оси таймлайна, статусные бейджи
+   * фиксированной ширины («фикс.» / «новая»).
+   */
+  .type-page-title {
+    @apply text-3xl font-bold text-gray-100;
+  }
+
+  .type-section-title {
+    @apply text-xl font-bold text-gray-100;
+  }
+
+  .type-card-title {
+    @apply text-lg font-semibold text-gray-100;
+  }
+
+  .type-body {
+    @apply text-base text-gray-100;
+  }
+
+  .type-secondary {
+    @apply text-sm text-gray-400;
+  }
+
+  .type-caption {
+    @apply text-xs text-gray-500;
+  }
+
   .app-shell,
   .app-viewport-min-height {
     min-height: 100vh;

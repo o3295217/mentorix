@@ -13,8 +13,8 @@ export type ChatProcessingIndicatorProps = {
 export default function ChatProcessingIndicator({ text }: ChatProcessingIndicatorProps) {
   return (
     <div className="py-1" aria-hidden="true">
-      <div className="mb-1 text-sm font-medium text-gray-400">Ассистент</div>
-      <div className="flex items-center gap-2 text-sm text-gray-500">
+      <div className="type-secondary mb-1 font-medium">Ассистент</div>
+      <div className="type-caption flex items-center gap-2">
         <span>{text}</span>
         <span className="chat-typing-dots">
           <span />

@@ -36,9 +36,9 @@ export default function DailyPlanCardHeader({
   return (
     <div className="daily-phase-accent mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 lg:pr-6" data-phase={phase}>
       <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
-        <h2 className="text-xl font-bold">План на день</h2>
+        <h2 className="type-section-title">План на день</h2>
         <span
-          className="inline-block text-base font-semibold tabular-nums leading-none tracking-tight text-gray-400"
+          className="type-secondary inline-block font-semibold tabular-nums leading-none tracking-tight"
           aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
           title={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
         >
@@ -49,6 +49,8 @@ export default function DailyPlanCardHeader({
       </div>
       <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 sm:w-auto sm:justify-end">
         {totalCount > 0 && (
+          // Вне шкалы: KPI-счётчик прогресса дня намеренно растёт в фазе исполнения
+          // (text-base → text-xl) как акцент внимания, это не статичная роль текста.
           <span className={`whitespace-nowrap tabular-nums leading-none tracking-tight ${isExecution ? 'text-xl font-bold' : 'text-base font-semibold'} ${
             completionPercent === 100 ? 'text-green-400' :
             completionPercent > 0 ? 'text-amber-400' :
@@ -60,7 +62,7 @@ export default function DailyPlanCardHeader({
         )}
         {habitTotalCount > 0 && (
           <span
-            className="whitespace-nowrap text-xs font-medium tabular-nums leading-none text-gray-500"
+            className="type-caption whitespace-nowrap font-medium tabular-nums leading-none"
             title="Бытовые привычки не входят в показатель рабочих задач"
           >
             привычки {habitCompletedCount}/{habitTotalCount}

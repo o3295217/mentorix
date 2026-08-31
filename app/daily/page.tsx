@@ -1153,7 +1153,7 @@ export default function DailyPage() {
   return (
     <div className="min-w-0 space-y-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:space-y-6 lg:pb-0">
       <div className="flex min-w-0 items-center justify-between gap-3">
-        <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">
+        <h1 className="type-page-title min-w-0">
           <span className="lg:hidden">План дня</span>
           <span className="hidden lg:inline">Ежедневное планирование</span>
         </h1>
@@ -1184,10 +1184,10 @@ export default function DailyPage() {
             aria-expanded={!isContextCollapsed}
             aria-controls="daily-context-cards"
           >
-            {/* Единая типографика заголовков секций страницы: text-xl font-bold,
-                как у «План на день» и «Обсуждаем с mentorix» */}
-            <span className="text-xl font-bold text-gray-100">Цели периода</span>
-            <span className="text-sm font-medium text-gray-300 transition-colors hover:text-gray-100">{isContextCollapsed ? '▾ показать' : 'скрыть ▴'}</span>
+            {/* Единая типографика заголовков секций страницы — см. .type-section-title
+                в globals.css, тот же класс у «План на день» и «Обсуждаем с mentorix» */}
+            <span className="type-section-title">Цели периода</span>
+            <span className="type-secondary font-medium transition-colors hover:text-gray-100">{isContextCollapsed ? '▾ показать' : 'скрыть ▴'}</span>
           </button>
 
           <div
@@ -1299,7 +1299,7 @@ export default function DailyPage() {
               disabled={planTaskMutationLocked}
               placeholder="Добавить задачу..."
               rows={1}
-              className="min-h-11 flex-1 resize-none overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="type-body min-h-11 flex-1 resize-none overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
               style={{ height: 'auto' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
@@ -1327,16 +1327,18 @@ export default function DailyPage() {
             return (
               <div className={`relative z-40 mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 lg:mr-6 ${showHabitsExpanded ? 'shadow-[0_12px_32px_rgba(0,0,0,0.28)]' : ''}`}>
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="text-sm text-amber-300 font-medium">
+                  <span className="type-secondary text-amber-300 font-medium">
                     Привычки ({habits.length})
                   </span>
                   <div className="flex min-w-0 flex-1 gap-1 overflow-hidden">
                     {habits.slice(0, 3).map((habit) => {
                       const isInPlan = taskTextsLower.has(habit.taskText.toLowerCase())
                       return (
+                        // Вне шкалы: усечённая цветовая метка привычки (max-w 120px) — компактный
+                        // тег, а не читаемый текст, как бейджи «фикс.»/«новая».
                         <span
                           key={habit.id}
-                          className={`text-xs px-2 py-0.5 rounded-full truncate max-w-[120px] ${
+                          className={`type-caption px-2 py-0.5 rounded-full truncate max-w-[120px] ${
                             isInPlan
                               ? 'bg-green-500/15 text-green-400'
                               : 'bg-amber-500/15 text-amber-400'
@@ -1347,7 +1349,7 @@ export default function DailyPage() {
                       )
                     })}
                     {habits.length > 3 && (
-                      <span className="text-xs text-amber-500">+{habits.length - 3}</span>
+                      <span className="type-caption text-amber-500">+{habits.length - 3}</span>
                     )}
                   </div>
                   <button
@@ -1371,7 +1373,7 @@ export default function DailyPage() {
                         return (
                           <div
                             key={habit.id}
-                            className={`inline-flex min-w-0 items-center gap-1 rounded-xl pl-2 pr-1 text-xs lg:rounded-full ${
+                            className={`type-body inline-flex min-w-0 items-center gap-1 rounded-xl pl-2 pr-1 lg:rounded-full ${
                               isInPlan
                                 ? 'bg-green-500/15 text-green-400'
                                 : 'bg-amber-500/15 text-amber-300'
@@ -1386,7 +1388,8 @@ export default function DailyPage() {
                             >
                               {isInPlan && ' '}
                               {habit.taskText}
-                              {habit.streak > 0 && <span className={`ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>{habit.streak}</span>}
+                              {/* Вне шкалы: счётчик стрика — компактная цифровая метка, а не текст с ролью. */}
+                              {habit.streak > 0 && <span className={`type-caption ml-1 ${isInPlan ? 'text-green-500' : 'text-amber-600'}`}>{habit.streak}</span>}
                             </button>
                             <button
                               onClick={(e) => {
@@ -1429,12 +1432,12 @@ export default function DailyPage() {
                           type="text"
                           value={editingHabitText}
                           onChange={(e) => setEditingHabitText(e.target.value)}
-                          className="min-h-11 w-full rounded-lg border border-amber-500/20 bg-gray-900/70 px-3 py-2 text-base text-amber-50 outline-none transition-colors focus:border-amber-400 lg:text-sm"
+                          className="type-body min-h-11 w-full rounded-lg border border-amber-500/20 bg-gray-900/70 px-3 py-2 text-amber-50 outline-none transition-colors focus:border-amber-400"
                           placeholder="Название привычки"
                         />
 
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm text-amber-200">Повтор:</span>
+                          <span className="type-secondary text-amber-200">Повтор:</span>
                           {[
                             { value: 'daily', label: 'Ежедневно' },
                             { value: 'weekdays', label: 'Будни' },
@@ -1526,10 +1529,10 @@ export default function DailyPage() {
           {/* Предложения создать привычки */}
           {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).length > 0 && (
             <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 lg:mr-6">
-              <h3 className="font-medium text-amber-200 text-sm mb-2">Сделать привычкой?</h3>
+              <h3 className="type-secondary font-medium text-amber-200 mb-2">Сделать привычкой?</h3>
               <div className="space-y-2">
                 {habitSuggestions.filter(s => !dismissedSuggestions.has(s.text)).slice(0, 3).map((suggestion, index) => (
-                  <div key={index} className="flex min-w-0 flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div key={index} className="type-secondary flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <span className="min-w-0 flex-1 break-words text-amber-300">
                       &ldquo;{suggestion.text}&rdquo; — {suggestion.totalCount} раз
                     </span>
@@ -1560,8 +1563,8 @@ export default function DailyPage() {
           {/* Список задач */}
             {tasks.length === 0 ? (
               <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 text-center shadow-sm">
-                <h3 className="text-base font-semibold text-gray-100">План на день пока пустой</h3>
-                <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-gray-400">
+                <h3 className="type-card-title">План на день пока пустой</h3>
+                <p className="type-secondary mx-auto mt-1 max-w-md leading-6">
                   {hasGoalContext
                     ? 'Ментрикс может предложить задачи из целей и разложить день по времени.'
                     : 'Ментрикс поможет собрать список дел и сделать реалистичное расписание.'}
@@ -1671,12 +1674,12 @@ export default function DailyPage() {
                               el.style.height = 'auto'
                               el.style.height = el.scrollHeight + 'px'
                             }}
-                            className="min-w-0 flex-1 resize-none overflow-hidden rounded border border-primary-300 bg-gray-800 px-2 py-2 text-base leading-relaxed text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            className="type-body min-w-0 flex-1 resize-none overflow-hidden rounded border border-primary-300 bg-gray-800 px-2 py-2 leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-500"
                             aria-label={`Редактировать задачу «${task.taskText}»`}
                           />
                         ) : (
                           <span
-                            className={`min-w-0 flex-1 break-words py-2 text-base text-gray-100 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
+                            className={`type-body min-w-0 flex-1 break-words py-2 ${selectedTasks.has(task.id) ? 'line-through text-gray-400' : ''}`}
                             onDoubleClick={() => {
                               if (!planTaskMutationLocked) handleStartEditingTask(task.id, task.taskText)
                             }}
@@ -1687,7 +1690,8 @@ export default function DailyPage() {
                         )}
 
                         {timeChipLabel && (
-                          <span className="rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 text-xs font-medium tabular-nums text-primary-100">
+                          // Вне шкалы: компактная пилюля времени, как пилюли границ шкалы дня.
+                          <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums text-primary-100">
                             {timeChipLabel}
                           </span>
                         )}
@@ -1788,14 +1792,14 @@ export default function DailyPage() {
                         <div className="relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:bg-gray-900/25 lg:py-1.5">
                           {activeTaskAction.type === 'postpone' && (
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <label className="flex min-w-0 flex-col gap-2 text-sm text-gray-300 sm:flex-row sm:items-center lg:text-xs">
+                              <label className="type-secondary flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                                 <span>Перенести на</span>
                                 <input
                                   type="date"
                                   value={postponeTargetDate}
                                   min={getNextDateKey(selectedDate)}
                                   onChange={(event) => setPostponeTargetDate(event.target.value)}
-                                  className="h-11 min-w-0 rounded-md border border-gray-700/70 bg-transparent px-2 text-base text-gray-100 outline-none transition-colors hover:border-gray-500/70 focus:border-gray-400/80 lg:h-8 lg:text-sm"
+                                  className="type-body h-11 min-w-0 rounded-md border border-gray-700/70 bg-transparent px-2 outline-none transition-colors hover:border-gray-500/70 focus:border-gray-400/80 lg:h-8"
                                 />
                               </label>
                               <div className="flex items-center justify-end gap-1">
@@ -1823,7 +1827,7 @@ export default function DailyPage() {
 
                           {activeTaskAction.type === 'delete' && (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-sm text-gray-300 lg:text-xs">Удалить задачу?</span>
+                              <span className="type-secondary">Удалить задачу?</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => {
@@ -1849,7 +1853,7 @@ export default function DailyPage() {
 
                           {activeTaskAction.type === 'habit-remove' && habit && (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-xs text-gray-300">Снять цикличность?</span>
+                              <span className="type-secondary">Снять цикличность?</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={async () => {
@@ -1875,7 +1879,7 @@ export default function DailyPage() {
                           {activeTaskAction.type === 'habit-create' && (
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs text-gray-300">Сделать привычкой:</span>
+                                <span className="type-secondary">Сделать привычкой:</span>
                                 {[
                                   { value: 'daily', label: 'Ежедневно' },
                                   { value: 'weekdays', label: 'Будни' },
@@ -1965,7 +1969,7 @@ export default function DailyPage() {
                         {showCompleted ? '▼' : '▶'}
                       </span>
                       
-                      <span className="flex-1 text-base text-green-400 font-medium">
+                      <span className="type-secondary flex-1 text-green-400 font-medium">
                         Выполнено ({completedTasks.length})
                       </span>
                     </button>
@@ -2028,12 +2032,12 @@ export default function DailyPage() {
                                   element.style.height = 'auto'
                                   element.style.height = `${element.scrollHeight}px`
                                 }}
-                                className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded border border-primary-300 bg-gray-800 px-2 py-2 text-base leading-relaxed text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="type-body min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded border border-primary-300 bg-gray-800 px-2 py-2 leading-relaxed"
                                 aria-label={`Редактировать выполненную задачу «${task.taskText}»`}
                               />
                             ) : (
                               <span
-                                className="min-w-0 flex-1 break-words py-2 text-base text-gray-400"
+                                className="type-body min-w-0 flex-1 break-words py-2 text-gray-400"
                                 onDoubleClick={() => {
                                   if (!planTaskMutationLocked) handleStartEditingTask(task.id, task.taskText)
                                 }}
@@ -2043,7 +2047,7 @@ export default function DailyPage() {
                               </span>
                             )}
                             {timeChipLabel && (
-                              <span className="rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 text-xs font-medium tabular-nums text-primary-100">
+                              <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums text-primary-100">
                                 {timeChipLabel}
                               </span>
                             )}
@@ -2112,7 +2116,7 @@ export default function DailyPage() {
                           {activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete' && (
                             <div className="relative z-30 mt-2 w-full rounded-lg border border-gray-700/45 bg-gray-900/95 px-2.5 py-2 shadow-none ring-1 ring-white/5 backdrop-blur-sm lg:bg-gray-900/25 lg:py-1.5">
                               <div className="flex items-center justify-between gap-3">
-                                <span className="text-xs text-gray-300">Удалить задачу?</span>
+                                <span className="type-secondary">Удалить задачу?</span>
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={(e) => {
@@ -2209,7 +2213,7 @@ export default function DailyPage() {
               </div>
 
               {message && (
-                <div className={`flex items-center gap-2 text-sm transition-all duration-300 ${
+                <div className={`type-body flex items-center gap-2 transition-all duration-300 ${
                   message.includes('Ошибка') ? 'text-red-400' : message.includes('получена') ? 'text-green-400' : 'text-slate-400'
                 }`}>
                   {message.includes('Ошибка') && (
@@ -2258,11 +2262,11 @@ export default function DailyPage() {
                   onCancelEditingTask={cancelEditingTask}
                 />
               ) : scheduleLoading ? (
-                <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+                <div className="type-secondary flex flex-1 items-center justify-center">
                   Загрузка расписания…
                 </div>
               ) : (
-                <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+                <div className="type-secondary flex flex-1 items-center justify-center">
                   Не удалось загрузить расписание.
                 </div>
               )}
@@ -2285,7 +2289,7 @@ export default function DailyPage() {
           style={dailyChatViewportStyle}
         >
           <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-2">
-            <h2 className="min-w-0 text-xl font-bold">Обсуждаем с mentorix</h2>
+            <h2 className="type-section-title min-w-0">Обсуждаем с mentorix</h2>
             {chatMessages.length > 0 && (
               <button 
                 onClick={clearChat}
@@ -2298,7 +2302,7 @@ export default function DailyPage() {
           </div>
 
           {assistantOperationError && (
-            <div className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200" role="alert">
+            <div className="type-body mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-200" role="alert">
               {assistantOperationError}
             </div>
           )}
@@ -2323,15 +2327,15 @@ export default function DailyPage() {
             ) : chatMessages.length === 0 ? (
               <div className="py-4 space-y-3">
                 {!canPlanWithMentrix && (
-                  <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2 text-sm text-gray-400">
+                  <div className="type-secondary rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2">
                     Планирование с Ментриксом доступно только для сегодняшнего дня
                   </div>
                 )}
                 {tasks.length === 0 ? (
                   canShowPlanChatKickoffCta && (
                     <div className="rounded-2xl border border-primary-500/25 bg-primary-500/10 p-4 shadow-sm">
-                      <div className="text-sm font-semibold text-primary-100">Ментрикс может начать планирование</div>
-                      <p className="mt-1 text-sm leading-6 text-gray-300">
+                      <div className="type-card-title text-primary-100">Ментрикс может начать планирование</div>
+                      <p className="type-secondary mt-1 leading-6">
                         Соберу план на день из целей недели и месяца и разложу задачи по времени — начните диалог, и я задам уточняющие вопросы.
                       </p>
                       <button
@@ -2346,7 +2350,7 @@ export default function DailyPage() {
                   )
                 ) : (
                   <>
-                    <p className="text-center text-gray-500 text-sm mb-4">Спросите Ассистента:</p>
+                    <p className="type-caption text-center mb-4">Спросите Ассистента:</p>
                     <button
                       onClick={() => void handleSendChatMessage('Проанализируй мой план на день и дай рекомендации')}
                       disabled={sendingChat || isSubmittingChat}
@@ -2391,11 +2395,11 @@ export default function DailyPage() {
                 >
                   {msg.role === 'user' ? (
                     <div className="max-w-[85%] bg-primary-900/30 rounded-2xl px-4 py-2.5">
-                      <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
+                      <p className="type-body whitespace-pre-wrap">{msg.content}</p>
                     </div>
                   ) : (
                     <div className="py-1" role={/(^|\n)Ошибка:/.test(msg.content) || isInvalidProposalFallbackMessage(msg.content) ? 'alert' : undefined}>
-                      <div className="text-sm font-medium text-gray-400 mb-1">Ассистент</div>
+                      <div className="type-secondary font-medium mb-1">Ассистент</div>
                       <div className="space-y-2 text-gray-100">{renderAssistantMessageContent(msg.content)}</div>
                       {isInvalidProposalFallbackMessage(msg.content) && (
                         <button
@@ -2458,7 +2462,7 @@ export default function DailyPage() {
               aria-label="Сообщение Ассистенту"
               disabled={sendingChat || isSubmittingChat}
               rows={1}
-              className="min-h-11 max-h-40 flex-1 resize-none overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800"
+              className="type-body min-h-11 max-h-40 flex-1 resize-none overflow-y-auto rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-800"
               style={{ height: '44px' }}
             />
             <button

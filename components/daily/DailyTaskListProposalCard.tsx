@@ -54,10 +54,11 @@ export default function DailyTaskListProposalCard({
     <section className="mt-3 max-w-xl rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-gray-900 to-gray-950 p-3 shadow-lg shadow-cyan-950/20" aria-label="Предложение списка задач">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-gray-100">Предложение списка задач</h3>
-          <p className="text-xs text-gray-400">{metadata.tasks.length} задач можно добавить в план дня</p>
+          <h3 className="type-card-title">Предложение списка задач</h3>
+          <p className="type-secondary">{metadata.tasks.length} задач можно добавить в план дня</p>
         </div>
         {isApplied && (
+          // Вне шкалы: статусный бейдж-пилюля, как «фикс.»/«новая».
           <span className="rounded-full border border-green-500/40 bg-green-500/10 px-2 py-1 text-xs font-medium text-green-300" role="status">
             Добавлено
           </span>
@@ -65,14 +66,14 @@ export default function DailyTaskListProposalCard({
       </div>
 
       {metadata.scheduleIssue?.reason && (
-        <p className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs leading-5 text-amber-100">
+        <p className="type-caption mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 leading-5 text-amber-100">
           {metadata.scheduleIssue.reason}
         </p>
       )}
 
       {metadata.scheduleIssue && (
         <div className="mb-3 rounded-xl border border-gray-700 bg-gray-900/80 p-3">
-          <p className="text-xs font-medium text-gray-200">Как собрать временную шкалу?</p>
+          <p className="type-secondary font-medium text-gray-200">Как собрать временную шкалу?</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {DAILY_SCHEDULE_ISSUE_ACTIONS.map((item) => (
               <button
@@ -86,21 +87,22 @@ export default function DailyTaskListProposalCard({
               </button>
             ))}
           </div>
-          {!isApplied && <p className="mt-2 text-xs text-gray-500">Сначала добавьте список в план — тогда ассистент увидит эти задачи и разложит их по времени.</p>}
-          {isApplied && isChatBusy && <p className="mt-2 text-xs text-cyan-200" role="status">Ассистент собирает расписание…</p>}
+          {!isApplied && <p className="type-caption mt-2">Сначала добавьте список в план — тогда ассистент увидит эти задачи и разложит их по времени.</p>}
+          {isApplied && isChatBusy && <p className="type-caption mt-2 text-cyan-200" role="status">Ассистент собирает расписание…</p>}
         </div>
       )}
 
       <div className="space-y-1.5">
         {metadata.tasks.map((task, index) => (
-          <div key={`${index}-${task}`} className="rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-sm text-cyan-50">
+          <div key={`${index}-${task}`} className="type-body rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-cyan-50">
+            {/* Вне шкалы: компактный номерной маркер, аналог буллита списка, не текстовая роль. */}
             <span className="mr-2 text-xs font-semibold text-cyan-300">{index + 1}.</span>
             {task}
           </div>
         ))}
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-300" role="alert">{error}</p>}
+      {error && <p className="type-body mt-2 text-red-300" role="alert">{error}</p>}
 
       <div className="mt-3">
         <button
@@ -113,8 +115,8 @@ export default function DailyTaskListProposalCard({
           {getApplyButtonLabel({ isApplied, isApplying })}
         </button>
       </div>
-      {!messageId && <p className="mt-1 text-xs text-gray-500">Кнопка станет доступна после сохранения ответа ассистента.</p>}
-      {isApplied && <p className="mt-2 text-sm text-green-300" role="status">Список задач добавлен в план.</p>}
+      {!messageId && <p className="type-caption mt-1">Кнопка станет доступна после сохранения ответа ассистента.</p>}
+      {isApplied && <p className="type-body mt-2 text-green-300" role="status">Список задач добавлен в план.</p>}
     </section>
   )
 }

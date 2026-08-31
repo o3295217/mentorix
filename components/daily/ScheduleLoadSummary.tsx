@@ -41,7 +41,7 @@ export default function ScheduleLoadSummary({ summary, className = '' }: Schedul
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <p className="text-sm text-gray-300">
+      <p className="type-secondary">
         Занято <span className="font-medium text-gray-100">{formatDurationLabel(summary.scheduledMinutes)}</span>
         {' '}· свободно <span className="font-medium text-gray-100">{formatDurationLabel(summary.unscheduledMinutes)}</span>
       </p>
@@ -61,7 +61,7 @@ export default function ScheduleLoadSummary({ summary, className = '' }: Schedul
       </div>
 
       {activeCategories.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+        <div className="type-caption flex flex-wrap gap-x-3 gap-y-1">
           {activeCategories.map(category => (
             <span key={category} className="inline-flex items-center gap-1.5">
               <span className={`h-2 w-2 shrink-0 rounded-full ${CATEGORY_BAR_COLOR[category]}`} aria-hidden />
@@ -72,12 +72,12 @@ export default function ScheduleLoadSummary({ summary, className = '' }: Schedul
       )}
 
       {isOverloaded ? (
-        <p className="flex items-start gap-1.5 text-xs font-medium text-amber-300" role="status">
+        <p className="type-caption flex items-start gap-1.5 font-medium text-amber-300" role="status">
           <span aria-hidden>⚠</span>
           {summary.recommendation}
         </p>
       ) : (
-        <p className="text-xs text-gray-500">{summary.recommendation}</p>
+        <p className="type-caption">{summary.recommendation}</p>
       )}
     </div>
   )
