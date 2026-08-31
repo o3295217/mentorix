@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Goal, GoalTag } from '@/lib/types'
-import { monthNames, fuzzyMatchGoal } from '@/lib/goals-utils'
+import { monthNames, fuzzyMatchGoal, formatWeekRange, getMonthWeeks, getWeekOfDate } from '@/lib/goals-utils'
 import { useInlineEdit } from '@/hooks/useInlineEdit'
 import { useCopyDropdown } from '@/hooks/useCopyDropdown'
 import WeekCard from './WeekCard'
@@ -87,23 +87,8 @@ export default function MonthSection({
 
   const isPast = !isCurrent && new Date(year, month + 1, 0) < new Date()
 
-  const weeksInMonth = useMemo(() => {
-    const weeks: { num: number; key: string; start: Date; end: Date }[] = []
-    const firstD = new Date(year, month, 1)
-    const lastD = new Date(year, month + 1, 0)
-    const curr = new Date(firstD)
-    while (curr.getDay() !== 1) curr.setDate(curr.getDate() + 1)
-    let wNum = 1
-    while (curr <= lastD) {
-      const wStart = new Date(curr)
-      const wEnd = new Date(curr)
-      wEnd.setDate(wEnd.getDate() + 6)
-      weeks.push({ num: wNum, key: `${year}-${String(month + 1).padStart(2, '0')}-W${wNum}`, start: wStart, end: wEnd })
-      curr.setDate(curr.getDate() + 7)
-      wNum++
-    }
-    return weeks
-  }, [year, month])
+  // Перечисление недель — общий хелпер: тот же список используется при декомпозиции целей
+  const weeksInMonth = useMemo(() => getMonthWeeks(year, month), [year, month])
 
   const hasWeekGoals = weeksInMonth.some(w => (periodGoals.get(w.key) || []).length > 0)
   const isEmpty = goals.length === 0 && !hasWeekGoals
@@ -277,7 +262,7 @@ export default function MonthSection({
                                   onClick={() => { onCopyGoal(goal, 'week', w.key); closeDropdown() }}
                                   className="min-h-11 w-full px-3 py-2 text-left text-sm text-slate-300 transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-300"
                                 >
-                                  Неделя {w.num} ({w.start.getDate()}-{w.end.getDate()})
+                                  Неделя {w.num} ({formatWeekRange(w)})
                                 </button>
                               ))}
                             </div>
@@ -313,8 +298,8 @@ export default function MonthSection({
               }`}
             >
               {weeksInMonth.map(week => {
-                const today = new Date()
-                const isCurrentWeek = today >= week.start && today <= week.end
+                // Сравниваем по ключу недели, а не по границам дат: end — это полночь воскресенья
+                const isCurrentWeek = getWeekOfDate(new Date()).key === week.key
 
                 return (
                   <WeekCard

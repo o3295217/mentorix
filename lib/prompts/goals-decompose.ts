@@ -1,5 +1,5 @@
 import { formatHorizon } from '@/lib/dates'
-import { MONTH_NAMES } from '@/lib/goals-utils'
+import { MONTH_NAMES, formatWeekRange, getMonthWeeks, getWeekOfDate } from '@/lib/goals-utils'
 
 interface GoalsContext {
   dream: string
@@ -186,15 +186,40 @@ export function buildGoalsDecomposePrompt(context: GoalsContext, planningProfile
   const nextMonth = (realMonth + 1) % 12
   const nextMonthYear = realMonth === 11 ? realYear + 1 : realYear
 
-  // Оставшиеся недели текущего месяца (текущая неделя НЕ учитывается)
-  // Вычисляем через первый понедельник месяца — так же как UI
-  const firstDayOfMonth = new Date(realYear, realMonth, 1)
-  const firstMonday = new Date(firstDayOfMonth)
-  while (firstMonday.getDay() !== 1) firstMonday.setDate(firstMonday.getDate() + 1)
-  const daysSinceFirstMonday = dayOfMonth - firstMonday.getDate()
-  const currentWeekOfMonth = daysSinceFirstMonday < 0 ? 1 : Math.min(Math.floor(daysSinceFirstMonday / 7) + 1, 4)
-  const remainingWeeksCurrentMonth = 4 - currentWeekOfMonth
-  const remainingWeekLabels = Array.from({length: remainingWeeksCurrentMonth}, (_, i) => `W${currentWeekOfMonth + 1 + i}`)
+  // Недели перечисляет КОД, а не модель.
+  // Источник истины — getMonthWeeks (ISO 8601): неделя принадлежит месяцу своего
+  // четверга, поэтому у месяца бывает и 4, и 5 недель, а даты недели могут выходить
+  // за границы месяца из ключа (2026-09-W1 = 31.08–06.09). Раньше здесь была жёсткая
+  // арифметика «в месяце 4 недели», и стыковая неделя выпадала из плана.
+  const currentWeek = getWeekOfDate(now)
+  const currentMonthWeeks = getMonthWeeks(realYear, realMonth)
+  const passedWeeksCurrentMonth = currentMonthWeeks.filter((w) => w.start < currentWeek.start)
+  const remainingWeeksCurrentMonth = currentMonthWeeks.filter((w) => w.start > currentWeek.start)
+
+  // Окно планирования отсчитывается от МЕСЯЦА-ВЛАДЕЛЬЦА текущей недели, а не от
+  // календарного месяца: 31.08.2026 — это уже 2026-09-W1, и «следующий месяц» для
+  // недель здесь октябрь, иначе текущая неделя попала бы в собственный план.
+  const ownerYear = currentWeek.year
+  const ownerMonth = currentWeek.month
+  const afterOwnerYear = ownerMonth === 11 ? ownerYear + 1 : ownerYear
+  const afterOwnerMonth = (ownerMonth + 1) % 12
+  const afterOwnerMonthWeeks = getMonthWeeks(afterOwnerYear, afterOwnerMonth)
+
+  // Текущая неделя в план не идёт (продуктовое правило) — строго последующие.
+  // Месяцы-владельцы не пересекаются, поэтому список непрерывен и без дублей.
+  const planWeeks = [...getMonthWeeks(ownerYear, ownerMonth), ...afterOwnerMonthWeeks]
+    .filter((w) => w.start > currentWeek.start)
+
+  const currentWeekLabel = `${currentWeek.key} (${formatWeekRange(currentWeek)})`
+  const passedWeekLabels = passedWeeksCurrentMonth.map((w) => `W${w.num}`)
+  const remainingWeekLabels = remainingWeeksCurrentMonth.map((w) => `W${w.num}`)
+  const planWeekList = planWeeks
+    .map((w) => `  [WEEK:${w.key}] — ${formatWeekRange(w)}`)
+    .join('\n')
+  const planWeekKeys = planWeeks.map((w) => w.key).join(', ')
+  const planWeekExample = planWeeks
+    .map((w, i) => `[WEEK:${w.key}]\n2.3.3.${i + 1}. Конкретное действие (${formatWeekRange(w)})`)
+    .join('\n\n')
 
   // Оставшиеся кварталы текущего года (текущий квартал включается — он ещё не закончен)
   const remainingQuarters = Array.from({length: 4 - currentQuarter + 1}, (_, i) => `Q${currentQuarter + i}`)
@@ -389,17 +414,25 @@ ${periodGoalsSummary ? `СУЩЕСТВУЮЩИЕ ЦЕЛИ ПО ПЕРИОДАМ 
 
 ТЕКУЩАЯ СИТУАЦИЯ:
 - Сейчас ${MONTH_NAMES[realMonth]} ${realYear}, день ${dayOfMonth} из ${daysInMonth}
-- Текущая неделя месяца: W${currentWeekOfMonth} (недели W1-W${currentWeekOfMonth} уже ПРОШЛИ и НЕ МОГУТ быть включены в план)
+- Текущая неделя: ${currentWeekLabel} — она уже идёт и в план НЕ включается${passedWeekLabels.length > 0 ? `. Недели ${passedWeekLabels.join(', ')} этого месяца уже ПРОШЛИ и НЕ МОГУТ быть включены в план` : ''}
 ${isEndOfMonth ? `- Последняя неделя месяца → следующий месяц (${MONTH_NAMES[nextMonth]} ${nextMonthYear}) тоже планируется ПОНЕДЕЛЬНО` : `- До конца месяца ${daysInMonth - dayOfMonth} дней`}
 ${isEndOfQuarter ? `- Последний месяц квартала → следующий квартал раскрывается на МЕСЯЦЫ` : ''}
 ${isEndOfHalf ? `- Последний квартал полугодия → следующее полугодие раскрывается на КВАРТАЛЫ` : ''}
 
 АБСОЛЮТНЫЙ ЗАПРЕТ НА ПРОШЕДШИЕ ПЕРИОДЫ:
-- НЕЛЬЗЯ ставить цели на прошедшие недели. Сегодня ${dayOfMonth} ${MONTH_NAMES[realMonth]} — это W${currentWeekOfMonth}. Недели W1${currentWeekOfMonth > 2 ? `-W${currentWeekOfMonth - 1}` : ''} ${MONTH_NAMES[realMonth]} УЖЕ ПРОШЛИ.
+- НЕЛЬЗЯ ставить цели на прошедшие недели. Сегодня ${dayOfMonth} ${MONTH_NAMES[realMonth]} — идёт неделя ${currentWeekLabel}.${passedWeekLabels.length > 0 ? ` Недели ${passedWeekLabels.join(', ')} этого месяца УЖЕ ПРОШЛИ.` : ''}
 - НЕЛЬЗЯ ставить цели на прошедшие месяцы (до ${MONTH_NAMES[realMonth]} ${realYear}).
 - НЕЛЬЗЯ ставить цели на прошедшие кварталы (до Q${currentQuarter} ${realYear}).
 - Текущий месяц (${MONTH_NAMES[realMonth]}) — можно, но ТОЛЬКО оставшиеся недели: ${remainingWeekLabels.length > 0 ? remainingWeekLabels.join(', ') : 'уже нет оставшихся'}.
 - Если пользователь в середине месяца — НЕ ДАВАЙ цели на весь месяц как будто он ещё не начался. Планируй только ОСТАВШУЮСЯ часть.
+
+ПЕРЕЧЕНЬ НЕДЕЛЬ ДЛЯ ПЛАНА (сформирован кодом — НЕ считай недели сам):
+Неделя идёт с понедельника по воскресенье и принадлежит месяцу, в который попадает её ЧЕТВЕРГ (ISO 8601). Поэтому в месяце бывает и 4, и 5 недель, а даты недели могут выходить за границы своего месяца — это нормально.
+Используй ТОЛЬКО эти ключи, в этом же порядке, без пропусков:
+${planWeekList}
+- ЗАПРЕЩЕНО придумывать ключи недель, которых нет в списке, и пересчитывать номер недели по датам: даты в списке уже сверены с календарём.
+- ЗАПРЕЩЕНО пропускать неделю из списка: план по неделям должен быть непрерывным, без дырок на стыке месяцев.
+- Одна и та же неделя не может стоять под двумя ключами: у недели ровно один месяц-владелец — месяц её четверга.
 
 ПОСТРОЕНИЕ СТРУКТУРЫ ПЛАНА (СВЕРХУ ВНИЗ):
 КРИТИЧЕСКОЕ ПРАВИЛО: КАЖДЫЙ ГОД горизонта ОБЯЗАТЕЛЬНО имеет годовую цель [YEAR:YYYY].
@@ -430,7 +463,7 @@ ${isEndOfHalf ? `- Последний квартал полугодия → сл
 - Будущие кварталы: только квартальная цель (без раскрытия на месяцы)
 ${isEndOfQuarter ? `- Упреждающее: следующий квартал тоже раскрывается на месяцы` : ''}
 ${isEndOfMonth ? `- Упреждающее: следующий месяц тоже планируется понедельно` : ''}
-- Недели: ${remainingWeeksCurrentMonth > 0 ? `ТОЛЬКО оставшиеся недели текущего месяца (${MONTH_NAMES[realMonth]}: ${remainingWeekLabels.join(', ')} — W1-W${currentWeekOfMonth} уже прошли!), затем ` : `все недели текущего месяца уже прошли, поэтому `}4 недели следующего месяца (${MONTH_NAMES[nextMonth]} ${nextMonthYear}: W1-W4).
+- Недели: бери ТОЛЬКО ключи из блока «ПЕРЕЧЕНЬ НЕДЕЛЬ ДЛЯ ПЛАНА» — это остаток ${MONTH_NAMES[ownerMonth]} ${ownerYear} и все недели ${MONTH_NAMES[afterOwnerMonth]} ${afterOwnerYear}, без текущей недели.
 
 Примеры структуры по горизонту (сейчас ${MONTH_NAMES[realMonth]} ${realYear}, порядок от ДАЛЬНЕГО к БЛИЖНЕМУ):
 - 3 мес: [YEAR:${realYear}] → месяцы → недели
@@ -442,8 +475,8 @@ ${isEndOfMonth ? `- Упреждающее: следующий месяц тож
 Внутри каждого уровня порядок: от самого дальнего к самому ближнему.
 
 КРИТИЧЕСКОЕ ПРАВИЛО НЕДЕЛЬ:
-Текущая неделя НЕ УЧИТЫВАЕТСЯ. Планирование начинается с оставшихся недель ТЕКУЩЕГО месяца, затем 4 недели следующего.
-${remainingWeeksCurrentMonth > 0 ? `Сейчас идёт W${currentWeekOfMonth} ${MONTH_NAMES[realMonth]}. Оставшиеся недели текущего месяца: ${remainingWeekLabels.join(', ')}. Затем W1-W4 ${MONTH_NAMES[nextMonth]} ${nextMonthYear}.` : `До конца ${MONTH_NAMES[realMonth]} нет полных недель. Планируй W1-W4 ${MONTH_NAMES[nextMonth]} ${nextMonthYear}.`}
+Текущая неделя ${currentWeekLabel} НЕ УЧИТЫВАЕТСЯ. Планирование начинается со следующей за ней недели и идёт подряд, без пропусков.
+Ключи бери из блока «ПЕРЕЧЕНЬ НЕДЕЛЬ ДЛЯ ПЛАНА» — ровно эти: ${planWeekKeys}.
 
 Пример: сейчас 14 апреля 2026, горизонт 36 месяцев (порядок от дальнего к ближнему):
 
@@ -478,19 +511,22 @@ ${remainingWeeksCurrentMonth > 0 ? `Сейчас идёт W${currentWeekOfMonth}
 3.3.2. Месячный шаг из квартальной 3.3
 
 [WEEK:2026-04-W4]
-3.3.3.1. Конкретное действие (оставшаяся неделя апреля)
+3.3.3.1. Конкретное действие (20.04–26.04 — оставшаяся неделя апреля)
+
+[WEEK:2026-04-W5]
+3.3.3.2. Конкретное действие (27.04–03.05 — четверг 30.04, поэтому неделя апрельская)
 
 [WEEK:2026-05-W1]
-3.3.3.2. Конкретное действие
+3.3.3.3. Конкретное действие (04.05–10.05)
 
 [WEEK:2026-05-W2]
-3.3.3.3. Конкретное действие
+3.3.3.4. Конкретное действие (11.05–17.05)
 
 [WEEK:2026-05-W3]
-3.3.3.4. Конкретное действие
+3.3.3.5. Конкретное действие (18.05–24.05)
 
 [WEEK:2026-05-W4]
-3.3.3.5. Конкретное действие
+3.3.3.6. Конкретное действие (25.05–31.05)
 
 ВАЖНО — ПОРЯДОК ВЫВОДА ПЛАНА:
 План выводится от ДАЛЬНЕГО к БЛИЖНЕМУ:
@@ -498,7 +534,7 @@ ${remainingWeeksCurrentMonth > 0 ? `Сейчас идёт W${currentWeekOfMonth}
 2. Затем полугодия (H2 раньше H1 того же года)
 3. Затем кварталы (Q4 раньше Q3)
 4. Затем месяцы (июнь раньше мая)
-5. В конце — недели (хронологически: оставшиеся недели текущего месяца, затем W1-W4 следующего)
+5. В конце — недели (хронологически, по списку из блока «ПЕРЕЧЕНЬ НЕДЕЛЬ ДЛЯ ПЛАНА»: оставшиеся недели текущего месяца, затем все недели следующего)
 Это позволяет пользователю увидеть масштаб мечты, а затем спуститься к конкретным действиям.
 
 КРИТИЧЕСКОЕ ПРАВИЛО ФОРМАТА:
@@ -511,7 +547,7 @@ ${remainingWeeksCurrentMonth > 0 ? `Сейчас идёт W${currentWeekOfMonth}
 - Месяц: [MONTH:YYYY-MM] — например [MONTH:2026-04]
 - Неделя: [WEEK:YYYY-MM-WN] — например [WEEK:2026-03-W1]
 
-Пример плана на 18 месяцев (текущий: ${MONTH_NAMES[realMonth]} ${realYear}, W${currentWeekOfMonth}, порядок от дальнего к ближнему):
+Пример плана на 18 месяцев (текущий: ${MONTH_NAMES[realMonth]} ${realYear}, идёт ${currentWeek.key}, порядок от дальнего к ближнему):
 
 [YEAR:${realYear + 1}]
 1. Годовая цель на ${realYear + 1} (следующий год — раскрывается на полугодия)
@@ -540,19 +576,7 @@ ${remainingWeeksCurrentMonth > 0 ? `Сейчас идёт W${currentWeekOfMonth}
 [MONTH:${realYear}-${String(realMonth + 1).padStart(2, '0')}]
 2.3.2. Месячная цель (из квартальной 2.3)
 
-${remainingWeekLabels.map((w, i) => `[WEEK:${realYear}-${String(realMonth + 1).padStart(2, '0')}-${w}]\n2.3.3.${i + 1}. Конкретное действие (${w} ${MONTH_NAMES[realMonth]} — оставшаяся неделя)`).join('\n\n')}
-
-[WEEK:${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-W1]
-2.3.4.1. Конкретное действие (W1 ${MONTH_NAMES[nextMonth]})
-
-[WEEK:${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-W2]
-2.3.4.2. Конкретное действие (W2 ${MONTH_NAMES[nextMonth]})
-
-[WEEK:${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-W3]
-2.3.4.3. Конкретное действие (W3 ${MONTH_NAMES[nextMonth]})
-
-[WEEK:${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-W4]
-2.3.4.4. Конкретное действие (W4 ${MONTH_NAMES[nextMonth]})
+${planWeekExample}
 
 ПРАВИЛА:
 1. Отвечай на русском языке, кратко и по делу

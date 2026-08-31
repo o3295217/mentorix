@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { parsePeriodKey, getPeriodKey, MONTH_NAMES, PeriodType, fuzzyMatchGoal } from '@/lib/goals-utils'
+import { parsePeriodKey, parseWeekKey, getPeriodKey, MONTH_NAMES, PeriodType, fuzzyMatchGoal } from '@/lib/goals-utils'
 import type { ParsedGoal } from '@/hooks/useGoalsChat'
 import type { Goal, YearGoalItem } from '@/lib/types'
 
@@ -82,11 +82,8 @@ function resolveGoalPeriod(goal: ParsedGoal): { key: string; periodType: PeriodT
       label = MONTH_NAMES[parsed.index]
       break
     case 'week': {
-      const m = parsed.month!
-      const firstDay = new Date(parsed.year, m, 1)
-      date = new Date(firstDay)
-      while (date.getDay() !== 1) date.setDate(date.getDate() + 1)
-      date.setDate(date.getDate() + (parsed.index - 1) * 7)
+      // ISO: понедельник недели может лежать в предыдущем месяце (2026-09-W1 → 31.08)
+      date = parseWeekKey(goal.periodKey).weekStart
       label = `Неделя ${parsed.index}`
       break
     }

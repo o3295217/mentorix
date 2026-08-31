@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { PeriodType, getPeriodDates } from '@/lib/dates'
+import { getMonthWeeks, getPeriodKey } from '@/lib/goals-utils'
 import type { YearGoalItem } from '@/lib/types'
 
 export function usePeriodGoals(showMessage: (text: string) => void) {
@@ -124,17 +125,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
       } else if (periodType === 'month') {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       } else if (periodType === 'week') {
-        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-        const current = new Date(firstDay)
-        while (current.getDay() !== 1 && current <= date) {
-          current.setDate(current.getDate() + 1)
-        }
-        let weekNum = 1
-        while (current <= date) {
-          current.setDate(current.getDate() + 7)
-          if (current <= date) weekNum++
-        }
-        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-W${weekNum}`
+        key = getPeriodKey('week', date)
       }
 
       if (key && data?.goals) {
@@ -150,21 +141,11 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
   }, [showMessage])
 
   const loadAllWeeksForMonth = useCallback(async (year: number, month: number) => {
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    
-    const current = new Date(firstDay)
-    while (current.getDay() !== 1) {
-      current.setDate(current.getDate() + 1)
-    }
-    
-    const weekPromises: Promise<void>[] = []
-    while (current <= lastDay) {
-      const weekStart = new Date(current)
-      weekPromises.push(loadPeriodGoalsWithKey('week', weekStart))
-      current.setDate(current.getDate() + 7)
-    }
-    await Promise.all(weekPromises)
+    // Недели месяца по ISO-правилу четверга: понедельник первой недели
+    // может лежать в предыдущем месяце (2026-09-W1 = 31.08)
+    await Promise.all(
+      getMonthWeeks(year, month).map((week) => loadPeriodGoalsWithKey('week', week.start))
+    )
   }, [loadPeriodGoalsWithKey])
 
   const savePeriodGoals = useCallback(async (periodType: PeriodType, date: Date, goals: string[], label: string) => {
@@ -178,17 +159,7 @@ export function usePeriodGoals(showMessage: (text: string) => void) {
       } else if (periodType === 'month') {
         periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       } else if (periodType === 'week') {
-        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-        const current = new Date(firstDay)
-        while (current.getDay() !== 1 && current <= date) {
-          current.setDate(current.getDate() + 1)
-        }
-        let weekNum = 1
-        while (current <= date) {
-          current.setDate(current.getDate() + 7)
-          if (current <= date) weekNum++
-        }
-        periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-W${weekNum}`
+        periodKey = getPeriodKey('week', date)
       }
 
       await fetch('/api/goals/period', {

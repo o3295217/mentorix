@@ -80,30 +80,138 @@ export function resolvePeriodMeta(key: string): { periodType: PeriodType; date: 
       return { periodType: 'quarter', date: new Date(p.year, (p.index - 1) * 3, 1), label: `Q${p.index}` }
     case 'month':
       return { periodType: 'month', date: new Date(p.year, p.index, 1), label: MONTH_NAMES[p.index] }
-    case 'week': {
-      const firstDay = new Date(p.year, p.month!, 1)
-      const d = new Date(firstDay)
-      while (d.getDay() !== 1) d.setDate(d.getDate() + 1)
-      d.setDate(d.getDate() + (p.index - 1) * 7)
-      return { periodType: 'week', date: d, label: `Неделя ${p.index}` }
-    }
+    case 'week':
+      // Понедельник недели по ISO-правилу четверга — может быть в прошлом месяце
+      return { periodType: 'week', date: parseWeekKey(key).weekStart, label: `Неделя ${p.index}` }
     default:
       return null
   }
 }
 
-// Helper to parse week key (e.g., "2025-12-W1")
+// ─────────────────────────────────────────────────────────────────────────────
+// НЕДЕЛИ — ISO 8601
+//
+// Неделя всегда пн–вс. Неделя принадлежит месяцу, в который попадает её ЧЕТВЕРГ.
+// Следствия, на которые обязан рассчитывать вызывающий код:
+//   • даты недели МОГУТ лежать вне месяца из ключа: 2026-09-W1 = 31.08–06.09
+//     (четверг 03.09 → сентябрь), 2026-10-W1 = 28.09–04.10 (четверг 01.10);
+//   • в месяце ровно столько недель, сколько в нём четвергов — 4 или 5;
+//   • у каждой недели ровно один месяц-владелец, поэтому недели соседних
+//     месяцев стыкуются без дырок и без дублей.
+//
+// Это единственный источник истины по неделям: UI-сетка, декомпозиция целей,
+// разбор и сборка ключей идут через функции ниже, своих вычислений быть не должно.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MonthWeek {
+  /** Порядковый номер недели внутри месяца-владельца, с 1 */
+  num: number
+  /** Ключ периода, например «2026-09-W1» */
+  key: string
+  /** Год месяца-владельца (месяца четверга) */
+  year: number
+  /** Месяц-владелец (месяц четверга), 0-11 */
+  month: number
+  /** Понедельник — может быть в предыдущем месяце */
+  start: Date
+  /** Воскресенье — может быть в следующем месяце */
+  end: Date
+}
+
+const THURSDAY = 4
+
+const weekKeyOf = (year: number, month: number, num: number): string =>
+  `${year}-${String(month + 1).padStart(2, '0')}-W${num}`
+
+// Первый четверг месяца — якорь нумерации недель месяца
+function getFirstThursday(year: number, month: number): Date {
+  const d = new Date(year, month, 1)
+  while (d.getDay() !== THURSDAY) d.setDate(d.getDate() + 1)
+  return d
+}
+
+// Собирает неделю по её четвергу
+function weekFromThursday(thursday: Date, year: number, month: number, num: number): MonthWeek {
+  const start = new Date(thursday)
+  start.setDate(start.getDate() - 3)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  return { num, key: weekKeyOf(year, month, num), year, month, start, end }
+}
+
+/**
+ * Все недели месяца — те, чей четверг лежит в этом месяце.
+ * Август 2026 → 4 недели (03–09, 10–16, 17–23, 24–30).
+ * Сентябрь 2026 → 5 недель, первая 31.08–06.09.
+ */
+export function getMonthWeeks(year: number, month: number): MonthWeek[] {
+  const weeks: MonthWeek[] = []
+  const thursday = getFirstThursday(year, month)
+
+  let num = 1
+  while (thursday.getMonth() === month && thursday.getFullYear() === year) {
+    weeks.push(weekFromThursday(thursday, year, month, num))
+    thursday.setDate(thursday.getDate() + 7)
+    num++
+  }
+  return weeks
+}
+
+/**
+ * Диапазон недели «31.08–06.09».
+ * Недели по ISO часто пересекают границу месяца, поэтому день без месяца («31-6») читается неверно.
+ */
+export const formatWeekRange = (week: { start: Date; end: Date }): string => {
+  const dm = (d: Date) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
+  return `${dm(week.start)}–${dm(week.end)}`
+}
+
+// Ключи всех недель месяца: ["2026-09-W1", …, "2026-09-W5"]
+export function getMonthWeekKeys(year: number, month: number): string[] {
+  return getMonthWeeks(year, month).map((w) => w.key)
+}
+
+// Понедельник недели, которой принадлежит дата (время обнуляется)
+export function getWeekStart(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+/**
+ * Неделя, которой принадлежит дата, вместе с месяцем-владельцем (месяцем четверга).
+ * 31.08.2026 и 01.09.2026 → 2026-09-W1; 28.09.2026 → 2026-10-W1.
+ */
+export function getWeekOfDate(date: Date): MonthWeek {
+  const start = getWeekStart(date)
+  const thursday = new Date(start)
+  thursday.setDate(thursday.getDate() + 3)
+
+  const year = thursday.getFullYear()
+  const month = thursday.getMonth()
+  const firstThursday = getFirstThursday(year, month)
+  // Оба четверга в одном месяце — разница дат делится на 7 без остатка
+  const num = (thursday.getDate() - firstThursday.getDate()) / 7 + 1
+
+  return weekFromThursday(thursday, year, month, num)
+}
+
+/**
+ * Разбор ключа недели («2026-09-W1» → понедельник 31.08.2026).
+ * weekStart НЕ обязан лежать внутри месяца из ключа.
+ */
 export const parseWeekKey = (key: string): { weekStart: Date; weekNum: number; year: number; month: number } => {
-  const parts = key.split('-') // 2025-12-W1
+  const parts = key.split('-') // 2026-09-W1
   const year = parseInt(parts[0])
   const month = parseInt(parts[1]) - 1
   const weekNum = parseInt(parts[2].replace('W', ''))
-  
-  const firstDay = new Date(year, month, 1)
-  const current = new Date(firstDay)
-  while (current.getDay() !== 1) current.setDate(current.getDate() + 1)
-  for (let i = 1; i < weekNum; i++) current.setDate(current.getDate() + 7)
-  return { weekStart: current, weekNum, year, month }
+
+  const thursday = getFirstThursday(year, month)
+  thursday.setDate(thursday.getDate() + (weekNum - 1) * 7)
+  const weekStart = new Date(thursday)
+  weekStart.setDate(weekStart.getDate() - 3)
+
+  return { weekStart, weekNum, year, month }
 }
 
 // Проверка на дубликат (нечёткое сравнение - игнорирует регистр и пробелы)
@@ -130,19 +238,9 @@ export const getPeriodKey = (periodType: 'quarter' | 'month' | 'week' | 'half_ye
       return `${year}-H${month < 6 ? 1 : 2}`
     case 'month':
       return `${year}-${String(month + 1).padStart(2, '0')}`
-    case 'week': {
-      const firstDay = new Date(year, month, 1)
-      const current = new Date(firstDay)
-      while (current.getDay() !== 1 && current <= date) {
-        current.setDate(current.getDate() + 1)
-      }
-      let weekNum = 1
-      while (current <= date) {
-        current.setDate(current.getDate() + 7)
-        if (current <= date) weekNum++
-      }
-      return `${year}-${String(month + 1).padStart(2, '0')}-W${weekNum}`
-    }
+    case 'week':
+      // Месяц-владелец определяется четвергом недели, а не месяцем самой даты
+      return getWeekOfDate(date).key
     default:
       return ''
   }

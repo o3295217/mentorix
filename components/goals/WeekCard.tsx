@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Goal, GoalTag } from '@/lib/types'
 import { parseDateParam, toDateKey } from '@/lib/dates'
-import { fuzzyMatchGoal } from '@/lib/goals-utils'
+import { formatWeekRange, fuzzyMatchGoal } from '@/lib/goals-utils'
 
 interface WeekData {
   num: number
@@ -186,13 +186,13 @@ export default function WeekCard({
             Неделя {week.num}
           </div>
           <div className={`text-[11px] ${isCurrentWeek ? 'text-blue-400/60' : 'text-slate-600'}`}>
-            {week.start.getDate()}-{week.end.getDate()}
+            {formatWeekRange(week)}
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-2 mb-2">
           <span className={`text-sm font-semibold ${isCurrentWeek ? 'text-blue-400' : 'text-slate-400'}`}>
-            Неделя {week.num}: {week.start.getDate()}-{week.end.getDate()}
+            Неделя {week.num}: {formatWeekRange(week)}
           </span>
           {isCurrentWeek && <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">сейчас</span>}
         </div>
