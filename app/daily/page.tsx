@@ -1180,12 +1180,14 @@ export default function DailyPage() {
           <button
             type="button"
             onClick={() => setIsContextCollapsed((collapsed) => !collapsed)}
-            className="hidden min-h-11 w-full items-center justify-between rounded-lg px-1 text-left text-sm text-gray-400 transition-colors hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
+            className="hidden min-h-11 w-full items-center justify-between rounded-lg px-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:flex"
             aria-expanded={!isContextCollapsed}
             aria-controls="daily-context-cards"
           >
-            <span>Цели периода</span>
-            <span className="text-xs text-gray-500">{isContextCollapsed ? '▼ показать' : 'Скрыть ▲'}</span>
+            {/* Единая типографика заголовков секций страницы: text-xl font-bold,
+                как у «План на день» и «Обсуждаем с mentorix» */}
+            <span className="text-xl font-bold text-gray-100">Цели периода</span>
+            <span className="text-sm text-gray-400 transition-colors hover:text-gray-200">{isContextCollapsed ? '▼ показать' : 'Скрыть ▲'}</span>
           </button>
 
           <div
