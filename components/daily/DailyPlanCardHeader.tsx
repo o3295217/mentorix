@@ -53,9 +53,10 @@ export default function DailyPlanCardHeader({
 }: DailyPlanCardHeaderProps) {
   const isExecution = phase === 'execution'
   return (
-    <div className="daily-phase-accent mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 lg:pr-6" data-phase={phase}>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2">
-        <h2 className="type-section-title whitespace-nowrap">План на день</h2>
+    <div className="daily-phase-accent mb-4 flex flex-shrink-0 flex-col gap-2 lg:pr-6" data-phase={phase}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
+        <h2 className="type-section-title">План на день</h2>
         <span
           className="type-secondary inline-block font-semibold tabular-nums leading-none tracking-tight"
           aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
@@ -65,38 +66,8 @@ export default function DailyPlanCardHeader({
             {currentTime ?? '00:00'}
           </span>
         </span>
-        {/* Единая пилюля арифметики дня с разделителями «|»: переносится только целиком.
-            До конца · задачи · отдых/еда · буфер (может быть отрицательным) */}
-        {dayMetrics !== null && (
-          <span className="flex items-center gap-2 whitespace-nowrap rounded-full border border-gray-700/70 bg-gray-900/60 px-3 py-1 text-sm font-medium tabular-nums leading-none text-gray-200">
-            <span className={metricSegment} title={`До конца дня осталось ${formatDurationLabel(dayMetrics.remainingMinutes)}`}>
-              <PlanTimelineIcon className="h-4 w-4 text-gray-400" />
-              {formatDurationLabel(dayMetrics.remainingMinutes)}
-            </span>
-            <span aria-hidden="true" className="text-gray-600">|</span>
-            <span className={metricSegment} title={`Невыполненных задач на шкале: ${dayMetrics.taskCount}, суммарно ${formatDurationLabel(dayMetrics.taskMinutes)}`}>
-              <PlanListIcon className="h-4 w-4 text-gray-400" />
-              {dayMetrics.taskCount} · {formatDurationLabel(dayMetrics.taskMinutes)}
-            </span>
-            <span aria-hidden="true" className="text-gray-600">|</span>
-            <span className={metricSegment} title={`Отдых, еда, перерывы и личные блоки до конца дня: ${formatDurationLabel(dayMetrics.restMinutes)} (прошедшие не считаются)`}>
-              <MealRestIcon className="h-4 w-4 text-gray-400" />
-              {formatDurationLabel(dayMetrics.restMinutes)}
-            </span>
-            <span aria-hidden="true" className="text-gray-600">|</span>
-            <span
-              className={`${metricSegment} ${dayMetrics.bufferMinutes < 0 ? 'font-semibold text-red-300' : ''}`}
-              title={dayMetrics.bufferMinutes < 0
-                ? `Буфер отрицательный: задачам и отдыху не хватает ${formatDurationLabel(-dayMetrics.bufferMinutes)} до конца дня`
-                : `Буфер — незанятое время до конца дня после задач и отдыха: ${formatDurationLabel(dayMetrics.bufferMinutes)}`}
-            >
-              <BufferTimeIcon className={`h-4 w-4 ${dayMetrics.bufferMinutes < 0 ? 'text-red-300' : 'text-gray-400'}`} />
-              {dayMetrics.bufferMinutes < 0 ? '−' : ''}{formatDurationLabel(Math.abs(dayMetrics.bufferMinutes))}
-            </span>
-          </span>
-        )}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 sm:w-auto sm:justify-end">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 sm:justify-end">
         {totalCount > 0 && (
           // Вне шкалы: KPI-счётчик прогресса дня намеренно растёт в фазе исполнения
           // (text-base → text-xl) как акцент внимания, это не статичная роль текста.
@@ -125,6 +96,44 @@ export default function DailyPlanCardHeader({
           timelineBusy={timelineBusy}
         />
       </div>
+      </div>
+
+      {/* Строка арифметики дня на всю ширину: подписи + значения, разделители «|».
+          Не конкурирует с правым блоком управления и не ломает перенос. */}
+      {dayMetrics !== null && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm tabular-nums leading-none">
+          <span className={metricSegment} title={`До конца дня осталось ${formatDurationLabel(dayMetrics.remainingMinutes)}`}>
+            <PlanTimelineIcon className="h-4 w-4 text-gray-500" />
+            <span className="text-gray-500">до конца</span>
+            <span className="font-medium text-gray-200">{formatDurationLabel(dayMetrics.remainingMinutes)}</span>
+          </span>
+          <span aria-hidden="true" className="text-gray-700">|</span>
+          <span className={metricSegment} title={`Невыполненных задач на шкале: ${dayMetrics.taskCount}, суммарно ${formatDurationLabel(dayMetrics.taskMinutes)}`}>
+            <PlanListIcon className="h-4 w-4 text-gray-500" />
+            <span className="text-gray-500">задачи</span>
+            <span className="font-medium text-gray-200">{dayMetrics.taskCount} · {formatDurationLabel(dayMetrics.taskMinutes)}</span>
+          </span>
+          <span aria-hidden="true" className="text-gray-700">|</span>
+          <span className={metricSegment} title={`Отдых, еда, перерывы и личные блоки до конца дня: ${formatDurationLabel(dayMetrics.restMinutes)} (прошедшие не считаются)`}>
+            <MealRestIcon className="h-4 w-4 text-gray-500" />
+            <span className="text-gray-500">отдых</span>
+            <span className="font-medium text-gray-200">{formatDurationLabel(dayMetrics.restMinutes)}</span>
+          </span>
+          <span aria-hidden="true" className="text-gray-700">|</span>
+          <span
+            className={metricSegment}
+            title={dayMetrics.bufferMinutes < 0
+              ? `Буфер отрицательный: задачам и отдыху не хватает ${formatDurationLabel(-dayMetrics.bufferMinutes)} до конца дня`
+              : `Буфер — незанятое время до конца дня после задач и отдыха: ${formatDurationLabel(dayMetrics.bufferMinutes)}`}
+          >
+            <BufferTimeIcon className={`h-4 w-4 ${dayMetrics.bufferMinutes < 0 ? 'text-red-400' : 'text-gray-500'}`} />
+            <span className={dayMetrics.bufferMinutes < 0 ? 'text-red-400/80' : 'text-gray-500'}>буфер</span>
+            <span className={`font-medium ${dayMetrics.bufferMinutes < 0 ? 'font-semibold text-red-300' : 'text-gray-200'}`}>
+              {dayMetrics.bufferMinutes < 0 ? '−' : ''}{formatDurationLabel(Math.abs(dayMetrics.bufferMinutes))}
+            </span>
+          </span>
+        </div>
+      )}
     </div>
   )
 }
