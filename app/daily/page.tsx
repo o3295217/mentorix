@@ -341,6 +341,7 @@ export default function DailyPage() {
     addTask,
     addGoalToTasks,
     removeTask,
+    removeTaskAndSave,
     postponeTask,
     toggleTaskSelection,
     startEditingTask,
@@ -2255,6 +2256,7 @@ export default function DailyPage() {
                   onSetBlockRange={setBlockRange}
                   onMoveBlock={moveBlockByStep}
                   onRemoveBlock={removeBlock}
+                  onDeleteTask={removeTaskAndSave}
                   onScheduleUnscheduled={scheduleUnscheduledTask}
                   appliedAnimationKey={appliedAnimationKey}
                   highlightedTaskIndexes={highlightedTimelineTaskIndexes}

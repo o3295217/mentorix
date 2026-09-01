@@ -111,6 +111,8 @@ export interface UseDailyReturn {
   addTask: () => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
+  /** Удаление задачи со шкалы: из списка плана с немедленным сохранением */
+  removeTaskAndSave: (taskId: number) => void
   postponeTask: (taskId: number, taskText: string, targetDate?: string) => Promise<void>
   toggleTaskSelection: (taskId: number) => void
   startEditingTask: (taskId: number, currentText: string) => void

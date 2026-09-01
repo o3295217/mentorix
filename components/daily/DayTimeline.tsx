@@ -221,6 +221,8 @@ export interface DayTimelineProps {
   onSetBlockRange: (blockId: string, startMinutes: number, durationMinutes: number) => void
   onMoveBlock: (blockId: string, deltaMinutes: number) => void
   onRemoveBlock: (blockId: string) => void
+  /** Удалить задачу целиком: из плана и со шкалы (взаимосвязанно) */
+  onDeleteTask: (taskId: number) => void
   onScheduleUnscheduled: (taskIndex: number, startMinutes?: number, durationMinutes?: number) => void
   appliedAnimationKey?: number
   highlightedTaskIndexes?: Set<number>
@@ -282,6 +284,7 @@ export default function DayTimeline({
   onSetBlockRange,
   onMoveBlock,
   onRemoveBlock,
+  onDeleteTask,
   onScheduleUnscheduled,
   appliedAnimationKey = 0,
   highlightedTaskIndexes = new Set<number>(),
@@ -625,6 +628,7 @@ export default function DayTimeline({
               onSetBlockRange={onSetBlockRange}
               onMove={onMoveBlock}
               onRemove={onRemoveBlock}
+              onDeleteTask={onDeleteTask}
               appliedAnimationKey={appliedAnimationKey}
               animationIndex={index}
               isHighlighted={isTaskHighlighted(block, highlightedTaskIndexes)}
@@ -657,6 +661,7 @@ interface ScheduleBlockProps {
   onSetBlockRange: (blockId: string, startMinutes: number, durationMinutes: number) => void
   onMove: (blockId: string, deltaMinutes: number) => void
   onRemove: (blockId: string) => void
+  onDeleteTask: (taskId: number) => void
   appliedAnimationKey: number
   animationIndex: number
   isHighlighted: boolean
@@ -681,6 +686,7 @@ function ScheduleBlock({
   onSetBlockRange,
   onMove,
   onRemove,
+  onDeleteTask,
   appliedAnimationKey,
   animationIndex,
   isHighlighted,
@@ -944,6 +950,21 @@ function ScheduleBlock({
                 ✎
               </button>
             )}
+            {isTaskBlock && taskId !== null && !mutationLocked && (
+              <button
+                type="button"
+                className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-red-400/70 hover:text-red-200"
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  onDeleteTask(taskId)
+                }}
+                title="Удалить задачу из плана"
+                aria-label={`Удалить задачу «${title}» из плана и со шкалы`}
+              >
+                🗑
+              </button>
+            )}
             <div className="type-secondary shrink-0 font-medium">
               {startLabel}–{endLabel} · {formatDurationLabel(displayDuration)}
               {/* Вне шкалы: бейдж «фикс.», как в карточке предложения расписания. */}
@@ -982,6 +1003,21 @@ function ScheduleBlock({
                   aria-label={`Править задачу «${title}»`}
                 >
                   ✎
+                </button>
+              )}
+              {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
+                <button
+                  type="button"
+                  className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-red-400/70 hover:text-red-200"
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => {
+                    e.stopPropagation()
+                    onDeleteTask(taskId)
+                  }}
+                  title="Удалить задачу из плана"
+                  aria-label={`Удалить задачу «${title}» из плана и со шкалы`}
+                >
+                  🗑
                 </button>
               )}
             </div>

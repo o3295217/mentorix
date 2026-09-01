@@ -714,6 +714,17 @@ export function useDaily(): UseDailyReturn {
     setHasUnsavedChanges(true)
   }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText])
 
+  // Удаление задачи со шкалы времени: убирает её из списка плана и сразу
+  // сохраняет план — reconcile-эффект шкалы синхронно уберёт блоки задачи
+  const removeTaskAndSave = useCallback((taskId: number) => {
+    const updatedTexts = tasks.filter((t) => t.id !== taskId).map((t) => t.taskText)
+    const updatedTasks = buildTasksFromTexts(updatedTexts)
+    const updatedSelected = remapSelectionByText(tasks, selectedTasks, updatedTasks)
+    setTasks(updatedTasks)
+    setSelectedTasks(updatedSelected)
+    void savePlanWithTasks(updatedTasks, updatedSelected)
+  }, [tasks, selectedTasks, buildTasksFromTexts, remapSelectionByText, savePlanWithTasks])
+
   // Перенести задачу на выбранный день
   const postponeTask = useCallback(async (taskId: number, taskText: string, targetDate?: string) => {
     try {
@@ -1155,6 +1166,7 @@ export function useDaily(): UseDailyReturn {
     addTask,
     addGoalToTasks,
     removeTask,
+    removeTaskAndSave,
     postponeTask,
     toggleTaskSelection,
     startEditingTask,
