@@ -335,6 +335,8 @@ export default function DailyPage() {
     requestPlanChatKickoff,
     canShowPlanChatKickoffCta,
     applyPlanTasksFromProposal,
+    pendingAutoApplyScheduleProposalId,
+    clearPendingAutoApplyScheduleProposal,
     addTask,
     addGoalToTasks,
     removeTask,
@@ -549,6 +551,23 @@ export default function DailyPage() {
       setApplyingProposalId(null)
     }
   }, [applyingProposalId, applyPlanTasksFromProposal, applySavedSchedule, ensureEntrySaved, flushScheduleChanges, markChatProposalApplied, selectedDate, showMessage, tasks.length])
+
+  // Автоприменение расписания: карточка в чат не выкладывается — отмашка
+  // получена на черновике, предложение уходит на шкалу в фоне. Карточка
+  // рендерится только как fallback, если фоновое применение не удалось.
+  const [autoApplyFailedProposalIds, setAutoApplyFailedProposalIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!pendingAutoApplyScheduleProposalId || applyingProposalId) return
+    const proposalId = pendingAutoApplyScheduleProposalId
+    clearPendingAutoApplyScheduleProposal()
+    const message = chatMessages.find(msg => msg.id === proposalId)
+    if (!message || message.metadata?.type !== 'daily_schedule_proposal' || message.metadata.appliedAt) return
+    const metadata = message.metadata
+    void handleApplyProposal(proposalId, metadata, buildProposalApplyOptions(metadata)).catch(() => {
+      // Текст ошибки уже показан баннером assistantOperationError
+      setAutoApplyFailedProposalIds(prev => new Set(prev).add(proposalId))
+    })
+  }, [pendingAutoApplyScheduleProposalId, applyingProposalId, chatMessages, clearPendingAutoApplyScheduleProposal, handleApplyProposal])
 
   const handleApplyTaskListProposal = useCallback(async (
     messageId: string | undefined,
@@ -2422,7 +2441,12 @@ export default function DailyPage() {
                           Собрать ещё раз
                         </button>
                       )}
-                      {msg.metadata?.type === 'daily_schedule_proposal' && !dismissedProposalIds.has(msg.id ?? '') && (
+                      {/* Карточка расписания — только fallback после неудачного фонового применения */}
+                      {msg.metadata?.type === 'daily_schedule_proposal'
+                        && !msg.metadata.appliedAt
+                        && autoApplyFailedProposalIds.has(msg.id ?? '')
+                        && applyingProposalId !== msg.id
+                        && !dismissedProposalIds.has(msg.id ?? '') && (
                         <DailyScheduleProposalCard
                           metadata={msg.metadata}
                           messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}

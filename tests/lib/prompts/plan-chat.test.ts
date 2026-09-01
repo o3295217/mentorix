@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   it('opens with a style code that applies to every kind of reply', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('СТИЛЬ ОТВЕТА — ДЕЙСТВУЕТ НА ВСЕ ОТВЕТЫ (анализ, уточнения, сопровождение карточки, ответы на вопросы)')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('СТИЛЬ ОТВЕТА — ДЕЙСТВУЕТ НА ВСЕ ОТВЕТЫ (анализ, уточнения, сопровождение сборки, ответы на вопросы)')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Краткость по умолчанию: обычный ответ — до 8-10 строк')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Список — не больше 5-7 пунктов, в анализе — не больше 4')
     // Стиль-кодекс стоит до всех предметных блоков
@@ -47,7 +47,7 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Тон партнёра, не ментора: без нотаций и лекций о продуктивности')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Оценочные укоры («ты снова намешал», «это ловушка», «как и вчера») и разбор характера пользователя запрещены')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('В ответе запрещены КАПС-заголовки секций, нумерованные трактаты, эмодзи')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не пересказывай то, что пользователь и так видит на экране: список задач, карточку расписания, проценты загрузки')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не пересказывай то, что пользователь и так видит на экране: список задач, шкалу дня, проценты загрузки')
   })
 
   it('forbids repeating settled parts of the dialogue and keeps corrections short', () => {
@@ -285,21 +285,21 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   it('forbids claiming any load level, percentage or spare time in the reply text', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАГРУЗКУ В ТЕКСТЕ НЕ ЗАЯВЛЯЙ')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`«загрузка в пределах ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}%», «день не перегружен», «плотно, но нормально»`)
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Это метрика сервера, её печатает карточка')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Это метрика сервера, её печатает сводка на шкале')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«итого 8 часов плотной работы», «запас есть», «свободно два часа», «всё помещается»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('пользователь увидит «Занято 8ч43м, свободно 0 мин» рядом с твоим обещанием запаса')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Говорить о загрузке можно только когда задачи не помещаются (пункт 3)')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('и одной фразой о перегрузе по просьбе вместить всё (пункт 4)')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('В ходе с вызовом tool поводов говорить о загрузке по-прежнему нет')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЧЕРНОВИК ПЕРЕД КАРТОЧКОЙ — ОБЯЗАТЕЛЬНАЯ ОТМАШКА ПОЛЬЗОВАТЕЛЯ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЧЕРНОВИК ПЕРЕД СБОРКОЙ — ОБЯЗАТЕЛЬНАЯ ОТМАШКА ПОЛЬЗОВАТЕЛЯ')
   })
 
   it('requires summing block durations before the tool call and rebuilding on overload', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('САМОПРОВЕРКА СУММЫ ДО ВЫЗОВА TOOL, поблочно и по всем блокам без исключения')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Превышает — пересобери план по пункту 3 и только потом вызывай tool')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызвать tool с перегрузом и оправдаться в тексте запрещено: карточка посчитает сама и покажет предупреждение о забитом дне')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызвать tool с перегрузом и оправдаться в тексте запрещено: сводка загрузки на шкале посчитает сама и покажет предупреждение о забитом дне')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('такое предупреждение на собранном тобой по своей инициативе плане — твоя ошибка планирования, а не сообщение пользователю')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('пользователь сам явно попросил занять всё время — тогда предупреждение карточки отражает его выбор')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('пользователь сам явно попросил занять всё время — тогда предупреждение сводки отражает его выбор')
   })
 
   it('offers explicit options instead of cramming when tasks do not fit the reserve', () => {
@@ -367,20 +367,21 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   })
 
   it('narrows the tool accompaniment text to assumptions, ordering logic and the CTA', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('СОПРОВОДИТЕЛЬНЫЙ ТЕКСТ К ВЫЗОВУ TOOL — ЭТО ТОЛЬКО ТРИ ВЕЩИ')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(а) принятые допущения — какие длительности ты назначил незнакомым задачам и почему, с оговоркой «поправь, если иначе»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(б) логика порядка в одну-две фразы')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(в) CTA «проверь карточку и нажми „Применить“»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('СОПРОВОДИТЕЛЬНЫЙ ТЕКСТ К ВЫЗОВУ TOOL — КОРОТКИЙ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('КАРТОЧКА В ЧАТ НЕ ВЫКЛАДЫВАЕТСЯ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('принятые допущения по длительностям с оговоркой «поправь, если иначе»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('одна-две фразы — «Применяю расписание на шкалу дня»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Применяю расписание на шкалу дня»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('исключение одно — задачи не помещаются в запас, тогда добавляется разбор и вопрос по блоку ЦЕЛЕВАЯ ЗАГРУЗКА ДНЯ')
   })
 
   it('forbids retelling the card as a list of blocks with times', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЗАПРЕЩЕНО перечислять в тексте блоки с временами')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('расписание показывает карточка, текст его не дублирует')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('расписание показывает шкала, текст его не дублирует')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«11:17–12:47 — тестирование», «12:47–13:02 — перерыв» — нарушение')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('даже если времена в точности совпадают с tool, и даже если блоков всего два')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не выдавай список блоков ни целиком, ни выборочно «для наглядности»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всей карточки, без итогов загрузки и без обещаний за пользователя')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всего расписания, без итогов загрузки и без обещаний за пользователя')
     // Прежняя формулировка прямо требовала перечислить блоки текстом — она снята
     expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('перечисли блоки по порядку с длительностями')
   })
@@ -425,7 +426,7 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   it('requires the proposal tool call without claiming persistence', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('используй tool propose_daily_schedule')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('только предложение для размещения, не сохранение')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Никогда не говори, что расписание уже сохранено')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Запрещён перфект и заявление результата')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не вставляй JSON, технические маркеры или описание вызова tool в текст пользователю')
   })
 
@@ -457,8 +458,8 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
 
   it('does not contradict backend handling of natural schedule confirmations', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Естественные подтверждения «да», «размести», «замени»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('клиент обрабатывает как explicit apply конкретного messageId')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если такое подтверждение всё же дошло до AI route')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('при неприменённом последнем предложении клиент обрабатывает сам как повторное применение')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если такое подтверждение дошло до AI route')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('не заявляй, что расписание применено')
   })
 
@@ -492,44 +493,44 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   })
 
   it('sets the final CTA to the card button depending on whether a schedule already exists', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Финальный CTA всегда указывает на кнопку карточки, а не на твоё действие')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если текущего расписания нет — «Собрал расписание — проверь карточку и нажми „Применить“»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Собрал новый вариант — проверь карточку и нажми „Применить“; замена потребует подтверждения — кнопку нужно нажать дважды»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Финальный CTA после вызова tool: «Применяю расписание — проверь шкалу дня; поправки — прямо здесь, в чате»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Никаких кнопок и карточек в CTA')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('она появляется только если фоновое применение не удалось')
     expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('Разместить на шкале?')
     expect(PLAN_CHAT_SYSTEM_PROMPT).not.toContain('Заменить текущее расписание?')
   })
 
   it('forbids claiming the schedule action as done or in progress by the assistant', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПРИМЕНЯЕТ КАРТОЧКУ ПОЛЬЗОВАТЕЛЬ, А НЕ ТЫ')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('расписание дня меняется исключительно после того, как пользователь сам нажал в карточке кнопку «Применить»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ТЕКСТ НЕ ИМЕЕТ ПРАВА РАСХОДИТЬСЯ С ФАКТОМ ПРИМЕНЕНИЯ')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«раскладываю на шкалу», «сейчас разложу по шкале», «поставил», «расставил», «применил», «добавил в расписание», «занёс в план», «обновил шкалу», «готово, расписание обновлено»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«день собран», «всё на шкале», «разместил», «применяю», «готово»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('шкала осталась прежней, а задачи — в «Не распределено»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПРИМЕНЕНИЕ ПОДТВЕРЖДАЕТ СИСТЕМА, А НЕ ТЫ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('система применяет расписание к шкале дня автоматически в фоне — отмашка уже получена на черновике')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ПРИМЕНЕНИЕ ПОДТВЕРЖДАЕТ СИСТЕМА, А НЕ ТЫ')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Запрещён перфект и заявление результата: «применил», «готово, расписание обновлено», «день собран», «всё на шкале»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Допустимая формула — настоящее время процесса: «применяю расписание на шкалу»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('успех виден пользователю по самой шкале и системному сообщению, а провал придёт ошибкой в чат')
   })
 
   it('keeps the ban in force even when the proposal tool was called', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Запрет действует и когда tool вызван: вызов tool — это показ карточки, а не изменение дня')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('допустимы только с явной привязкой к предложению — «в карточке», «в черновике», «в этом варианте»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('вызов tool отправляет расписание на фоновое применение, но успех ты не видишь')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('о содержимом предложения — только с привязкой: «в черновике», «в этом варианте»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызванный tool тоже не делает эти глаголы правдой про шкалу')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('с ним они допустимы только про содержимое карточки («в новом варианте сдвинул созвон»)')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('с ним они допустимы только про содержимое предложения («в новом варианте сдвинул созвон»)')
   })
 
   it('requires the apply CTA next to the proposal card', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('(в) CTA «проверь карточку и нажми „Применить“»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всей карточки, без итогов загрузки и без обещаний за пользователя')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Ты её нажать не можешь')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«Применяю расписание на шкалу дня»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Без пересказа всего расписания, без итогов загрузки и без обещаний за пользователя')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не проси нажимать «Применить» и не ссылайся на карточку')
   })
 
   it('warns about the double confirmation when a schedule already exists', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('если в контексте ТЕКУЩЕЕ РАСПИСАНИЕ: есть — «Собрал новый вариант — проверь карточку и нажми „Применить“; замена потребует подтверждения — кнопку нужно нажать дважды»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('провал придёт ошибкой в чат')
   })
 
   it('aligns the honesty rule with the server note about moved fixed and unscheduled blocks', () => {
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Служебная строка про блоки, которые были помечены фиксированными и переставлены в свободное время, и про задачи, оставшиеся в «Не распределено», описывает содержимое той же непринятой карточки')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Не делай из неё вывод, что день уже разложен')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Пока обновлённое расписание не пришло в контекст следующего хода, применение не состоялось')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('скажи, что предложение осталось в карточке и его нужно применить кнопкой')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Служебная строка про блоки, помеченные фиксированными и переставленные, и про задачи в «Не распределено» описывает отправленное предложение')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('фоновое применение могло не пройти, предложи собрать заново')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Если пользователь пишет, что на шкале этого нет — не спорь')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('спроси, видна ли ошибка')
   })
 
   it('keeps first-person wording elsewhere tied to the draft rather than the timeline', () => {
@@ -614,7 +615,7 @@ describe('plan chat kickoff helpers', () => {
 
     expect(existingPlan).toContain('В плане уже есть задачи')
     expect(existingPlan).toContain('Не спрашивай "чем помочь?"')
-    expect(existingPlan).toContain('покажи черновик-табличку (блок ЧЕРНОВИК ПЕРЕД КАРТОЧКОЙ)')
+    expect(existingPlan).toContain('покажи черновик-табличку (блок ЧЕРНОВИК ПЕРЕД СБОРКОЙ)')
     expect(existingPlan).toContain('tool propose_daily_schedule в этом ходе НЕ вызывай')
     expect(existingPlan).not.toContain('целей недели/месяца/мечты')
     expect(existingPlan).toContain('откуда планировать — «Планируем с текущего времени или указать другое время старта?»')

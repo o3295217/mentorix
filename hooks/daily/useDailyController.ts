@@ -18,7 +18,7 @@ import {
   mergeAppliedPlanTasks,
   sanitizeSelectedForTotal,
 } from './task-helpers'
-import { getBrowserTimezone, normalizeChatMessageId } from './chat-helpers'
+import { getBrowserTimezone, isPendingChatMessageId, normalizeChatMessageId } from './chat-helpers'
 import { consumeDailyChatSseStream, DailyChatSseError } from './stream-consumer'
 import { shouldKickoffPlanChat, shouldShowPlanChatKickoffCta, SYSTEM_KICKOFF_PLAN_CHAT } from './kickoff-helpers'
 import { getDailyChatDraftKey } from '@/hooks/chat-viewport-helpers'
@@ -67,6 +67,8 @@ export function useDaily(): UseDailyReturn {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [sendingChat, setSendingChat] = useState(false)
+  // Свежепришедшее предложение расписания, которое страница должна применить в фоне
+  const [pendingAutoApplyScheduleProposalId, setPendingAutoApplyScheduleProposalId] = useState<string | null>(null)
   const [chatHistoryLoadedDate, setChatHistoryLoadedDate] = useState<string | null>(null)
   
   // Функция получения ключа чата для даты
@@ -965,6 +967,23 @@ export function useDaily(): UseDailyReturn {
         },
       })
       void streamResult
+
+      // Карточка расписания в чат не выкладывается: отмашка получена на черновике,
+      // поэтому пришедшее со стрима предложение страница применяет к шкале сама.
+      // Сигналим только о свежепришедшем proposal текущей даты — предложения из
+      // истории (перезагрузка страницы) автоматически не применяются.
+      if (isChatDateCurrent()) {
+        const lastMessage = chatMessagesRef.current.at(-1)
+        if (
+          lastMessage?.role === 'assistant'
+          && lastMessage.id
+          && !isPendingChatMessageId(lastMessage.id)
+          && lastMessage.metadata?.type === 'daily_schedule_proposal'
+          && !lastMessage.metadata.appliedAt
+        ) {
+          setPendingAutoApplyScheduleProposalId(lastMessage.id)
+        }
+      }
       return
     } catch (error) {
       console.error('Error sending chat message:', error)
@@ -1131,6 +1150,8 @@ export function useDaily(): UseDailyReturn {
     requestPlanChatKickoff,
     canShowPlanChatKickoffCta,
     applyPlanTasksFromProposal,
+    pendingAutoApplyScheduleProposalId,
+    clearPendingAutoApplyScheduleProposal: () => setPendingAutoApplyScheduleProposalId(null),
     addTask,
     addGoalToTasks,
     removeTask,

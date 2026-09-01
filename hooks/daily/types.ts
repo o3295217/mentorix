@@ -104,6 +104,10 @@ export interface UseDailyReturn {
   canShowPlanChatKickoffCta: boolean
   applyPlanTasksFromProposal: (planTasks: string[]) => void
 
+  /** Свежепришедшее предложение расписания для фонового применения (карточка в чат не выкладывается) */
+  pendingAutoApplyScheduleProposalId: string | null
+  clearPendingAutoApplyScheduleProposal: () => void
+
   addTask: () => void
   addGoalToTasks: (goalText: string) => void
   removeTask: (taskId: number) => void
