@@ -72,6 +72,12 @@ const proposeDailyScheduleTool = {
         description: 'New tasks proposed for today. They are not in the plan until the user applies the proposal. Use 1-3 normally, max 4 unless explicitly needed; empty array when there are no new tasks.',
         items: { type: 'string', minLength: 1, maxLength: 500 },
       },
+      removeTaskIndexes: {
+        type: 'array',
+        maxItems: 50,
+        description: 'Optional: 1-based indexes of CURRENT planTasks that applying the proposal must REMOVE from the plan — use when the user agreed to merge/replace them with a task from newTasks (draft row like «2, 3, 4. Монетизация…»). No block may reference a removed index; the merged replacement goes through newTasks with taskSource=new.',
+        items: { type: 'integer', minimum: 1 },
+      },
       rationale: { type: 'string', maxLength: 1000, description: 'Short explanation only; no load summary.' },
       blocks: {
         type: 'array',
@@ -187,6 +193,14 @@ function getScheduleProposalValidationDiagnosticsInternal(proposal: DailySchedul
   const diagnostics: string[] = []
   if (proposal.date !== current.date) diagnostics.push(options.includeValues ? `date ${proposal.date} does not match request date ${current.date}` : 'date mismatch')
   if (proposal.timezone !== current.timezone) diagnostics.push(options.includeValues ? `timezone ${proposal.timezone} does not match request timezone ${current.timezone}` : 'timezone mismatch')
+
+  if (proposal.version === 3) {
+    for (const removedIndex of proposal.removeTaskIndexes ?? []) {
+      if (removedIndex < 1 || removedIndex > current.planTasks.length) {
+        diagnostics.push(`removeTaskIndexes: index ${removedIndex} does not exist in current planTasks (1-${current.planTasks.length})`)
+      }
+    }
+  }
 
   for (const [index, block] of proposal.blocks.entries()) {
     if (block.kind !== 'task') continue

@@ -4,6 +4,7 @@ import { DailyScheduleSchema, hashDailySchedule } from '@/lib/daily-schedule'
 import { getNewTasksFromProposal, hashDailyPlanTasks, proposalToDailySchedule, safeParseProposalMetadata, safeParseTaskListProposalMetadata, validateProposalAgainstCurrentPlan } from '@/lib/daily-schedule-proposal'
 import { lockDailyEntryForScheduleMutation } from '@/lib/daily-schedule-lock'
 import { parseDateParam } from '@/lib/dates'
+import { safeParseJsonArray } from '@/lib/fact-utils'
 
 export type ApplyScheduleProposalResult =
   | { status: 200; schedule: unknown; updatedAt: Date; applyStatus: 'created' | 'replaced' | 'already_applied'; proposalMessageId: number; planTasks: string[] }
@@ -92,7 +93,7 @@ export async function applyDailyScheduleProposal(input: {
       const metadata = safeParseProposalMetadata(message.metadataJson)
       if (!metadata || metadata.date !== input.date) return { status: 400 as const, error: 'Valid schedule proposal metadata not found' }
 
-      const entry = await tx.dailyEntry.findFirst({ where: { id: entryIdentity.id, userId: input.userId, date: parseDateParam(input.date) }, select: { id: true, planText: true, schedule: { select: { scheduleJson: true, updatedAt: true } } } })
+      const entry = await tx.dailyEntry.findFirst({ where: { id: entryIdentity.id, userId: input.userId, date: parseDateParam(input.date) }, select: { id: true, planText: true, selectedTasksJson: true, schedule: { select: { scheduleJson: true, updatedAt: true } } } })
       if (!entry) return { status: 404 as const }
 
       const storedScheduleValidation = entry.schedule ? DailyScheduleSchema.safeParse(entry.schedule.scheduleJson) : null
@@ -141,16 +142,40 @@ export async function applyDailyScheduleProposal(input: {
         if (planTasksConflict) return { status: 409 as const, currentHash, error: planTasksConflict }
       }
 
-      const duplicateConflict = getNewTaskDuplicateConflict(planTasks, newTasks)
+      // Задачи, которые пользователь согласился объединить/заменить новыми:
+      // применение удаляет их из плана (черновик это проговорил, отмашка получена)
+      const removeIndexes = metadata.proposal.version === 3
+        ? [...new Set(metadata.proposal.removeTaskIndexes ?? [])].sort((a, b) => a - b)
+        : []
+      const removeIndexSet = new Set(removeIndexes)
+      const keptPlanTasks = planTasks.filter((_, i) => !removeIndexSet.has(i + 1))
+
+      const duplicateConflict = getNewTaskDuplicateConflict(keptPlanTasks, newTasks)
       if (duplicateConflict) return { status: 409 as const, currentHash, error: duplicateConflict }
 
       const proposalValidation = validateProposalAgainstCurrentPlan(metadata.proposal, { date: input.date, timezone: metadata.proposal.timezone, planTasks })
       if (!proposalValidation.success) return { status: 400 as const, error: proposalValidation.error }
-      const updatedPlanText = appendPlanTasks(entry.planText, newTasks)
-      const updatedPlanTasks = newTasks.length > 0 ? splitPlanTasks(updatedPlanText) : planTasks
+      const planChanged = newTasks.length > 0 || removeIndexes.length > 0
+      const updatedPlanText = appendPlanTasks(keptPlanTasks.join('\n'), newTasks)
+      const updatedPlanTasks = planChanged ? splitPlanTasks(updatedPlanText) : planTasks
 
-      if (newTasks.length > 0) {
-        await tx.dailyEntry.update({ where: { id: entry.id }, data: { planText: updatedPlanText }, select: { id: true } })
+      if (planChanged) {
+        // Отмеченные задачи хранятся 1-based индексами в строки плана —
+        // при удалении строк индексы пересчитываются, удалённые выпадают
+        const selectedIds = safeParseJsonArray<string | number>(entry.selectedTasksJson)
+          .map(id => Number(id))
+          .filter(id => Number.isInteger(id) && id > 0 && id <= planTasks.length)
+        const remappedSelected = selectedIds
+          .filter(id => !removeIndexSet.has(id))
+          .map(id => id - removeIndexes.filter(removed => removed < id).length)
+        await tx.dailyEntry.update({
+          where: { id: entry.id },
+          data: {
+            planText: updatedPlanText,
+            ...(removeIndexes.length > 0 && { selectedTasksJson: remappedSelected as unknown as Prisma.InputJsonValue }),
+          },
+          select: { id: true },
+        })
       }
 
       const stored = await tx.dailySchedule.upsert({

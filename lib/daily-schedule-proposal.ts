@@ -137,6 +137,9 @@ export const DailyScheduleProposalV3Schema = z.object({
   workEndMinutes: z.number().int().min(0).max(1440),
   activityEndMinutes: z.number().int().min(0).max(1440),
   newTasks: z.array(TaskTextSchema).max(MAX_DAILY_SCHEDULE_PROPOSAL_NEW_TASKS),
+  // 1-based индексы задач текущего плана, которые применение УДАЛИТ из плана:
+  // пользователь согласился объединить/заменить их задачами из newTasks
+  removeTaskIndexes: z.array(z.number().int().min(1).max(200)).max(50).optional(),
   blocks: z.array(DailyScheduleProposalV3BlockSchema).min(1).max(100),
   rationale: z.string().trim().max(1000).optional(),
 }).strict().superRefine((proposal, ctx) => {
@@ -151,6 +154,11 @@ export const DailyScheduleProposalV3Schema = z.object({
     normalizedNewTasks.add(normalized)
   }
 
+  const removedIndexSet = new Set(proposal.removeTaskIndexes ?? [])
+  if (proposal.removeTaskIndexes && removedIndexSet.size !== proposal.removeTaskIndexes.length) {
+    ctx.addIssue({ code: 'custom', path: ['removeTaskIndexes'], message: 'removeTaskIndexes must be unique' })
+  }
+
   for (const [index, block] of proposal.blocks.entries()) {
     if (!isTimeStep(block.startMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'startMinutes'], message: 'startMinutes must use 1 minute step' })
     if (!isTimeStep(block.durationMinutes)) ctx.addIssue({ code: 'custom', path: ['blocks', index, 'durationMinutes'], message: 'durationMinutes must use 1 minute step' })
@@ -161,6 +169,9 @@ export const DailyScheduleProposalV3Schema = z.object({
       if (!expectedText) {
         ctx.addIssue({ code: 'custom', path: ['blocks', index, 'taskIndex'], message: 'new task block references unknown newTasks index' })
       }
+    }
+    if (block.taskSource === 'existing' && removedIndexSet.has(block.taskIndex)) {
+      ctx.addIssue({ code: 'custom', path: ['blocks', index, 'taskIndex'], message: 'task block references a task listed in removeTaskIndexes' })
     }
   }
 })
@@ -798,6 +809,13 @@ function validateTaskBlocksAgainstCurrentPlan(proposal: DailyScheduleProposal, c
 export function validateProposalAgainstCurrentPlan(proposal: DailyScheduleProposal, current: { date: string; timezone: string; planTasks: string[] }): { success: true; data: DailyScheduleProposal } | { success: false; error: string } {
   const taskValidation = validateTaskBlocksAgainstCurrentPlan(proposal, current)
   if (!taskValidation.success) return taskValidation
+  if (proposal.version === 3) {
+    for (const removedIndex of proposal.removeTaskIndexes ?? []) {
+      if (removedIndex < 1 || removedIndex > current.planTasks.length) {
+        return { success: false, error: `removeTaskIndexes references task ${removedIndex} outside the current plan (1-${current.planTasks.length})` }
+      }
+    }
+  }
   const schedule = proposalToDailySchedule(proposal, { currentPlanTaskCount: current.planTasks.length })
   const validation = DailyScheduleSchema.safeParse(schedule)
   if (!validation.success) {
@@ -834,6 +852,11 @@ export function proposalToDailyScheduleV3(proposal: DailyScheduleProposalV2): Da
 export function proposalToDailyScheduleV3(proposal: DailyScheduleProposalV3, currentPlanTaskCount: number): DailyScheduleV3
 export function proposalToDailyScheduleV3(proposal: DailyScheduleProposalV2 | DailyScheduleProposalV3, currentPlanTaskCount?: number): DailyScheduleV3 {
   const existingTaskCount = proposal.version === 3 ? currentPlanTaskCount ?? inferMinimumCurrentPlanTaskCount(proposal) : 0
+  // removeTaskIndexes: применение удалит эти задачи из плана, поэтому индексы
+  // блоков пересчитываются под итоговый план (без удалённых, новые — в конце)
+  const removedIndexes = proposal.version === 3 ? [...new Set(proposal.removeTaskIndexes ?? [])].sort((a, b) => a - b) : []
+  const removedBelow = (taskIndex: number) => removedIndexes.filter(removed => removed < taskIndex).length
+  const keptTaskCount = existingTaskCount - removedIndexes.length
   return {
     version: 3,
     timezone: proposal.timezone,
@@ -847,8 +870,8 @@ export function proposalToDailyScheduleV3(proposal: DailyScheduleProposalV2 | Da
       const id = proposalBlockId(proposal, index, block.kind, block.startMinutes, block.durationMinutes)
       if (block.kind === 'task') {
         const taskIndex = proposal.version === 3 && 'taskSource' in block && block.taskSource === 'new'
-          ? existingTaskCount + block.taskIndex
-          : block.taskIndex
+          ? keptTaskCount + block.taskIndex
+          : block.taskIndex - removedBelow(block.taskIndex)
         return { id, kind: 'task', taskIndex, taskText: block.taskText, category: block.category, isFixed: block.isFixed, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }
       }
       return { id, kind: block.kind, title: block.title, category: block.category, isFixed: block.isFixed, startMinutes: block.startMinutes, durationMinutes: block.durationMinutes }

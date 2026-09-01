@@ -339,7 +339,7 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
 
   it('requires proposal v3 planning fields, minute-level timing and fixed semantics', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Tool input всегда плоский proposal v3')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('planningBasis,planningStartMinutes,workEndMinutes,activityEndMinutes,newTasks,blocks[]')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('planningBasis,planningStartMinutes,workEndMinutes,activityEndMinutes,newTasks,removeTaskIndexes?,blocks[]')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("taskSource='existing'")
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain("taskSource='new'")
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Время указывается с точностью до ${DAILY_SCHEDULE_TIME_STEP_MINUTES} мин.`)
