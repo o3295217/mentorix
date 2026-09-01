@@ -9,7 +9,6 @@ import { useDaily } from '@/hooks/useDaily'
 import { getDailyChatMessageRenderKey } from '@/hooks/daily/useDailyController'
 import { useDailySchedule } from '@/hooks/daily/useDailySchedule'
 import DayTimeline from '@/components/daily/DayTimeline'
-import DailyScheduleProposalCard from '@/components/daily/DailyScheduleProposalCard'
 import DailyTaskListProposalCard from '@/components/daily/DailyTaskListProposalCard'
 import DailyPlanCardHeader from '@/components/daily/DailyPlanCardHeader'
 import DailyPeriodContext from '@/components/daily/DailyPeriodContext'
@@ -149,7 +148,9 @@ export default function DailyPage() {
   const [showUncompletedModal, setShowUncompletedModal] = useState(false)
   const [uncompletedTasks, setUncompletedTasks] = useState<UncompletedTask[]>([])
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null)
-  const [dismissedProposalIds, setDismissedProposalIds] = useState<Set<string>>(() => new Set())
+  // Карточек-предложений в чате больше нет, «отклонить» нечего — набор всегда пуст,
+  // но селекторы предложений по-прежнему принимают его параметром
+  const [dismissedProposalIds] = useState<Set<string>>(() => new Set())
   const [isSubmittingChat, setIsSubmittingChat] = useState(false)
   const [assistantOperationError, setAssistantOperationError] = useState('')
   const [mobileView, setMobileView] = useState<'plan' | 'assistant'>('plan')
@@ -553,9 +554,8 @@ export default function DailyPage() {
   }, [applyingProposalId, applyPlanTasksFromProposal, applySavedSchedule, ensureEntrySaved, flushScheduleChanges, markChatProposalApplied, selectedDate, showMessage, tasks.length])
 
   // Автоприменение расписания: карточка в чат не выкладывается — отмашка
-  // получена на черновике, предложение уходит на шкалу в фоне. Карточка
-  // рендерится только как fallback, если фоновое применение не удалось.
-  const [autoApplyFailedProposalIds, setAutoApplyFailedProposalIds] = useState<Set<string>>(new Set())
+  // получена на черновике, предложение уходит на шкалу в фоне. При ошибке
+  // остаётся баннер assistantOperationError; повтор — словом «да» в чате.
   useEffect(() => {
     if (!pendingAutoApplyScheduleProposalId || applyingProposalId) return
     const proposalId = pendingAutoApplyScheduleProposalId
@@ -565,7 +565,6 @@ export default function DailyPage() {
     const metadata = message.metadata
     void handleApplyProposal(proposalId, metadata, buildProposalApplyOptions(metadata)).catch(() => {
       // Текст ошибки уже показан баннером assistantOperationError
-      setAutoApplyFailedProposalIds(prev => new Set(prev).add(proposalId))
     })
   }, [pendingAutoApplyScheduleProposalId, applyingProposalId, chatMessages, clearPendingAutoApplyScheduleProposal, handleApplyProposal])
 
@@ -669,11 +668,6 @@ export default function DailyPage() {
     }
   }, [chatMessages, isSubmittingChat, sendingChat])
 
-  const handleDismissProposal = useCallback((id: string | undefined) => {
-    if (!id) return
-    setDismissedProposalIds(prev => new Set(prev).add(id))
-  }, [])
-
   // Список текстов выполненных задач для проверки целей
   const completedTaskTexts = useMemo(() => {
     return tasks
@@ -703,21 +697,6 @@ export default function DailyPage() {
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`
   }, [])
-
-  const handleDiscussProposal = useCallback((text: string) => {
-    setChatInput(text)
-    if (chatFocusFrameRef.current !== null) {
-      window.cancelAnimationFrame(chatFocusFrameRef.current)
-    }
-    chatFocusFrameRef.current = window.requestAnimationFrame(() => {
-      chatFocusFrameRef.current = null
-      const textarea = chatTextareaRef.current
-      if (!textarea) return
-      resizeChatTextarea(textarea, text)
-      textarea.focus()
-      ensureChatComposerVisible()
-    })
-  }, [ensureChatComposerVisible, resizeChatTextarea, setChatInput])
 
   // Последнее неприменённое предложение расписания в чате (для подсказки в «Не распределено»)
   const unappliedScheduleProposal = useMemo(
@@ -2441,21 +2420,8 @@ export default function DailyPage() {
                           Собрать ещё раз
                         </button>
                       )}
-                      {/* Карточка расписания — только fallback после неудачного фонового применения */}
-                      {msg.metadata?.type === 'daily_schedule_proposal'
-                        && !msg.metadata.appliedAt
-                        && autoApplyFailedProposalIds.has(msg.id ?? '')
-                        && applyingProposalId !== msg.id
-                        && !dismissedProposalIds.has(msg.id ?? '') && (
-                        <DailyScheduleProposalCard
-                          metadata={msg.metadata}
-                          messageId={isPendingChatMessageId(msg.id) ? undefined : msg.id}
-                          isApplying={applyingProposalId === msg.id}
-                          onApply={(options) => msg.metadata?.type === 'daily_schedule_proposal' ? handleApplyProposal(msg.id, msg.metadata, options) : Promise.resolve()}
-                          onDiscuss={() => handleDiscussProposal('Хочу скорректировать черновик расписания: ')}
-                          onDismiss={() => handleDismissProposal(msg.id)}
-                        />
-                      )}
+                      {/* Карточка расписания в чат не выкладывается: применение фоновое.
+                          При ошибке показывается баннер, повтор — словом «да» в чате. */}
                       {msg.metadata?.type === 'daily_task_list_proposal' && (
                         <DailyTaskListProposalCard
                           metadata={msg.metadata}

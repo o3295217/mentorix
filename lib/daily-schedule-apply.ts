@@ -111,7 +111,9 @@ export async function applyDailyScheduleProposal(input: {
       if (!proposalScheduleValidation.success) return { status: 400 as const, error: 'Proposal schedule is invalid' }
       const proposalHash = hashDailySchedule(proposalSchedule)
 
-      if (input.expectedCurrentScheduleHash !== metadata.currentScheduleHash) return { status: 409 as const, currentHash }
+      if (input.expectedCurrentScheduleHash !== metadata.currentScheduleHash) {
+        return { status: 409 as const, currentHash, error: 'Предложение устарело. Попросите ассистента собрать расписание заново.' }
+      }
 
       if (metadata.appliedAt) {
         if (metadata.schemaVersion === 3) {
@@ -121,8 +123,18 @@ export async function applyDailyScheduleProposal(input: {
         if (currentHash === proposalHash && storedScheduleValidation?.success && entry.schedule) return { status: 200 as const, schedule: storedScheduleValidation.data, updatedAt: entry.schedule.updatedAt, applyStatus: 'already_applied' as const, proposalMessageId: message.id, planTasks }
         return { status: 409 as const, currentHash, error: 'Schedule changed after proposal was applied' }
       }
-      if (input.expectedCurrentScheduleHash !== currentHash) return { status: 409 as const, currentHash }
-      if (!input.replaceExisting && entry.schedule) return { status: 409 as const, currentHash }
+      if (input.expectedCurrentScheduleHash !== currentHash) {
+        return { status: 409 as const, currentHash, error: 'Расписание изменилось с момента предложения. Попросите ассистента собрать его заново.' }
+      }
+      // Пустая шкала (запись есть, блоков нет) существующей не считается —
+      // та же семантика, что в чат-роуте при вычислении currentScheduleExists,
+      // иначе применение без replaceExisting падает на очищенном таймлайне
+      const storedScheduleHasBlocks = storedScheduleValidation?.success
+        ? storedScheduleValidation.data.blocks.length > 0
+        : !!entry.schedule
+      if (!input.replaceExisting && entry.schedule && storedScheduleHasBlocks) {
+        return { status: 409 as const, currentHash, error: 'На шкале уже есть расписание — замена требует подтверждения. Попросите ассистента собрать заново.' }
+      }
 
       if (metadata.schemaVersion === 3) {
         const planTasksConflict = getV3PlanTasksConflict({ currentPlanTasksHash: metadata.currentPlanTasksHash, basePlanTasks: planTasks })
