@@ -1737,17 +1737,26 @@ export default function DailyPage() {
                         )}
 
                         {timeChip && (
-                          // Вне шкалы: пилюля держит один факт — интервал; длительность
-                          // подписью под ней, без рамки. Кластер компактный, чип чистый.
-                          <span className="flex flex-col items-center gap-1" title={timeChipLabel ?? undefined}>
-                            <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100">
+                          // Вне шкалы: время без пилюли — интервал и длительность двумя
+                          // строками, выровненными по горизонтам рядов пульта 2×2.
+                          <span className="flex flex-col items-end gap-0.5 tabular-nums leading-none lg:gap-1" title={timeChipLabel ?? undefined}>
+                            <span className="flex items-center text-sm font-medium text-gray-100 lg:h-8">
                               {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
                             </span>
-                            <span className="type-caption tabular-nums leading-none text-gray-500">{formatDurationLabel(timeChip.totalMinutes)}</span>
+                            <span className="type-caption flex items-center text-gray-500 lg:h-8">{formatDurationLabel(timeChip.totalMinutes)}</span>
                           </span>
                         )}
 
-                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
+                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:relative lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
+                        {/* Разделители пульта 2×2: крест, не сходящийся в центре */}
+                        {editingTaskId !== task.id && (
+                          <>
+                            <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1 hidden h-[calc(50%-9px)] w-px -translate-x-1/2 bg-gray-700/50 lg:block" />
+                            <span aria-hidden="true" className="pointer-events-none absolute bottom-1 left-1/2 hidden h-[calc(50%-9px)] w-px -translate-x-1/2 bg-gray-700/50 lg:block" />
+                            <span aria-hidden="true" className="pointer-events-none absolute left-1 top-1/2 hidden h-px w-[calc(50%-9px)] -translate-y-1/2 bg-gray-700/50 lg:block" />
+                            <span aria-hidden="true" className="pointer-events-none absolute right-1 top-1/2 hidden h-px w-[calc(50%-9px)] -translate-y-1/2 bg-gray-700/50 lg:block" />
+                          </>
+                        )}
                         {editingTaskId === task.id ? (
                           <>
                             <button
@@ -2100,14 +2109,18 @@ export default function DailyPage() {
                               </span>
                             )}
                             {timeChip && (
-                              <span className="flex flex-col items-center gap-1" title={timeChipLabel ?? undefined}>
-                                <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100">
+                              <span className="flex flex-col items-end gap-0.5 tabular-nums leading-none lg:gap-1" title={timeChipLabel ?? undefined}>
+                                <span className="flex items-center text-sm font-medium text-gray-300 lg:h-8">
                                   {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
                                 </span>
-                                <span className="type-caption tabular-nums leading-none text-gray-500">{formatDurationLabel(timeChip.totalMinutes)}</span>
+                                <span className="type-caption flex items-center text-gray-500 lg:h-8">{formatDurationLabel(timeChip.totalMinutes)}</span>
                               </span>
                             )}
-                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
+                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:relative lg:grid lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
+                            {/* Две кнопки — одна вертикальная линия-разделитель */}
+                            {editingTaskId !== task.id && (
+                              <span aria-hidden="true" className="pointer-events-none absolute bottom-1 left-1/2 top-1 hidden w-px -translate-x-1/2 bg-gray-700/50 lg:block" />
+                            )}
                             {editingTaskId === task.id ? (
                               <>
                                 <button
