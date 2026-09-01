@@ -368,14 +368,14 @@
 
   .task-card-actions {
     opacity: 1;
-    transition: opacity 150ms ease, transform 180ms ease;
+    transition: opacity 260ms ease, transform 320ms cubic-bezier(0.22, 0.7, 0.3, 1);
   }
 
   /* Время строки плана: в покое занимает правый край; при наведении/фокусе
      растворяется, уступая место пульту. Анимация — «направленный сдвиг»:
      только transform+opacity, вёрстка не пересчитывается. */
   .task-row-time {
-    transition: opacity 150ms ease, transform 180ms ease;
+    transition: opacity 260ms ease, transform 320ms cubic-bezier(0.22, 0.7, 0.3, 1);
   }
 
   .goal-hover-actions {
@@ -386,7 +386,7 @@
   @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
     .task-card-actions {
       opacity: 0;
-      transform: translateX(8px);
+      transform: translateX(12px);
     }
 
     .group:hover .task-card-actions,
@@ -398,7 +398,7 @@
     .group:hover .task-row-time,
     .group:focus-within .task-row-time {
       opacity: 0;
-      transform: translateX(-8px);
+      transform: translateX(-12px);
     }
 
     .goal-hover-actions {
