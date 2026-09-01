@@ -109,8 +109,9 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .task-card-actions,
-    .task-row-time {
+    .task-card-actions > button,
+    .task-card-actions > span,
+    .task-row-time > span {
       transition: none;
       transform: none;
     }
@@ -366,15 +367,12 @@
     max-height: calc(100vh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 
-  .task-card-actions {
-    opacity: 1;
-    transition: opacity 260ms ease, transform 320ms cubic-bezier(0.22, 0.7, 0.3, 1);
-  }
-
-  /* Время строки плана: в покое занимает правый край; при наведении/фокусе
-     растворяется, уступая место пульту. Анимация — «направленный сдвиг»:
-     только transform+opacity, вёрстка не пересчитывается. */
-  .task-row-time {
+  /* Кроссфейд «время ↔ пульт» построчно, как поворот двух рядов кубика:
+     верхняя пара (интервал ↔ верхний ряд кнопок) уходит первой, нижняя —
+     с задержкой. Анимируются строки, не контейнеры; только opacity+transform. */
+  .task-card-actions > button,
+  .task-card-actions > span,
+  .task-row-time > span {
     transition: opacity 260ms ease, transform 320ms cubic-bezier(0.22, 0.7, 0.3, 1);
   }
 
@@ -384,21 +382,46 @@
   }
 
   @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-    .task-card-actions {
+    .task-card-actions > button {
       opacity: 0;
       transform: translateX(12px);
     }
 
-    .group:hover .task-card-actions,
-    .group:focus-within .task-card-actions {
+    /* Разделители-крест: без сдвига, только проявление между рядами */
+    .task-card-actions > span {
+      opacity: 0;
+    }
+
+    .group:hover .task-card-actions > button:nth-of-type(-n+2),
+    .group:focus-within .task-card-actions > button:nth-of-type(-n+2) {
       opacity: 1;
       transform: translateX(0);
     }
 
-    .group:hover .task-row-time,
-    .group:focus-within .task-row-time {
+    .group:hover .task-card-actions > button:nth-of-type(n+3),
+    .group:focus-within .task-card-actions > button:nth-of-type(n+3) {
+      opacity: 1;
+      transform: translateX(0);
+      transition-delay: 160ms;
+    }
+
+    .group:hover .task-card-actions > span,
+    .group:focus-within .task-card-actions > span {
+      opacity: 1;
+      transition-delay: 80ms;
+    }
+
+    .group:hover .task-row-time > span:first-child,
+    .group:focus-within .task-row-time > span:first-child {
       opacity: 0;
       transform: translateX(-12px);
+    }
+
+    .group:hover .task-row-time > span:last-child,
+    .group:focus-within .task-row-time > span:last-child {
+      opacity: 0;
+      transform: translateX(-12px);
+      transition-delay: 160ms;
     }
 
     .goal-hover-actions {
