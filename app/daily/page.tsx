@@ -1750,7 +1750,7 @@ export default function DailyPage() {
                           </span>
                         )}
 
-                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:absolute lg:right-2 lg:top-1/2 lg:grid lg:w-auto lg:-translate-y-1/2 lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
+                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:absolute lg:inset-y-0 lg:right-2 lg:my-auto lg:grid lg:h-fit lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
                         {/* Разделители пульта 2×2: крест, не сходящийся в центре */}
                         {editingTaskId !== task.id && (
                           <>
@@ -2122,7 +2122,7 @@ export default function DailyPage() {
                             </span>
                               </span>
                             )}
-                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:absolute lg:right-2 lg:top-1/2 lg:grid lg:w-auto lg:-translate-y-1/2 lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
+                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:absolute lg:inset-y-0 lg:right-2 lg:my-auto lg:grid lg:h-fit lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
                             {/* Две кнопки — одна вертикальная линия-разделитель */}
                             {editingTaskId !== task.id && (
                               <span aria-hidden="true" className="pointer-events-none absolute bottom-1 left-1/2 top-1 hidden w-px -translate-x-1/2 bg-gray-700/50 lg:block" />
