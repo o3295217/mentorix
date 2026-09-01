@@ -119,14 +119,15 @@ export default function Navigation() {
   return (
     <>
       <header className="app-top-header fixed inset-x-0 top-0 z-50 border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
-        <nav aria-label="Основная навигация" className="app-top-nav-inner mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Шапка тянется на всю ширину окна, ссылки распределяются равномерно */}
+        <nav aria-label="Основная навигация" className="app-top-nav-inner px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between lg:h-16">
             <div className="flex min-w-0 flex-1 items-center gap-3 lg:gap-4">
               <Link href="/" className="flex min-h-11 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
                 <span className="nav-logo" aria-label="mentorix">mentorix</span>
               </Link>
 
-              <div className="hidden min-w-0 items-center space-x-0.5 overflow-x-clip lg:flex">
+              <div className="hidden min-w-0 flex-1 items-center justify-evenly overflow-x-clip lg:flex">
                 {desktopNavItems.map((item) => {
                   const active = isRouteActive(pathname, item.href)
                   return (
