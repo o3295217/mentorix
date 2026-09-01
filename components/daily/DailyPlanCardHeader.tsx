@@ -3,6 +3,7 @@
 import PlanLensSwitch, { type PlanLens } from './PlanLensSwitch'
 import type { DailyPhase } from '@/hooks/daily/phase-helpers'
 import { formatDurationLabel } from '@/hooks/daily/schedule-helpers'
+import { PlanListIcon, PlanTimelineIcon } from '@/components/icons'
 
 function formatTaskCountWord(count: number): string {
   const mod10 = count % 10
@@ -50,8 +51,8 @@ export default function DailyPlanCardHeader({
   const isExecution = phase === 'execution'
   return (
     <div className="daily-phase-accent mb-4 flex flex-shrink-0 flex-wrap items-start justify-between gap-3 lg:pr-6" data-phase={phase}>
-      <div className="flex flex-shrink-0 items-baseline gap-2 whitespace-nowrap">
-        <h2 className="type-section-title">План на день</h2>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2">
+        <h2 className="type-section-title whitespace-nowrap">План на день</h2>
         <span
           className="type-secondary inline-block font-semibold tabular-nums leading-none tracking-tight"
           aria-label={currentTime ? `Текущее локальное время: ${currentTime}` : 'Текущее локальное время загружается'}
@@ -61,32 +62,36 @@ export default function DailyPlanCardHeader({
             {currentTime ?? '00:00'}
           </span>
         </span>
-        {(workRemainingMinutes !== null || scheduledTasks !== null) && (
-          // Коротко и символично: «⏳ остаток · N задач / M ч»; расшифровка — в подсказке
+        {/* Пилюли-метрики в стиле границ дня на шкале: остаток рабочего окна и объём задач */}
+        {workRemainingMinutes !== null && (
           <span
-            className="type-caption cursor-default whitespace-nowrap leading-none text-gray-500"
+            className="flex cursor-default items-center gap-1.5 whitespace-nowrap rounded-full border border-gray-700/70 bg-gray-900/60 px-2.5 py-1 text-sm font-medium tabular-nums leading-none text-gray-200"
+            title={`До конца рабочего окна осталось ${formatDurationLabel(workRemainingMinutes)}`}
+          >
+            <PlanTimelineIcon className="h-4 w-4 text-gray-400" />
+            {formatDurationLabel(workRemainingMinutes)}
+          </span>
+        )}
+        {scheduledTasks !== null && (
+          <span
+            className={`flex cursor-default items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-sm font-medium tabular-nums leading-none ${
+              workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+                : 'border-gray-700/70 bg-gray-900/60 text-gray-200'
+            }`}
             title={[
-              workRemainingMinutes !== null ? `До конца рабочего окна осталось ${formatDurationLabel(workRemainingMinutes)}` : null,
-              scheduledTasks !== null ? `Невыполненных задач на шкале: ${scheduledTasks.count}, суммарно ${formatDurationLabel(scheduledTasks.minutes)} (еда, перерывы и буферы не считаются)` : null,
-              workRemainingMinutes !== null && scheduledTasks !== null && scheduledTasks.minutes > workRemainingMinutes
+              `Невыполненных задач на шкале: ${scheduledTasks.count}, суммарно ${formatDurationLabel(scheduledTasks.minutes)} (еда, перерывы и буферы не считаются)`,
+              workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
                 ? 'Задачи не помещаются в остаток рабочего окна'
                 : null,
             ].filter(Boolean).join('. ')}
           >
-            {workRemainingMinutes !== null && (
-              <> · <span aria-hidden="true">⏳</span> <span className="tabular-nums text-gray-300">{formatDurationLabel(workRemainingMinutes)}</span></>
-            )}
-            {scheduledTasks !== null && (
-              <> ·{' '}
-                <span className={`tabular-nums ${
-                  workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
-                    ? 'font-semibold text-amber-300'
-                    : 'text-gray-300'
-                }`}>
-                  {scheduledTasks.count} {formatTaskCountWord(scheduledTasks.count)} / {formatDurationLabel(scheduledTasks.minutes)}
-                </span>
-              </>
-            )}
+            <PlanListIcon className={`h-4 w-4 ${
+              workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
+                ? 'text-amber-300'
+                : 'text-gray-400'
+            }`} />
+            {scheduledTasks.count} {formatTaskCountWord(scheduledTasks.count)} · {formatDurationLabel(scheduledTasks.minutes)}
           </span>
         )}
       </div>
