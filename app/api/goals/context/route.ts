@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getPeriodKey } from '@/lib/goals-utils'
 import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { mapGoalForResponse } from '@/lib/goal-response'
@@ -107,21 +106,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid year parameter' }, { status: 400 })
     }
 
-    const yearStart = new Date(requestedYear, 0, 1)
-    const nextYearStart = new Date(requestedYear + 1, 0, 1)
-
-    const [latestDream, earliestDream, yearGoalRows, periodGoalRows, goalRows, tags, evaluations, dreamTasks] = await prisma.$transaction([
+    const [latestDream, earliestDream, yearGoalRows, goalRows, tags, evaluations, dreamTasks] = await prisma.$transaction([
       prisma.dreamGoal.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.dreamGoal.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
       prisma.yearGoal.findMany({ where: { userId }, orderBy: { year: 'asc' } }),
-      prisma.periodGoal.findMany({
-        where: {
-          userId,
-          periodType: { in: ['half_year', 'quarter', 'month', 'week'] },
-          periodStart: { gte: yearStart, lt: nextYearStart },
-        },
-        orderBy: [{ periodStart: 'asc' }, { createdAt: 'desc' }],
-      }),
       prisma.goal.findMany({
         where: { userId },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -161,11 +149,12 @@ export async function GET(request: NextRequest) {
     }
     if (!yearGoals[String(requestedYear)]) yearGoals[String(requestedYear)] = []
 
+    // Списки периодов — из записей Goal (единый источник правды);
+    // ключи запрошенного года: '2026-08', '2026-08-W4', '2026-Q3', '2026-H1'
     const periodGoals: Record<string, string[]> = {}
-    for (const row of periodGoalRows) {
-      const key = getPeriodKey(row.periodType as 'half_year' | 'quarter' | 'month' | 'week', row.periodStart)
-      if (!key || periodGoals[key]) continue
-      periodGoals[key] = safeParseJson<string[]>(row.goalsJson, [])
+    for (const goal of goalRows) {
+      if (!goal.periodKey || !goal.periodKey.startsWith(`${requestedYear}-`)) continue
+      ;(periodGoals[goal.periodKey] ||= []).push(goal.text)
     }
 
     return NextResponse.json({

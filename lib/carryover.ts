@@ -1,9 +1,8 @@
 // Логика «ревизии месяца»: незакрытые цели прошлого месяца, о которых
-// напоминаем при входе. Чистые функции — работа с БД в API-роуте
-// app/api/goals/carryover.
+// напоминаем при входе. Источник — записи Goal (единая модель целей);
+// чистые функции, работа с БД — в app/api/goals/carryover.
 
 import { areTasksSimilar } from '@/lib/task-match'
-import { fuzzyMatchGoal } from '@/lib/goals-utils'
 
 export const MONTH_NAMES_GENITIVE = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
 
@@ -27,20 +26,15 @@ export function formatMonthGenitive(monthKey: string): string {
 // «2026-08» → «из августа 2026» (бейдж на перенесённой задаче)
 export const formatCarriedFrom = (monthKey: string): string => `из ${formatMonthGenitive(monthKey)}`
 
-export interface CarryoverSource {
-  /** Ключ периода-источника: месяц «2026-08» или неделя «2026-08-W3» */
-  key: string
-  type: 'month' | 'week'
-  texts: string[]
-}
-
-export interface TrackedGoalLite {
-  periodKey: string
+export interface CarryoverGoalRow {
+  id: number
   text: string
+  periodKey: string
   completed: boolean
 }
 
 export interface CarryoverItem {
+  goalId: number
   text: string
   fromKey: string
   fromType: 'month' | 'week'
@@ -48,40 +42,37 @@ export interface CarryoverItem {
 
 /**
  * Незакрытые цели прошлого месяца, о которых стоит напомнить.
- * Цель выпадает из списка, если она выполнена (tracked-запись с completed),
- * уже перенесена самим пользователем в текущий месяц, уже отправлена
- * в бэклог задач, либо дублирует другую цель списка (декомпозиция
- * месяц → недели с одинаковой формулировкой показывается один раз —
- * источники с типом month подавайте первыми).
+ * prevKeys — ключ месяца и ключи его недель. Цель выпадает из списка,
+ * если она выполнена, похожий текст уже есть в текущем месяце (перенёс сам),
+ * уже отправлена в бэклог задач, либо дублирует другую цель списка
+ * (декомпозиция месяц → недели: месячная запись показывается один раз).
  */
 export function collectCarryoverItems(params: {
-  sources: CarryoverSource[]
-  tracked: TrackedGoalLite[]
+  prevMonthKey: string
+  prevKeys: string[]
+  rows: CarryoverGoalRow[]
   currentMonthTexts: string[]
   openTaskTexts: string[]
-  /** Ключ прошлого месяца («2026-08»): выполненность ищется по всему месяцу,
-   * а не только по периоду-источнику — текст цели могли переносить между
-   * неделями, а tracked-запись с галочкой осталась под старым ключом */
-  monthKey?: string
 }): CarryoverItem[] {
-  const { sources, tracked, currentMonthTexts, openTaskTexts, monthKey } = params
+  const { prevMonthKey, prevKeys, rows, currentMonthTexts, openTaskTexts } = params
+  const prevKeySet = new Set(prevKeys)
   const items: CarryoverItem[] = []
 
-  const inScope = (periodKey: string, sourceKey: string): boolean =>
-    monthKey
-      ? periodKey === monthKey || periodKey.startsWith(`${monthKey}-W`)
-      : periodKey === sourceKey
+  const candidates = rows
+    .filter(r => prevKeySet.has(r.periodKey) && !r.completed && r.text.trim())
+    // Месячные цели первыми — дедуп предпочитает их недельным дублям
+    .sort((a, b) => (a.periodKey === b.periodKey ? 0 : a.periodKey === prevMonthKey ? -1 : b.periodKey === prevMonthKey ? 1 : 0))
 
-  for (const source of sources) {
-    for (const text of source.texts) {
-      if (!text.trim()) continue
-      const isCompleted = tracked.some(g => inScope(g.periodKey, source.key) && g.completed && fuzzyMatchGoal(g.text, text))
-      if (isCompleted) continue
-      if (currentMonthTexts.some(t => areTasksSimilar(t, text))) continue
-      if (openTaskTexts.some(t => areTasksSimilar(t, text))) continue
-      if (items.some(i => areTasksSimilar(i.text, text))) continue
-      items.push({ text, fromKey: source.key, fromType: source.type })
-    }
+  for (const row of candidates) {
+    if (currentMonthTexts.some(t => areTasksSimilar(t, row.text))) continue
+    if (openTaskTexts.some(t => areTasksSimilar(t, row.text))) continue
+    if (items.some(i => areTasksSimilar(i.text, row.text))) continue
+    items.push({
+      goalId: row.id,
+      text: row.text,
+      fromKey: row.periodKey,
+      fromType: row.periodKey === prevMonthKey ? 'month' : 'week',
+    })
   }
   return items
 }

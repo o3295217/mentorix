@@ -7,6 +7,7 @@ import { requireUserId } from '@/lib/get-user-id'
 import { syncCompletedWorkForGoal, removeCompletedWorkForGoal } from '@/lib/completed-work'
 import { buildPaginatedResponse, parsePaginationParams } from '@/lib/pagination'
 import { goalPriorityNumberToString, mapGoalForResponse } from '@/lib/goal-response'
+import { fuzzyMatchGoal } from '@/lib/goals-utils'
 import { z } from 'zod'
 
 const GoalPrioritySchema = z.union([
@@ -101,24 +102,42 @@ export async function POST(request: NextRequest) {
     // priority приходит как число (0-3), конвертируем в строку
     const priorityStr = typeof priority === 'number' ? goalPriorityNumberToString(priority) : (priority || 'none')
 
-    const goal = await prisma.goal.create({
-      data: {
-        userId,
-        text,
-        periodType,
-        periodKey,
-        deadline: deadline ? parseDateParam(deadline) : null,
-        priority: priorityStr,
-        tagsJson: tags || [],
-        historyJson: [{
-          type: 'created',
-          date: new Date().toISOString(),
-        }],
-        parentId: parentId || null,
-        scope: scope || 'dream',
-        rootYearGoalId: rootYearGoalId || null,
-      },
-    })
+    // Цель — единая запись: если в периоде уже есть запись с этим текстом
+    // (например, создана сохранением списка целей периода), не плодим дубль,
+    // а дополняем её метаданными (иерархия, scope, приоритет, теги)
+    const samePeriod = await prisma.goal.findMany({ where: { userId, periodKey } })
+    const existing = samePeriod.find(g => fuzzyMatchGoal(g.text, text))
+
+    const goal = existing
+      ? await prisma.goal.update({
+          where: { id: existing.id },
+          data: {
+            ...(deadline !== undefined && deadline !== null && { deadline: parseDateParam(deadline) }),
+            ...(priority !== undefined && { priority: priorityStr }),
+            ...(tags !== undefined && { tagsJson: tags }),
+            ...(parentId !== undefined && { parentId: parentId || null }),
+            ...(scope !== undefined && { scope: scope || 'dream' }),
+            ...(rootYearGoalId !== undefined && { rootYearGoalId: rootYearGoalId || null }),
+          },
+        })
+      : await prisma.goal.create({
+          data: {
+            userId,
+            text,
+            periodType,
+            periodKey,
+            deadline: deadline ? parseDateParam(deadline) : null,
+            priority: priorityStr,
+            tagsJson: tags || [],
+            historyJson: [{
+              type: 'created',
+              date: new Date().toISOString(),
+            }],
+            parentId: parentId || null,
+            scope: scope || 'dream',
+            rootYearGoalId: rootYearGoalId || null,
+          },
+        })
 
     return NextResponse.json({
       ...goal,

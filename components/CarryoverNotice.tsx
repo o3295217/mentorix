@@ -17,6 +17,7 @@ interface CarryoverData {
 }
 
 type Decision = {
+  goalId?: number
   text: string
   fromKey: string
   action: { type: 'week'; weekKey: string } | { type: 'backlog' } | { type: 'completed' }
@@ -82,7 +83,7 @@ export default function CarryoverNotice() {
 
   const resolveItem = useCallback(async (item: CarryoverItem, action: Decision['action']) => {
     setProcessing(prev => new Set(prev).add(item.text))
-    const ok = await sendDecisions([{ text: item.text, fromKey: item.fromKey, action }])
+    const ok = await sendDecisions([{ goalId: item.goalId, text: item.text, fromKey: item.fromKey, action }])
     setProcessing(prev => {
       const next = new Set(prev)
       next.delete(item.text)
@@ -101,7 +102,7 @@ export default function CarryoverNotice() {
     if (!data) return
     setBulkProcessing(true)
     const ok = await sendDecisions(
-      data.items.map(item => ({ text: item.text, fromKey: item.fromKey, action: { type: 'backlog' as const } }))
+      data.items.map(item => ({ goalId: item.goalId, text: item.text, fromKey: item.fromKey, action: { type: 'backlog' as const } }))
     )
     setBulkProcessing(false)
     if (ok) setData(null)

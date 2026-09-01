@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectCarryoverItems, formatCarriedFrom, formatMonthGenitive, prevMonthOf } from '@/lib/carryover'
+import { collectCarryoverItems, formatCarriedFrom, formatMonthGenitive, prevMonthOf, CarryoverGoalRow } from '@/lib/carryover'
 
 describe('prevMonthOf', () => {
   it('обычный месяц: сентябрь 2026 → август 2026', () => {
@@ -19,69 +19,44 @@ describe('formatMonthGenitive / formatCarriedFrom', () => {
 })
 
 describe('collectCarryoverItems', () => {
-  const sources = [
-    { key: '2026-08', type: 'month' as const, texts: ['Запустить лендинг', 'Написать статью'] },
-    { key: '2026-08-W4', type: 'week' as const, texts: ['Написать статью', 'Собрать отчёт'] },
+  const prevMonthKey = '2026-08'
+  const prevKeys = ['2026-08', '2026-08-W1', '2026-08-W2', '2026-08-W3', '2026-08-W4']
+
+  const rows: CarryoverGoalRow[] = [
+    { id: 1, text: 'Запустить лендинг', periodKey: '2026-08', completed: false },
+    { id: 2, text: 'Написать статью', periodKey: '2026-08-W4', completed: false },
+    { id: 3, text: 'Запустить лендинг', periodKey: '2026-08-W3', completed: false }, // недельный дубль месячной
+    { id: 4, text: 'Собрать отчёт', periodKey: '2026-08-W4', completed: true }, // выполнена
+    { id: 5, text: 'Цель сентября', periodKey: '2026-09-W2', completed: false }, // не прошлый месяц
   ]
 
-  it('собирает незакрытое, дедуплицируя месяц и недели (месячный источник в приоритете)', () => {
-    const items = collectCarryoverItems({ sources, tracked: [], currentMonthTexts: [], openTaskTexts: [] })
+  it('собирает незакрытое прошлого месяца, месячные в приоритете при дедупе', () => {
+    const items = collectCarryoverItems({ prevMonthKey, prevKeys, rows, currentMonthTexts: [], openTaskTexts: [] })
     expect(items).toEqual([
-      { text: 'Запустить лендинг', fromKey: '2026-08', fromType: 'month' },
-      { text: 'Написать статью', fromKey: '2026-08', fromType: 'month' },
-      { text: 'Собрать отчёт', fromKey: '2026-08-W4', fromType: 'week' },
+      { goalId: 1, text: 'Запустить лендинг', fromKey: '2026-08', fromType: 'month' },
+      { goalId: 2, text: 'Написать статью', fromKey: '2026-08-W4', fromType: 'week' },
     ])
-  })
-
-  it('исключает выполненные (tracked-запись с completed в том же периоде)', () => {
-    const items = collectCarryoverItems({
-      sources,
-      tracked: [{ periodKey: '2026-08', text: 'Запустить лендинг', completed: true }],
-      currentMonthTexts: [],
-      openTaskTexts: [],
-    })
-    expect(items.map(i => i.text)).toEqual(['Написать статью', 'Собрать отчёт'])
-  })
-
-  it('с monthKey выполненность ищется по всему прошлому месяцу (текст переносили между неделями)', () => {
-    const items = collectCarryoverItems({
-      sources: [{ key: '2026-08-W4', type: 'week', texts: ['Опубликовать сайт AIONLAB'] }],
-      tracked: [{ periodKey: '2026-08-W3', text: 'Опубликовать сайт AIONLAB', completed: true }],
-      currentMonthTexts: [],
-      openTaskTexts: [],
-      monthKey: '2026-08',
-    })
-    expect(items).toHaveLength(0)
-  })
-
-  it('с monthKey выполненная в другом месяце запись не закрывает цель', () => {
-    const items = collectCarryoverItems({
-      sources: [{ key: '2026-08-W4', type: 'week', texts: ['Опубликовать сайт AIONLAB'] }],
-      tracked: [{ periodKey: '2026-09-W1', text: 'Опубликовать сайт AIONLAB', completed: true }],
-      currentMonthTexts: [],
-      openTaskTexts: [],
-      monthKey: '2026-08',
-    })
-    expect(items).toHaveLength(1)
-  })
-
-  it('не считает закрытой цель, выполненную в другом периоде', () => {
-    const items = collectCarryoverItems({
-      sources: [{ key: '2026-08', type: 'month', texts: ['Запустить лендинг'] }],
-      tracked: [{ periodKey: '2026-07', text: 'Запустить лендинг', completed: true }],
-      currentMonthTexts: [],
-      openTaskTexts: [],
-    })
-    expect(items).toHaveLength(1)
   })
 
   it('исключает уже перенесённое в текущий месяц и уже отправленное в задачи', () => {
     const items = collectCarryoverItems({
-      sources,
-      tracked: [],
+      prevMonthKey,
+      prevKeys,
+      rows,
       currentMonthTexts: ['Написать статью'],
-      openTaskTexts: ['Собрать отчёт'],
+      openTaskTexts: ['Запустить лендинг'],
     })
-    expect(items.map(i => i.text)).toEqual(['Запустить лендинг'])
+    expect(items).toEqual([])
+  })
+
+  it('выполненная запись не попадает в список независимо от недели', () => {
+    const items = collectCarryoverItems({
+      prevMonthKey,
+      prevKeys,
+      rows: [{ id: 7, text: 'Опубликовать сайт AIONLAB', periodKey: '2026-08-W4', completed: true }],
+      currentMonthTexts: [],
+      openTaskTexts: [],
+    })
+    expect(items).toEqual([])
   })
 })

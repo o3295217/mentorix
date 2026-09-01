@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getPeriodDates } from '@/lib/dates'
 import { safeParseJson } from '@/lib/api-utils'
+import { getPeriodGoalTexts } from '@/lib/period-goals'
 
 type UserProfileRecord = {
   name: string | null
@@ -157,24 +157,21 @@ export async function getLatestUserProfile(userId: string) {
 }
 
 export async function getPlanUserContext(userId: string, targetDate: Date): Promise<AiPlanContext> {
-  const weekPeriod = getPeriodDates(targetDate, 'week')
-  const monthPeriod = getPeriodDates(targetDate, 'month')
-
-  const [dream, weekGoalsRecord, monthGoalsRecord, userProfile, userInsights] = await Promise.all([
+  const [dream, weekTexts, monthTexts, userProfile, userInsights] = await Promise.all([
     getLatestDreamGoal(userId),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'week', periodStart: weekPeriod.start },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'month', periodStart: monthPeriod.start },
-      orderBy: { createdAt: 'desc' },
-    }),
+    getPeriodGoalTexts(userId, 'week', targetDate),
+    getPeriodGoalTexts(userId, 'month', targetDate),
     prisma.userProfile.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
     prisma.userInsights.findFirst({ where: { userId } }),
   ])
 
-  return buildPlanContext({ dream, weekGoalsRecord, monthGoalsRecord, userProfile, userInsights })
+  return buildPlanContext({
+    dream,
+    weekGoalsRecord: { goalsJson: weekTexts },
+    monthGoalsRecord: { goalsJson: monthTexts },
+    userProfile,
+    userInsights,
+  })
 }
 
 export async function getDailyEvaluationUserContext(userId: string, date: Date): Promise<AiEvaluationContext> {
@@ -195,62 +192,48 @@ export async function getDailyEvaluationGoalsContext(
   dreamOverride?: DreamRecord
 ): Promise<AiGoalsContext> {
   const year = date.getFullYear()
-  const halfYearPeriod = getPeriodDates(date, 'half_year')
-  const quarterPeriod = getPeriodDates(date, 'quarter')
-  const monthPeriod = getPeriodDates(date, 'month')
-  const weekPeriod = getPeriodDates(date, 'week')
 
-  const [dream, currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals] = await Promise.all([
+  const [dream, currentYearGoal, halfYearTexts, quarterTexts, monthTexts, weekTexts] = await Promise.all([
     dreamOverride !== undefined ? Promise.resolve(dreamOverride) : getLatestDreamGoal(userId),
     prisma.yearGoal.findFirst({ where: { userId, year } }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'half_year', periodStart: halfYearPeriod.start },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'quarter', periodStart: quarterPeriod.start },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'month', periodStart: monthPeriod.start },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'week', periodStart: weekPeriod.start },
-      orderBy: { createdAt: 'desc' },
-    }),
+    getPeriodGoalTexts(userId, 'half_year', date),
+    getPeriodGoalTexts(userId, 'quarter', date),
+    getPeriodGoalTexts(userId, 'month', date),
+    getPeriodGoalTexts(userId, 'week', date),
   ])
 
-  return buildGoalsContext({ dream, currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals })
+  return buildGoalsContext({
+    dream,
+    currentYearGoal,
+    halfYearGoals: { goalsJson: halfYearTexts },
+    quarterGoals: { goalsJson: quarterTexts },
+    monthGoals: { goalsJson: monthTexts },
+    weekGoals: { goalsJson: weekTexts },
+  })
 }
 
 export async function getPeriodEvaluationUserContext(userId: string, startDate: Date): Promise<AiEvaluationContext> {
   const year = startDate.getFullYear()
 
-  const [dream, currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals, userProfile] = await Promise.all([
+  const [dream, currentYearGoal, halfYearTexts, quarterTexts, monthTexts, weekTexts, userProfile] = await Promise.all([
     getLatestDreamGoal(userId),
     prisma.yearGoal.findFirst({ where: { userId, year } }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'half_year', periodStart: { lte: startDate } },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'quarter', periodStart: { lte: startDate } },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'month', periodStart: { lte: startDate } },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.periodGoal.findFirst({
-      where: { userId, periodType: 'week', periodStart: { lte: startDate } },
-      orderBy: { createdAt: 'desc' },
-    }),
+    getPeriodGoalTexts(userId, 'half_year', startDate),
+    getPeriodGoalTexts(userId, 'quarter', startDate),
+    getPeriodGoalTexts(userId, 'month', startDate),
+    getPeriodGoalTexts(userId, 'week', startDate),
     prisma.userProfile.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
   ])
 
   return {
-    goals: buildGoalsContext({ dream, currentYearGoal, halfYearGoals, quarterGoals, monthGoals, weekGoals }),
+    goals: buildGoalsContext({
+      dream,
+      currentYearGoal,
+      halfYearGoals: { goalsJson: halfYearTexts },
+      quarterGoals: { goalsJson: quarterTexts },
+      monthGoals: { goalsJson: monthTexts },
+      weekGoals: { goalsJson: weekTexts },
+    }),
     profile: mapUserProfile(userProfile),
   }
 }
@@ -277,10 +260,5 @@ export async function getForecastHorizonGoals(options: {
     return safeParseJson(yearGoal?.goalsJson, [])
   }
 
-  const periodGoal = await prisma.periodGoal.findFirst({
-    where: { userId, periodType: forecastHorizon, periodStart: horizonStartDate },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  return safeParseJson(periodGoal?.goalsJson, [])
+  return getPeriodGoalTexts(userId, forecastHorizon, horizonStartDate)
 }
