@@ -6,6 +6,8 @@ import { splitLines } from '@/lib/fact-utils'
 import { safeParseJson } from '@/lib/api-utils'
 import { requireUserId } from '@/lib/get-user-id'
 import { syncCompletedWorkForEntry, recalculateWorkSummary } from '@/lib/completed-work'
+import { completeTrackedGoalsForTasks } from '@/lib/goal-completion-sync'
+import { deriveCompletedTaskTexts } from '@/lib/goal-task-match'
 import { buildPaginatedResponse, parsePaginationParams } from '@/lib/pagination'
 import { Prisma } from '@prisma/client'
 
@@ -215,9 +217,32 @@ export async function POST(request: NextRequest) {
           selectedTasksJson: entry.selectedTasksJson,
           extraTasksJson: entry.extraTasksJson,
         })
-        await recalculateWorkSummary(userId, entry.date)
       } catch (cwError) {
         console.error('[CompletedWork] sync failed:', cwError)
+      }
+
+      // Взаимная связь: выполненная задача дня отмечает совпавшую tracked-цель
+      try {
+        const completedGoals = await completeTrackedGoalsForTasks({
+          userId,
+          date: entry.date,
+          taskTexts: deriveCompletedTaskTexts({
+            planText: entry.planText,
+            selectedTasksJson: entry.selectedTasksJson,
+            extraTasksJson: entry.extraTasksJson,
+          }),
+        })
+        if (completedGoals > 0) {
+          console.log(`[GoalSync] completed ${completedGoals} tracked goal(s) from daily tasks`)
+        }
+      } catch (gsError) {
+        console.error('[GoalSync] failed:', gsError)
+      }
+
+      try {
+        await recalculateWorkSummary(userId, entry.date)
+      } catch (wsError) {
+        console.error('[WorkSummary] recalc failed:', wsError)
       }
     }
 

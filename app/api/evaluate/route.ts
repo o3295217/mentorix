@@ -11,6 +11,7 @@ import { recalculateUserStats } from '@/lib/user-stats'
 import { requireUserId } from '@/lib/get-user-id'
 import { logAIUsage } from '@/lib/ai-usage'
 import { recalculateWorkSummary } from '@/lib/completed-work'
+import { completeTrackedGoalsForTasks } from '@/lib/goal-completion-sync'
 import { getDailyEvaluationUserContext } from '@/lib/user-context'
 import { getObservedDayRhythm } from '@/lib/observed-day-rhythm'
 
@@ -71,6 +72,18 @@ export async function POST(request: NextRequest) {
         { error: 'No completed tasks. Mark tasks as done before evaluation.' },
         { status: 400 }
       )
+    }
+
+    // Взаимная связь: выполненные задачи дня отмечают совпавшие tracked-цели
+    // (до сбора контекста, чтобы оценка видела актуальный статус целей)
+    try {
+      await completeTrackedGoalsForTasks({
+        userId,
+        date: dailyEntry.date,
+        taskTexts: [...derived.completedTasks, ...extraTasks],
+      })
+    } catch (gsError) {
+      console.error('[GoalSync] failed:', gsError)
     }
 
     const date = dailyEntry.date

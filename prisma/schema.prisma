@@ -249,6 +249,7 @@ model Evaluation {
   recommendationsText   String
   suggestedTasksJson    Json?
   createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @default(now()) @updatedAt
 
   @@index([dreamProgressScore])
   @@index([createdAt])
@@ -267,6 +268,7 @@ model OpenTask {
   isClosed   Boolean   @default(false)
   archiveStatus String?
   closedAt   DateTime?
+  carriedFromMonth String? // месяц-источник «YYYY-MM», если задача пришла из незакрытых целей прошлого месяца
   createdAt  DateTime  @default(now())
 
   @@index([userId])
@@ -524,7 +526,7 @@ model CompletedWork {
   type        String   // task | goal | habit | extra
   text        String
   category    String?  // стратегические | операционные | привычки | созвоны
-  goalLink    String?  // periodKey цели (например week:2026-03-W3)
+  goalLink    String?  // periodKey цели (например 2026-03-W3)
   sourceType  String?  // dailyEntry | goal | habit
   sourceId    Int?
   createdAt   DateTime @default(now())

@@ -25,6 +25,8 @@ interface DateState {
 }
 
 interface DatePickerWithIndicatorsProps {
+  /** id выпадающего календаря — переопределить при нескольких экземплярах на странице */
+  calendarId?: string
   value: string // "yyyy-MM-dd"
   onChange: (value: string) => void
 }
@@ -33,7 +35,7 @@ function parseDateKey(dateKey: string) {
   return new Date(`${dateKey}T00:00:00`)
 }
 
-export default function DatePickerWithIndicators({ value, onChange }: DatePickerWithIndicatorsProps) {
+export default function DatePickerWithIndicators({ value, onChange, calendarId = 'daily-date-picker-calendar' }: DatePickerWithIndicatorsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(parseDateKey(value))
   const [indicators, setIndicators] = useState<DateIndicators>({})
@@ -383,7 +385,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
         onClick={toggleCalendar}
         className="input type-body flex min-h-11 w-auto min-w-0 cursor-pointer items-center justify-between gap-2 text-left"
         aria-expanded={isOpen}
-        aria-controls="daily-date-picker-calendar"
+        aria-controls={calendarId}
         aria-haspopup="dialog"
       >
         <span className="min-w-0 truncate">{format(parseDateKey(value), 'd MMMM yyyy', { locale: ru })}</span>
@@ -393,7 +395,7 @@ export default function DatePickerWithIndicators({ value, onChange }: DatePicker
       {/* Calendar Dropdown */}
       {isOpen && (
         <div
-          id="daily-date-picker-calendar"
+          id={calendarId}
           role="dialog"
           aria-label="Выбор даты"
           className="daily-date-picker-dialog fixed left-1/2 z-50 w-screen max-w-[22rem] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-lg border-2 border-gray-700 bg-gray-900/95 p-0 shadow-xl sm:w-[22rem] sm:p-2 lg:absolute lg:left-auto lg:right-0 lg:top-full lg:mt-2 lg:translate-x-0 lg:overflow-visible lg:overscroll-auto lg:p-4"

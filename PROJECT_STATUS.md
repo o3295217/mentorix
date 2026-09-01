@@ -2,7 +2,7 @@
 
 > ⚠️ Этот файл генерируется автоматически при коммите. Не редактируй вручную!
 > 
-> Последнее обновление: **2026-08-31**
+> Последнее обновление: **2026-09-01**
 
 ## Общая информация
 
@@ -33,7 +33,7 @@
 | `/progress` |
 | `/tasks` |
 
-## API Endpoints (56)
+## API Endpoints (57)
 
 | Endpoint | Методы |
 |----------|--------|
@@ -63,6 +63,7 @@
 | `/api/facts` | GET |
 | `/api/facts/summary` | GET |
 | `/api/forecast` | POST |
+| `/api/goals/carryover` | GET, POST |
 | `/api/goals/context` | GET |
 | `/api/goals/decompose` | POST |
 | `/api/goals/dream` | GET, POST |
@@ -94,14 +95,16 @@
 | `/api/tasks/open` | GET, POST |
 | `/api/tasks/process-uncompleted` | POST |
 
-## Компоненты (47)
+## Компоненты (49)
 
 - `AppShell`
 - `AuthGuard`
 - `AuthProvider`
+- `CarryoverNotice`
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `ExpandableInput`
+- `HeaderDailyDate`
 - `InstallAppButton`
 - `Landing`
 - `LayoutFooter`
@@ -331,6 +334,7 @@
 | recommendationsText | `String` |
 | suggestedTasksJson | `Json?` |
 | createdAt | `DateTime` |
+| updatedAt | `DateTime` |
 
 ### OpenTask
 | Поле | Тип |
@@ -344,6 +348,7 @@
 | isClosed | `Boolean` |
 | archiveStatus | `String?` |
 | closedAt | `DateTime?` |
+| carriedFromMonth | `String?` |
 | createdAt | `DateTime` |
 
 ### UserProfile

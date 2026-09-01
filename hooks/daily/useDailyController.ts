@@ -22,6 +22,7 @@ import { getBrowserTimezone, normalizeChatMessageId } from './chat-helpers'
 import { consumeDailyChatSseStream, DailyChatSseError } from './stream-consumer'
 import { shouldKickoffPlanChat, shouldShowPlanChatKickoffCta, SYSTEM_KICKOFF_PLAN_CHAT } from './kickoff-helpers'
 import { getDailyChatDraftKey } from '@/hooks/chat-viewport-helpers'
+import { isDateKey, subscribeDailyDate, writeStoredDailyDate } from '@/lib/daily-date-sync'
 
 let dailyChatTempMessageIdCounter = 0
 
@@ -132,13 +133,17 @@ export function useDaily(): UseDailyReturn {
   const abortControllerRef = useRef<AbortController | null>(null)
   
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem('daily:selectedDate', selectedDate)
-    } catch {
-      // ignore
-    }
+    // Пишет localStorage и оповещает закреплённую дату в шапке (HeaderDailyDate)
+    writeStoredDailyDate(selectedDate)
   }, [selectedDate])
+
+  // Дата из шапки: событие при смене на этой странице, ?date= при переходе с другой
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const param = new URLSearchParams(window.location.search).get('date')
+    if (param && isDateKey(param)) setSelectedDate(param)
+    return subscribeDailyDate(d => setSelectedDate(prev => (prev === d ? prev : d)))
+  }, [])
 
   useEffect(() => {
     if (!storageUserId || typeof window === 'undefined') return
@@ -172,7 +177,11 @@ export function useDaily(): UseDailyReturn {
     
     // Устанавливаем флаг чтобы не перезаписать загруженные данные
     skipNextChatSaveRef.current = true
-    
+
+    // Чужая дата не должна ни секунды показывать прежний чат
+    chatMessagesRef.current = []
+    setChatMessages([])
+
     // Загружаем чат из БД
     const loadChatHistory = async () => {
       setChatHistoryLoadedDate(null)
@@ -861,9 +870,14 @@ export function useDaily(): UseDailyReturn {
   const sendChatMessage = useCallback(async (initialMessage?: string) => {
     const messageToSend = initialMessage || chatInput.trim()
     if (!messageToSend) return
-    
+
     setSendingChat(true)
-    
+
+    // Дата, к которой принадлежит эта переписка: если пользователь переключит
+    // день до конца стрима, обновления не должны утекать на другую дату
+    const chatDate = selectedDate
+    const isChatDateCurrent = () => currentDateRef.current === chatDate
+
     const currentMessages = chatMessagesRef.current
 
     // Добавить сообщение пользователя в историю (если не initialMessage)
@@ -919,10 +933,15 @@ export function useDaily(): UseDailyReturn {
       const tempAssistantId = createDailyChatTempMessageId('pending')
       const assistantMessage: ChatMessage = { id: tempAssistantId, role: 'assistant', content: '', metadata: null }
       const messagesWithAssistant = [...baseMessages, assistantMessage]
-      chatMessagesRef.current = messagesWithAssistant
-      setChatMessages(messagesWithAssistant)
+      if (isChatDateCurrent()) {
+        chatMessagesRef.current = messagesWithAssistant
+        setChatMessages(messagesWithAssistant)
+      }
 
       const updateAssistant = (patch: Partial<ChatMessage>) => {
+        // Стрим пережил переключение даты — его сообщения принадлежат chatDate,
+        // на экране уже чат другого дня, молча дописываем только в БД (сервер)
+        if (!isChatDateCurrent()) return
         const streamedMessages = chatMessagesRef.current.map((message, index) => {
           const isTarget = index === chatMessagesRef.current.length - 1 && message.role === 'assistant'
           return isTarget ? { ...message, ...patch } : message

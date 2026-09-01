@@ -14,6 +14,7 @@ import MonthTimeline from '@/components/goals/MonthTimeline'
 import MonthSection from '@/components/goals/MonthSection'
 import GoalsChatTrigger from '@/components/goals/GoalsChatTrigger'
 import GoalsChatPanel from '@/components/goals/GoalsChatPanel'
+import CarryoverNotice from '@/components/CarryoverNotice'
 
 export default function GoalsPage() {
   const {
@@ -224,6 +225,7 @@ export default function GoalsPage() {
 
   return (
     <div>
+      <CarryoverNotice />
       <div className="space-y-4">
         {/* DreamBar — управляет состояниями 0, 1, 2 */}
         <DreamBar

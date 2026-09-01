@@ -8,6 +8,7 @@ import { parseDateParam } from '@/lib/dates'
 import { areTasksSimilar } from '@/lib/task-match'
 import { expectOk, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
 import { safeParseJson } from '@/lib/safe-json'
+import { formatCarriedFrom } from '@/lib/carryover'
 
 type TaskType = OpenTask['taskType']
 
@@ -49,6 +50,17 @@ const TASK_TONES: Record<TaskType, TaskTone> = {
     badgeClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200',
     accentButtonClass: 'text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200',
   },
+}
+
+// Тон секции «Задачи прошлого месяца» — задачи, пришедшие из незакрытых целей
+const CARRIED_TONE: TaskTone = {
+  eyebrow: 'Хвосты периода',
+  title: 'Задачи прошлого месяца',
+  description: 'Незакрытые цели прошлого месяца, отправленные в задачи при ревизии.',
+  sectionCountClass: 'border-amber-500/20 bg-amber-500/10 text-amber-200',
+  itemClass: 'border-amber-500/15 bg-amber-500/[0.05]',
+  badgeClass: 'border-amber-500/20 bg-amber-500/10 text-amber-200',
+  accentButtonClass: 'text-amber-300 hover:bg-amber-500/10 hover:text-amber-200',
 }
 
 function formatTaskDate(date: string) {
@@ -185,6 +197,11 @@ function TaskCard({
                 {formatPlanStatus(inPlanDate, today)}
               </span>
             )}
+            {task.carriedFromMonth && (
+              <span className={`inline-flex max-w-full items-center whitespace-normal break-words rounded-full border px-2.5 py-1 text-[11px] font-medium leading-5 [overflow-wrap:anywhere] ${tone.badgeClass}`}>
+                {formatCarriedFrom(task.carriedFromMonth)}
+              </span>
+            )}
           </div>
 
           {isEditing ? (
@@ -303,14 +320,14 @@ function TaskCard({
 }
 
 function TaskSection({
-  type,
+  tone,
   tasks,
   totalCount,
   state,
   actions,
   headerContent,
 }: {
-  type: TaskType
+  tone: TaskTone
   tasks: OpenTask[]
   totalCount: number
   state: TaskSectionState
@@ -318,7 +335,6 @@ function TaskSection({
   headerContent?: ReactNode
 }) {
   const { today, tasksInPlan, hideInPlan, confirmCloseId, confirmDeleteId } = state
-  const tone = TASK_TONES[type]
   const hiddenCount = Math.max(totalCount - tasks.length, 0)
 
   return (
@@ -759,13 +775,17 @@ export default function TasksPage() {
   const inPlanTodayCount = Object.values(tasksInPlan).filter((date) => date === today).length
   const filteredOpen = hideInPlan ? openTasks.filter((task) => tasksInPlan[task.id] !== today) : openTasks
 
-  const strategicTotal = openTasks.filter((task) => task.taskType === 'strategic')
-  const operationalTotal = openTasks.filter((task) => task.taskType === 'operational')
-  const personalTotal = openTasks.filter((task) => task.taskType === 'personal')
+  // Задачи из незакрытых целей прошлого месяца живут в собственной секции
+  const carriedTotal = openTasks.filter((task) => task.carriedFromMonth)
+  const carriedOpen = filteredOpen.filter((task) => task.carriedFromMonth)
 
-  const strategicOpen = filteredOpen.filter((task) => task.taskType === 'strategic')
-  const operationalOpen = filteredOpen.filter((task) => task.taskType === 'operational')
-  const personalOpen = filteredOpen.filter((task) => task.taskType === 'personal')
+  const strategicTotal = openTasks.filter((task) => task.taskType === 'strategic' && !task.carriedFromMonth)
+  const operationalTotal = openTasks.filter((task) => task.taskType === 'operational' && !task.carriedFromMonth)
+  const personalTotal = openTasks.filter((task) => task.taskType === 'personal' && !task.carriedFromMonth)
+
+  const strategicOpen = filteredOpen.filter((task) => task.taskType === 'strategic' && !task.carriedFromMonth)
+  const operationalOpen = filteredOpen.filter((task) => task.taskType === 'operational' && !task.carriedFromMonth)
+  const personalOpen = filteredOpen.filter((task) => task.taskType === 'personal' && !task.carriedFromMonth)
 
   const strategicClosed = closedTasks.filter((task) => task.taskType === 'strategic')
   const operationalClosed = closedTasks.filter((task) => task.taskType === 'operational')
@@ -881,9 +901,19 @@ export default function TasksPage() {
           </p>
         </section>
 
+        {carriedTotal.length > 0 && (
+          <TaskSection
+            tone={CARRIED_TONE}
+            tasks={carriedOpen}
+            totalCount={carriedTotal.length}
+            state={taskSectionState}
+            actions={taskSectionActions}
+          />
+        )}
+
         <div id="open-task-sections" className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[0.8fr_1fr_1.35fr]">
             <TaskSection
-              type="personal"
+              tone={TASK_TONES.personal}
               tasks={personalOpen}
               totalCount={personalTotal.length}
               state={taskSectionState}
@@ -914,7 +944,7 @@ export default function TasksPage() {
             />
 
             <TaskSection
-              type="strategic"
+              tone={TASK_TONES.strategic}
               tasks={strategicOpen}
               totalCount={strategicTotal.length}
               state={taskSectionState}
@@ -922,7 +952,7 @@ export default function TasksPage() {
             />
 
             <TaskSection
-              type="operational"
+              tone={TASK_TONES.operational}
               tasks={operationalOpen}
               totalCount={operationalTotal.length}
               state={taskSectionState}

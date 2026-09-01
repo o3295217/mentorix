@@ -16,6 +16,7 @@ import DailyPeriodContext from '@/components/daily/DailyPeriodContext'
 import type { PlanLens } from '@/components/daily/PlanLensSwitch'
 import { isInvalidProposalFallbackMessage, renderAssistantMessageContent } from '@/components/daily/chat-render-helpers'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
+import CarryoverNotice from '@/components/CarryoverNotice'
 import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskPostponeIcon, TaskRepeatIcon } from '@/components/icons'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 import { areTasksSimilar } from '@/lib/task-match'
@@ -972,8 +973,11 @@ export default function DailyPage() {
   const extraDoneCount = extraTasks.length
   const savedTaskCount = useMemo(() => countSavedPlanTasks(dailyEntry?.planText), [dailyEntry?.planText])
   const hasEvaluation = !!dailyEntry?.evaluation
-  const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && dailyEntry.evaluation?.createdAt
-    && new Date(dailyEntry.updatedAt) > new Date(dailyEntry.evaluation.createdAt)
+  // Сравниваем с updatedAt оценки: повторная оценка сдвигает её и гасит
+  // подсветку «Обновить оценку» (createdAt при upsert-обновлении не меняется)
+  const lastEvaluatedAt = dailyEntry?.evaluation?.updatedAt ?? dailyEntry?.evaluation?.createdAt
+  const planChangedAfterEval = hasEvaluation && dailyEntry?.updatedAt && lastEvaluatedAt
+    && new Date(dailyEntry.updatedAt) > new Date(lastEvaluatedAt)
   const todayDateKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), [])
   const canPlanWithMentrix = selectedDate === todayDateKey
   const hasGoalContext = weekGoals.length > 0 || monthGoals.length > 0
@@ -1152,12 +1156,16 @@ export default function DailyPage() {
 
   return (
     <div className="min-w-0 space-y-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:space-y-6 lg:pb-0">
+      <CarryoverNotice />
       <div className="flex min-w-0 items-center justify-between gap-3">
         <h1 className="type-page-title min-w-0">
           <span className="lg:hidden">План дня</span>
           <span className="hidden lg:inline">Ежедневное планирование</span>
         </h1>
-        <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
+        {/* На десктопе дата закреплена в шапке (HeaderDailyDate), здесь — только мобильный селектор */}
+        <div className="lg:hidden">
+          <DatePickerWithIndicators value={selectedDate} onChange={setSelectedDate} />
+        </div>
       </div>
 
       {/* Context from periods */}

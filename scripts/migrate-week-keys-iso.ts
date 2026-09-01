@@ -2,75 +2,76 @@
  * Миграция данных: пересчёт недельных periodKey со старого правила
  * («неделя N месяца = первый понедельник месяца + (N-1)*7») на ISO 8601
  * («неделя принадлежит месяцу своего ЧЕТВЕРГА, номер = порядковый номер
- * этого четверга в месяце»).
+ * этого четверга в месяце»). Функция пересчёта — lib/week-key-migration.ts.
  *
  * Затрагивает: goals.periodKey (periodType='week'),
  * work_summaries.periodKey (periodType='week'),
  * completed_work.goalLink (значения формата YYYY-MM-WN).
- * PeriodGoal хранится по дате periodStart и в пересчёте не нуждается.
+ * PeriodGoal и PeriodEvaluation хранятся по дате periodStart и в пересчёте
+ * не нуждаются.
+ *
+ * Идемпотентность: по строке ключа нельзя отличить старое правило от нового
+ * (повторный пересчёт «2026-09-W2» дал бы «2026-09-W3»), поэтому факт
+ * применения фиксируется маркером в таблице data_migrations — второй запуск
+ * с --apply ничего не меняет.
  *
  * По умолчанию — dry-run (только печать плана). Запись: флаг --apply.
  * Запуск: ENCRYPTION_KEY=... npx tsx scripts/migrate-week-keys-iso.ts [--apply]
  */
 
 import { prisma } from '../lib/prisma'
+import { remapWeekKey, WEEK_KEY_RE } from '../lib/week-key-migration'
 
-const WEEK_KEY_RE = /^(\d{4})-(\d{2})-W(\d+)$/
+const MIGRATION_NAME = 'week-keys-iso'
 
-/** Понедельник недели N месяца по СТАРОМУ правилу (правило понедельника). */
-function oldRuleWeekStart(year: number, month0: number, weekNum: number): Date {
-  const d = new Date(year, month0, 1)
-  while (d.getDay() !== 1) d.setDate(d.getDate() + 1)
-  d.setDate(d.getDate() + (weekNum - 1) * 7)
-  return d
-}
+interface Update { id: number; from: string; to: string }
 
-/** Ключ недели по НОВОМУ правилу (ISO: месяц и номер — по четвергу недели). */
-function isoKeyForWeekStart(monday: Date): string {
-  const thursday = new Date(monday)
-  thursday.setDate(thursday.getDate() + 3)
-  const weekNum = Math.floor((thursday.getDate() - 1) / 7) + 1
-  return `${thursday.getFullYear()}-${String(thursday.getMonth() + 1).padStart(2, '0')}-W${weekNum}`
-}
+// Изменившийся ключ всегда строго больше старого (тот же месяц и номер+1 либо
+// W1 следующего месяца), поэтому обновление по убыванию from не создаёт
+// временных дублей под @@unique(userId, periodType, periodKey) в work_summaries.
+const toUpdates = (rows: Array<{ id: number; key: string | null }>): Update[] =>
+  rows
+    .map(r => ({ id: r.id, from: r.key ?? '', to: remapWeekKey(r.key ?? '') }))
+    .filter((u): u is Update => u.to !== null && u.to !== u.from)
+    .sort((a, b) => b.from.localeCompare(a.from))
 
-/** Старый ключ → новый ключ; null, если ключ не недельный или уже совпадает. */
-export function remapWeekKey(oldKey: string): string | null {
-  const m = WEEK_KEY_RE.exec(oldKey)
-  if (!m) return null
-  const monday = oldRuleWeekStart(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10))
-  const newKey = isoKeyForWeekStart(monday)
-  return newKey === oldKey ? null : newKey
+async function isApplied(): Promise<boolean> {
+  const table = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT to_regclass('data_migrations') IS NOT NULL AS exists`
+  if (!table[0]?.exists) return false
+  const rows = await prisma.$queryRaw<Array<{ name: string }>>`
+    SELECT "name" FROM "data_migrations" WHERE "name" = ${MIGRATION_NAME}`
+  return rows.length > 0
 }
 
 async function main() {
   const apply = process.argv.includes('--apply')
   console.log(apply ? '=== РЕЖИМ ЗАПИСИ (--apply) ===' : '=== DRY-RUN (без записи; для применения добавьте --apply) ===')
 
+  if (await isApplied()) {
+    console.log(`Миграция «${MIGRATION_NAME}» уже применена — изменений нет.`)
+    return
+  }
+
   const goals = await prisma.goal.findMany({
     where: { periodType: 'week' },
     select: { id: true, periodKey: true },
   })
-  const goalUpdates = goals
-    .map(g => ({ id: g.id, from: g.periodKey, to: remapWeekKey(g.periodKey) }))
-    .filter((u): u is { id: number; from: string; to: string } => u.to !== null)
+  const goalUpdates = toUpdates(goals.map(g => ({ id: g.id, key: g.periodKey })))
 
   const summaries = await prisma.workSummary.findMany({
     where: { periodType: 'week' },
     select: { id: true, periodKey: true },
   })
-  const summaryUpdates = summaries
-    .map(s => ({ id: s.id, from: s.periodKey, to: remapWeekKey(s.periodKey) }))
-    .filter((u): u is { id: number; from: string; to: string } => u.to !== null)
+  const summaryUpdates = toUpdates(summaries.map(s => ({ id: s.id, key: s.periodKey })))
 
   const works = await prisma.completedWork.findMany({
     where: { goalLink: { not: null } },
     select: { id: true, goalLink: true },
   })
-  const workUpdates = works
-    .map(w => ({ id: w.id, from: w.goalLink as string, to: remapWeekKey(w.goalLink as string) }))
-    .filter((u): u is { id: number; from: string; to: string } => u.to !== null)
+  const workUpdates = toUpdates(works.map(w => ({ id: w.id, key: w.goalLink })))
 
-  const report = (label: string, updates: Array<{ id: number; from: string; to: string }>, total: number) => {
+  const report = (label: string, updates: Update[], total: number) => {
     console.log(`\n${label}: недельных записей ${total}, к пересчёту ${updates.length}`)
     for (const u of updates) console.log(`  #${u.id}: ${u.from} -> ${u.to}`)
   }
@@ -80,10 +81,16 @@ async function main() {
 
   if (!apply) return
 
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS "data_migrations" (
+      "name" TEXT PRIMARY KEY,
+      "applied_at" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`
   await prisma.$transaction([
     ...goalUpdates.map(u => prisma.goal.update({ where: { id: u.id }, data: { periodKey: u.to } })),
     ...summaryUpdates.map(u => prisma.workSummary.update({ where: { id: u.id }, data: { periodKey: u.to } })),
     ...workUpdates.map(u => prisma.completedWork.update({ where: { id: u.id }, data: { goalLink: u.to } })),
+    prisma.$executeRaw`INSERT INTO "data_migrations" ("name") VALUES (${MIGRATION_NAME}) ON CONFLICT ("name") DO NOTHING`,
   ])
   console.log(`\nГотово: goals ${goalUpdates.length}, work_summaries ${summaryUpdates.length}, completed_work ${workUpdates.length}.`)
 }

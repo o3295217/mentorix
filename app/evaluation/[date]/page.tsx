@@ -63,6 +63,8 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
   const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set())
   const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
   const [taskError, setTaskError] = useState('')
+  // Список задач в «Результате дня» по умолчанию свёрнут — сводка в бейджах
+  const [tasksExpanded, setTasksExpanded] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -236,7 +238,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
           const percent = total > 0 ? Math.round((completed / total) * 100) : 0
           
           return (
-            <div className="flex flex-wrap gap-4 mb-4 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm">
               <span className="px-3 py-1 rounded-full bg-green-900/40 text-green-200">
                  Выполнено: {completed}/{total} ({percent}%)
               </span>
@@ -250,12 +252,25 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
                    Сверх плана: {extra}
                 </span>
               )}
+              {tasksWithStatus.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTasksExpanded((open) => !open)}
+                  aria-expanded={tasksExpanded}
+                  aria-controls="day-result-task-list"
+                  className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-700 px-3 py-1 text-gray-300 transition hover:bg-gray-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+                >
+                  {tasksExpanded ? 'Свернуть список' : `Показать список (${tasksWithStatus.length})`}
+                  <span aria-hidden="true" className="text-xs">{tasksExpanded ? '▴' : '▾'}</span>
+                </button>
+              )}
             </div>
           )
         })()}
 
-        {/* Список задач */}
-        <div className="space-y-1.5 mb-6">
+        {/* Список задач — по умолчанию свёрнут, сводка выше в бейджах */}
+        {tasksExpanded && (
+        <div id="day-result-task-list" className="space-y-1.5 mb-6">
           {tasksWithStatus.map((task, index) => (
             <div
               key={index}
@@ -283,6 +298,7 @@ export default function EvaluationPage({ params }: { params: Promise<{ date: str
             <p className="text-gray-400 italic text-center py-4">Нет задач</p>
           )}
         </div>
+        )}
 
         {/* Анализ */}
         <div className="border-t border-gray-700 pt-4">

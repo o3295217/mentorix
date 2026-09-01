@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireUserId } from '@/lib/get-user-id'
+import { completeTrackedGoalsForTasks } from '@/lib/goal-completion-sync'
+import { recalculateWorkSummary } from '@/lib/completed-work'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,6 +31,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         closedAt: new Date(),
       },
     })
+
+    // Взаимная связь: закрытая задача отмечает совпавшую tracked-цель
+    try {
+      const completedGoals = await completeTrackedGoalsForTasks({
+        userId,
+        date: task.closedAt ?? new Date(),
+        taskTexts: [task.taskText],
+      })
+      if (completedGoals > 0) {
+        await recalculateWorkSummary(userId, task.closedAt ?? new Date())
+      }
+    } catch (gsError) {
+      console.error('[GoalSync] failed:', gsError)
+    }
 
     return NextResponse.json(task)
   } catch (error) {

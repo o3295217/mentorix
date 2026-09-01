@@ -44,6 +44,7 @@ export interface Evaluation {
   workValuesAlignment?: string
   suggestedTasksJson?: unknown
   createdAt: string
+  updatedAt?: string
 }
 
 // === ЕЖЕДНЕВНАЯ ЗАПИСЬ ===
@@ -141,6 +142,7 @@ export interface OpenTask {
   isClosed: boolean
   archiveStatus?: 'completed' | 'paused' | null
   closedAt?: string
+  carriedFromMonth?: string | null // месяц-источник «YYYY-MM» для задач из незакрытых целей прошлого месяца
   createdAt: string
 }
 

@@ -1075,15 +1075,17 @@ export async function getUserStatsForAI(): Promise<string>
 
 ## 7. КОМПОНЕНТЫ
 
-### Список компонентов (16 основных + 8 для целей)
+### Список компонентов (18 основных + 8 для целей)
 
 **Основные:**
 - `AppShell`
 - `AuthGuard`
 - `AuthProvider`
+- `CarryoverNotice`
 - `DatePickerWithIndicators`
 - `DreamProgress`
 - `ExpandableInput`
+- `HeaderDailyDate`
 - `InstallAppButton`
 - `Landing`
 - `LayoutFooter`

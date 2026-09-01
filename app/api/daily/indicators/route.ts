@@ -24,9 +24,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid month value (expected: YYYY-MM)' }, { status: 400 })
     }
 
-    // Начало и конец месяца
-    const startDate = new Date(year, month - 1, 1)
-    const endDate = new Date(year, month, 0, 23, 59, 59)
+    // Месяц с запасом ±7 дней: сетка календаря показывает хвостовые дни
+    // соседних месяцев (например, 31.08 в первой строке сентября) —
+    // их индикаторы должны прийти в том же ответе
+    const startDate = new Date(year, month - 1, 1 - 7)
+    const endDate = new Date(year, month, 7, 23, 59, 59)
 
     // Получить все daily entries за месяц
     const entries = await prisma.dailyEntry.findMany({
