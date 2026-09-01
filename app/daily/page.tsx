@@ -34,7 +34,7 @@ import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helper
 import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, findLatestUnappliedScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 import { getTaskTimeChipLabel, getTaskTimeChips, sortTasksByScheduleTime } from '@/hooks/daily/list-lens-helpers'
 import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
-import { getScheduleBoundaryMinutes, isTaskScheduleBlock } from '@/hooks/daily/schedule-helpers'
+import { formatDurationLabel, getScheduleBoundaryMinutes, isTaskScheduleBlock } from '@/hooks/daily/schedule-helpers'
 import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
 import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
 import type { FactItem, Habit } from '@/hooks/daily/types'
@@ -1643,7 +1643,8 @@ export default function DailyPage() {
                   const isPostponeActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'postpone'
                   const isHabitActive = activeTaskAction?.taskId === task.id && (activeTaskAction.type === 'habit-create' || activeTaskAction.type === 'habit-remove')
                   const isDeleteActive = activeTaskAction?.taskId === task.id && activeTaskAction.type === 'delete'
-                  const timeChipLabel = getTaskTimeChipLabel(taskTimeChips.get(index + 1))
+                  const timeChip = taskTimeChips.get(index + 1)
+                  const timeChipLabel = getTaskTimeChipLabel(timeChip)
 
                   return (
                     <div
@@ -1735,14 +1736,19 @@ export default function DailyPage() {
                           </span>
                         )}
 
-                        {timeChipLabel && (
-                          // Вне шкалы: компактная пилюля времени, как пилюли границ шкалы дня.
-                          <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums text-primary-100">
-                            {timeChipLabel}
+                        {timeChip && (
+                          // Вне шкалы: пилюля времени в две строки (интервал/длительность) —
+                          // правый кластер компактный, тексту задачи достаётся ширина.
+                          <span
+                            className="type-caption flex flex-col items-center gap-0.5 rounded-2xl border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100"
+                            title={timeChipLabel ?? undefined}
+                          >
+                            <span>{timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}</span>
+                            <span className="text-primary-200/70">{formatDurationLabel(timeChip.totalMinutes)}</span>
                           </span>
                         )}
 
-                        <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:w-auto lg:flex-nowrap lg:border-0 lg:pt-0">
+                        <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:border-0 lg:pt-0">
                         {editingTaskId === task.id ? (
                           <>
                             <button
@@ -2027,7 +2033,8 @@ export default function DailyPage() {
                       <div className={`min-h-0 space-y-2 ${showCompleted ? 'overflow-visible' : 'overflow-hidden'}`}>
                         {sortedCompletedTasks.map((task) => {
                           const index = tasks.findIndex(t => t.id === task.id)
-                          const timeChipLabel = getTaskTimeChipLabel(taskTimeChips.get(index + 1))
+                          const timeChip = taskTimeChips.get(index + 1)
+                          const timeChipLabel = getTaskTimeChipLabel(timeChip)
                           return (
                           <div
                             key={task.id}
@@ -2093,12 +2100,16 @@ export default function DailyPage() {
                                 {task.taskText}
                               </span>
                             )}
-                            {timeChipLabel && (
-                              <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums text-primary-100">
-                                {timeChipLabel}
+                            {timeChip && (
+                              <span
+                                className="type-caption flex flex-col items-center gap-0.5 rounded-2xl border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100"
+                                title={timeChipLabel ?? undefined}
+                              >
+                                <span>{timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}</span>
+                                <span className="text-primary-200/70">{formatDurationLabel(timeChip.totalMinutes)}</span>
                               </span>
                             )}
-                            <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:w-auto lg:flex-nowrap lg:border-0 lg:pt-0">
+                            <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:grid lg:w-auto lg:grid-cols-2 lg:border-0 lg:pt-0">
                             {editingTaskId === task.id ? (
                               <>
                                 <button
