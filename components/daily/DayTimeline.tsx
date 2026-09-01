@@ -972,14 +972,16 @@ function ScheduleBlock({
               {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
                 <button
                   type="button"
-                  className="shrink-0 rounded border border-gray-700 px-2 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
+                  className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation()
                     openEditing()
                   }}
+                  title="Править"
+                  aria-label={`Править задачу «${title}»`}
                 >
-                  Править
+                  ✎
                 </button>
               )}
             </div>
