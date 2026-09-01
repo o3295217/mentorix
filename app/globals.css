@@ -109,6 +109,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .task-card-actions,
+    .task-row-time {
+      transition: none;
+      transform: none;
+    }
+
     .schedule-block-apply-enter,
     .schedule-block-new-task-highlight,
     .daily-lens-panel {
@@ -362,13 +368,14 @@
 
   .task-card-actions {
     opacity: 1;
-    transition: opacity 150ms ease;
+    transition: opacity 150ms ease, transform 180ms ease;
   }
 
   /* Время строки плана: в покое занимает правый край; при наведении/фокусе
-     растворяется, уступая место пульту действий (кроссфейд без сдвигов). */
+     растворяется, уступая место пульту. Анимация — «направленный сдвиг»:
+     только transform+opacity, вёрстка не пересчитывается. */
   .task-row-time {
-    transition: opacity 150ms ease;
+    transition: opacity 150ms ease, transform 180ms ease;
   }
 
   .goal-hover-actions {
@@ -379,16 +386,19 @@
   @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
     .task-card-actions {
       opacity: 0;
+      transform: translateX(8px);
     }
 
     .group:hover .task-card-actions,
     .group:focus-within .task-card-actions {
       opacity: 1;
+      transform: translateX(0);
     }
 
     .group:hover .task-row-time,
     .group:focus-within .task-row-time {
       opacity: 0;
+      transform: translateX(-8px);
     }
 
     .goal-hover-actions {
