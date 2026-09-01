@@ -611,7 +611,8 @@ describe('plan chat kickoff helpers', () => {
 
     expect(existingPlan).toContain('В плане уже есть задачи')
     expect(existingPlan).toContain('Не спрашивай "чем помочь?"')
-    expect(existingPlan).toContain('не заявляй, что уже разложил задачи по шкале: карточку применяет пользователь кнопкой «Применить»')
+    expect(existingPlan).toContain('покажи черновик-табличку (блок ЧЕРНОВИК ПЕРЕД КАРТОЧКОЙ)')
+    expect(existingPlan).toContain('tool propose_daily_schedule в этом ходе НЕ вызывай')
     expect(existingPlan).not.toContain('целей недели/месяца/мечты')
     expect(existingPlan).toContain('откуда планировать — «Планируем с текущего времени или указать другое время старта?»')
     expect(withGoals).toContain('План пустой, но есть опора: цели недели')

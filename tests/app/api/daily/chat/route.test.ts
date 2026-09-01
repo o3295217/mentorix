@@ -376,7 +376,7 @@ describe('/api/daily/chat SSE schedule proposal', () => {
     expect(response.headers.get('content-type')).toContain('text/event-stream')
     expect(text).toContain('"assistantMessageId":77')
     expect(userContent).toContain('План пустой, но есть опора: цели недели')
-    expect(userContent).toContain('tool propose_daily_schedule с newTasks')
+    expect(userContent).toContain('tool propose_daily_schedule — только после отмашки')
     expect(userContent).not.toContain('[SYSTEM_KICKOFF_PLAN_CHAT]')
     expect(mocks.chatMessageCreate).toHaveBeenCalledTimes(1)
     expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'assistant' }) }))
