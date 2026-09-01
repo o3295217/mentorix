@@ -289,7 +289,9 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«итого 8 часов плотной работы», «запас есть», «свободно два часа», «всё помещается»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('пользователь увидит «Занято 8ч43м, свободно 0 мин» рядом с твоим обещанием запаса')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Говорить о загрузке можно только когда задачи не помещаются (пункт 3)')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('и одной фразой о перегрузе по просьбе вместить всё (пункт 4). Больше поводов говорить о загрузке нет')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('и одной фразой о перегрузе по просьбе вместить всё (пункт 4)')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('В ходе с вызовом tool поводов говорить о загрузке по-прежнему нет')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЧЕРНОВИК ПЕРЕД КАРТОЧКОЙ — ОБЯЗАТЕЛЬНАЯ ОТМАШКА ПОЛЬЗОВАТЕЛЯ')
   })
 
   it('requires summing block durations before the tool call and rebuilding on overload', () => {
@@ -618,7 +620,8 @@ describe('plan chat kickoff helpers', () => {
     expect(withGoals).toContain('План пустой, но есть опора: цели недели')
     expect(withGoals).not.toContain('цели месяца')
     expect(withGoals).not.toContain('мечта')
-    expect(withGoals).toContain('newTasks')
+    expect(withGoals).toContain('новые помечай «(новая)»')
+    expect(withGoals).toContain('tool propose_daily_schedule — только после отмашки')
     expect(empty).toContain('ЗАПРЕЩЕНО упоминать слова')
     expect(empty).not.toContain('План пуст, целей нет')
     expect(empty).toContain('Не вызывай tool')
