@@ -1659,7 +1659,7 @@ export default function DailyPage() {
                         onDrop={() => {
                           if (!planTaskMutationLocked) handleDrop(task.id)
                         }}
-                        className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:relative lg:flex-nowrap lg:gap-2 ${
+                        className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:relative lg:min-h-[76px] lg:flex-nowrap lg:gap-2 ${
                           editingTaskId === task.id ? 'cursor-text' : planTaskMutationLocked ? '' : 'lg:cursor-move'
                         } ${
                       selectedTasks.has(task.id)
