@@ -153,11 +153,12 @@ export default function Navigation() {
                 <div className="hidden shrink-0 lg:block">
                   <HeaderDailyDate />
                 </div>
+                {/* По умолчанию только кружок с инициалом; имя выезжает при наведении/фокусе */}
                 <Link
                   href="/profile"
                   title={user ? `${user.name || 'Без имени'} · ${user.email}` : undefined}
                   aria-current={isRouteActive(pathname, '/profile') ? 'page' : undefined}
-                  className={`flex min-h-11 max-w-[9rem] items-center gap-2 rounded-md px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-w-[12rem] ${
+                  className={`group flex min-h-11 items-center rounded-md px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     isRouteActive(pathname, '/profile')
                       ? 'text-blue-300'
                       : 'text-gray-400 hover:text-blue-300'
@@ -167,15 +168,25 @@ export default function Navigation() {
                   <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-400" aria-hidden="true">
                     {userName.charAt(0).toUpperCase()}
                   </span>
-                  <span className="truncate">{userName}</span>
+                  <span className="max-w-0 overflow-hidden whitespace-nowrap pl-0 opacity-0 transition-all duration-200 group-hover:max-w-[12rem] group-hover:pl-2 group-hover:opacity-100 group-focus-visible:max-w-[12rem] group-focus-visible:pl-2 group-focus-visible:opacity-100">
+                    {userName}
+                  </span>
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
                   disabled={isLoggingOut}
-                  className="nav-user-action hidden rounded-md px-3 py-1.5 text-gray-400 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:opacity-50 lg:inline-flex"
+                  title="Выход"
+                  aria-label="Выход"
+                  className="hidden h-11 w-11 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:opacity-50 lg:flex"
                 >
-                  {isLoggingOut ? '...' : 'Выход'}
+                  {isLoggingOut ? (
+                    <span aria-hidden="true" className="text-xs">…</span>
+                  ) : (
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.7}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                    </svg>
+                  )}
                 </button>
               </div>
             )}
