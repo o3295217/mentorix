@@ -1659,7 +1659,7 @@ export default function DailyPage() {
                         onDrop={() => {
                           if (!planTaskMutationLocked) handleDrop(task.id)
                         }}
-                        className={`flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
+                        className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
                           editingTaskId === task.id ? 'cursor-text' : planTaskMutationLocked ? '' : 'lg:cursor-move'
                         } ${
                       selectedTasks.has(task.id)
@@ -1747,7 +1747,7 @@ export default function DailyPage() {
                           </span>
                         )}
 
-                        <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
+                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
                         {editingTaskId === task.id ? (
                           <>
                             <button
@@ -2040,7 +2040,7 @@ export default function DailyPage() {
                             ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
                             className="relative"
                           >
-                          <div className={`flex min-w-0 flex-wrap items-center gap-1 rounded-lg border bg-gray-900/80 px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
+                          <div className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border bg-gray-900/80 px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
                             editingTaskId === task.id
                               ? 'border-primary-500/50 opacity-100'
                               : 'border-gray-700 opacity-50 hover:opacity-70'
@@ -2107,7 +2107,7 @@ export default function DailyPage() {
                                 <span className="type-caption tabular-nums leading-none text-gray-500">{formatDurationLabel(timeChip.totalMinutes)}</span>
                               </span>
                             )}
-                            <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
+                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
                             {editingTaskId === task.id ? (
                               <>
                                 <button
