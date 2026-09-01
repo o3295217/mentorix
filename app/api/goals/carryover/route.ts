@@ -11,6 +11,7 @@ import { safeParseJson } from '@/lib/api-utils'
 import { areTasksSimilar } from '@/lib/task-match'
 import { fuzzyMatchGoal, getMonthWeeks, getWeekOfDate, MonthWeek } from '@/lib/goals-utils'
 import { collectCarryoverItems, monthKeyOf, prevMonthOf, CarryoverSource } from '@/lib/carryover'
+import { syncCompletedWorkForGoal } from '@/lib/completed-work'
 
 const WEEK_KEY_RE = /^\d{4}-\d{2}-W\d+$/
 const MONTH_KEY_RE = /^\d{4}-\d{2}$/
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
       tracked,
       currentMonthTexts,
       openTaskTexts: openTasks.map(t => t.taskText),
+      monthKey: prev.key,
     })
 
     return NextResponse.json({ month: prev.key, items })
@@ -103,6 +105,7 @@ const DecisionSchema = z.object({
   action: z.discriminatedUnion('type', [
     z.object({ type: z.literal('week'), weekKey: z.string().min(1) }),
     z.object({ type: z.literal('backlog') }),
+    z.object({ type: z.literal('completed') }),
   ]),
 })
 
@@ -203,7 +206,29 @@ export async function POST(request: NextRequest) {
           return fromKey === prev.key ? owner.key === prev.key && row.periodType === 'month' : owner.weekKey === fromKey
         })
 
-        if (action.type === 'week') {
+        if (action.type === 'completed') {
+          // Цель сделана, но не отмечена: ставим галочку тем же путём, что и
+          // страница целей. Текст из PeriodGoal не убираем — выполненная цель
+          // остаётся в своём месяце и учитывается в его прогрессе.
+          const candidates = await prisma.goal.findMany({ where: { userId, periodKey: fromKey } })
+          let goal = candidates.find(g => fuzzyMatchGoal(g.text, text))
+          if (!goal) {
+            goal = await prisma.goal.create({
+              data: { userId, text, periodType: WEEK_KEY_RE.test(fromKey) ? 'week' : 'month', periodKey: fromKey },
+            })
+          }
+          if (!goal.completed) {
+            const history = safeParseJson<Array<Record<string, unknown>>>(goal.historyJson, [])
+            history.push({ type: 'completed', date: new Date().toISOString() })
+            const completedAt = new Date()
+            await prisma.goal.update({
+              where: { id: goal.id },
+              data: { completed: true, completedAt, historyJson: history as Prisma.InputJsonValue },
+            })
+            await syncCompletedWorkForGoal({ userId, goalId: goal.id, goalText: goal.text, periodKey: goal.periodKey, completedAt })
+          }
+          results.push({ text, success: true, action: 'marked_completed' })
+        } else if (action.type === 'week') {
           const week = currentWeeks.get(action.weekKey)
           if (!week) {
             results.push({ text, success: false, action: 'invalid_week_key' })

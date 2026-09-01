@@ -27,6 +27,7 @@ export default function HeaderDailyDate() {
     <DatePickerWithIndicators
       value={date}
       calendarId="header-daily-date-calendar"
+      triggerFormat="d MMM yyyy"
       onChange={(d) => {
         setDate(d)
         writeStoredDailyDate(d)

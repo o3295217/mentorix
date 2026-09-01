@@ -59,14 +59,23 @@ export function collectCarryoverItems(params: {
   tracked: TrackedGoalLite[]
   currentMonthTexts: string[]
   openTaskTexts: string[]
+  /** Ключ прошлого месяца («2026-08»): выполненность ищется по всему месяцу,
+   * а не только по периоду-источнику — текст цели могли переносить между
+   * неделями, а tracked-запись с галочкой осталась под старым ключом */
+  monthKey?: string
 }): CarryoverItem[] {
-  const { sources, tracked, currentMonthTexts, openTaskTexts } = params
+  const { sources, tracked, currentMonthTexts, openTaskTexts, monthKey } = params
   const items: CarryoverItem[] = []
+
+  const inScope = (periodKey: string, sourceKey: string): boolean =>
+    monthKey
+      ? periodKey === monthKey || periodKey.startsWith(`${monthKey}-W`)
+      : periodKey === sourceKey
 
   for (const source of sources) {
     for (const text of source.texts) {
       if (!text.trim()) continue
-      const isCompleted = tracked.some(g => g.periodKey === source.key && g.completed && fuzzyMatchGoal(g.text, text))
+      const isCompleted = tracked.some(g => inScope(g.periodKey, source.key) && g.completed && fuzzyMatchGoal(g.text, text))
       if (isCompleted) continue
       if (currentMonthTexts.some(t => areTasksSimilar(t, text))) continue
       if (openTaskTexts.some(t => areTasksSimilar(t, text))) continue

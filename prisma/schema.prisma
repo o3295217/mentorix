@@ -591,6 +591,18 @@ model PlanningProfile {
   @@map("planning_profiles")
 }
 
+// ==================== ДАТА-МИГРАЦИИ ====================
+// Маркеры применённых одноразовых миграций данных (scripts/migrate-*).
+// Таблица создаётся и заполняется самими скриптами; модель здесь нужна,
+// чтобы prisma db push не пытался её удалить.
+
+model DataMigration {
+  name      String   @id
+  appliedAt DateTime @default(now()) @map("applied_at") @db.Timestamptz
+
+  @@map("data_migrations")
+}
+
 // ==================== АУДИТ-ЛОГ ====================
 
 model AuditLog {

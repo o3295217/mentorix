@@ -19,7 +19,7 @@ interface CarryoverData {
 type Decision = {
   text: string
   fromKey: string
-  action: { type: 'week'; weekKey: string } | { type: 'backlog' }
+  action: { type: 'week'; weekKey: string } | { type: 'backlog' } | { type: 'completed' }
 }
 
 export default function CarryoverNotice() {
@@ -80,9 +80,9 @@ export default function CarryoverNotice() {
     }
   }, [])
 
-  const moveToWeek = useCallback(async (item: CarryoverItem, weekKey: string) => {
+  const resolveItem = useCallback(async (item: CarryoverItem, action: Decision['action']) => {
     setProcessing(prev => new Set(prev).add(item.text))
-    const ok = await sendDecisions([{ text: item.text, fromKey: item.fromKey, action: { type: 'week', weekKey } }])
+    const ok = await sendDecisions([{ text: item.text, fromKey: item.fromKey, action }])
     setProcessing(prev => {
       const next = new Set(prev)
       next.delete(item.text)
@@ -116,7 +116,7 @@ export default function CarryoverNotice() {
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-white">Цели прошлого месяца не закрыты</h2>
             <p className="mt-1 text-sm text-gray-400">
-              Осталось из {formatMonthGenitive(data.month)}: {data.items.length}. Перенеси кнопками на неделю текущего месяца или отправь все в раздел задач.
+              Осталось из {formatMonthGenitive(data.month)}: {data.items.length}. Отметь выполненное галочкой, перенеси на неделю текущего месяца или отправь все в раздел задач.
             </p>
           </div>
           <button
@@ -141,8 +141,20 @@ export default function CarryoverNotice() {
                   <p className="break-words text-sm leading-6 text-gray-100 [overflow-wrap:anywhere]">{item.text}</p>
                   <p className="mt-0.5 text-xs text-gray-500">{item.fromType === 'week' ? `неделя ${item.fromKey.split('-W')[1]} прошлого месяца` : 'цель месяца'}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5" aria-label={`Перенести «${item.text}» на неделю`}>
-                  <span className="mr-1 text-xs text-gray-500">в неделю:</span>
+                <div className="flex shrink-0 items-center gap-1.5" aria-label={`Действия с целью «${item.text}»`}>
+                  <button
+                    type="button"
+                    disabled={isProcessing || bulkProcessing}
+                    title="Отметить выполненной"
+                    aria-label={`Отметить «${item.text}» выполненной`}
+                    onClick={() => resolveItem(item, { type: 'completed' })}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-green-500/25 bg-green-500/10 text-green-300 transition hover:border-green-400/50 hover:bg-green-500/20 hover:text-green-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+                    </svg>
+                  </button>
+                  <span className="ml-1 mr-1 text-xs text-gray-500">в неделю:</span>
                   {weeks.map(week => (
                     <button
                       key={week.key}
@@ -150,7 +162,7 @@ export default function CarryoverNotice() {
                       disabled={isProcessing || bulkProcessing}
                       title={formatWeekRange(week)}
                       aria-label={`Перенести «${item.text}» на неделю ${week.num} (${formatWeekRange(week)})`}
-                      onClick={() => moveToWeek(item, week.key)}
+                      onClick={() => resolveItem(item, { type: 'week', weekKey: week.key })}
                       className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] text-sm font-medium text-gray-200 transition hover:border-amber-400/40 hover:bg-amber-400/10 hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {week.num}

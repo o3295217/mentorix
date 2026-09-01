@@ -43,6 +43,28 @@ describe('collectCarryoverItems', () => {
     expect(items.map(i => i.text)).toEqual(['Написать статью', 'Собрать отчёт'])
   })
 
+  it('с monthKey выполненность ищется по всему прошлому месяцу (текст переносили между неделями)', () => {
+    const items = collectCarryoverItems({
+      sources: [{ key: '2026-08-W4', type: 'week', texts: ['Опубликовать сайт AIONLAB'] }],
+      tracked: [{ periodKey: '2026-08-W3', text: 'Опубликовать сайт AIONLAB', completed: true }],
+      currentMonthTexts: [],
+      openTaskTexts: [],
+      monthKey: '2026-08',
+    })
+    expect(items).toHaveLength(0)
+  })
+
+  it('с monthKey выполненная в другом месяце запись не закрывает цель', () => {
+    const items = collectCarryoverItems({
+      sources: [{ key: '2026-08-W4', type: 'week', texts: ['Опубликовать сайт AIONLAB'] }],
+      tracked: [{ periodKey: '2026-09-W1', text: 'Опубликовать сайт AIONLAB', completed: true }],
+      currentMonthTexts: [],
+      openTaskTexts: [],
+      monthKey: '2026-08',
+    })
+    expect(items).toHaveLength(1)
+  })
+
   it('не считает закрытой цель, выполненную в другом периоде', () => {
     const items = collectCarryoverItems({
       sources: [{ key: '2026-08', type: 'month', texts: ['Запустить лендинг'] }],

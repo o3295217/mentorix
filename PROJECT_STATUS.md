@@ -147,7 +147,7 @@
 - `landing/TrustSection`
 - `landing/data`
 
-## Модели БД (29)
+## Модели БД (30)
 
 ### User
 | Поле | Тип |
@@ -591,6 +591,12 @@
 | declined | `Boolean` |
 | createdAt | `DateTime` |
 | updatedAt | `DateTime` |
+
+### DataMigration
+| Поле | Тип |
+|------|-----|
+| name | `String` |
+| appliedAt | `DateTime` |
 
 ### AuditLog
 | Поле | Тип |

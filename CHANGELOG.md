@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-09-01 — docs: changelog (post-commit hook)
+- 📝 Документация: 1 файлов
+
+
 ### 2026-09-01 — feat(goals,daily): взаимная отметка целей, ревизия месяца, дата в шапке, фиксы чата/оценки/календаря
 - 🔌 API: 5 файлов (route, route, route...)
 - 🧩 Компоненты: 4 файлов (CarryoverNotice, DatePickerWithIndicators, HeaderDailyDate...)

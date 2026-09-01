@@ -144,16 +144,15 @@ export default function Navigation() {
                     </Link>
                   )
                 })}
-                {user && (
-                  <div className="pl-2">
-                    <HeaderDailyDate />
-                  </div>
-                )}
               </div>
             </div>
 
             {userName && (
               <div className="ml-6 flex min-w-0 flex-shrink-0 items-center gap-3 border-l border-gray-800 bg-gray-900/80 pl-4">
+                {/* Дата плана дня закреплена в шапке — вне контейнера ссылок с overflow-x-clip, иначе её срезает на узких окнах */}
+                <div className="hidden shrink-0 lg:block">
+                  <HeaderDailyDate />
+                </div>
                 <Link
                   href="/profile"
                   title={user ? `${user.name || 'Без имени'} · ${user.email}` : undefined}

@@ -27,6 +27,8 @@ interface DateState {
 interface DatePickerWithIndicatorsProps {
   /** id выпадающего календаря — переопределить при нескольких экземплярах на странице */
   calendarId?: string
+  /** date-fns формат даты на кнопке (по умолчанию «1 сентября 2026») */
+  triggerFormat?: string
   value: string // "yyyy-MM-dd"
   onChange: (value: string) => void
 }
@@ -35,7 +37,7 @@ function parseDateKey(dateKey: string) {
   return new Date(`${dateKey}T00:00:00`)
 }
 
-export default function DatePickerWithIndicators({ value, onChange, calendarId = 'daily-date-picker-calendar' }: DatePickerWithIndicatorsProps) {
+export default function DatePickerWithIndicators({ value, onChange, calendarId = 'daily-date-picker-calendar', triggerFormat = 'd MMMM yyyy' }: DatePickerWithIndicatorsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(parseDateKey(value))
   const [indicators, setIndicators] = useState<DateIndicators>({})
@@ -388,7 +390,7 @@ export default function DatePickerWithIndicators({ value, onChange, calendarId =
         aria-controls={calendarId}
         aria-haspopup="dialog"
       >
-        <span className="min-w-0 truncate">{format(parseDateKey(value), 'd MMMM yyyy', { locale: ru })}</span>
+        <span className="min-w-0 truncate">{format(parseDateKey(value), triggerFormat, { locale: ru })}</span>
         <span aria-hidden="true" className="flex-shrink-0 text-gray-400">▾</span>
       </button>
 
