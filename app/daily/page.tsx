@@ -1642,10 +1642,6 @@ export default function DailyPage() {
                         >
                           ⋮⋮
                         </span>
-                        {/* Номер задачи в плане — чат ссылается на задачи по этим номерам */}
-                        <span className="w-5 flex-shrink-0 text-right text-xs tabular-nums text-gray-500" aria-hidden="true">
-                          {index + 1}
-                        </span>
                         <label className="flex h-11 w-11 flex-shrink-0 cursor-pointer items-center justify-center lg:h-auto lg:w-auto">
                           <span className="sr-only">{`Отметить задачу «${task.taskText}» (номер ${index + 1}) выполненной`}</span>
                           <input
@@ -1697,6 +1693,8 @@ export default function DailyPage() {
                             }}
                             title="Дважды кликните для редактирования"
                           >
+                            {/* Номер перед текстом — чат ссылается на задачи по этим номерам */}
+                            <span className="tabular-nums" aria-hidden="true">{index + 1}. </span>
                             {task.taskText}
                           </span>
                         )}
@@ -2005,9 +2003,6 @@ export default function DailyPage() {
                               ? 'border-primary-500/50 opacity-100'
                               : 'border-gray-700 opacity-50 hover:opacity-70'
                           }`}>
-                            <span className="w-5 flex-shrink-0 text-right text-xs tabular-nums text-gray-500" aria-hidden="true">
-                              {index + 1}
-                            </span>
                             <label className="flex h-11 w-11 flex-shrink-0 cursor-pointer items-center justify-center lg:h-auto lg:w-auto">
                               <span className="sr-only">{`Вернуть задачу «${task.taskText}» (номер ${index + 1}) в невыполненные`}</span>
                               <input
@@ -2058,6 +2053,7 @@ export default function DailyPage() {
                                 }}
                                 title="Дважды кликните для редактирования"
                               >
+                                <span className="tabular-nums" aria-hidden="true">{index + 1}. </span>
                                 {task.taskText}
                               </span>
                             )}
