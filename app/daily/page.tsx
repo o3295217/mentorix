@@ -1737,18 +1737,17 @@ export default function DailyPage() {
                         )}
 
                         {timeChip && (
-                          // Вне шкалы: пилюля времени в две строки (интервал/длительность) —
-                          // правый кластер компактный, тексту задачи достаётся ширина.
-                          <span
-                            className="type-caption flex flex-col items-center gap-0.5 rounded-2xl border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100"
-                            title={timeChipLabel ?? undefined}
-                          >
-                            <span>{timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}</span>
-                            <span className="text-primary-200/70">{formatDurationLabel(timeChip.totalMinutes)}</span>
+                          // Вне шкалы: пилюля держит один факт — интервал; длительность
+                          // подписью под ней, без рамки. Кластер компактный, чип чистый.
+                          <span className="flex flex-col items-center gap-1" title={timeChipLabel ?? undefined}>
+                            <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100">
+                              {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
+                            </span>
+                            <span className="type-caption tabular-nums leading-none text-gray-500">{formatDurationLabel(timeChip.totalMinutes)}</span>
                           </span>
                         )}
 
-                        <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:border-0 lg:pt-0">
+                        <div className="flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
                         {editingTaskId === task.id ? (
                           <>
                             <button
@@ -2101,15 +2100,14 @@ export default function DailyPage() {
                               </span>
                             )}
                             {timeChip && (
-                              <span
-                                className="type-caption flex flex-col items-center gap-0.5 rounded-2xl border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100"
-                                title={timeChipLabel ?? undefined}
-                              >
-                                <span>{timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}</span>
-                                <span className="text-primary-200/70">{formatDurationLabel(timeChip.totalMinutes)}</span>
+                              <span className="flex flex-col items-center gap-1" title={timeChipLabel ?? undefined}>
+                                <span className="type-caption rounded-full border border-primary-500/25 bg-primary-500/10 px-2 py-1 font-medium tabular-nums leading-none text-primary-100">
+                                  {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
+                                </span>
+                                <span className="type-caption tabular-nums leading-none text-gray-500">{formatDurationLabel(timeChip.totalMinutes)}</span>
                               </span>
                             )}
-                            <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:grid lg:w-auto lg:grid-cols-2 lg:border-0 lg:pt-0">
+                            <div className="flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:grid lg:w-auto lg:grid-cols-2 lg:gap-0.5 lg:rounded-xl lg:border lg:border-gray-800/60 lg:bg-white/[0.03] lg:p-1 lg:pt-1">
                             {editingTaskId === task.id ? (
                               <>
                                 <button
