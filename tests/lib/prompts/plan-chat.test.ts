@@ -268,12 +268,12 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   it('requires a self-authored plan to leave free room below the overload threshold', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('ЦЕЛЕВАЯ ЗАГРУЗКА ДНЯ: ПЛАН ОБЯЗАН ОСТАВЛЯТЬ ЗАПАС')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('сумма durationMinutes ВСЕХ блоков без исключения (задачи, еда, отдых, буферы, личные и дорожные блоки) делится на длину окна [planningStartMinutes, activityEndMinutes]')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Если занято ${DAILY_SCHEDULE_OVERLOADED_LOAD_PERCENT}% окна и больше, сервер помечает день «перегружен»`)
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«День перегружен: перенесите часть задач или увеличьте буферы»')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Если занято ${DAILY_SCHEDULE_OVERLOADED_LOAD_PERCENT}% окна и больше, сервер помечает день забитым`)
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('«День расписан почти без остатка: запаса на непредвиденное нет…»')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`План, который ты собрал сам, обязан укладываться максимум в ${PLAN_CHAT_TARGET_MAX_LOAD_PERCENT}% окна дня`)
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`спокойный ориентир — ${DAILY_SCHEDULE_BUSY_LOAD_PERCENT}% и ниже`)
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain(`Не меньше ${PLAN_CHAT_MIN_FREE_LOAD_PERCENT}% окна оставляй вообще незанятыми`)
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('предупреждение о перегрузе на собранном тобой плане — твоя ошибка планирования, а не сообщение пользователю')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('такое предупреждение на собранном тобой по своей инициативе плане — твоя ошибка планирования, а не сообщение пользователю')
   })
 
   it('forbids faking the reserve with buffer, rest or meal blocks', () => {
@@ -297,8 +297,9 @@ describe('PLAN_CHAT_SYSTEM_PROMPT', () => {
   it('requires summing block durations before the tool call and rebuilding on overload', () => {
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('САМОПРОВЕРКА СУММЫ ДО ВЫЗОВА TOOL, поблочно и по всем блокам без исключения')
     expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Превышает — пересобери план по пункту 3 и только потом вызывай tool')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызвать tool с перегрузом и оправдаться в тексте запрещено: карточка посчитает сама и покажет «День перегружен»')
-    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('предупреждение о перегрузе на собранном тобой плане — твоя ошибка планирования, а не сообщение пользователю')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('Вызвать tool с перегрузом и оправдаться в тексте запрещено: карточка посчитает сама и покажет предупреждение о забитом дне')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('такое предупреждение на собранном тобой по своей инициативе плане — твоя ошибка планирования, а не сообщение пользователю')
+    expect(PLAN_CHAT_SYSTEM_PROMPT).toContain('пользователь сам явно попросил занять всё время — тогда предупреждение карточки отражает его выбор')
   })
 
   it('offers explicit options instead of cramming when tasks do not fit the reserve', () => {
@@ -587,7 +588,7 @@ describe('plan chat target load matches the server load metric', () => {
 
     expect(summary.scheduledPercent).toBe(100)
     expect(summary.loadLevel).toBe('overloaded')
-    expect(summary.recommendation).toBe('День перегружен: перенесите часть задач или увеличьте буферы.')
+    expect(summary.recommendation).toBe('День расписан почти без остатка: запаса на непредвиденное нет. Если это осознанный выбор — ок; если нет, перенесите часть задач.')
   })
 })
 
