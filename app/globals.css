@@ -365,14 +365,6 @@
     transition: opacity 150ms ease;
   }
 
-  /* Пульт действий строки плана: в покое схлопнут в ноль, время прижато к
-     правому краю; при наведении/фокусе выезжает, отодвигая время влево.
-     Ширина фиксированная (2 колонки по 32px + зазор) — иначе не анимируется. */
-  .task-actions-slide {
-    opacity: 1;
-    transition: opacity 150ms ease;
-  }
-
   .goal-hover-actions {
     opacity: 1;
     transition: opacity 150ms ease;
@@ -385,20 +377,6 @@
 
     .group:hover .task-card-actions,
     .group:focus-within .task-card-actions {
-      opacity: 1;
-    }
-
-    .task-actions-slide {
-      width: 0;
-      margin-left: 0;
-      opacity: 0;
-      overflow: hidden;
-      transition: width 200ms ease, opacity 150ms ease;
-    }
-
-    .group:hover .task-actions-slide,
-    .group:focus-within .task-actions-slide {
-      width: 68px;
       opacity: 1;
     }
 
