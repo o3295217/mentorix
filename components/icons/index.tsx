@@ -98,3 +98,27 @@ export function CloseIcon(props: IconProps) {
     </IconBase>
   )
 }
+
+// Чашка — отдых, еда, перерывы и прочие сервисные блоки дня
+export function MealRestIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 9h11v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9Z" />
+      <path d="M15 10h2a2.5 2.5 0 0 1 0 5h-2" />
+      <path d="M7 5v1.5" />
+      <path d="M11 5v1.5" />
+    </IconBase>
+  )
+}
+
+// Песочные часы — буфер/запас времени дня
+export function BufferTimeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6.5 4h11" />
+      <path d="M6.5 20h11" />
+      <path d="M8 4v3.5l4 4.5 4-4.5V4" />
+      <path d="M8 20v-3.5l4-4.5 4 4.5V20" />
+    </IconBase>
+  )
+}

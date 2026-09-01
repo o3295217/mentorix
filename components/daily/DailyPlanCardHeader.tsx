@@ -3,22 +3,27 @@
 import PlanLensSwitch, { type PlanLens } from './PlanLensSwitch'
 import type { DailyPhase } from '@/hooks/daily/phase-helpers'
 import { formatDurationLabel } from '@/hooks/daily/schedule-helpers'
-import { PlanListIcon, PlanTimelineIcon } from '@/components/icons'
+import { BufferTimeIcon, MealRestIcon, PlanListIcon, PlanTimelineIcon } from '@/components/icons'
 
-function formatTaskCountWord(count: number): string {
-  const mod10 = count % 10
-  const mod100 = count % 100
-  if (mod10 === 1 && mod100 !== 11) return 'задача'
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'задачи'
-  return 'задач'
+export type DailyPlanDayMetrics = {
+  /** До конца дня (конца активности), мин */
+  remainingMinutes: number
+  /** Невыполненные задачи на шкале */
+  taskCount: number
+  taskMinutes: number
+  /** Будущие сервисные блоки: еда, отдых, перерывы, личное, дорога */
+  restMinutes: number
+  /** Остаток − задачи − сервисные; может быть отрицательным */
+  bufferMinutes: number
 }
+
+const metricPillBase = 'flex cursor-default items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-sm font-medium tabular-nums leading-none'
+const metricPillNeutral = `${metricPillBase} border-gray-700/70 bg-gray-900/60 text-gray-200`
 
 type DailyPlanCardHeaderProps = {
   currentTime: string | null
-  /** Остаток рабочего окна (мин), null — не показывать (нет расписания или не сегодня) */
-  workRemainingMinutes?: number | null
-  /** Невыполненные задачи на шкале: количество и сумма времени, без еды/перерывов/буферов */
-  scheduledTasks?: { count: number; minutes: number } | null
+  /** Арифметика остатка дня; null — не показывать (нет расписания или не сегодня) */
+  dayMetrics?: DailyPlanDayMetrics | null
   completedCount: number
   totalCount: number
   completionPercent: number
@@ -34,8 +39,7 @@ type DailyPlanCardHeaderProps = {
 
 export default function DailyPlanCardHeader({
   currentTime,
-  workRemainingMinutes = null,
-  scheduledTasks = null,
+  dayMetrics = null,
   completedCount,
   totalCount,
   completionPercent,
@@ -62,37 +66,35 @@ export default function DailyPlanCardHeader({
             {currentTime ?? '00:00'}
           </span>
         </span>
-        {/* Пилюли-метрики в стиле границ дня на шкале: остаток рабочего окна и объём задач */}
-        {workRemainingMinutes !== null && (
-          <span
-            className="flex cursor-default items-center gap-1.5 whitespace-nowrap rounded-full border border-gray-700/70 bg-gray-900/60 px-2.5 py-1 text-sm font-medium tabular-nums leading-none text-gray-200"
-            title={`До конца рабочего окна осталось ${formatDurationLabel(workRemainingMinutes)}`}
-          >
-            <PlanTimelineIcon className="h-4 w-4 text-gray-400" />
-            {formatDurationLabel(workRemainingMinutes)}
-          </span>
-        )}
-        {scheduledTasks !== null && (
-          <span
-            className={`flex cursor-default items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-sm font-medium tabular-nums leading-none ${
-              workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
-                : 'border-gray-700/70 bg-gray-900/60 text-gray-200'
-            }`}
-            title={[
-              `Невыполненных задач на шкале: ${scheduledTasks.count}, суммарно ${formatDurationLabel(scheduledTasks.minutes)} (еда, перерывы и буферы не считаются)`,
-              workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
-                ? 'Задачи не помещаются в остаток рабочего окна'
-                : null,
-            ].filter(Boolean).join('. ')}
-          >
-            <PlanListIcon className={`h-4 w-4 ${
-              workRemainingMinutes !== null && scheduledTasks.minutes > workRemainingMinutes
-                ? 'text-amber-300'
-                : 'text-gray-400'
-            }`} />
-            {scheduledTasks.count} {formatTaskCountWord(scheduledTasks.count)} · {formatDurationLabel(scheduledTasks.minutes)}
-          </span>
+        {/* Пилюли арифметики дня: до конца · задачи · отдых/еда · буфер (может быть отрицательным) */}
+        {dayMetrics !== null && (
+          <>
+            <span className={metricPillNeutral} title={`До конца дня осталось ${formatDurationLabel(dayMetrics.remainingMinutes)}`}>
+              <PlanTimelineIcon className="h-4 w-4 text-gray-400" />
+              {formatDurationLabel(dayMetrics.remainingMinutes)}
+            </span>
+            <span className={metricPillNeutral} title={`Невыполненных задач на шкале: ${dayMetrics.taskCount}, суммарно ${formatDurationLabel(dayMetrics.taskMinutes)}`}>
+              <PlanListIcon className="h-4 w-4 text-gray-400" />
+              {dayMetrics.taskCount} · {formatDurationLabel(dayMetrics.taskMinutes)}
+            </span>
+            <span className={metricPillNeutral} title={`Отдых, еда, перерывы и личные блоки до конца дня: ${formatDurationLabel(dayMetrics.restMinutes)} (прошедшие не считаются)`}>
+              <MealRestIcon className="h-4 w-4 text-gray-400" />
+              {formatDurationLabel(dayMetrics.restMinutes)}
+            </span>
+            <span
+              className={`${metricPillBase} ${
+                dayMetrics.bufferMinutes < 0
+                  ? 'border-red-400/30 bg-red-500/10 text-red-200'
+                  : 'border-gray-700/70 bg-gray-900/60 text-gray-200'
+              }`}
+              title={dayMetrics.bufferMinutes < 0
+                ? `Буфер отрицательный: задачам и отдыху не хватает ${formatDurationLabel(-dayMetrics.bufferMinutes)} до конца дня`
+                : `Буфер — незанятое время до конца дня после задач и отдыха: ${formatDurationLabel(dayMetrics.bufferMinutes)}`}
+            >
+              <BufferTimeIcon className={`h-4 w-4 ${dayMetrics.bufferMinutes < 0 ? 'text-red-300' : 'text-gray-400'}`} />
+              {dayMetrics.bufferMinutes < 0 ? '−' : ''}{formatDurationLabel(Math.abs(dayMetrics.bufferMinutes))}
+            </span>
+          </>
         )}
       </div>
       <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 sm:w-auto sm:justify-end">

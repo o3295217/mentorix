@@ -991,26 +991,41 @@ export default function DailyPage() {
     return { startMinutes: boundaries.planningStartMinutes, endMinutes: boundaries.workEndMinutes }
   }, [schedule])
 
-  // Метрики шапки: остаток рабочего окна (только для сегодня, при наличии
-  // расписания) и сумма времени НЕвыполненных задач на шкале — без еды,
-  // перерывов и буферов. Пара отвечает на вопрос «влезает ли работа в остаток».
-  const headerWorkRemainingMinutes = useMemo(() => {
+  // Арифметика остатка дня для шапки (только сегодня, при наличии расписания):
+  // до конца дня (конец активности) · невыполненные задачи · будущие сервисные
+  // блоки (еда, отдых, перерывы, личное, дорога) · буфер = остаток − задачи −
+  // сервисные. Буфер может уйти в минус — день не влезает.
+  const headerDayMetrics = useMemo(() => {
     if (!schedule || selectedDate !== todayDateKey) return null
-    return Math.max(0, getScheduleBoundaryMinutes(schedule).workEndMinutes - currentMinutes)
-  }, [schedule, selectedDate, todayDateKey, currentMinutes])
-  const headerScheduledTasks = useMemo(() => {
-    if (!schedule) return null
-    let minutes = 0
+    const dayEnd = getScheduleBoundaryMinutes(schedule).activityEndMinutes
+    const remainingMinutes = Math.max(0, dayEnd - currentMinutes)
+
+    let taskMinutes = 0
     const taskIndexes = new Set<number>()
+    let restMinutes = 0
     for (const block of schedule.blocks) {
-      if (!isTaskScheduleBlock(block)) continue
-      const task = tasks[block.taskIndex - 1]
-      if (task && selectedTasks.has(task.id)) continue
-      minutes += block.durationMinutes
-      taskIndexes.add(block.taskIndex)
+      if (isTaskScheduleBlock(block)) {
+        const task = tasks[block.taskIndex - 1]
+        if (task && selectedTasks.has(task.id)) continue
+        // Невыполненная задача занимает остаток целиком, даже если её блок в прошлом
+        taskMinutes += block.durationMinutes
+        taskIndexes.add(block.taskIndex)
+      } else {
+        // Сервисные блоки считаются только будущей частью: прошедший обед остаток не ест
+        const start = Math.max(block.startMinutes, currentMinutes)
+        const end = Math.min(block.startMinutes + block.durationMinutes, dayEnd)
+        restMinutes += Math.max(0, end - start)
+      }
     }
-    return minutes > 0 ? { count: taskIndexes.size, minutes } : null
-  }, [schedule, tasks, selectedTasks])
+
+    return {
+      remainingMinutes,
+      taskCount: taskIndexes.size,
+      taskMinutes,
+      restMinutes,
+      bufferMinutes: remainingMinutes - taskMinutes - restMinutes,
+    }
+  }, [schedule, selectedDate, todayDateKey, currentMinutes, tasks, selectedTasks])
   const dailyPhase = getDailyPhase({
     selectedDate,
     todayDate: todayDateKey,
@@ -1296,8 +1311,7 @@ export default function DailyPage() {
         >
           <DailyPlanCardHeader
             currentTime={currentTime}
-            workRemainingMinutes={headerWorkRemainingMinutes}
-            scheduledTasks={headerScheduledTasks}
+            dayMetrics={headerDayMetrics}
             completedCount={workCompletedCount}
             totalCount={workTotalCount}
             completionPercent={workCompletionPercent}
