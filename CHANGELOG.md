@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+### 2026-09-01 — fix(nav,carryover): дата в шапке не режется overflow'ом; «Выполнено» в ревизии месяца
+- 🔌 API: 1 файлов (route)
+- 🧩 Компоненты: 4 файлов (CarryoverNotice, DatePickerWithIndicators, HeaderDailyDate...)
+- 📚 Библиотеки: 1 файлов (carryover)
+- 🗄️ База данных: 1 файлов
+- 📝 Документация: 2 файлов
+- 📦 Другое: 1 файлов
+
+
 ### 2026-09-01 — docs: changelog (post-commit hook)
 - 📝 Документация: 1 файлов
 
