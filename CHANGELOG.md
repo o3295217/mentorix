@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 2026-09-01 — feat(schedule): объединение задач в черновике заменяет исходные при применении
+- 🔌 API: 1 файлов (route)
+- 📚 Библиотеки: 3 файлов (daily-schedule-apply, daily-schedule-proposal, plan-chat)
+- 📝 Документация: 1 файлов
+- 📦 Другое: 2 файлов
+
+
 ### 2026-09-01 — docs: changelog (hook)
 - 📝 Документация: 1 файлов
 
