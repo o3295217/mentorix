@@ -1,8 +1,10 @@
 #!/bin/bash
 
 # AI Effectiveness Assistant - Local Development Startup
-# Поднимает postgres в Docker, синхронизирует схему БД и запускает dev-сервер.
-# Вызывается напрямую или через "Start AI Assistant.command" (двойной клик).
+# Поднимает postgres в Docker и запускает dev-сервер на первом свободном
+# порту начиная с 3003. Схему БД НЕ трогает — миграции применяются отдельно,
+# в процессе разработки. Вызывается напрямую или через
+# "Start AI Assistant.command" (двойной клик).
 
 set -euo pipefail
 
@@ -110,57 +112,39 @@ echo -e "${YELLOW}Установка зависимостей...${NC}"
 npm install
 echo -e "${GREEN}✓ Зависимости установлены${NC}"
 
-# Генерация Prisma клиента и синхронизация схемы.
-# Локальная БД управляется через db push (в _prisma_migrations пусто),
-# поэтому migrate deploy здесь не используется — он упал бы на существующих таблицах.
+# Генерация Prisma клиента. Схему БД скрипт НЕ трогает: db push/миграции
+# применяются в процессе разработки, лаунчер только запускает приложение.
 echo -e "${YELLOW}Генерация Prisma клиента...${NC}"
 npx prisma generate
 echo -e "${GREEN}✓ Prisma клиент сгенерирован${NC}"
 
-echo -e "${YELLOW}Синхронизация схемы базы данных...${NC}"
-npx prisma db push
-echo -e "${GREEN}✓ База данных готова${NC}"
-
 # Удаление файла блокировки dev-сервера от прошлых запусков
 rm -f ".next/dev/lock"
 
-# Проверка порта: не подбираем соседний, а честно разбираемся с занятым.
-# Смотрим только на слушающий процесс — клиентские соединения (браузер) не трогаем.
-port_listener_pids() {
-    lsof -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null || true
+# Подбор порта: начинаем с базового (из NEXT_PUBLIC_APP_URL, по умолчанию 3003)
+# и идём вверх до первого свободного. Никаких вопросов и убийства процессов.
+port_is_busy() {
+    lsof -ti "tcp:${1}" -sTCP:LISTEN &>/dev/null
 }
 
+BASE_PORT="$PORT"
 echo ""
-echo -e "${YELLOW}Проверка порта ${PORT}...${NC}"
-PORT_PIDS="$(port_listener_pids)"
-if [ -n "$PORT_PIDS" ]; then
-    echo -e "${YELLOW}Порт ${PORT} занят следующим процессом:${NC}"
-    lsof -nP -iTCP:${PORT} -sTCP:LISTEN || true
-    echo ""
-    if [ ! -t 0 ]; then
-        echo -e "${RED}Порт занят, а запуск неинтерактивный — отменяю. Освободите порт ${PORT} и повторите.${NC}"
-        exit 1
+echo -e "${YELLOW}Поиск свободного порта (с ${BASE_PORT})...${NC}"
+FOUND=""
+for OFFSET in $(seq 0 20); do
+    CANDIDATE=$((BASE_PORT + OFFSET))
+    if ! port_is_busy "$CANDIDATE"; then
+        PORT="$CANDIDATE"
+        FOUND=1
+        break
     fi
-    echo "Скорее всего это уже запущенный dev-сервер этого же проекта."
-    read -r -p "Остановить его и продолжить запуск? [y/N]: " REPLY
-    if [[ "$REPLY" == "y" || "$REPLY" == "Y" ]]; then
-        kill $PORT_PIDS 2>/dev/null || true
-        # Даём процессу до 15 секунд на штатное завершение
-        for _ in $(seq 1 15); do
-            if [ -z "$(port_listener_pids)" ]; then
-                break
-            fi
-            sleep 1
-        done
-        if [ -n "$(port_listener_pids)" ]; then
-            echo -e "${RED}Не удалось освободить порт ${PORT}. Остановите процесс вручную и повторите.${NC}"
-            exit 1
-        fi
-        echo -e "${GREEN}✓ Порт ${PORT} освобождён${NC}"
-    else
-        echo -e "${RED}Порт занят — запуск отменён (приложение привязано к ${PORT} через NEXT_PUBLIC_APP_URL).${NC}"
-        exit 1
-    fi
+done
+if [ -z "$FOUND" ]; then
+    echo -e "${RED}Не нашлось свободного порта в диапазоне ${BASE_PORT}–$((BASE_PORT + 20)).${NC}"
+    exit 1
+fi
+if [ "$PORT" != "$BASE_PORT" ]; then
+    echo -e "${YELLOW}⚠ Порт ${BASE_PORT} занят — запускаю на ${PORT}${NC}"
 else
     echo -e "${GREEN}✓ Порт ${PORT} свободен${NC}"
 fi
