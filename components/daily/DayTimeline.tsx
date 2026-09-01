@@ -508,7 +508,7 @@ export default function DayTimeline({
       {/* Timeline viewport: this element clips and scrolls the positioned hour grid and blocks. */}
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl"
+        className="chat-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl"
         style={{ height: viewportHeight, maxHeight: 'min(62vh, 560px)' }}
       >
       {/* Timeline area + hour axis */}
@@ -909,7 +909,7 @@ function ScheduleBlock({
           ⠿
         </span>
       )}
-      <div className={`min-h-0 flex-1 ${isVeryShortBlock && !editing ? 'flex items-center overflow-hidden' : 'overflow-y-auto'} ${!editing && !mutationLocked ? 'pr-9' : 'pr-0.5'}`}>
+      <div className={`chat-scrollbar min-h-0 flex-1 ${isVeryShortBlock && !editing ? 'flex items-center overflow-hidden' : 'overflow-y-auto'} ${!editing && !mutationLocked ? 'pr-9' : 'pr-0.5'}`}>
         {isVeryShortBlock && !editing ? (
           <div className="flex min-w-0 items-center gap-2 leading-tight">
             {isTaskBlock && taskId !== null && (
