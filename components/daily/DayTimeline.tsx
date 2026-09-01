@@ -940,7 +940,7 @@ function ScheduleBlock({
               // строки блока, а не текстовой ролью.
               <button
                 type="button"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-300 transition-colors hover:border-gray-500/30 hover:bg-gray-800"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-300 transition-colors hover:border-gray-500/30 hover:bg-gray-800"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => {
                   e.stopPropagation()
@@ -955,7 +955,7 @@ function ScheduleBlock({
             {isTaskBlock && taskId !== null && !mutationLocked && (
               <button
                 type="button"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-red-300/65 transition-colors hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-red-300/65 transition-colors hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => {
                   e.stopPropagation()
@@ -964,7 +964,7 @@ function ScheduleBlock({
                 title="Удалить задачу"
                 aria-label={`Удалить задачу «${title}» из плана и со шкалы`}
               >
-                <TaskDeleteIcon className="h-4 w-4" />
+                <TaskDeleteIcon className="h-[18px] w-[18px]" />
               </button>
             )}
             <div className="type-secondary shrink-0 font-medium">
@@ -995,7 +995,7 @@ function ScheduleBlock({
               {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
                 <button
                   type="button"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-300 transition-colors hover:border-gray-500/30 hover:bg-gray-800"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-300 transition-colors hover:border-gray-500/30 hover:bg-gray-800"
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation()
@@ -1010,7 +1010,7 @@ function ScheduleBlock({
               {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
                 <button
                   type="button"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-red-300/65 transition-colors hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-red-300/65 transition-colors hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200"
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation()
@@ -1019,7 +1019,7 @@ function ScheduleBlock({
                   title="Удалить задачу"
                   aria-label={`Удалить задачу «${title}» из плана и со шкалы`}
                 >
-                  <TaskDeleteIcon className="h-4 w-4" />
+                  <TaskDeleteIcon className="h-[18px] w-[18px]" />
                 </button>
               )}
             </div>
