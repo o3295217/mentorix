@@ -1659,7 +1659,7 @@ export default function DailyPage() {
                         onDrop={() => {
                           if (!planTaskMutationLocked) handleDrop(task.id)
                         }}
-                        className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
+                        className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors lg:relative lg:flex-nowrap lg:gap-2 ${
                           editingTaskId === task.id ? 'cursor-text' : planTaskMutationLocked ? '' : 'lg:cursor-move'
                         } ${
                       selectedTasks.has(task.id)
@@ -1739,7 +1739,7 @@ export default function DailyPage() {
                         {timeChip && (
                           // Вне шкалы: время без пилюли — интервал и длительность двумя
                           // строками, выровненными по горизонтам рядов пульта 2×2.
-                          <span className="flex flex-col items-end gap-0.5 tabular-nums leading-none lg:gap-1" title={timeChipLabel ?? undefined}>
+                          <span className="task-row-time flex flex-col items-center gap-0.5 tabular-nums leading-none lg:ml-auto lg:gap-1" title={timeChipLabel ?? undefined}>
                             <span className="flex items-center text-sm font-medium text-gray-100 lg:h-8">
                               {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
                             </span>
@@ -1750,7 +1750,7 @@ export default function DailyPage() {
                           </span>
                         )}
 
-                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:relative lg:ml-auto lg:grid lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
+                        <div className="task-card-actions flex w-full flex-wrap items-center justify-end gap-1 border-t border-gray-800 pt-1 lg:absolute lg:right-2 lg:top-1/2 lg:grid lg:w-auto lg:-translate-y-1/2 lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
                         {/* Разделители пульта 2×2: крест, не сходящийся в центре */}
                         {editingTaskId !== task.id && (
                           <>
@@ -2052,7 +2052,7 @@ export default function DailyPage() {
                             ref={activeTaskAction?.taskId === task.id ? activeTaskActionRowRef : undefined}
                             className="relative"
                           >
-                          <div className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border bg-gray-900/80 px-2 py-1 transition-colors lg:flex-nowrap lg:gap-2 ${
+                          <div className={`group flex min-w-0 flex-wrap items-center gap-1 rounded-lg border bg-gray-900/80 px-2 py-1 transition-colors lg:relative lg:flex-nowrap lg:gap-2 ${
                             editingTaskId === task.id
                               ? 'border-primary-500/50 opacity-100'
                               : 'border-gray-700 opacity-50 hover:opacity-70'
@@ -2112,7 +2112,7 @@ export default function DailyPage() {
                               </span>
                             )}
                             {timeChip && (
-                              <span className="flex flex-col items-end gap-0.5 tabular-nums leading-none lg:gap-1" title={timeChipLabel ?? undefined}>
+                              <span className="task-row-time flex flex-col items-center gap-0.5 tabular-nums leading-none lg:ml-auto lg:gap-1" title={timeChipLabel ?? undefined}>
                                 <span className="flex items-center text-sm font-medium text-gray-300 lg:h-8">
                                   {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
                                 </span>
@@ -2122,7 +2122,7 @@ export default function DailyPage() {
                             </span>
                               </span>
                             )}
-                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:relative lg:grid lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
+                            <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:absolute lg:right-2 lg:top-1/2 lg:grid lg:w-auto lg:-translate-y-1/2 lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
                             {/* Две кнопки — одна вертикальная линия-разделитель */}
                             {editingTaskId !== task.id && (
                               <span aria-hidden="true" className="pointer-events-none absolute bottom-1 left-1/2 top-1 hidden w-px -translate-x-1/2 bg-gray-700/50 lg:block" />

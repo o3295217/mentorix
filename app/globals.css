@@ -365,6 +365,12 @@
     transition: opacity 150ms ease;
   }
 
+  /* Время строки плана: в покое занимает правый край; при наведении/фокусе
+     растворяется, уступая место пульту действий (кроссфейд без сдвигов). */
+  .task-row-time {
+    transition: opacity 150ms ease;
+  }
+
   .goal-hover-actions {
     opacity: 1;
     transition: opacity 150ms ease;
@@ -378,6 +384,11 @@
     .group:hover .task-card-actions,
     .group:focus-within .task-card-actions {
       opacity: 1;
+    }
+
+    .group:hover .task-row-time,
+    .group:focus-within .task-row-time {
+      opacity: 0;
     }
 
     .goal-hover-actions {
