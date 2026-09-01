@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DailySchedule } from '@/lib/daily-schedule'
 import type { OpenTask } from '@/lib/types'
 import ScheduleLoadSummary from '@/components/daily/ScheduleLoadSummary'
+import { TaskDeleteIcon } from '@/components/icons'
 import TimeField from '@/components/daily/TimeField'
 import {
   type BlockInput,
@@ -939,30 +940,31 @@ function ScheduleBlock({
               // строки блока, а не текстовой ролью.
               <button
                 type="button"
-                className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-300 transition-colors hover:border-gray-500/30 hover:bg-gray-800"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => {
                   e.stopPropagation()
                   openEditing()
                 }}
+                title="Править задачу"
                 aria-label={`Править задачу «${title}»`}
               >
-                ✎
+                <span aria-hidden="true">✎</span>
               </button>
             )}
             {isTaskBlock && taskId !== null && !mutationLocked && (
               <button
                 type="button"
-                className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-red-400/70 hover:text-red-200"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-red-300/65 transition-colors hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => {
                   e.stopPropagation()
                   onDeleteTask(taskId)
                 }}
-                title="Удалить задачу из плана"
+                title="Удалить задачу"
                 aria-label={`Удалить задачу «${title}» из плана и со шкалы`}
               >
-                🗑
+                <TaskDeleteIcon className="h-4 w-4" />
               </button>
             )}
             <div className="type-secondary shrink-0 font-medium">
@@ -993,31 +995,31 @@ function ScheduleBlock({
               {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
                 <button
                   type="button"
-                  className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-blue-400/70 hover:text-blue-100"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-300 transition-colors hover:border-gray-500/30 hover:bg-gray-800"
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation()
                     openEditing()
                   }}
-                  title="Править"
+                  title="Править задачу"
                   aria-label={`Править задачу «${title}»`}
                 >
-                  ✎
+                  <span aria-hidden="true">✎</span>
                 </button>
               )}
               {!editing && isTaskBlock && taskId !== null && !mutationLocked && (
                 <button
                   type="button"
-                  className="shrink-0 rounded border border-gray-700 px-1.5 py-0.5 text-[11px] font-medium text-gray-300 hover:border-red-400/70 hover:text-red-200"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-red-300/65 transition-colors hover:border-red-400/20 hover:bg-red-500/5 hover:text-red-200"
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation()
                     onDeleteTask(taskId)
                   }}
-                  title="Удалить задачу из плана"
+                  title="Удалить задачу"
                   aria-label={`Удалить задачу «${title}» из плана и со шкалы`}
                 >
-                  🗑
+                  <TaskDeleteIcon className="h-4 w-4" />
                 </button>
               )}
             </div>
