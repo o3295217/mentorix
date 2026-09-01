@@ -111,6 +111,18 @@ export function MealRestIcon(props: IconProps) {
   )
 }
 
+// Секундомер — длительность задачи
+export function TaskDurationIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="13.5" r="7.5" />
+      <path d="M12 10v3.5l2.3 1.4" />
+      <path d="M10 3h4" />
+      <path d="M12 3v3" />
+    </IconBase>
+  )
+}
+
 // Песочные часы — буфер/запас времени дня
 export function BufferTimeIcon(props: IconProps) {
   return (

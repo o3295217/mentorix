@@ -16,7 +16,7 @@ import type { PlanLens } from '@/components/daily/PlanLensSwitch'
 import { isInvalidProposalFallbackMessage, renderAssistantMessageContent } from '@/components/daily/chat-render-helpers'
 import DatePickerWithIndicators from '@/components/DatePickerWithIndicators'
 import CarryoverNotice from '@/components/CarryoverNotice'
-import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskPostponeIcon, TaskRepeatIcon } from '@/components/icons'
+import { CheckIcon, CloseIcon, TaskDeleteIcon, TaskDurationIcon, TaskPostponeIcon, TaskRepeatIcon } from '@/components/icons'
 import UncompletedTasksModal, { TaskDecision, UncompletedTask } from '@/components/UncompletedTasksModal'
 import { areTasksSimilar } from '@/lib/task-match'
 import { FetchJsonError, fetchJson, getFetchErrorMessage } from '@/lib/fetch-json'
@@ -1743,7 +1743,10 @@ export default function DailyPage() {
                             <span className="flex items-center text-sm font-medium text-gray-100 lg:h-8">
                               {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
                             </span>
-                            <span className="flex items-center justify-center text-sm font-medium text-gray-300 lg:h-8">{formatDurationLabel(timeChip.totalMinutes)}</span>
+                            <span className="flex items-center justify-center gap-1 text-sm font-medium text-gray-300 lg:h-8">
+                              <TaskDurationIcon className="h-3.5 w-3.5 text-gray-500" />
+                              {formatDurationLabel(timeChip.totalMinutes)}
+                            </span>
                           </span>
                         )}
 
@@ -2113,7 +2116,10 @@ export default function DailyPage() {
                                 <span className="flex items-center text-sm font-medium text-gray-300 lg:h-8">
                                   {timeChip.extraCount > 0 ? `${timeChip.label} +${timeChip.extraCount}` : timeChip.label}
                                 </span>
-                                <span className="flex items-center justify-center text-sm font-medium text-gray-300 lg:h-8">{formatDurationLabel(timeChip.totalMinutes)}</span>
+                                <span className="flex items-center justify-center gap-1 text-sm font-medium text-gray-300 lg:h-8">
+                              <TaskDurationIcon className="h-3.5 w-3.5 text-gray-500" />
+                              {formatDurationLabel(timeChip.totalMinutes)}
+                            </span>
                               </span>
                             )}
                             <div className="task-card-actions flex w-full flex-wrap justify-end gap-1 border-t border-gray-800 pt-1 lg:relative lg:grid lg:w-auto lg:grid-cols-2 lg:gap-1 lg:border-0 lg:pt-0">
