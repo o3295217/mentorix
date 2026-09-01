@@ -2448,7 +2448,8 @@ export default function DailyPage() {
                 )
               })
             )}
-            {showChatProcessingPlaceholder && (
+            {/* При пустой ленте индикатор уже отрисован веткой выше — не дублируем */}
+            {chatMessages.length > 0 && showChatProcessingPlaceholder && (
               <ChatProcessingIndicator text={getChatProcessingPlaceholderText(applyingProposalId)} />
             )}
           </div>
