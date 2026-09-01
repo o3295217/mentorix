@@ -34,7 +34,7 @@ import { sendDailyChatWithPreconditions } from '@/hooks/daily/chat-submit-helper
 import { buildApplyProposalRequestBody, buildProposalApplyOptions, applyDailyScheduleProposal, findLatestUnappliedScheduleProposal, getProposalNewTasks, parsePersistedNumericMessageId, type ProposalApplyOptions } from '@/hooks/daily/proposal-helpers'
 import { getTaskTimeChipLabel, getTaskTimeChips, sortTasksByScheduleTime } from '@/hooks/daily/list-lens-helpers'
 import { countSavedPlanTasks, getDailyPhase } from '@/hooks/daily/phase-helpers'
-import { getScheduleBoundaryMinutes } from '@/hooks/daily/schedule-helpers'
+import { getScheduleBoundaryMinutes, isTaskScheduleBlock } from '@/hooks/daily/schedule-helpers'
 import { selectStrictScheduleConfirmationProposal } from '@/hooks/daily/schedule-confirmation-helpers'
 import { useChatAutoScroll } from '@/hooks/useChatAutoScroll'
 import type { FactItem, Habit } from '@/hooks/daily/types'
@@ -990,6 +990,27 @@ export default function DailyPage() {
     const boundaries = getScheduleBoundaryMinutes(schedule)
     return { startMinutes: boundaries.planningStartMinutes, endMinutes: boundaries.workEndMinutes }
   }, [schedule])
+
+  // Метрики шапки: остаток рабочего окна (только для сегодня, при наличии
+  // расписания) и сумма времени НЕвыполненных задач на шкале — без еды,
+  // перерывов и буферов. Пара отвечает на вопрос «влезает ли работа в остаток».
+  const headerWorkRemainingMinutes = useMemo(() => {
+    if (!schedule || selectedDate !== todayDateKey) return null
+    return Math.max(0, getScheduleBoundaryMinutes(schedule).workEndMinutes - currentMinutes)
+  }, [schedule, selectedDate, todayDateKey, currentMinutes])
+  const headerScheduledTasks = useMemo(() => {
+    if (!schedule) return null
+    let minutes = 0
+    const taskIndexes = new Set<number>()
+    for (const block of schedule.blocks) {
+      if (!isTaskScheduleBlock(block)) continue
+      const task = tasks[block.taskIndex - 1]
+      if (task && selectedTasks.has(task.id)) continue
+      minutes += block.durationMinutes
+      taskIndexes.add(block.taskIndex)
+    }
+    return minutes > 0 ? { count: taskIndexes.size, minutes } : null
+  }, [schedule, tasks, selectedTasks])
   const dailyPhase = getDailyPhase({
     selectedDate,
     todayDate: todayDateKey,
@@ -1275,6 +1296,8 @@ export default function DailyPage() {
         >
           <DailyPlanCardHeader
             currentTime={currentTime}
+            workRemainingMinutes={headerWorkRemainingMinutes}
+            scheduledTasks={headerScheduledTasks}
             completedCount={workCompletedCount}
             totalCount={workTotalCount}
             completionPercent={workCompletionPercent}
