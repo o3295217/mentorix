@@ -24,8 +24,9 @@ describe('daily list lens helpers', () => {
   it('builds first time chip with extra block count', () => {
     const chips = getTaskTimeChips(schedule)
 
-    expect(getTaskTimeChipLabel(chips.get(1))).toBe('09:00–09:45')
-    expect(getTaskTimeChipLabel(chips.get(2))).toBe('10:00–10:30 +1')
+    expect(getTaskTimeChipLabel(chips.get(1))).toBe('09:00–09:45 · 45 мин')
+    // Длительность в чипе — суммарная по всем блокам задачи (30 + 30)
+    expect(getTaskTimeChipLabel(chips.get(2))).toBe('10:00–10:30 +1 · 1 ч')
   })
 
   it('sorts tasks by first scheduled block and keeps unscheduled tasks last', () => {

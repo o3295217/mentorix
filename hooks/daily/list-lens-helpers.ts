@@ -1,11 +1,13 @@
 import type { DailySchedule } from '@/lib/daily-schedule'
 import type { OpenTask } from '@/lib/types'
-import { isTaskScheduleBlock, minutesToTimeLabel } from './schedule-helpers'
+import { formatDurationLabel, isTaskScheduleBlock, minutesToTimeLabel } from './schedule-helpers'
 
 export type TaskTimeChip = {
   label: string
   extraCount: number
   firstStartMinutes: number
+  /** Суммарная длительность всех блоков задачи, мин */
+  totalMinutes: number
 }
 
 export function getTaskTimeChips(schedule: DailySchedule | null): Map<number, TaskTimeChip> {
@@ -28,6 +30,7 @@ export function getTaskTimeChips(schedule: DailySchedule | null): Map<number, Ta
       label: `${minutesToTimeLabel(first.startMinutes)}–${minutesToTimeLabel(first.endMinutes)}`,
       extraCount: Math.max(0, sorted.length - 1),
       firstStartMinutes: first.startMinutes,
+      totalMinutes: sorted.reduce((sum, b) => sum + (b.endMinutes - b.startMinutes), 0),
     })
   }
   return chips
@@ -48,5 +51,6 @@ export function sortTasksByScheduleTime(tasks: OpenTask[], chips: Map<number, Ta
 
 export function getTaskTimeChipLabel(chip: TaskTimeChip | undefined): string | null {
   if (!chip) return null
-  return chip.extraCount > 0 ? `${chip.label} +${chip.extraCount}` : chip.label
+  const interval = chip.extraCount > 0 ? `${chip.label} +${chip.extraCount}` : chip.label
+  return `${interval} · ${formatDurationLabel(chip.totalMinutes)}`
 }
