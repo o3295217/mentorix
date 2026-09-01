@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 2026-09-01 — docs: changelog (hook)
+- 📝 Документация: 1 файлов
+
+
 ### 2026-09-01 — refactor(goals): единая модель целей — запись Goal с id как источник правды
 - 🔌 API: 4 файлов (route, route, route...)
 - 🧩 Компоненты: 1 файлов (CarryoverNotice)
